@@ -7,7 +7,7 @@ long_window = 26
 signal_window = 9
 
 
-file_path = '/home/zs/workspace/exp/quent/data/510880.csv'
+file_path = 'data/510880.csv'
 df = pd.read_csv(file_path)
 df.columns = ['datetime','open','high','low','close','volume','amount']
 df.set_index('datetime', inplace=True)
