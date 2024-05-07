@@ -31,6 +31,10 @@ class DataSource:
 
         self.data = self._load_csv()
         self._preprocess()
+
+        self.min_values = self.data.min()
+        self.max_values = self.data.max()
+        print(self.data)
         # self.data.set_index('trade_date').sort_index().dropna()
         
         # print(len(self.data.index) - self.trading_days)
@@ -68,9 +72,9 @@ class DataSource:
         df = self.data
         df['amplitude'] = ((df['high'] - df['low']) / df['close'].shift(1))
         df['returns'] = np.log(df['close'] / df['close'].shift(1))
-        df['ret_2'] = df['close'].pct_change(2)
-        df['ret_5'] = df['close'].pct_change(5)
-        df['ret_21'] = df['close'].pct_change(21)
+        df['ret_2'] = np.log(df['close'] / df['close'].shift(2))
+        df['ret_5'] = np.log(df['close'] / df['close'].shift(5))
+        df['ret_21'] = np.log(df['close'] / df['close'].shift(21))
         df.dropna(inplace=True)
         return df
         
@@ -107,5 +111,9 @@ class DataSource:
 
 if __name__ == '__main__':
     ds = DataSource('510880')
-    for i in range(10):
-        print(ds.step())
+    # print(ds.get_data())
+    df = ds.get_data()
+    # print(df['returns'])
+    print(np.exp(df['returns'].sum()))
+    # for i in range(10):
+    #     print(ds.step())
