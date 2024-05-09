@@ -6,6 +6,8 @@ import torch.nn as nn
 import torch
 import torch.nn.functional as F
 from loguru import logger
+import matplotlib.pyplot as plt
+
 
 from market_env import MarketEnv
 
@@ -71,9 +73,6 @@ class DDQNAgent:
                                     lr=self.learning_rate,
                                     weight_decay=self.weight_decay)
 
-    def update_target(self):
-        self.target_net.load_state_dict(self.policy_net.state_dict())
-
     def select_action(self, state):
         self.total_steps += 1
         if np.random.rand() < self.epsilon:
@@ -117,7 +116,13 @@ class DDQNAgent:
             self.target_net.load_state_dict(self.policy_net.state_dict())
         self.total_steps += 1
 
-        
+
+    def load(self,name):
+        self.policy_net = torch.load(name).to(self.device)
+        self.target_net = torch.load(name).to(self.device)
+                
+    def save(self,name):
+        torch.save(self.target_net, f'{name}.pth')
     # def experience_replay(self):
     #     if self.batch_size > len(self.experience):
     #         return
@@ -149,7 +154,8 @@ class DDQNAgent:
     #     if self.total_steps % self.tau == 0:
     #         self.update_target()
 
-if __name__ == '__main__':
+
+def train():
     env = MarketEnv(252)
     input_size = env.observation_space.shape[0]
     output_size = env.action_space.n
@@ -157,6 +163,8 @@ if __name__ == '__main__':
     hidden_dim = 128
     agent = DDQNAgent(input_size, hidden_dim, output_size)
     num_episodes = 1000
+    market_return_vis = []
+    strategy_return_vis = []
     for episode in range(num_episodes):
         state = env.reset()
         total_reward = 0
@@ -169,6 +177,62 @@ if __name__ == '__main__':
             state = next_state
             total_reward += reward
             agent.train()
+        if episode % 100 == 0:
+            agent.save(f'ddqn-{episode}')
         tot_ret = env.result()
+        market_return_vis.append(round(tot_ret['market_return']*100 - 100,2))
+        strategy_return_vis.append(round(tot_ret['strategy_return']*100 - 100,2))
         logger.info(f'Episode: {episode+1} | Total Reward: {total_reward} | market_return: {round(tot_ret['market_return']*100 - 100,2) }% | strategy_return: {round(tot_ret['strategy_return']*100 - 100,2)}%')
-        # print(f"Episode: {episode+1}, Total Reward: {total_reward}")
+
+    # 创建折线图
+    plt.plot(market_return_vis, label='Market Return')
+    plt.plot(strategy_return_vis, label='Strategy Return')
+
+    # 添加图例，位于最佳位置（可选）
+    plt.legend(loc='best')
+
+    # 添加标题和轴标签
+    plt.title("Market vs Strategy Returns")
+    plt.xlabel("Time")
+    plt.ylabel("Returns")
+
+    # 显示网格（可选）
+    plt.grid(True)
+    
+    plt.savefig('return_comparison.png', dpi=300, bbox_inches='tight')
+
+    # 显示图形
+    # plt.show()
+
+
+def valid(filename):
+    seed = 0
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
+    # env.seed(seed)  # 如果环境提供seed()方法
+
+    env = MarketEnv(252,start_date='20220101',end_date='20230501')
+    input_size = env.observation_space.shape[0]
+    output_size = env.action_space.n
+    hidden_dim = 128
+    agent = DDQNAgent(input_size, hidden_dim, output_size)
+    # agent.load(filename)
+    state = env.reset()
+    total_reward = 0
+    done = False
+    while not done:
+        action = agent.select_action(state)
+        print(action)
+        next_state, reward, done,_ = env.step(action)
+        # print(reward)
+        # agent.buffer.push(state, action, reward, next_state, done)
+        state = next_state
+        total_reward += reward
+    tot_ret = env.result()
+    logger.info(f'Total Reward: {total_reward} | market_return: {round(tot_ret['market_return']*100 - 100,2) }% | strategy_return: {round(tot_ret['strategy_return']*100 - 100,2)}%')
+
+    
+if __name__ == '__main__':
+    # valid("ddqn-600.pth")
+    train()
