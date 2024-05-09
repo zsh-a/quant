@@ -3,8 +3,9 @@ import gymnasium as gym
 import numpy as np
 from data_source import DataSource
 
+INF = 1e9
 class MarketEnv(gym.Env):
-    def __init__(self,num_step,code='510880',start_date='20150101',end_date='20231231') -> None:
+    def __init__(self,num_step,code='510880',start_date='20150701',end_date='20160901') -> None:
         super().__init__()
         
         self.data_source = DataSource(code=code,trading_days=num_step,start_date=start_date,end_date=end_date)
@@ -32,7 +33,6 @@ class MarketEnv(gym.Env):
         
         self.actions[self.cur_step] = action
         start_position = self.positions[self.cur_step - 1]
-        start_nav = self.navs[self.cur_step - 1]
         end_position = action - 1
         n_trades = end_position - start_position
         self.positions[self.cur_step] = end_position

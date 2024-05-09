@@ -14,7 +14,7 @@ def data_preprocess(file_path):
         file.writelines(lines)
 
 class DataSource:
-    def __init__(self,code,trading_days=252,start_date='20150101',end_date='20231231') -> None:
+    def __init__(self,code,trading_days=252,start_date='20150701',end_date='20180701') -> None:
 
         self.file_path = f'data/{code}.csv'
         if not os.path.exists(self.file_path):
