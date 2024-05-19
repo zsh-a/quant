@@ -40,8 +40,8 @@ class MarketEnv(gym.Env):
         trade_cost = abs(n_trades) * self.trading_cost_bps
         self.costs[self.cur_step] = trade_cost
         
-        obs,done = self.data_source.step()
-        market_return = obs['returns']
+        obs,done,ori_obs = self.data_source.step()
+        market_return = ori_obs['returns']
         self.market_returns[self.cur_step] = market_return
         
         # reward
@@ -51,7 +51,8 @@ class MarketEnv(gym.Env):
         
         info = {
             'reward': reward,
-            'costs': self.costs[self.cur_step]
+            'costs': self.costs[self.cur_step],
+            'ori_obs' : ori_obs
         }
         self.cur_step += 1
         return obs.values,reward,done,info
@@ -70,7 +71,7 @@ class MarketEnv(gym.Env):
         self.trades.fill(0)
         self.market_returns.fill(0)
         self.data_source.reset()
-        obs,done = self.data_source.step()
+        obs,done,ori_obs = self.data_source.step()
         return obs.values
 
 
