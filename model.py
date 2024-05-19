@@ -162,7 +162,7 @@ def train():
     print(input_size,output_size)
     hidden_dim = 128
     agent = DDQNAgent(input_size, hidden_dim, output_size)
-    num_episodes = 1000
+    num_episodes = 300
     market_return_vis = []
     strategy_return_vis = []
     for episode in range(num_episodes):
@@ -171,7 +171,7 @@ def train():
         done = False
         while not done:
             action = agent.select_action(state)
-            next_state, reward, done,_ = env.step(action)
+            next_state, reward, done,info = env.step(action)
             # print(reward)
             agent.buffer.push(state, action, reward, next_state, done)
             state = next_state

@@ -30,10 +30,13 @@ class DataSource:
         self.offset = 0
 
         self.data = self._load_csv()
-        self._preprocess()
 
+        self._preprocess()
+        self.origin_data = self.data
         self.min_values = self.data.min()
         self.max_values = self.data.max()
+        self._normilize()
+        print(self.origin_data)
         print(self.data)
         # self.data.set_index('trade_date').sort_index().dropna()
         
@@ -46,27 +49,18 @@ class DataSource:
 
         
     def step(self):
-        obs = self.data.iloc[self.offset + self.cur_step]
+        obs,ori_obs = self.data.iloc[self.offset + self.cur_step],self.origin_data.iloc[self.offset + self.cur_step]
         self.cur_step += 1
         done = self.cur_step > self.trading_days
-        return obs,done
+        return obs,done,ori_obs
     
     def get_data(self):
         return self.data
 
-    def normilize(df):
-        for col in feature_columns:
-            df.loc[:,col] = (df[col] - df[col].min()) / (df[col].max() - df[col].min())
-
-        df.loc[:,'returns_5d'] = (df['returns_5d'] - df['returns_5d'].min()) / (df['returns_5d'].max() - df['returns_5d'].min())
-        # print(df)
-        X = []
-        Y = []
-        for i in range(len(df) - PREDICT_KS - FEATURE_KS):
-            X.append(df[feature_columns].iloc[i:i + FEATURE_KS].values)
-            # Y.append(df['returns_5d'].iloc[i + FEATURE_KS])
-            Y.append(df['label'].iloc[i + FEATURE_KS])
-        return np.array(X),np.array(Y)
+    def _normilize(self):
+        def min_max_scaling(column):
+            return (column - column.min()) / (column.max() - column.min())
+        self.data = self.data.apply(min_max_scaling)
         
     def _preprocess(self):
         df = self.data
