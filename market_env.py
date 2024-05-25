@@ -16,7 +16,7 @@ class MarketEnv(gym.Env):
         
         self.num_step = num_step
 
-        self.trading_cost_bps = 1e-4
+        self.trading_cost_bps = 1e-3
         # state
         self.cur_step = 1
         self.actions = np.zeros(self.num_step + 1)
@@ -30,23 +30,26 @@ class MarketEnv(gym.Env):
 
     def step(self, action: Any) -> Tuple[Any | SupportsFloat | bool | dict[str, Any]]:
         assert self.action_space.contains(action)
-        
-        self.actions[self.cur_step] = action
+        self.actions[self.cur_step] = action - 1
         start_position = self.positions[self.cur_step - 1]
-        end_position = action - 1
-        n_trades = end_position - start_position
-        self.positions[self.cur_step] = end_position
+        position = start_position + action - 1
+        obs,done,ori_obs = self.data_source.step()
+        if position >= 0 and position <=1:
+            n_trades = action - 1
+        else:
+            n_trades = 0
+        position = np.clip(position,0,1)
+
+        self.positions[self.cur_step] = position
         self.trades[self.cur_step] = n_trades
         trade_cost = abs(n_trades) * self.trading_cost_bps
         self.costs[self.cur_step] = trade_cost
-        
-        obs,done,ori_obs = self.data_source.step()
         market_return = ori_obs['returns']
         self.market_returns[self.cur_step] = market_return
-        
         # reward
-        reward = start_position * market_return - self.costs[self.cur_step - 1]
-
+        # reward = start_position * market_return - self.costs[self.cur_step - 1]
+        reward = position * market_return - trade_cost
+        
         self.strategy_returns[self.cur_step] = reward
         
         info = {
@@ -60,7 +63,8 @@ class MarketEnv(gym.Env):
     def result(self):
         return {
             "market_return" : np.exp(sum(self.market_returns)),
-            "strategy_return" : np.exp(sum(self.strategy_returns))
+            "strategy_return" : np.exp(sum(self.strategy_returns)),
+            "actions":self.actions
         }
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> Tuple[Any, dict]:
         self.cur_step = 1
