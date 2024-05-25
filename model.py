@@ -162,7 +162,7 @@ def train():
     print(input_size,output_size)
     hidden_dim = 128
     agent = DDQNAgent(input_size, hidden_dim, output_size)
-    num_episodes = 300
+    num_episodes = 500
     market_return_vis = []
     strategy_return_vis = []
     for episode in range(num_episodes):
@@ -183,7 +183,8 @@ def train():
         market_return_vis.append(round(tot_ret['market_return']*100 - 100,2))
         strategy_return_vis.append(round(tot_ret['strategy_return']*100 - 100,2))
         logger.info(f'Episode: {episode+1} | Total Reward: {total_reward} | market_return: {round(tot_ret['market_return']*100 - 100,2) }% | strategy_return: {round(tot_ret['strategy_return']*100 - 100,2)}%')
-
+        if episode % 100 == 0:
+            logger.info(f'{tot_ret['actions']}') 
     # 创建折线图
     plt.plot(market_return_vis, label='Market Return')
     plt.plot(strategy_return_vis, label='Strategy Return')

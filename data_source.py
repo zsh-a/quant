@@ -66,9 +66,28 @@ class DataSource:
         df = self.data
         df['amplitude'] = ((df['high'] - df['low']) / df['close'].shift(1))
         df['returns'] = np.log(df['close'] / df['close'].shift(1))
-        df['ret_2'] = np.log(df['close'] / df['close'].shift(2))
-        df['ret_5'] = np.log(df['close'] / df['close'].shift(5))
-        df['ret_21'] = np.log(df['close'] / df['close'].shift(21))
+        # df['ret_2'] = np.log(df['close'] / df['close'].shift(2))
+        # df['ret_5'] = np.log(df['close'] / df['close'].shift(5))
+        # df['ret_21'] = np.log(df['close'] / df['close'].shift(21))
+
+
+        short_window = 12
+        long_window = 26
+        signal_window = 9
+
+        # 计算短期EMA和长期EMA
+        df["EMA_12"] = df["close"].ewm(span=short_window, adjust=False).mean()
+        df["EMA_26"] = df["close"].ewm(span=long_window, adjust=False).mean()
+
+        # 计算MACD值
+        df["MACD"] = df["EMA_12"] - df["EMA_26"]
+
+        # 计算信号线
+        df["Signal_Line"] = df["MACD"].ewm(span=signal_window, adjust=False).mean()
+
+        # MACD Histogram，可选，代表MACD与信号线之间的差值
+        df["MACD_Histogram"] = df["MACD"] - df["Signal_Line"]
+
         df.dropna(inplace=True)
         return df
         
