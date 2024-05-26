@@ -38,6 +38,7 @@ class DataSource:
         self._normilize()
         print(self.origin_data)
         print(self.data)
+        print(len(self.data))
         # self.data.set_index('trade_date').sort_index().dropna()
         
         # print(len(self.data.index) - self.trading_days)
@@ -88,8 +89,25 @@ class DataSource:
         # MACD Histogram，可选，代表MACD与信号线之间的差值
         df["MACD_Histogram"] = df["MACD"] - df["Signal_Line"]
 
+        # 计算每日价格变化
+        df['Price Change'] = df['close'].diff()
+
+        # 计算增益和损失
+        window_length = 6
+        df['Gain'] = df['Price Change'].apply(lambda x: x if x > 0 else 0)
+        df['Loss'] = df['Price Change'].apply(lambda x: -x if x < 0 else 0)
+
+        # 计算平均增益和平均损失
+        df['Avg Gain'] = df['Gain'].rolling(window=window_length, min_periods=1).mean()
+        df['Avg Loss'] = df['Loss'].rolling(window=window_length, min_periods=1).mean()
+
+        # 计算RS和RSI
+        df['RS'] = df['Avg Gain'] / df['Avg Loss']
+        df['RSI'] = 100 - (100 / (1 + df['RS']))
+
+
         df.dropna(inplace=True)
-        return df
+        self.data = df[['amplitude','returns','MACD','Signal_Line','RSI']]
         
     def _load_csv(self):
         df = pd.read_csv(self.file_path)
