@@ -3,6 +3,7 @@ import gymnasium as gym
 import numpy as np
 from data_source import DataSource
 
+from utils import *
 INF = 1e9
 class MarketEnv(gym.Env):
     def __init__(self,num_step,code='510880',start_date='20150701',end_date='20160901') -> None:
@@ -24,7 +25,7 @@ class MarketEnv(gym.Env):
         self.navs = np.ones(self.num_step + 1)
         self.trades = np.zeros(self.num_step + 1)
         self.costs = np.zeros(self.num_step + 1)
-        self.strategy_returns = np.ones(self.num_step + 1)
+        self.strategy_returns = np.zeros(self.num_step + 1)
         self.market_returns = np.zeros(self.num_step + 1)
 
 
@@ -39,7 +40,6 @@ class MarketEnv(gym.Env):
         else:
             n_trades = 0
         position = np.clip(position,0,1)
-
         self.positions[self.cur_step] = position
         self.trades[self.cur_step] = n_trades
         trade_cost = abs(n_trades) * self.trading_cost_bps
@@ -48,9 +48,11 @@ class MarketEnv(gym.Env):
         self.market_returns[self.cur_step] = market_return
         # reward
         # reward = start_position * market_return - self.costs[self.cur_step - 1]
-        reward = position * market_return - trade_cost
+        reward = position * market_return
+        if position == 0.:
+            reward = -market_return
         
-        self.strategy_returns[self.cur_step] = reward
+        self.strategy_returns[self.cur_step] = position * market_return
         
         info = {
             'reward': reward,
@@ -60,11 +62,19 @@ class MarketEnv(gym.Env):
         self.cur_step += 1
         return obs.values,reward,done,info
 
+
+
     def result(self):
         return {
-            "market_return" : np.exp(sum(self.market_returns)),
-            "strategy_return" : np.exp(sum(self.strategy_returns)),
-            "actions":self.actions
+            "market_return" : log2percent(np.exp(sum(self.market_returns))),
+            "strategy_return" : log2percent(np.exp(sum(self.strategy_returns))),
+            "max_drawdown": log2percent(np.exp(np.min(np.cumsum(self.strategy_returns)))),
+            "max_profit": log2percent(np.exp(np.max(np.cumsum(self.strategy_returns)))),
+            "actions":self.actions,
+            'positions': self.positions,
+            'actions':self.actions,
+            'strategy_returns': self.strategy_returns,
+            'market_returns': self.market_returns
         }
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> Tuple[Any, dict]:
         self.cur_step = 1
