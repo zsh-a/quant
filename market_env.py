@@ -51,6 +51,8 @@ class MarketEnv(gym.Env):
         reward = position * market_return
         if position == 0.:
             reward = -market_return
+        if reward < 0:
+            reward *= 10
         
         self.strategy_returns[self.cur_step] = position * market_return
         
