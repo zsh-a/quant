@@ -2,6 +2,7 @@ from loguru import logger
 import re,os
 import pandas as pd
 import numpy as np
+import matplotlib.pyplot as plt
 
 def data_preprocess(file_path):
     with open(file_path, 'r',errors="ignore") as file:
@@ -39,18 +40,20 @@ class DataSource:
         print(self.origin_data)
         print(self.data)
         print(len(self.data))
+
+        self.seq_len = 20
         # self.data.set_index('trade_date').sort_index().dropna()
         
         # print(len(self.data.index) - self.trading_days)
 
 
     def reset(self):
-        self.offset = np.random.randint(0,len(self.data.index) - self.trading_days)
+        self.offset = np.random.randint(self.seq_len,len(self.data.index) - self.trading_days)
         self.cur_step = 0
 
         
     def step(self):
-        obs,ori_obs = self.data.iloc[self.offset + self.cur_step],self.origin_data.iloc[self.offset + self.cur_step]
+        obs,ori_obs = self.data.iloc[self.offset + self.cur_step - self.seq_len:self.offset + self.cur_step],self.origin_data.iloc[self.offset + self.cur_step]
         self.cur_step += 1
         done = self.cur_step > self.trading_days
         return obs,done,ori_obs
@@ -71,6 +74,24 @@ class DataSource:
         # df['ret_5'] = np.log(df['close'] / df['close'].shift(5))
         # df['ret_21'] = np.log(df['close'] / df['close'].shift(21))
 
+        # df['moving_average'] = df['close'].rolling(window=21).mean()
+        # df['MA5'] = df['close'].rolling(window=5).mean()
+        # df['MA10'] = df['close'].rolling(window=10).mean()
+        # df['MA20'] = df['close'].rolling(window=20).mean()
+        # df['MA30'] = df['close'].rolling(window=30).mean()
+
+        # plt.figure(figsize=(10, 6))
+        # # plt.plot(df.index, df['close'], label='Price')
+        # plt.plot(df.index, df['MA5'], label='Moving Average')
+        # plt.plot(df.index, df['MA10'], label='MA21')
+        # plt.plot(df.index, df['MA20'], label='MA21')
+        # plt.plot(df.index, df['MA60'], label='MA21')
+        # plt.title('Price and Moving Average')
+        # plt.xlabel('Date')
+        # plt.ylabel('Price')
+        # plt.legend()
+        # plt.grid(True)
+        # plt.show()
 
         short_window = 12
         long_window = 26
@@ -107,7 +128,8 @@ class DataSource:
 
 
         df.dropna(inplace=True)
-        self.data = df[['amplitude','returns','MACD','Signal_Line','RSI']]
+        self.data = df[['amplitude','returns','MACD_Histogram','RSI']]
+        # self.data = df[['MA5','returns','MA10','MA20','MA30']]
         
     def _load_csv(self):
         df = pd.read_csv(self.file_path)
@@ -142,9 +164,9 @@ class DataSource:
 
 if __name__ == '__main__':
     ds = DataSource('510880')
+    ds.reset()
     # print(ds.get_data())
-    df = ds.get_data()
     # print(df['returns'])
-    print(np.exp(df['returns'].sum()))
+    print(ds.step())
     # for i in range(10):
     #     print(ds.step())

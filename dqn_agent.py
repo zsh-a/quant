@@ -18,7 +18,7 @@ from utils import *
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
-BATCH_SIZE = 32
+BATCH_SIZE = 128
 
 GAMMA = 0.99
 EPS_START = 0.9
@@ -112,7 +112,7 @@ class DQNAgent:
         eps_threshold = EPS_END + (EPS_START - EPS_END) * np.exp(-1. * self.total_steps / EPS_DECAY)
         # print(eps_threshold)
         self.total_steps +=1 
-        print(eps_threshold)
+        # print(eps_threshold)
         if self.train_mode and np.random.rand() < eps_threshold:
             return random.randrange(self.num_actions)
         with torch.no_grad():
@@ -211,7 +211,7 @@ class DQNAgent:
         done_batch = torch.BoolTensor(done).to(self.device)
         state_action_values = self.policy_net(state_batch).gather(1, action_batch.unsqueeze(1))
 
-        next_state_values = torch.zeros(BATCH_SIZE)
+        next_state_values = torch.zeros(BATCH_SIZE,device=self.device)
         with torch.no_grad():
             next_state_values[~done_batch] = self.target_net(next_state_batch[~done_batch]).max(1).values
         
