@@ -90,7 +90,7 @@ def valid(filename):
     random.seed(seed)
     # env.seed(seed)  # 如果环境提供seed()方法
 
-    env = gym.make("CartPole-v1",render_mode="human")
+    env = gym.make("CartPole-v1")
     input_size = env.observation_space.shape[0]
     output_size = env.action_space.n
     # print(input_size,output_size)

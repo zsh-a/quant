@@ -6,7 +6,7 @@ from data_source import DataSource
 from utils import *
 INF = 1e9
 class MarketEnv(gym.Env):
-    def __init__(self,num_step,code='510880',start_date='20150701',end_date='20160901') -> None:
+    def __init__(self,num_step,code='510880',start_date='20140701',end_date='20160901') -> None:
         super().__init__()
         
         self.data_source = DataSource(code=code,trading_days=num_step,start_date=start_date,end_date=end_date)
@@ -51,8 +51,6 @@ class MarketEnv(gym.Env):
         reward = position * market_return
         if position == 0.:
             reward = -market_return
-        if reward < 0:
-            reward *= 10
         
         self.strategy_returns[self.cur_step] = position * market_return
         
@@ -93,6 +91,7 @@ class MarketEnv(gym.Env):
 
 if __name__ == '__main__':
     env = MarketEnv(252)
+    env.reset()
     print(env.step(2))
     print(env.step(1))
     print(env.step(1))
