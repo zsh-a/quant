@@ -63,7 +63,7 @@ policy_net = PolicyNetwork(input_dim, hidden_dim, output_dim).to(device)
 optimizer = optim.Adam(policy_net.parameters(), lr=learning_rate)
 
 # 训练策略网络
-num_episodes = 1000
+num_episodes = 2000
 for episode in range(num_episodes):
     state = env.reset()
     state = state[0]
@@ -97,16 +97,16 @@ for episode in range(num_episodes):
     
     if episode % 100 == 0:
         print(f'Episode {episode}, Last length: {len(rewards)}')
-        eval_env = gym.make('CartPole-v1',render_mode='human')
-        state = eval_env.reset()
-        state = state[0]
-        done = False
+        # eval_env = gym.make('CartPole-v1',render_mode='human')
+        # state = eval_env.reset()
+        # state = state[0]
+        # done = False
     
-        while not done:
-            action, log_prob = select_action(policy_net, state)
-            new_state, reward, done, truncated,_ = eval_env.step(action)
-            done = done or truncated
-            state = new_state
+        # while not done:
+        #     action, log_prob = select_action(policy_net, state)
+        #     new_state, reward, done, truncated,_ = eval_env.step(action)
+        #     done = done or truncated
+        #     state = new_state
 
 
 env.close()
