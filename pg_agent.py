@@ -8,6 +8,9 @@ from market_env import MarketEnv
 import utils
 from loguru import logger
 
+from torch.utils.tensorboard import SummaryWriter
+writer = SummaryWriter()
+
 
 # SEED = 1
 # torch.manual_seed(SEED)
@@ -214,6 +217,11 @@ if __name__ == '__main__':
 
         if episode % 10 == 0:
             ret = env.result()
+            writer.add_scalar("reward", sum(rewards), episode)
+            writer.add_scalar("market_return", ret['market_return'], episode)
+            writer.add_scalar("strategy_return", ret['strategy_return'], episode)
+            writer.add_scalar("max_profit", ret['max_profit'], episode)
+            writer.add_scalar("max_drawdown", ret['max_drawdown'], episode)
             logger.info(f'episode : {episode} | Total Reward: {sum(rewards)} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |  position : {np.array(ret['positions'])} | actions : {np.array(ret['actions'])}')
         if episode % 100 == 0:
             name = f'pg-{episode}'
