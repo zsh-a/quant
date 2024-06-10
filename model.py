@@ -106,30 +106,38 @@ def base_policy():
 
         def __init__(self) -> None:
             self.last_state = None
+            self.last_rsi = None
 
         def select_action(self, state):
             val = state[2]
+            rsi = state[3]
+            ret = 1
             if self.last_state is None:
                 self.last_state = val
+                self.last_rsi = rsi
                 return 1
 
             if val > self.last_state:
-                return 2
+                ret = 2
             else:
-                return 0
+                ret = 0
+            self.last_state = val
+            self.last_rsi = rsi
+            return ret
 
-    seed = 0
-    torch.manual_seed(seed)
-    np.random.seed(seed)
-    random.seed(seed)
+    # seed = 0
+    # torch.manual_seed(seed)
+    # np.random.seed(seed)
+    # random.seed(seed)
     # env.seed(seed)  # 如果环境提供seed()方法
     agent = BaseAgent()
-    env = MarketEnv(240,start_date='20230401',end_date='20240401')
+    env = MarketEnv(252,start_date='20100401',end_date='20240401')
     state = env.reset()
     total_reward = 0
     done = False
     while not done:
-        action = agent.select_action(state)
+        # print(state[0])
+        action = agent.select_action(state[0])
         next_state, reward, done,_ = env.step(action)
         # print(reward)
         # agent.buffer.push(state, action, reward, next_state, done)
@@ -152,5 +160,5 @@ def base_policy():
 
 if __name__ == '__main__':
     # valid("ddqn-600.pth")
-    train()
-    # base_policy()
+    # train()
+    base_policy()

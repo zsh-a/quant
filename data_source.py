@@ -36,7 +36,7 @@ class DataSource:
         self.origin_data = self.data
         self.min_values = self.data.min()
         self.max_values = self.data.max()
-        self._normilize()
+        # self._normilize()
 
         # print(self.origin_data)
         # print(self.data)
@@ -55,7 +55,7 @@ class DataSource:
 
         
     def step(self):
-        obs,ori_obs = self.data.iloc[self.offset + self.cur_step - self.seq_len:self.offset + self.cur_step + 1],self.origin_data.iloc[self.offset + self.cur_step]
+        obs,ori_obs = self.data.iloc[self.offset + self.cur_step],self.origin_data.iloc[self.offset + self.cur_step]
         self.cur_step += 1
         done = self.cur_step > self.trading_days
         return obs,done,ori_obs
@@ -77,9 +77,9 @@ class DataSource:
         df['ret_21'] = np.log(df['close'] / df['close'].shift(21))
 
         # df['moving_average'] = df['close'].rolling(window=21).mean()
-        # df['MA5'] = df['close'].rolling(window=5).mean()
-        # df['MA10'] = df['close'].rolling(window=10).mean()
-        # df['MA20'] = df['close'].rolling(window=20).mean()
+        df['MA5'] = df['close'].rolling(window=5).mean()
+        df['MA10'] = df['close'].rolling(window=10).mean()
+        df['MA20'] = df['close'].rolling(window=20).mean()
         # df['MA30'] = df['close'].rolling(window=30).mean()
 
         # plt.figure(figsize=(10, 6))
@@ -130,7 +130,7 @@ class DataSource:
 
 
         df.dropna(inplace=True)
-        self.data = df[['amplitude','returns','MACD_Histogram','RSI','ret_2','ret_5','ret_21','volume']]
+        self.data = df[['amplitude','returns','MACD_Histogram','RSI','MA5','MA10','MA20','volume']]
         # self.data = df[['MA5','returns','MA10','MA20','MA30']]
         
     def _load_csv(self):
@@ -138,7 +138,7 @@ class DataSource:
         df.columns = ['datetime','open','high','low','close','volume','amount']
         df.set_index('datetime', inplace=True)
         df.index = pd.to_datetime(df.index)
-        df = df[['open','high','low','close','volume']]
+        df = df[['open','high','low','close','volume','amount']]
         df = df.astype(float)
         df = df[self.start_date:self.end_date]
         # df['change'] = df['close'].pct_change()
