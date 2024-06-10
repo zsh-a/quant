@@ -17,7 +17,7 @@ class MarketEnv(gym.Env):
         
         self.num_step = num_step
 
-        self.trading_cost_bps = 1e-3
+        self.trading_cost_bps = 1e-4
         # state
         self.cur_step = 1
         self.actions = np.zeros(self.num_step + 1)
@@ -48,11 +48,11 @@ class MarketEnv(gym.Env):
         self.market_returns[self.cur_step] = market_return
         # reward
         # reward = start_position * market_return - self.costs[self.cur_step - 1]
-        reward = position * market_return
-        if position == 0.:
+        reward = start_position * market_return
+        if start_position == 0.:
             reward = -market_return
         
-        self.strategy_returns[self.cur_step] = position * market_return
+        self.strategy_returns[self.cur_step] = start_position * market_return
         
         info = {
             'reward': reward,
@@ -60,7 +60,7 @@ class MarketEnv(gym.Env):
             'ori_obs' : ori_obs
         }
         self.cur_step += 1
-        return obs.values,reward,done,info
+        return (obs.values,position),reward,done,info
 
 
 
@@ -86,7 +86,7 @@ class MarketEnv(gym.Env):
         self.market_returns.fill(0)
         self.data_source.reset()
         obs,done,ori_obs = self.data_source.step()
-        return obs.values
+        return (obs.values,0)
 
 
 if __name__ == '__main__':

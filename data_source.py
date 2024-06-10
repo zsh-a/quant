@@ -20,7 +20,7 @@ class DataSource:
         self.file_path = f'data/{code}.csv'
         if not os.path.exists(self.file_path):
             tdx_path = f'tdx_export/{code}.csv'
-        logger.info(f'get stock code : {code}, file path : {self.file_path}')
+        # logger.info(f'get stock code : {code}, file path : {self.file_path}')
         
         self.start_date = start_date
         self.end_date = end_date
@@ -37,9 +37,10 @@ class DataSource:
         self.min_values = self.data.min()
         self.max_values = self.data.max()
         self._normilize()
-        print(self.origin_data)
-        print(self.data)
-        print(len(self.data))
+
+        # print(self.origin_data)
+        # print(self.data)
+        # print(len(self.data))
 
         self.seq_len = 20
         # self.data.set_index('trade_date').sort_index().dropna()
@@ -48,12 +49,13 @@ class DataSource:
 
 
     def reset(self):
+        # print(len(self.data.index))
         self.offset = np.random.randint(self.seq_len,len(self.data.index) - self.trading_days)
         self.cur_step = 0
 
         
     def step(self):
-        obs,ori_obs = self.data.iloc[self.offset + self.cur_step - self.seq_len:self.offset + self.cur_step],self.origin_data.iloc[self.offset + self.cur_step]
+        obs,ori_obs = self.data.iloc[self.offset + self.cur_step - self.seq_len:self.offset + self.cur_step + 1],self.origin_data.iloc[self.offset + self.cur_step]
         self.cur_step += 1
         done = self.cur_step > self.trading_days
         return obs,done,ori_obs
@@ -70,9 +72,9 @@ class DataSource:
         df = self.data
         df['amplitude'] = ((df['high'] - df['low']) / df['close'].shift(1))
         df['returns'] = np.log(df['close'] / df['close'].shift(1))
-        # df['ret_2'] = np.log(df['close'] / df['close'].shift(2))
-        # df['ret_5'] = np.log(df['close'] / df['close'].shift(5))
-        # df['ret_21'] = np.log(df['close'] / df['close'].shift(21))
+        df['ret_2'] = np.log(df['close'] / df['close'].shift(2))
+        df['ret_5'] = np.log(df['close'] / df['close'].shift(5))
+        df['ret_21'] = np.log(df['close'] / df['close'].shift(21))
 
         # df['moving_average'] = df['close'].rolling(window=21).mean()
         # df['MA5'] = df['close'].rolling(window=5).mean()
@@ -128,7 +130,7 @@ class DataSource:
 
 
         df.dropna(inplace=True)
-        self.data = df[['amplitude','returns','MACD_Histogram','RSI']]
+        self.data = df[['amplitude','returns','MACD_Histogram','RSI','ret_2','ret_5','ret_21','volume']]
         # self.data = df[['MA5','returns','MA10','MA20','MA30']]
         
     def _load_csv(self):
