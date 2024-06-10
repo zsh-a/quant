@@ -11,6 +11,9 @@ from torch.distributions import Categorical
 import multiprocessing as mp
 import torch.nn.functional as F
 from collections import deque
+from utils import *
+import matplotlib.pyplot as plt
+
 
 from loguru import logger
 from torchstat import stat
@@ -79,12 +82,12 @@ class ActorCritic(nn.Module):
         self.input_size = input_dim
         num_encoder_layers = 2
         num_heads = 2
-        self.positional_encoding = PositionalEncoding(input_dim)
-        self.encoder_layer = nn.TransformerEncoderLayer(d_model=input_dim, nhead=num_heads, dim_feedforward=hidden_dim, dropout=dropout,batch_first=True)
-        self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=num_encoder_layers)
+        # self.positional_encoding = PositionalEncoding(input_dim)
+        # self.encoder_layer = nn.TransformerEncoderLayer(d_model=input_dim, nhead=num_heads, dim_feedforward=hidden_dim, dropout=dropout,batch_first=True)
+        # self.transformer_encoder = nn.TransformerEncoder(self.encoder_layer, num_layers=num_encoder_layers)
         # self.decoder = nn.Linear(input_dim, output_size)
 
-        self.fc = nn.Linear(input_dim, hidden_dim)
+        self.fc = nn.Linear(input_dim + 1, hidden_dim + 1)
 
         self.fc_pi = nn.Linear(hidden_dim + 1, output_size)
         self.fc_v = nn.Linear(hidden_dim + 1, 1)
@@ -104,21 +107,23 @@ class ActorCritic(nn.Module):
         
     def pi(self, x, pos):
         # print(x.size())
-        x = self.positional_encoding(x)
-        # print(x.size())
-        x = self.transformer_encoder(x)
-        x = F.gelu(self.fc(x[:, -1, :]))
+        # x = self.positional_encoding(x)
+        # # print(x.size())
+        # x = self.transformer_encoder(x)
+        # x = F.gelu(self.fc(x[:, -1, :]))
         x = torch.cat((x,pos),dim=-1)
+        x = F.gelu(self.fc(x))
         x = self.fc_pi(x)
         prob = torch.softmax(x, dim=-1)
         # print(prob.size())
         return prob
     
     def v(self, x, pos):
-        x = self.positional_encoding(x)
-        x = self.transformer_encoder(x)
-        x = F.gelu(self.fc(x[:, -1, :]))
+        # x = self.positional_encoding(x)
+        # x = self.transformer_encoder(x)
+        # x = F.gelu(self.fc(x[:, -1, :]))
         x = torch.cat((x,pos),dim=-1)
+        x = F.gelu(self.fc(x))
         v = self.fc_v(x)
         return v
     
@@ -187,7 +192,7 @@ class ActorCritic(nn.Module):
 
 # Worker function to collect data
 def worker(pid, model, env_name, queue, gamma):
-    env = MarketEnv(252,start_date='20100401',end_date='20230401')
+    env = MarketEnv(200,start_date='20230401',end_date='20240401')
     while True:
         state = env.reset()
         done = False
@@ -278,6 +283,7 @@ if __name__ == '__main__':
 
                 # state_tensor
                 logits = model.pi(state_tensor,pos_tensor).squeeze()
+                print(logits)
                 # print(state_tensor.size())
                 dist = Categorical(logits=logits)
                 action = dist.sample().item()
@@ -294,6 +300,15 @@ if __name__ == '__main__':
             writer.add_scalar("strategy_return", ret['strategy_return'], n_epi)
             writer.add_scalar("max_profit", ret['max_profit'], n_epi)
             writer.add_scalar("max_drawdown", ret['max_drawdown'], n_epi)
+
+            fig, (ax1) = plt.subplots(1, 1, figsize=(8, 6))
+            ax1.plot(log2percent(np.exp(np.cumsum(ret['market_returns']))), label='Market Return')
+            ax1.plot(log2percent(np.exp(np.cumsum(ret['strategy_returns']))), label='Strategy Return')
+            ax1.legend(loc='best')
+            ax1.set_title("Market vs Strategy Returns")
+            ax1.set_ylabel("Returns/%")
+            ax1.grid(True)
+            plt.savefig('return_comparison.png', dpi=300, bbox_inches='tight')
             logger.info(f'n_epi : {n_epi} | Total Reward: {tot_reward} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |  position : {np.array(ret['positions'])} | actions : {np.array(ret['actions'])}')
 
 
