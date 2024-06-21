@@ -146,15 +146,7 @@ def base_policy():
     ret = env.result()
 
     # print(ret['market_returns'],ret['strategy_returns'])
-    fig, (ax1) = plt.subplots(1, 1, figsize=(8, 6))
-    ax1.plot(log2percent(np.exp(np.cumsum(ret['market_returns']))), label='Market Return')
-    ax1.plot(log2percent(np.exp(np.cumsum(ret['strategy_returns']))), label='Strategy Return')
-    ax1.legend(loc='best')
-    ax1.set_title("Market vs Strategy Returns")
-    ax1.set_ylabel("Returns/%")
-    ax1.grid(True)
-    plt.savefig('return_comparison.png', dpi=300, bbox_inches='tight')
-
+    env.plot()
     logger.info(f'Total Reward: {total_reward} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |  position : {np.array(ret['positions'])} | actions : {np.array(ret['actions'])}')
 
 

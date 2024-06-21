@@ -15,9 +15,9 @@ def data_preprocess(file_path):
         file.writelines(lines)
 
 class DataSource:
-    def __init__(self,code,trading_days=252,start_date='20150701',end_date='20180701') -> None:
+    def __init__(self,code,trading_days=252,start_date='20150701',end_date='20180701',work_dir='.') -> None:
 
-        self.file_path = f'data/{code}.csv'
+        self.file_path = os.path.join(work_dir,f'data/{code}.csv')
         if not os.path.exists(self.file_path):
             tdx_path = f'tdx_export/{code}.csv'
         # logger.info(f'get stock code : {code}, file path : {self.file_path}')
@@ -130,7 +130,7 @@ class DataSource:
 
 
         df.dropna(inplace=True)
-        self.data = df[['amplitude','returns','MACD_Histogram','RSI','MA5','MA10','MA20','volume']]
+        self.data = df[['amplitude','returns','MACD_Histogram','RSI','MA5','MA10','MA20','volume','open','high','low','close']]
         # self.data = df[['MA5','returns','MA10','MA20','MA30']]
         
     def _load_csv(self):
