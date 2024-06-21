@@ -112,6 +112,8 @@ class PGAgent:
 
         state = torch.from_numpy(state).float().unsqueeze(0).to(self.device)
         probs = self.policy_net(state)
+        if not self.train_mode:
+            print(probs)    
         m = torch.distributions.Categorical(probs)
         action = m.sample()
         return action.item(), m.log_prob(action)
@@ -223,9 +225,9 @@ if __name__ == '__main__':
             writer.add_scalar("max_profit", ret['max_profit'], episode)
             writer.add_scalar("max_drawdown", ret['max_drawdown'], episode)
             logger.info(f'episode : {episode} | Total Reward: {sum(rewards)} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |  position : {np.array(ret['positions'])} | actions : {np.array(ret['actions'])}')
-        if episode % 100 == 0:
-            name = f'pg-{episode}'
-            agent.save(name)
+        # if episode % 100 == 0:
+        #     name = f'pg-{episode}'
+        #     agent.save(name)
             # valid(f'{name}.pth')
 
             # print(actions)

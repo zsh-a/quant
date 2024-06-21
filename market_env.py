@@ -2,21 +2,32 @@ from typing import Any, SupportsFloat, Tuple
 import gymnasium as gym
 import numpy as np
 from data_source import DataSource
+import matplotlib.pyplot as plt
+
 
 from utils import *
 INF = 1e9
 class MarketEnv(gym.Env):
-    def __init__(self,num_step,code='510880',start_date='20140701',end_date='20160901') -> None:
+    def __init__(self,num_step,code='510880',start_date='20100531',end_date='20110901',work_dir='',initial_capital=100000,max_stake=10000) -> None:
         super().__init__()
         
-        self.data_source = DataSource(code=code,trading_days=num_step,start_date=start_date,end_date=end_date)
+        self.data_source = DataSource(code=code,trading_days=num_step,start_date=start_date,end_date=end_date,work_dir=work_dir)
 
-        self.action_space = gym.spaces.Discrete(3)
+        self.action_space = gym.spaces.Box(low=-1, high=1, dtype=np.float32)
         self.observation_space = self.observation_space = gym.spaces.Box(low = np.array(self.data_source.min_values),
                                             high = np.array(self.data_source.max_values))
         
+        self.capital = initial_capital
+        self.max_stake = max_stake
         self.num_step = num_step
+        self.tot_values = self.capital
+        self.min_action = 100
+        
+        self.tot_values = np.zeros(self.num_step + 1)
+        self.tot_values[0] = self.capital
 
+        self.capitals = np.zeros(self.num_step + 1)
+        self.capitals[0] = self.capital
         self.trading_cost_bps = 1e-4
         # state
         self.cur_step = 1
@@ -30,31 +41,34 @@ class MarketEnv(gym.Env):
 
 
     def step(self, action: Any) -> Tuple[Any | SupportsFloat | bool | dict[str, Any]]:
-        assert self.action_space.contains(action)
-        self.actions[self.cur_step] = action - 1
-        start_position = self.positions[self.cur_step - 1]
-        position = start_position + action - 1
+        # assert self.action_space.contains(action)
         obs,done,ori_obs = self.data_source.step()
-        if position >= 0 and position <=1:
-            n_trades = action - 1
-        else:
-            n_trades = 0
-        position = np.clip(position,0,1)
+
+        action = int(action * self.max_stake)
+        position = self.positions[self.cur_step - 1]
+        cost = 0
+        if action < -self.min_action:
+            num_stakes = min(self.positions[self.cur_step - 1],-action)
+            position -= num_stakes
+            amount = ori_obs['open'] * num_stakes
+            cost = amount * self.trading_cost_bps
+            self.capital = self.capital + amount - cost
+
+        if action > self.min_action:
+            num_stakes = min(self.capital // ori_obs['open'],action)
+            amount = ori_obs['open'] * num_stakes
+            cost = amount * self.trading_cost_bps
+            if self.capital >= amount + cost:
+                position += num_stakes
+                self.capital = self.capital - amount - cost
+
+        self.costs[self.cur_step] = cost
         self.positions[self.cur_step] = position
-        self.trades[self.cur_step] = n_trades
-        trade_cost = abs(n_trades) * self.trading_cost_bps
-        self.costs[self.cur_step] = trade_cost
-        market_return = ori_obs['returns']
-        self.market_returns[self.cur_step] = market_return
-        # reward
-        # reward = start_position * market_return - self.costs[self.cur_step - 1]
-        reward = position * market_return
-        if position == 0.:
-            reward = -market_return
-        
-        self.strategy_returns[self.cur_step] = position * market_return
-        reward *= 100
-        
+        self.capitals[self.cur_step] = self.capital
+
+        self.tot_values[self.cur_step] = self.capital + self.positions[self.cur_step] * ori_obs['close']
+
+        reward = self.tot_values[self.cur_step] - self.tot_values[self.cur_step - 1]
         info = {
             'reward': reward,
             'costs': self.costs[self.cur_step],
@@ -77,6 +91,30 @@ class MarketEnv(gym.Env):
             'strategy_returns': self.strategy_returns,
             'market_returns': self.market_returns
         }
+
+    def plot(self):
+        fig, (ax1, ax2, ax3,ax4) = plt.subplots(4,1, figsize=(10, 6))
+        ax1.plot(self.positions[:self.cur_step], label='Position')
+        ax1.set_ylabel("Position/stake")
+
+        ax2.plot(self.tot_values[:self.cur_step], label='Value')
+        ax2.set_ylabel("Value/CNY")
+
+        ax3.plot(np.diff(self.tot_values[:self.cur_step]) / self.tot_values[:self.cur_step - 1] * 100, label='Value')
+        ax3.set_ylabel("Returns/%")
+        print(self.capitals[:self.cur_step])
+        ax4.plot(self.capitals[:self.cur_step], label='Capital')
+        ax4.set_ylabel("Capital/CNY")
+
+        ax1.legend(loc='best')
+        # ax1.set_title("Market vs Strategy Returns")``
+        # ax1.set_ylabel("Returns/%")
+        ax1.grid(True)
+        ax2.grid(True)
+        ax3.grid(True)
+        ax4.grid(True)
+        plt.savefig('trade_result.png', dpi=300, bbox_inches='tight')
+
     def reset(self, *, seed: int | None = None, options: dict | None = None) -> Tuple[Any, dict]:
         self.cur_step = 1
         self.actions.fill(0)
@@ -93,9 +131,12 @@ class MarketEnv(gym.Env):
 if __name__ == '__main__':
     env = MarketEnv(252)
     env.reset()
-    print(env.step(2))
     print(env.step(1))
-    print(env.step(1))
-    print(env.step(0))
+    print(env.step(0.05))
+    print(env.step(0.05))
+    print(env.step(0.05))
+    print(env.step(0.05))
+    print(env.step(0.05))
+    print(env.step(-0.1))
 
-    
+    env.plot()
