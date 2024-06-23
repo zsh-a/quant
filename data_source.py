@@ -257,7 +257,7 @@ class DataSource:
                     marker="^",
                     s=100,
                 )
-            elif action == "sell":
+            elif action == "sell" or action == 'stop':
                 ax.scatter(
                     self.origin_data.index.get_loc(date),
                     self.origin_data.loc[date, "high"],

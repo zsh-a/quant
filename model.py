@@ -9,8 +9,9 @@ from loguru import logger
 import matplotlib.pyplot as plt
 from dqn_agent import DQNAgent
 import os
-from market_env import MarketEnv
+from market_env import Account, MarketEnv, Order, OrderManager
 from torch.utils.tensorboard import SummaryWriter
+from market_env import OrderPolicy
 
 writer = SummaryWriter()
 from utils import *
@@ -159,12 +160,76 @@ def base_policy():
 
 
 def three_policy():
+    class BaseOrderPolicy(OrderPolicy):
+        def __init__(self, account) -> None:
+            self.last_obs = None
+            self.cur_obs = None
+
+            self.account = account
+
+            self.tracking = []
+
+        def order_callback(self, order: Order, order_manager: OrderManager):
+            if order.order_type == "buy":
+                order_manager.create_order(order.symbol, "stop", order.quantity)
+
+        def buy_policy(self, order):
+            action = order.quantity
+
+            trading_price = self.cur_obs["open"]
+            if action > self.account.min_action:
+                if self.cur_obs["high"] > self.last_obs["high"]:
+                    trading_price = max(self.last_obs["high"], self.cur_obs["open"])
+                    num_stakes = min(
+                        self.account.capital // trading_price // 100 * 100, action
+                    )
+                    if num_stakes > 0:
+                        amount = trading_price * num_stakes
+                        cost = amount * self.account.trading_cost_bps
+                        if self.account.capital >= amount + cost:
+                            order.quantity = num_stakes
+                            return (True, trading_price)
+                else:
+                    logger.info(
+                        f"order fail -> tracking | datetime : {self.cur_obs.name} order_id : {order.order_id} | order_type : {order.order_type}"
+                    )
+                    order.status = "tracking"
+
+            return (False, trading_price)
+
+        def sell_policy(self, order):
+            action = order.quantity
+            trading_price = self.cur_obs["open"]
+
+            if (
+                self.account.available > 0
+                and self.cur_obs["low"] < self.last_obs["low"]
+            ):
+                num_stakes = min(self.account.positions[-1], action)
+                if num_stakes > 0:
+                    trading_price = min(self.last_obs["low"], self.cur_obs["open"])
+                    order.quantity = num_stakes
+                    return (True, trading_price)
+            else:
+                logger.info(
+                    f"order fail -> tracking | datetime : {self.cur_obs.name} | order_id : {order.order_id} | order_type : {order.order_type} "
+                )
+                if order.order_type == 'sell':
+                    order.status = "tracking"
+            return (False, trading_price)
+
+        def step(self, obs):
+            self.last_obs = self.cur_obs
+            self.cur_obs = obs
+
     class ThreeAgent:
-        def __init__(self) -> None:
+        def __init__(self, market_env: MarketEnv) -> None:
             self.last_macd_close_weekly = None
             self.cur_macd_close_weekly = None
 
             self.last_force_index = None
+
+            self.market_env = market_env
 
         def find_monotonic_intervals(series):
             values = series.values
@@ -226,19 +291,53 @@ def three_policy():
             self.last_force_index = force_index
             return ret
 
+        def create_order(self, action):
+            action = int(action * self.market_env.max_stake)
+            if action < -self.market_env.min_action:
+                self.market_env.order_manager.create_order(
+                    "510880", "sell", abs(action)
+                )
+            if action > self.market_env.min_action:
+                self.market_env.order_manager.create_order("510880", "buy", abs(action))
+
     # seed = 0
     # torch.manual_seed(seed)
     # np.random.seed(seed)
     # random.seed(seed)
     # env.seed(seed)  # 如果环境提供seed()方法
-    agent = ThreeAgent()
-    env = MarketEnv(220, start_date="20230401", end_date="20240401",initial_capital=10000,max_stake=10000)
+
+    account = Account(init_capital=10000)
+    order_policy = BaseOrderPolicy(account)
+
+    # env = MarketEnv(
+    #     220,
+    #     start_date="20230401",
+    #     end_date="20240401",
+    #     initial_capital=10000,
+    #     max_stake=10000,
+    #     account=account,
+    #     order_policy=order_policy,
+    # )
+
+    env = MarketEnv(
+        220 *2,
+        # code='510880',
+        code='000001',
+        start_date="20220601",
+        end_date="20240601",
+        initial_capital=10000,
+        max_stake=10000,
+        account=account,
+        order_policy=order_policy,
+    )
+    agent = ThreeAgent(env)
     state, info = env.reset()
     total_reward = 0
     done = False
     while not done:
         # print(state[0])
         action = agent.select_action(info["ori_obs"])
+        agent.create_order(action)
         next_state, reward, done, info = env.step(action)
         # print(reward)
         # agent.buffer.push(state, action, reward, next_state, done)
@@ -248,10 +347,17 @@ def three_policy():
 
     # print(ret['market_returns'],ret['strategy_returns'])
     env.plot()
-    logger.info(
-        f'Total Reward: {total_reward} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |  position : {np.array(ret['positions'])} | actions : {np.array(ret['actions'])}'
-    )
+    # logger.info(
+    #     f'Total Reward: {total_reward} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |  position : {np.array(ret['positions'])} | actions : {np.array(ret['actions'])}'
+    # )
 
+    # logger.info(
+    #     f'Total Reward: {total_reward} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |'
+    # )
+
+    logger.info(
+        f'Total Reward: {total_reward} | {ret}'
+    )
 
 if __name__ == "__main__":
     # valid("ddqn-600.pth")
