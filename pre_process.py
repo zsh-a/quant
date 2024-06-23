@@ -114,4 +114,6 @@ def data_preprocess(file_path):
         file.writelines(lines)
 
 
-data_preprocess("/home/zs/workspace/exp/quent/tdx_export/SH#510880.txt")
+if __name__ == '__main__':
+    for file in os.listdir('tdx_export'):
+        data_preprocess(os.path.join('tdx_export',file))
