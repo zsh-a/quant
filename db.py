@@ -18,32 +18,34 @@ client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
 def write_data():
     write_api = client.write_api(write_options=SYNCHRONOUS)
 
-    df = pd.read_csv(os.path.join("data", "combine", "510880.csv"))
-    df["ticker"] = f"510880"
+    for file in os.listdir('data/combine'):
+        code = file.split('.')[0]
+        df = pd.read_csv(os.path.join("data", "combine", f"{code}.csv"))
+        df["ticker"] = f"{code}"
 
-    df["datetime"] = pd.to_datetime(df["datetime"])  # 确保 timestamp 是 datetime 类型
+        df["datetime"] = pd.to_datetime(df["datetime"])  # 确保 timestamp 是 datetime 类型
 
-    df["adj_factor"] = df["close"].shift(1) / df["pre_close"]
-    df["adj_factor"].iloc[0] = 1
+        df["adj_factor"] = df["close"].shift(1) / df["pre_close"]
+        df["adj_factor"].iloc[0] = 1
 
-    df["adj_factor"] = df["adj_factor"].cumprod()
-    print(df)
+        df["adj_factor"] = df["adj_factor"].cumprod()
+        print(code,df)
 
-    # 将 pandas DataFrame 插入 InfluxDB
-    for index, row in df.iterrows():
-        point = (
-            Point("stock_data")
-            .tag("ticker", row["ticker"])
-            .field("open", row["open"])
-            .field("high", row["high"])
-            .field("low", row["low"])
-            .field("close", row["close"])
-            .field("pre_close", row["pre_close"])
-            .field("amount", row["amount"])
-            .field("volume", row["volume"])
-            .time(row["datetime"], WritePrecision.S)
-        )
-        write_api.write(bucket=bucket, org="zs", record=point)
+        # 将 pandas DataFrame 插入 InfluxDB
+        for index, row in df.iterrows():
+            point = (
+                Point("stock_data")
+                .tag("ticker", row["ticker"])
+                .field("open", row["open"])
+                .field("high", row["high"])
+                .field("low", row["low"])
+                .field("close", row["close"])
+                .field("pre_close", row["pre_close"])
+                .field("amount", row["amount"])
+                .field("volume", row["volume"])
+                .time(row["datetime"], WritePrecision.S)
+            )
+            write_api.write(bucket=bucket, org="zs", record=point)
 
 
 def read_data():
