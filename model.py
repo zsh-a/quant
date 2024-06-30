@@ -214,7 +214,7 @@ def three_policy():
                 logger.info(
                     f"order fail -> tracking | datetime : {self.cur_obs.name} | order_id : {order.order_id} | order_type : {order.order_type} "
                 )
-                if order.order_type == 'sell':
+                if order.order_type == "sell":
                     order.status = "tracking"
             return (False, trading_price)
 
@@ -320,9 +320,9 @@ def three_policy():
     # )
 
     env = MarketEnv(
-        220 *2,
-        # code='510880',
-        code='000001',
+        220 * 2,
+        code="510880",
+        # code='000001',
         start_date="20220601",
         end_date="20240601",
         initial_capital=10000,
@@ -355,9 +355,8 @@ def three_policy():
     #     f'Total Reward: {total_reward} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |'
     # )
 
-    logger.info(
-        f'Total Reward: {total_reward} | {ret}'
-    )
+    logger.info(f"Total Reward: {total_reward} | {ret}")
+
 
 if __name__ == "__main__":
     # valid("ddqn-600.pth")

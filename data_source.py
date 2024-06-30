@@ -29,9 +29,9 @@ class DataSource:
         work_dir=".",
         random_start=False,
     ) -> None:
-        self.file_path = os.path.join(work_dir, f"data/{code}.csv")
+        self.file_path = os.path.join(work_dir, f"data/qfq/{code}.csv")
         if not os.path.exists(self.file_path):
-            tdx_path = f"tdx_export/{code}.csv"
+            tdx_path = f"tdx_export/qfq/{code}.csv"
         # logger.info(f'get stock code : {code}, file path : {self.file_path}')
 
         self.start_date = start_date
@@ -90,6 +90,17 @@ class DataSource:
 
     def _preprocess(self):
         df = self.data
+        # print(df)
+        # df['adj_factor'] = df['close'].shift(1) / df['pre_close']
+        # df['adj_factor'].iloc[0] = 1
+
+        # df['adj_factor'] = df['adj_factor'].cumprod()
+
+        # df['close'] = df['close'] * df['adj_factor']
+        # df['open'] = df['open'] * df['adj_factor']
+        # df['high'] = df['high'] * df['adj_factor']
+        # df['low'] = df['low'] * df['adj_factor']
+
         weekly_df = (
             df.resample("W-FRI")
             .agg(
@@ -257,7 +268,7 @@ class DataSource:
                     marker="^",
                     s=100,
                 )
-            elif action == "sell" or action == 'stop':
+            elif action == "sell" or action == "stop":
                 ax.scatter(
                     self.origin_data.index.get_loc(date),
                     self.origin_data.loc[date, "high"],
