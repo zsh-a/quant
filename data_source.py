@@ -33,6 +33,7 @@ class DataSource:
         if not os.path.exists(self.file_path):
             tdx_path = f"tdx_export/qfq/{code}.csv"
         # logger.info(f'get stock code : {code}, file path : {self.file_path}')
+        self.code = code
 
         self.start_date = start_date
         self.end_date = end_date
@@ -120,8 +121,8 @@ class DataSource:
         df = df.join(weekly_df, rsuffix="_weekly", how="outer").ffill()
         indictor.indictor_force_index(df)
 
-        df["ema12"] = df["close"].ewm(span=12, adjust=False).mean()
-        df["ema26"] = df["close"].ewm(span=26, adjust=False).mean()
+        df["ema5"] = df["close"].ewm(span=5, adjust=False).mean()
+        df["ema10"] = df["close"].ewm(span=10, adjust=False).mean()
 
         df.dropna(inplace=True)
         print(df)
@@ -170,8 +171,8 @@ class DataSource:
                 "macd_close_weekly",
                 "force_index_close",
                 "MA5",
-                "ema12",
-                "ema26",
+                "ema5",
+                "ema10",
                 "volume",
                 "open",
                 "high",
@@ -220,8 +221,8 @@ class DataSource:
         ]
 
         return [
-            mpf.make_addplot(self.origin_data["ema12"], color="lime"),
-            mpf.make_addplot(self.origin_data["ema26"], color="c"),
+            mpf.make_addplot(self.origin_data["ema5"], color="lime"),
+            mpf.make_addplot(self.origin_data["ema10"], color="c"),
             mpf.make_addplot(
                 self.origin_data["macd_close_weekly"],
                 type="bar",
@@ -254,7 +255,7 @@ class DataSource:
         apds = self.macd_bars(buy_sell_points)
 
         fig, axes = mpf.plot(
-            self.origin_data, addplot=apds, type="candle", style=style, returnfig=True
+            self.origin_data, addplot=apds, type="candle", style=style, returnfig=True,volume=False
         )
         ax = axes[0]
         for date, action in buy_sell_points:
