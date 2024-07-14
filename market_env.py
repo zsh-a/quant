@@ -1,10 +1,12 @@
+from random import shuffle
 from typing import Any, SupportsFloat, Tuple
 import gymnasium as gym
 import numpy as np
-from data_source import DataSource
+from data_source import DataSource,DBDataSource
 import matplotlib.pyplot as plt
 from loguru import logger
 from utils import log2percent
+import global_var
 
 
 class Order:
@@ -17,6 +19,13 @@ class Order:
         self.status = "open"  # 'open', 'filled', 'cancelled'
         self.filled_quantity = 0
         self.timestamp = None  # Time when the order was created
+        self.execution_price = None
+
+    def __str__(self) -> str:
+        return f"Order({self.order_id}, {self.symbol}, {self.order_type}, {self.quantity}, {self.execution_price}, {self.status}, {self.filled_quantity}, {self.timestamp})"
+
+    def __repr__(self) -> str:
+        return self.__str__()
 
 
 class OrderPolicy:
@@ -37,30 +46,39 @@ class Account:
     def __init__(self, init_capital=10000) -> None:
         self.capital = init_capital
         self.trading_cost_bps = 1e-4
-        self.available = 0
+        self.available = [np.zeros(len(global_var.SYMBOLS))]
         self.min_action = 100
 
-        self.code = None
-        self.actions = [0]
+        self.actions = [np.zeros(len(global_var.SYMBOLS))]
 
         self.costs = [0]
-        self.positions = [0]
+        self.positions = [np.zeros(len(global_var.SYMBOLS))]
+        self.returns = np.zeros(len(global_var.SYMBOLS))
+        self.cost_price = np.zeros(len(global_var.SYMBOLS))
         self.capitals = [init_capital]
         self.tot_values = [init_capital]
 
     def step(self):
-        self.actions.append(0)
+        self.actions.append(np.zeros(len(global_var.SYMBOLS)))
         self.costs.append(self.costs[-1])
-        self.positions.append(self.positions[-1])
+        self.positions.append(self.positions[-1].copy())
         self.capitals.append(self.capitals[-1])
         self.tot_values.append(self.tot_values[-1])
-        self.available = self.positions[-1]
+
+        # add deep copy self.positions[-1] to self.available
+        self.available.append(self.positions[-1].copy())
+
+    def get_position(self, symbol):
+        return self.positions[-1][global_var.SYMBOLS.index(symbol)]
+
+    def get_available(self, symbol):
+        return self.available[-1][global_var.SYMBOLS.index(symbol)]
 
     def result(self, risk_free_rate):
         strategy_return = (
             np.array(self.tot_values) - self.tot_values[0]
         ) / self.tot_values[0]
-        print(risk_free_rate, np.mean(strategy_return))
+        # print(risk_free_rate, np.mean(strategy_return))
         return {
             "strategy_return": round(strategy_return[-1] * 100, 2),
             "max_drawdown": round(
@@ -69,13 +87,17 @@ class Account:
             "max_profit": round(
                 (max(self.tot_values) / self.tot_values[0] - 1) * 100, 2
             ),
+            "code_returns": {
+                code: ret
+                for code, ret in zip(global_var.SYMBOLS, np.array(self.returns))
+            },
             "sharpe_ratio": (np.mean(strategy_return) - risk_free_rate)
             / np.std(strategy_return),
         }
 
 
 class OrderManager:
-    def __init__(self, account, order_policy):
+    def __init__(self, account: Account, order_policy):
         self.orders = []
         self.order_id_counter = 1
 
@@ -112,7 +134,7 @@ class OrderManager:
         Match open orders with the latest market data.
         """
         ts = None
-        for k,v in market_data.items():
+        for k, v in market_data.items():
             ts = v.name
             break
         self.timestamp = ts
@@ -133,9 +155,9 @@ class OrderManager:
         order.filled_quantity = order.quantity
         order.execution_price = execution_price
         order.timestamp = self.get_current_timestamp()
-        self.buy_sell_points.append((order.timestamp, order.order_type))
+        self.buy_sell_points.append((order.timestamp, order.symbol, order.order_type))
         logger.info(
-            f"complete order | datetime : {self.get_current_timestamp()} | order_id : {order.order_id}  | order_type : {order.order_type} | price : {order.execution_price} | quantity : {order.quantity}"
+            f"complete order | datetime : {self.get_current_timestamp()} | order_id : {order.order_id} | symbol : {order.symbol} | order_type : {order.order_type} | price : {order.execution_price} | quantity : {order.quantity}"
         )
         self.order_plolicy.order_callback(order, self)
         self.update_account(order)
@@ -145,25 +167,33 @@ class OrderManager:
         Update account balance and positions based on the filled order.
         """
         # Implement account and position update logic
+
+        idx = global_var.SYMBOLS.index(order.symbol)
         amount = order.execution_price * order.quantity
         cost = amount * self.account.trading_cost_bps
         if order.order_type == "buy":
             self.account.capital = self.account.capital - amount - cost
-            self.account.code = order.symbol
+            self.account.cost_price[idx] = order.execution_price
         else:
             self.account.capital = self.account.capital + amount - cost
-            self.account.code = None
+            self.account.returns[idx] += (
+                order.execution_price - self.account.cost_price[idx]
+            ) * order.quantity
 
         self.account.capitals[-1] = self.account.capital
-        self.account.actions[-1] = (
+        self.account.actions[-1][idx] = (
             order.quantity if order.order_type == "buy" else -order.quantity
         )
 
-        self.account.positions[-1] += self.account.actions[-1]
-        self.account.tot_values[-1] = (
-            self.account.capital + self.account.positions[-1] * self.obs["close"]
+        self.account.positions[-1][idx] += self.account.actions[-1][idx]
+        self.account.tot_values[-1] = self.account.capital + np.sum(
+            [
+                self.account.positions[-1][global_var.SYMBOLS.index(code)]
+                * info["close"]
+                for code, info in self.obs.items()
+            ]
         )
-        self.account.available = 0
+        self.account.available[-1][idx] = 0
 
     def get_current_timestamp(self):
         """
@@ -172,7 +202,9 @@ class OrderManager:
         return self.timestamp
 
     def get_order_history(self):
-        return [order for order in self.orders if order.status == "filled"]
+        return "\n".join(
+            [str(order) for order in self.orders if order.status == "filled"]
+        )
 
 
 INF = 1e9
@@ -338,37 +370,9 @@ class MultiMarketEnv(gym.Env):
     ) -> None:
         super().__init__()
 
-        self.code = [
-            str(c)
-            for c in [
-                512660,
-                159995,
-                512980,
-                510050,
-                515790,
-                159869,
-                159611,
-                513050,
-                512800,
-                159928,
-                159870,
-                159509,
-                588000,
-                159819,
-                515880,
-                515030,
-                159949,
-                512690,
-                513060,
-                512010,
-                510880,
-                512880,
-                510300,
-                159941,
-            ]
-        ]
+        self.code = global_var.SYMBOLS
         self.data_source = [
-            DataSource(
+            DBDataSource(
                 code=c,
                 trading_days=num_step,
                 start_date=start_date,
@@ -415,7 +419,7 @@ class MultiMarketEnv(gym.Env):
     def step(self, action: Any) -> Tuple[Any | SupportsFloat | bool | dict[str, Any]]:
         # assert self.action_space.contains(action)
 
-        obs = { ds.code : ds.step() for ds in self.data_source}
+        obs = {ds.code: ds.step() for ds in self.data_source}
         # print(obs)
         # obs, done, ori_obs = self.data_source.step()
         # self.data_source
@@ -424,7 +428,7 @@ class MultiMarketEnv(gym.Env):
         self.account.step()
         self.exec_order(ori_obs)
 
-        self.market_returns[self.cur_step] = ori_obs["returns"]
+        # self.market_returns[self.cur_step] = ori_obs['510880']["returns"]
 
         # print(self.account.tot_values,self.cur_step)
         reward = (
@@ -437,6 +441,9 @@ class MultiMarketEnv(gym.Env):
             "ori_obs": ori_obs,
         }
         self.cur_step += 1
+        done = False
+        for k, v in obs.items():
+            done = done or v[1]
         return (obs.values, self.account.positions[-1]), reward, done, info
 
     def result(self):
@@ -446,7 +453,7 @@ class MultiMarketEnv(gym.Env):
             "market_return": log2percent(np.exp(sum(self.market_returns)))
         }
 
-    def plot(self):
+    def plot(self, codes):
         fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(15, 20))
         ax1.plot(self.account.positions[: self.cur_step], label="Position")
         ax1.set_ylabel("Position/stake")
@@ -482,7 +489,9 @@ class MultiMarketEnv(gym.Env):
         ax5.grid(True)
 
         plt.title(self.code, fontsize=20, color="blue")
-        self.data_source.plot(self.order_manager.buy_sell_points)
+        for ds in self.data_source:
+            if ds.code in codes:
+                ds.plot(self.order_manager.buy_sell_points)
         plt.show()
         # plt.savefig('trade_result.png', dpi=300, bbox_inches='tight')
 
@@ -497,7 +506,7 @@ class MultiMarketEnv(gym.Env):
         self.market_returns.fill(0)
         for ds in self.data_source:
             ds.reset()
-        obs = { ds.code : ds.step() for ds in self.data_source}
+        obs = {ds.code: ds.step() for ds in self.data_source}
         # obs, done, ori_obs = self.data_source.step()
         info = {"ori_obs": {k: v[2] for k, v in obs.items()}}
         return obs, info
@@ -515,7 +524,6 @@ if __name__ == "__main__":
     # print(env.step(-0.1))
 
     # env.plot()
-
 
     env = MultiMarketEnv(220, start_date="20230401", end_date="20240401")
     env.reset()

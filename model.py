@@ -13,6 +13,7 @@ from market_env import Account, MarketEnv, Order, OrderManager, MultiMarketEnv
 from torch.utils.tensorboard import SummaryWriter
 from market_env import OrderPolicy
 import pandas as pd
+import global_var
 
 writer = SummaryWriter()
 from utils import *
@@ -160,7 +161,7 @@ def base_policy():
     )
 
 
-def three_policy(code):
+def three_policy():
     class BaseOrderPolicy(OrderPolicy):
         def __init__(self, account) -> None:
             self.last_obs = []
@@ -175,13 +176,16 @@ def three_policy(code):
             if order.order_type == "buy":
                 order_manager.create_order(order.symbol, "stop", order.quantity)
 
-        def buy_policy(self, order):
+        def buy_policy(self, order: Order):
             action = order.quantity
+            obs = self.cur_obs[order.symbol]
 
-            trading_price = self.cur_obs["open"]
+            trading_price = obs["open"]
             if action > self.account.min_action:
-                if self.buy_cond():
-                    trading_price = max(self.last_obs[-1]["high"], self.cur_obs["open"])
+                if self.buy_cond(order.symbol):
+                    trading_price = max(
+                        self.last_obs[-1][order.symbol]["high"], obs["open"]
+                    )
                     num_stakes = min(
                         self.account.capital // trading_price // 100 * 100, action
                     )
@@ -193,40 +197,43 @@ def three_policy(code):
                             return (True, trading_price)
                 else:
                     logger.info(
-                        f"order fail -> tracking | datetime : {self.cur_obs.name} order_id : {order.order_id} | order_type : {order.order_type}"
+                        f"order fail -> tracking | datetime : {obs.name} order_id : {order.order_id} | order_type : {order.order_type}"
                     )
                     order.status = "tracking"
 
             return (False, trading_price)
 
-        def buy_cond(self):
-            return self.cur_obs["high"] > self.last_obs[-1]["high"]
+        def buy_cond(self, code):
+            return self.cur_obs[code]["high"] > self.last_obs[-1][code]["high"]
 
         def sell_policy(self, order):
             action = order.quantity
-            trading_price = self.cur_obs["open"]
-
-            if self.sell_cond():
-                num_stakes = min(self.account.positions[-1], action)
+            obs = self.cur_obs[order.symbol]
+            trading_price = obs["open"]
+            idx = global_var.SYMBOLS.index(order.symbol)
+            if self.sell_cond(order.symbol):
+                num_stakes = min(self.account.positions[-1][idx], action)
                 if num_stakes > 0:
-                    trading_price = min(self.last_obs[-1]["low"], self.cur_obs["open"])
+                    trading_price = min(
+                        self.last_obs[-1][order.symbol]["low"], obs["open"]
+                    )
                     order.quantity = num_stakes
                     return (True, trading_price)
             else:
                 logger.info(
-                    f"order fail -> tracking | datetime : {self.cur_obs.name} | order_id : {order.order_id} | order_type : {order.order_type} "
+                    f"order fail -> tracking | datetime : {obs.name} | order_id : {order.order_id} | order_type : {order.order_type} "
                 )
                 if order.order_type == "sell":
                     order.status = "tracking"
             return (False, trading_price)
 
-        def sell_cond(self):
+        def sell_cond(self, code):
             if len(self.last_obs) < 2:
                 return False
-            return self.account.available > 0 and (
-                self.cur_obs["low"]
-                < min(self.last_obs[-1]["low"], self.last_obs[-2]["low"])
-                and self.cur_obs["close"] < self.cur_obs["ema10"]
+            return self.account.get_available(code) > 0 and (
+                self.cur_obs[code]["low"]
+                < min(self.last_obs[-1][code]["low"], self.last_obs[-2][code]["low"])
+                and self.cur_obs[code]["close"] < self.cur_obs[code]["ema10"]
             )
 
         def step(self, obs):
@@ -284,7 +291,7 @@ def three_policy(code):
                 and his.cur_macd_close_weekly
                 and his.last_force_index
             ):
-                if self.cur_macd_close_weekly > his.last_macd_close_weekly:
+                if his.cur_macd_close_weekly > his.last_macd_close_weekly:
                     # trend up
                     if (
                         force_index < his.last_force_index
@@ -308,20 +315,24 @@ def three_policy(code):
                 his.cur_macd_close_weekly = macd_close_weekly
 
             his.last_force_index = force_index
-            return ret
+            return ret, force_index
 
         def action_decider(self, stocks_obs):
-            return {code: self.select_action(code, stocks_obs[code]) for code in stocks_obs}
-
+            return {
+                code: self.select_action(code, stocks_obs[code]) for code in stocks_obs
+            }
 
         def stock_decider(self, actions):
-            if self.market_env.account.code:
-                if actions[self.market_env.account.code] < 0:
-                    self.create_order(self.market_env.account.code,actions[self.market_env.account.code])
-            else:
-                for code, action in actions.items():
-                    if action > 0:
-                        self.create_order(code,action)
+            buy_list = [(code, v[1]) for code, v in actions.items() if v[0] == 1]
+            buy_list = sorted(buy_list, key=lambda x: abs(x[1]))
+            # print(buy_list)
+            if len(buy_list) > 0:
+                self.create_order(buy_list[0][0], 1)
+            # for code, action in actions.items():
+            #     # print(code,action)
+            #     if action > 0:
+            #         self.create_order(code, action)
+
         def create_order(self, code, action):
             action = int(action * self.market_env.max_stake)
             if action < -self.market_env.min_action:
@@ -349,10 +360,9 @@ def three_policy(code):
     # )
 
     env = MultiMarketEnv(
-        220 * 2,
-        code=code,
+        220,
         # code='000001',
-        start_date="20220601",
+        start_date="20230601",
         end_date="20240601",
         initial_capital=10000,
         max_stake=10000,
@@ -366,7 +376,7 @@ def three_policy(code):
     while not done:
         # print(state[0])
         actions = agent.action_decider(info["ori_obs"])
-        print(actions)
+        # print(actions)
         agent.stock_decider(actions)
         next_state, reward, done, info = env.step(actions)
         # print(reward)
@@ -374,9 +384,13 @@ def three_policy(code):
         state = next_state
         total_reward += reward
     ret = env.result()
-
+    logger.info("\n" + env.order_manager.get_order_history())
+    code_returns = sorted(ret["code_returns"].items(), key=lambda x: x[1])
+    # print(code_returns)
+    code_returns = [key for key, value in code_returns]
+    # print(code_returns)
     # print(ret['market_returns'],ret['strategy_returns'])
-    env.plot()
+    env.plot(code_returns[:3])
     # logger.info(
     #     f'Total Reward: {total_reward} | market_return: {ret['market_return'] }% | strategy_return: {ret['strategy_return']}% | max_drawdown : {ret['max_drawdown']} | max_profit : {ret['max_profit']} |  position : {np.array(ret['positions'])} | actions : {np.array(ret['actions'])}'
     # )
@@ -391,7 +405,7 @@ def three_policy(code):
 if __name__ == "__main__":
     # valid("ddqn-600.pth")
     # train()
-    three_policy("510880")
+    three_policy()
 
     # for file in os.listdir(os.path.join('data','qfq')):
     #     code = file.split('.')[0]
