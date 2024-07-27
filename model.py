@@ -1,21 +1,27 @@
 from collections import deque
 from random import sample
 import random
+import time
 import numpy as np
-import torch.nn as nn
-import torch
-import torch.nn.functional as F
+
+# import torch.nn as nn
+# import torch
+# import torch.nn.functional as F
 from loguru import logger
 import matplotlib.pyplot as plt
-from dqn_agent import DQNAgent
+
+# from dqn_agent import DQNAgent
 import os
+
+import schedule
 from market_env import Account, MarketEnv, Order, OrderManager, MultiMarketEnv
-from torch.utils.tensorboard import SummaryWriter
+
+# from torch.utils.tensorboard import SummaryWriter
 from market_env import OrderPolicy
 import pandas as pd
 import global_var
 
-writer = SummaryWriter()
+# writer = SummaryWriter()
 from utils import *
 
 
@@ -197,7 +203,7 @@ def three_policy():
                             return (True, trading_price)
                 else:
                     logger.info(
-                        f"order fail -> tracking | datetime : {obs.name} order_id : {order.order_id} | order_type : {order.order_type}"
+                        f"order fail -> tracking | datetime : {obs.name} order_id : {order.order_id} | order_type : {order.order_type} | cur high : {self.cur_obs[order.symbol]["high"]} | last high : {self.last_obs[-1][order.symbol]["high"]}"
                     )
                     order.status = "tracking"
 
@@ -240,6 +246,9 @@ def three_policy():
             self.last_obs.append(self.cur_obs)
             if len(self.last_obs) > 2:
                 self.last_obs = self.last_obs[-2:]
+            self.cur_obs = obs
+
+        def step_in_day(self, obs):
             self.cur_obs = obs
 
     class ThreeAgent:
@@ -360,12 +369,12 @@ def three_policy():
     # )
 
     env = MultiMarketEnv(
-        220,
+        250,
         # code='000001',
         start_date="20230601",
-        end_date="20240601",
+        end_date=None,
         initial_capital=10000,
-        max_stake=10000,
+        max_stake=1000000,
         account=account,
         order_policy=order_policy,
     )
@@ -373,8 +382,8 @@ def three_policy():
     state, info = env.reset()
     total_reward = 0
     done = False
+    live = True
     while not done:
-        # print(state[0])
         actions = agent.action_decider(info["ori_obs"])
         # print(actions)
         agent.stock_decider(actions)
@@ -383,6 +392,8 @@ def three_policy():
         # agent.buffer.push(state, action, reward, next_state, done)
         state = next_state
         total_reward += reward
+    if live:
+        env.live()
     ret = env.result()
     logger.info("\n" + env.order_manager.get_order_history())
     code_returns = sorted(ret["code_returns"].items(), key=lambda x: x[1])
@@ -405,7 +416,11 @@ def three_policy():
 if __name__ == "__main__":
     # valid("ddqn-600.pth")
     # train()
-    three_policy()
+    # three_policy()
+    schedule.every().day.at("09:30").do(three_policy)
+    while True:
+        schedule.run_pending()
+        time.sleep(1)
 
     # for file in os.listdir(os.path.join('data','qfq')):
     #     code = file.split('.')[0]

@@ -127,6 +127,8 @@ def update_data():
 
 
 if __name__ == "__main__":
+    update_data()
+
     schedule.every().day.at(f"{18:02d}:{00:02d}").do(update_data)
     while True:
         schedule.run_pending()

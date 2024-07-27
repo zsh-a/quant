@@ -32,7 +32,7 @@ class DataSource:
     def __init__(
         self,
         code,
-        trading_days=252,
+        trading_days=None,
         start_date="20150701",
         end_date="20180701",
         work_dir=".",
@@ -309,9 +309,9 @@ class DBDataSource:
     def __init__(
         self,
         code,
-        trading_days=252,
+        trading_days=None,
         start_date="20150701",
-        end_date="20180701",
+        end_date=None,
         work_dir=".",
         random_start=False,
     ) -> None:
@@ -346,6 +346,7 @@ class DBDataSource:
         # self.data.set_index('trade_date').sort_index().dropna()
 
         # print(len(self.data.index) - self.trading_days)
+        self.trading_days = len(self.data)
 
     def reset(self):
         # print(len(self.data.index))
@@ -356,13 +357,16 @@ class DBDataSource:
         )
         self.cur_step = 0
 
+    def __len__(self):
+        return len(self.data)
+
     def step(self):
         obs, ori_obs = (
             self.data.iloc[self.offset + self.cur_step],
             self.origin_data.iloc[self.offset + self.cur_step],
         )
         self.cur_step += 1
-        done = self.cur_step > self.trading_days
+        done = self.cur_step >= self.trading_days
         return obs, done, ori_obs
 
     def get_data(self):
@@ -401,16 +405,18 @@ class DBDataSource:
             )
             .dropna()
         )
+        # print(self.code, weekly_df)
         weekly_df.rename(columns={"close": "close_weekly"}, inplace=True)
         indictor.indictor_macd(weekly_df, colums=["close_weekly"])
-        df = df.join(weekly_df, rsuffix="_weekly", how="outer").ffill()
+        df = df.join(weekly_df, rsuffix="_weekly", how="left").ffill()
+        # print(self.code, df)
         indictor.indictor_force_index(df)
 
         df["ema5"] = df["close"].ewm(span=5, adjust=False).mean()
         df["ema10"] = df["close"].ewm(span=10, adjust=False).mean()
         df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
         df.dropna(inplace=True)
-        print(df)
+
         # plt.figure(figsize=(14, 7))
         # plt.plot(df["force_index_close"], label="Close Price", color="blue")
         # plt.title("Stock Price with SMA and EMA")
@@ -464,6 +470,7 @@ class DBDataSource:
                 "high",
                 "low",
                 "close",
+                "adj_factor",
             ]
         ]
         # self.data = df[['MA5','returns','MA10','MA20','MA30']]
@@ -483,9 +490,9 @@ class DBDataSource:
         start_date = datetime.strptime(self.start_date, "%Y%m%d").strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
-        end_date = datetime.strptime(self.end_date, "%Y%m%d").strftime(
-            "%Y-%m-%dT%H:%M:%SZ"
-        )
+        # end_date = datetime.strptime(self.end_date, "%Y%m%d").strftime(
+        #     "%Y-%m-%dT%H:%M:%SZ"
+        # )
         # print(start_date,end_date)
         query = f"""
             from(bucket: "{bucket}")
@@ -519,11 +526,11 @@ class DBDataSource:
         df["high"] = df["high"] * df["adj_factor"]
         df["low"] = df["low"] * df["adj_factor"]
 
-        df = df[["open", "high", "low", "close", "volume", "amount"]]
+        df = df[["open", "high", "low", "close", "volume", "amount", "adj_factor"]]
         df = df.astype(float)
-        df = df[self.start_date : self.end_date]
+        df = df[self.start_date :]
+        # print(df)
         # df['change'] = df['close'].pct_change()
-
         return df
 
         # df['returns_5d'] = (df['close'].shift(-PREDICT_KS) - df['close']) / df['close']
