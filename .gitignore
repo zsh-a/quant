@@ -1,2 +1,14 @@
 __pycache__
 runs
+daily
+db
+DSAC
+gen
+vis_server
+utils/secret.json
+backups
+.env
+jointdata
+fin_data
+alpha/sample_models
+data

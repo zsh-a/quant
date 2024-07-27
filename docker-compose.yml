@@ -1,0 +1,15 @@
+services:
+  clickhouse:
+    image: bitnami/clickhouse:latest
+    container_name: clickhouse
+    restart: unless-stopped  # 推荐企业级应用使用自动重启策略[3,5](@ref)
+    volumes:
+      - ./db:/bitnami/clickhouse         # 数据持久化目录
+      - ./config/backup_disk.xml:/etc/clickhouse-server/config.d/backup_disk.xml  # 配置文件映射
+      - ./backups:/backups                # 备份目录
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes         # 允许空密码登录
+    ports:
+      - "9000:9000"                      # ClickHouse TCP 协议端口
+      - "8123:8123"                      # HTTP API 端口
+
