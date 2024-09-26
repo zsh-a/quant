@@ -169,12 +169,12 @@ class OrderManager:
 
     def execute_order(self, order, execution_price):
         order.status = "filled"
-        order.filled_quantity = order.quantity
+        order.filled_quantity = max(order.quantity,self.account.get_position(order.symbol))
         order.execution_price = execution_price
         order.timestamp = self.get_current_timestamp()
         self.buy_sell_points.append((order.timestamp, order.symbol, order.order_type))
         logger.info(
-            f"complete order | datetime : {self.get_current_timestamp()} | order_id : {order.order_id} | symbol : {order.symbol} | order_type : {order.order_type} | price : {order.execution_price} | quantity : {order.quantity}"
+            f"complete order | datetime : {self.get_current_timestamp()} | order_id : {order.order_id} | symbol : {order.symbol} | order_type : {order.order_type} | price : {order.execution_price} | quantity : {order.filled_quantity}"
         )
         self.order_plolicy.order_callback(order, self)
         self.update_account(order)
@@ -186,7 +186,7 @@ class OrderManager:
         # Implement account and position update logic
 
         idx = global_var.SYMBOLS.index(order.symbol)
-        amount = order.execution_price * order.quantity
+        amount = order.execution_price * order.filled_quantity
         cost = amount * self.account.trading_cost_bps
         if order.order_type == "buy":
             self.account.capital = self.account.capital - amount - cost
@@ -195,11 +195,11 @@ class OrderManager:
             self.account.capital = self.account.capital + amount - cost
             self.account.returns[idx] += (
                 order.execution_price - self.account.cost_price[idx]
-            ) * order.quantity
+            ) * order.filled_quantity
 
         self.account.capitals[-1] = self.account.capital
         self.account.actions[-1][idx] = (
-            order.quantity if order.order_type == "buy" else -order.quantity
+            order.filled_quantity if order.order_type == "buy" else -order.filled_quantity
         )
 
         self.account.positions[-1][idx] += self.account.actions[-1][idx]
@@ -684,7 +684,15 @@ class MultiMarketEnv(gym.Env):
         self.market_returns.fill(0)
         for ds in self.data_source:
             ds.reset()
-        obs = {ds.code: ds.step() for ds in self.data_source}
+
+        obs = {}
+        for ds in self.data_source:
+            try:
+                obs[ds.code] = ds.step()
+            except Exception as e:
+                print(e)
+                print(ds.code)
+        # obs = {ds.code: ds.step() for ds in self.data_source}
         # obs, done, ori_obs = self.data_source.step()
         info = {"ori_obs": {k: v[2] for k, v in obs.items()}}
         return obs, info
