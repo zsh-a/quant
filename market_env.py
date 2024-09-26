@@ -1,3 +1,4 @@
+from datetime import datetime
 from random import shuffle
 import time
 from typing import Any, SupportsFloat, Tuple
@@ -137,6 +138,13 @@ class OrderManager:
         )
         self.order_id_counter += 1
         return order
+
+    def get_waiting_order(self):
+        return [
+            order
+            for order in self.orders
+            if order.status == "open" or order.status == "tracking"
+        ]
 
     def match_orders(self, market_data):
         """
@@ -369,6 +377,8 @@ class Broker:
         self.last_obs = None
 
         self.order_policy: OrderPolicy = None
+        self.account: Account = None
+        self.order_manager: OrderManager = None
 
     def set_policy(self, order_policy):
         self.order_policy = order_policy
@@ -424,6 +434,37 @@ class Broker:
             df[k]["high"] *= v["adj_factor"]
             df[k]["low"] *= v["adj_factor"]
             df[k]["close"] *= v["adj_factor"]
+            Value_today = df[k]["close"]
+            EMA_yesterday = v["ema10"]
+            N = 10
+            K = 2 / (N + 1)
+
+            EMA_today = (Value_today * K) + (EMA_yesterday * (1 - K))
+            df[k]["ema10"] = EMA_today
+        for k, v in self.last_obs.items():
+            df[k]["open"] *= v["adj_factor"]
+            df[k]["high"] *= v["adj_factor"]
+            df[k]["low"] *= v["adj_factor"]
+            df[k]["close"] *= v["adj_factor"]
+            Value_today = df[k]["close"]
+            EMA_yesterday = v["ema20"]
+            N = 20
+            K = 2 / (N + 1)
+
+            EMA_today = (Value_today * K) + (EMA_yesterday * (1 - K))
+            df[k]["ema20"] = EMA_today
+        for k, v in self.last_obs.items():
+            df[k]["open"] *= v["adj_factor"]
+            df[k]["high"] *= v["adj_factor"]
+            df[k]["low"] *= v["adj_factor"]
+            df[k]["close"] *= v["adj_factor"]
+            Value_today = df[k]["close"]
+            EMA_yesterday = v["ema5"]
+            N = 5
+            K = 2 / (N + 1)
+
+            EMA_today = (Value_today * K) + (EMA_yesterday * (1 - K))
+            df[k]["ema5"] = EMA_today
         return df
 
     def step(self, obs):
@@ -432,11 +473,24 @@ class Broker:
         # print(self.get_data())
 
     def run(self, orders):
+        self.order_manager.step(None)
+        self.account.step()
         while True:
-            df = self.get_data()
+            current_time = datetime.now().time()
+            three_pm = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
+
+            try:
+                df = self.get_data()
+            except Exception as e:
+                logger.error(e)
+                time.sleep(5)
+                continue
             self.order_policy.step_in_day(df)
             self.match_order(orders)
             logger.info("live running")
+            if current_time > three_pm:
+                logger.info("live runing end")
+                return
             time.sleep(5 * 60)
 
     def match_order(self, orders):
@@ -460,7 +514,10 @@ class Broker:
                 ret = trader.sell(order.symbol)
         except Exception as e:
             ret = e
-        dd.Msg.send(ret)
+        try:
+            dd.Msg.send(ret)
+        except Exception as e:
+            logger.error(f"dd msg send error : {e}")
 
 
 class MultiMarketEnv(gym.Env):
@@ -522,6 +579,8 @@ class MultiMarketEnv(gym.Env):
 
         self.order_manager = OrderManager(account, order_policy)
         self.broker = Broker()
+        self.broker.account = self.account
+        self.broker.order_manager = self.order_manager
         self.broker.set_policy(self.order_manager.order_plolicy)
 
     def exec_order(self, obs):
@@ -539,6 +598,7 @@ class MultiMarketEnv(gym.Env):
         # self.data_source
         ori_obs = {k: v[2] for k, v in obs.items()}
         self.order_manager.step(ori_obs)
+        logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
         self.broker.step(ori_obs)
         self.account.step()
 

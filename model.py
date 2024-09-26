@@ -176,6 +176,7 @@ def three_policy():
 
             self.account = account
 
+            self.slip = 0.001
             self.tracking = []
 
         def order_callback(self, order: Order, order_manager: OrderManager):
@@ -189,8 +190,9 @@ def three_policy():
             trading_price = obs["open"]
             if action > self.account.min_action:
                 if self.buy_cond(order.symbol):
-                    trading_price = max(
-                        self.last_obs[-1][order.symbol]["high"], obs["open"]
+                    trading_price = (
+                        max(self.last_obs[-1][order.symbol]["high"], obs["open"])
+                        + self.slip
                     )
                     num_stakes = min(
                         self.account.capital // trading_price // 100 * 100, action
@@ -203,25 +205,30 @@ def three_policy():
                             return (True, trading_price)
                 else:
                     logger.info(
-                        f"order fail -> tracking | datetime : {obs.name} order_id : {order.order_id} | order_type : {order.order_type} | cur high : {self.cur_obs[order.symbol]["high"]} | last high : {self.last_obs[-1][order.symbol]["high"]}"
+                        f"order fail -> tracking | datetime : {obs.name} | symbol : {order.symbol} | order_id : {order.order_id} | order_type : {order.order_type} | cur : {self.cur_obs[order.symbol]["close"]} | cur high : {self.cur_obs[order.symbol]["high"]} | last high : {self.last_obs[-1][order.symbol]["high"]}"
                     )
                     order.status = "tracking"
 
             return (False, trading_price)
 
         def buy_cond(self, code):
+            logger.info(
+                f"buy cond | symbol : {code} | cur high : {self.cur_obs[code]["high"]} | last high : {self.last_obs[-1][code]["high"]}"
+            )
             return self.cur_obs[code]["high"] > self.last_obs[-1][code]["high"]
 
         def sell_policy(self, order):
             action = order.quantity
             obs = self.cur_obs[order.symbol]
             trading_price = obs["open"]
+            logger.info(f"pos : {self.account.positions[-1]}")
             idx = global_var.SYMBOLS.index(order.symbol)
             if self.sell_cond(order.symbol):
                 num_stakes = min(self.account.positions[-1][idx], action)
                 if num_stakes > 0:
-                    trading_price = min(
-                        self.last_obs[-1][order.symbol]["low"], obs["open"]
+                    trading_price = (
+                        min(self.last_obs[-1][order.symbol]["low"], obs["open"])
+                        - self.slip
                     )
                     order.quantity = num_stakes
                     return (True, trading_price)
@@ -236,10 +243,14 @@ def three_policy():
         def sell_cond(self, code):
             if len(self.last_obs) < 2:
                 return False
+            logger.info(
+                f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[code]["low"]} | cur close : {self.cur_obs[code]["close"]} last low : {min(self.last_obs[-1][code]["low"], self.last_obs[-2][code]["low"])} | ema5 : {self.cur_obs[code]["ema5"]}"
+            )
+            # print(self.cur_obs[code])
             return self.account.get_available(code) > 0 and (
                 self.cur_obs[code]["low"]
                 < min(self.last_obs[-1][code]["low"], self.last_obs[-2][code]["low"])
-                and self.cur_obs[code]["close"] < self.cur_obs[code]["ema10"]
+                and self.cur_obs[code]["low"] < self.cur_obs[code]["ema5"]
             )
 
         def step(self, obs):
@@ -332,10 +343,12 @@ def three_policy():
             }
 
         def stock_decider(self, actions):
+            # print(actions)
             buy_list = [(code, v[1]) for code, v in actions.items() if v[0] == 1]
             buy_list = sorted(buy_list, key=lambda x: abs(x[1]))
             # print(buy_list)
             if len(buy_list) > 0:
+                logger.info(f"buy list {buy_list}")
                 self.create_order(buy_list[0][0], 1)
             # for code, action in actions.items():
             #     # print(code,action)
@@ -371,10 +384,10 @@ def three_policy():
     env = MultiMarketEnv(
         250,
         # code='000001',
-        start_date="20230601",
+        start_date="20210601",
         end_date=None,
         initial_capital=10000,
-        max_stake=1000000,
+        max_stake=10000000,
         account=account,
         order_policy=order_policy,
     )
@@ -382,7 +395,7 @@ def three_policy():
     state, info = env.reset()
     total_reward = 0
     done = False
-    live = True
+    live = False
     while not done:
         actions = agent.action_decider(info["ori_obs"])
         # print(actions)
@@ -416,7 +429,7 @@ def three_policy():
 if __name__ == "__main__":
     # valid("ddqn-600.pth")
     # train()
-    # three_policy()
+    three_policy()
     schedule.every().day.at("09:30").do(three_policy)
     while True:
         schedule.run_pending()
