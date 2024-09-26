@@ -490,13 +490,14 @@ class DBDataSource:
         start_date = datetime.strptime(self.start_date, "%Y%m%d").strftime(
             "%Y-%m-%dT%H:%M:%SZ"
         )
-        # end_date = datetime.strptime(self.end_date, "%Y%m%d").strftime(
-        #     "%Y-%m-%dT%H:%M:%SZ"
-        # )
+        # ="20230601"
+        end_date = datetime.strptime(
+            datetime.now().strftime("%Y%m%d"), "%Y%m%d"
+        ).strftime("%Y-%m-%dT%H:%M:%SZ")
         # print(start_date,end_date)
         query = f"""
             from(bucket: "{bucket}")
-            |> range(start: {start_date})
+            |> range(start: {start_date}, stop: {end_date})
             |> filter(fn: (r) => r._measurement == "stock_data" and r.ticker == "{self.code}")
             |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
             // |> filter(fn: (r) => r._field == "close" or r._field == "pre_close")
@@ -529,7 +530,7 @@ class DBDataSource:
         df = df[["open", "high", "low", "close", "volume", "amount", "adj_factor"]]
         df = df.astype(float)
         df = df[self.start_date :]
-        # print(df)
+        print(df)
         # df['change'] = df['close'].pct_change()
         return df
 

@@ -15,8 +15,8 @@ def tdx_data_preprocess(file_path, fq):
 
 
 def combine():
-    df = pd.read_csv("pre_close.csv", index_col="Unnamed: 0")
-
+    df = pd.read_csv("Book1.csv", index_col="Unnamed: 0")
+    print(df)
     for column_name in df.columns:
         # print(f"列名: {column_name}")
         code = column_name.split(".")[0]
@@ -24,15 +24,16 @@ def combine():
         col = col.drop(col[(col == 0)].index)
 
         col.index = pd.to_datetime(col.index)
-
+        print(col)
         base = pd.read_csv(os.path.join("data", fq, f"{code}.csv"))
-
         base.columns = ["datetime", "open", "high", "low", "close", "volume", "amount"]
         base.set_index("datetime", inplace=True)
         base.index = pd.to_datetime(base.index)
-
-        df["adj_factor"] = df["close"].shift(1) / df["pre_close"]
-        df["adj_factor"].iloc[0] = 1
+        # print(base)
+        print()
+        # print(base)
+        # df["adj_factor"] = df["close"].shift(1) / df["pre_close"]
+        # df["adj_factor"].iloc[0] = 1
         base.assign(pre_close=col).to_csv(
             os.path.join("data", "combine", f"{code}.csv")
         )
@@ -40,7 +41,7 @@ def combine():
 
 if __name__ == "__main__":
     fq = "nfq"
-    for file in os.listdir(os.path.join("tdx_export", fq)):
-        tdx_data_preprocess(os.path.join("tdx_export", fq, file), fq)
+    # for file in os.listdir(os.path.join("tdx_export", fq)):
+    #     tdx_data_preprocess(os.path.join("tdx_export", fq, file), fq)
 
     combine()
