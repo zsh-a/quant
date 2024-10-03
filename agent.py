@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 from market_env import MarketEnv
 
-from utils import *
+from utils.utils import *
 
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()

@@ -47,7 +47,7 @@ def write_data():
                 .field("low", row["low"])
                 .field("close", row["close"])
                 .field("pre_close", row["pre_close"])
-                .field("amount", row["amount"])
+                .field("amount", row["amount"] / 100)
                 .field("volume", row["volume"])
                 .time(row["datetime"], WritePrecision.S)
             )
@@ -138,10 +138,10 @@ def update_data():
 
 
 if __name__ == "__main__":
-    update_data()
+    # update_data()
 
-    schedule.every().day.at(f"{18:02d}:{00:02d}").do(update_data)
-    while True:
-        schedule.run_pending()
-        time.sleep(1)
-    # write_data()
+    # schedule.every().day.at(f"{18:02d}:{00:02d}").do(update_data)
+    # while True:
+    #     schedule.run_pending()
+    #     time.sleep(1)
+    write_data()

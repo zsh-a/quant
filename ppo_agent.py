@@ -6,12 +6,12 @@ import numpy as np
 import gymnasium as gym
 import random
 from market_env import MarketEnv
-import utils
+import utils.utils as utils
 from torch.distributions import Categorical
 import multiprocessing as mp
 import torch.nn.functional as F
 from collections import deque
-from utils import *
+from utils.utils import *
 import matplotlib.pyplot as plt
 
 

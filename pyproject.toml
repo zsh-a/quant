@@ -16,6 +16,8 @@ mplfinance = "^0.12.10b0"
 influxdb-client = "^1.44.0"
 akshare = "^1.14.36"
 schedule = "^1.2.2"
+pyecharts = "^2.0.6"
+django = "^5.1.1"
 
 
 [build-system]

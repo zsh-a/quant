@@ -1,228 +1,20 @@
 from datetime import datetime
-from random import shuffle
 import time
 from typing import Any, SupportsFloat, Tuple
 import gymnasium as gym
 import numpy as np
+from account import Account
 from data_source import DataSource, DBDataSource
 import matplotlib.pyplot as plt
 from loguru import logger
-from utils import log2percent
+from order import Order, OrderManager
+from policy.base_policy import OrderPolicy
+from utils.utils import log2percent
 import global_var
-import asyncio
 import pandas as pd
 import akshare as ak
 import client as trader
 import dd
-
-
-class Order:
-    def __init__(self, order_id, symbol, order_type, quantity, price=None):
-        self.order_id = order_id
-        self.symbol = symbol
-        self.order_type = order_type  # 'buy' or 'sell'
-        self.quantity = quantity
-        self.price = price  # Limit price for limit orders
-        self.status = "open"  # 'open', 'filled', 'cancelled'
-        self.filled_quantity = 0
-        self.timestamp = None  # Time when the order was created
-        self.execution_price = None
-
-    def __str__(self) -> str:
-        return f"Order({self.order_id}, {self.symbol}, {self.order_type}, {self.quantity}, {self.execution_price}, {self.status}, {self.filled_quantity}, {self.timestamp})"
-
-    def __repr__(self) -> str:
-        return self.__str__()
-
-
-class OrderPolicy:
-    def __init__(self, account) -> None:
-        pass
-
-    def buy_policy(self, order):
-        pass
-
-    def sell_policy(self, order):
-        pass
-
-    def step(self, obs):
-        pass
-
-    def step_in_day(self, obs):
-        pass
-
-
-class Account:
-    def __init__(self, init_capital=10000) -> None:
-        self.capital = init_capital
-        self.trading_cost_bps = 1e-4
-        self.available = [np.zeros(len(global_var.SYMBOLS))]
-        self.min_action = 100
-
-        self.actions = [np.zeros(len(global_var.SYMBOLS))]
-
-        self.costs = [0]
-        self.positions = [np.zeros(len(global_var.SYMBOLS))]
-        self.returns = np.zeros(len(global_var.SYMBOLS))
-        self.cost_price = np.zeros(len(global_var.SYMBOLS))
-        self.capitals = [init_capital]
-        self.tot_values = [init_capital]
-
-    def step(self):
-        self.actions.append(np.zeros(len(global_var.SYMBOLS)))
-        self.costs.append(self.costs[-1])
-        self.positions.append(self.positions[-1].copy())
-        self.capitals.append(self.capitals[-1])
-        self.tot_values.append(self.tot_values[-1])
-
-        # add deep copy self.positions[-1] to self.available
-        self.available.append(self.positions[-1].copy())
-
-    def get_position(self, symbol):
-        return self.positions[-1][global_var.SYMBOLS.index(symbol)]
-
-    def get_available(self, symbol):
-        return self.available[-1][global_var.SYMBOLS.index(symbol)]
-
-    def result(self, risk_free_rate):
-        strategy_return = (
-            np.array(self.tot_values) - self.tot_values[0]
-        ) / self.tot_values[0]
-        # print(risk_free_rate, np.mean(strategy_return))
-        return {
-            "strategy_return": round(strategy_return[-1] * 100, 2),
-            "max_drawdown": round(
-                (min(self.tot_values) / self.tot_values[0] - 1) * 100, 2
-            ),
-            "max_profit": round(
-                (max(self.tot_values) / self.tot_values[0] - 1) * 100, 2
-            ),
-            "code_returns": {
-                code: ret
-                for code, ret in zip(global_var.SYMBOLS, np.array(self.returns))
-            },
-            "sharpe_ratio": (np.mean(strategy_return) - risk_free_rate)
-            / np.std(strategy_return),
-        }
-
-
-class OrderManager:
-    def __init__(self, account: Account, order_policy):
-        self.orders = []
-        self.order_id_counter = 1
-
-        self.order_plolicy = order_policy
-        self.account = account
-
-        self.buy_sell_points = []
-        self.timestamp = None
-
-        self.obs = None
-
-    def step(self, obs):
-        self.obs = obs
-        self.order_plolicy.step(obs)
-
-    def create_order(self, symbol, order_type, quantity, price=None):
-        order = Order(self.order_id_counter, symbol, order_type, quantity, price)
-        for od in self.orders:
-            if od.status == "tracking":
-                od.status = "cancelled"
-                logger.info(
-                    f"cancel order | datetime : {self.get_current_timestamp()} | symbol : {od.symbol} | order_id : {od.order_id}  | order_type : {od.order_type}"
-                )
-
-        self.orders.append(order)
-        logger.info(
-            f"create order | datetime : {self.get_current_timestamp()} | symbol : {symbol} | order_id : {order.order_id}  | order_type : {order_type}"
-        )
-        self.order_id_counter += 1
-        return order
-
-    def get_waiting_order(self):
-        return [
-            order
-            for order in self.orders
-            if order.status == "open" or order.status == "tracking"
-        ]
-
-    def match_orders(self, market_data):
-        """
-        Match open orders with the latest market data.
-        """
-        ts = None
-        for k, v in market_data.items():
-            ts = v.name
-            break
-        self.timestamp = ts
-
-        for order in self.orders:
-            if order.status == "open" or order.status == "tracking":
-                if order.order_type == "buy":
-                    ok, exec_price = self.order_plolicy.buy_policy(order)
-                    if ok:
-                        self.execute_order(order, exec_price)
-                elif order.order_type == "sell" or order.order_type == "stop":
-                    ok, exec_price = self.order_plolicy.sell_policy(order)
-                    if ok:
-                        self.execute_order(order, exec_price)
-
-    def execute_order(self, order, execution_price):
-        order.status = "filled"
-        order.filled_quantity = max(order.quantity,self.account.get_position(order.symbol))
-        order.execution_price = execution_price
-        order.timestamp = self.get_current_timestamp()
-        self.buy_sell_points.append((order.timestamp, order.symbol, order.order_type))
-        logger.info(
-            f"complete order | datetime : {self.get_current_timestamp()} | order_id : {order.order_id} | symbol : {order.symbol} | order_type : {order.order_type} | price : {order.execution_price} | quantity : {order.filled_quantity}"
-        )
-        self.order_plolicy.order_callback(order, self)
-        self.update_account(order)
-
-    def update_account(self, order):
-        """
-        Update account balance and positions based on the filled order.
-        """
-        # Implement account and position update logic
-
-        idx = global_var.SYMBOLS.index(order.symbol)
-        amount = order.execution_price * order.filled_quantity
-        cost = amount * self.account.trading_cost_bps
-        if order.order_type == "buy":
-            self.account.capital = self.account.capital - amount - cost
-            self.account.cost_price[idx] = order.execution_price
-        else:
-            self.account.capital = self.account.capital + amount - cost
-            self.account.returns[idx] += (
-                order.execution_price - self.account.cost_price[idx]
-            ) * order.filled_quantity
-
-        self.account.capitals[-1] = self.account.capital
-        self.account.actions[-1][idx] = (
-            order.filled_quantity if order.order_type == "buy" else -order.filled_quantity
-        )
-
-        self.account.positions[-1][idx] += self.account.actions[-1][idx]
-        self.account.tot_values[-1] = self.account.capital + np.sum(
-            [
-                self.account.positions[-1][global_var.SYMBOLS.index(code)]
-                * info["close"]
-                for code, info in self.obs.items()
-            ]
-        )
-        self.account.available[-1][idx] = 0
-
-    def get_current_timestamp(self):
-        """
-        Return the current timestamp in the desired format.
-        """
-        return self.timestamp
-
-    def get_order_history(self):
-        return "\n".join(
-            [str(order) for order in self.orders if order.status == "filled"]
-        )
-
 
 INF = 1e9
 
@@ -435,36 +227,21 @@ class Broker:
             df[k]["low"] *= v["adj_factor"]
             df[k]["close"] *= v["adj_factor"]
             Value_today = df[k]["close"]
-            EMA_yesterday = v["ema10"]
+
             N = 10
             K = 2 / (N + 1)
+            EMA_yesterday = v["ema10"]
+            df[k]["ema10"] = (Value_today * K) + (EMA_yesterday * (1 - K))
 
-            EMA_today = (Value_today * K) + (EMA_yesterday * (1 - K))
-            df[k]["ema10"] = EMA_today
-        for k, v in self.last_obs.items():
-            df[k]["open"] *= v["adj_factor"]
-            df[k]["high"] *= v["adj_factor"]
-            df[k]["low"] *= v["adj_factor"]
-            df[k]["close"] *= v["adj_factor"]
-            Value_today = df[k]["close"]
-            EMA_yesterday = v["ema20"]
             N = 20
             K = 2 / (N + 1)
+            EMA_yesterday = v["ema20"]
+            df[k]["ema20"] = (Value_today * K) + (EMA_yesterday * (1 - K))
 
-            EMA_today = (Value_today * K) + (EMA_yesterday * (1 - K))
-            df[k]["ema20"] = EMA_today
-        for k, v in self.last_obs.items():
-            df[k]["open"] *= v["adj_factor"]
-            df[k]["high"] *= v["adj_factor"]
-            df[k]["low"] *= v["adj_factor"]
-            df[k]["close"] *= v["adj_factor"]
-            Value_today = df[k]["close"]
-            EMA_yesterday = v["ema5"]
             N = 5
             K = 2 / (N + 1)
-
-            EMA_today = (Value_today * K) + (EMA_yesterday * (1 - K))
-            df[k]["ema5"] = EMA_today
+            EMA_yesterday = v["ema5"]
+            df[k]["ema5"] = (Value_today * K) + (EMA_yesterday * (1 - K))
         return df
 
     def step(self, obs):
@@ -474,7 +251,7 @@ class Broker:
 
     def run(self, orders):
         self.order_manager.step(None)
-        self.account.step()
+        self.account.step(None)
         while True:
             current_time = datetime.now().time()
             three_pm = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
@@ -491,7 +268,7 @@ class Broker:
             if current_time > three_pm:
                 logger.info("live runing end")
                 return
-            time.sleep(5 * 60)
+            time.sleep(60)
 
     def match_order(self, orders):
         for order in orders:
@@ -600,7 +377,7 @@ class MultiMarketEnv(gym.Env):
         self.order_manager.step(ori_obs)
         logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
         self.broker.step(ori_obs)
-        self.account.step()
+        self.account.step(ori_obs)
 
         self.exec_order(ori_obs)
 
@@ -632,46 +409,11 @@ class MultiMarketEnv(gym.Env):
         }
 
     def plot(self, codes):
-        fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(15, 20))
-        ax1.plot(self.account.positions[: self.cur_step], label="Position")
-        ax1.set_ylabel("Position/stake")
-
-        ax2.plot(self.account.tot_values[: self.cur_step], label="Value")
-        ax2.set_ylabel("Value/CNY")
-
-        ax3.plot(
-            (
-                np.array(self.account.tot_values[: self.cur_step])
-                - self.account.tot_values[0]
-            )
-            / self.account.tot_values[0]
-            * 100,
-            label="Strategy Return",
-        )
-        ax3.set_ylabel("Strategy Returns/%")
-        ax4.plot(self.account.capitals[: self.cur_step], label="Capital")
-        ax4.set_ylabel("Capital/CNY")
-
-        ax5.plot(
-            log2percent(np.exp(np.cumsum(self.market_returns))), label="Market Return"
-        )
-        ax5.set_ylabel("Market Return/%")
-
-        ax1.legend(loc="best")
-        # ax1.set_title("Market vs Strategy Returns")``
-        # ax1.set_ylabel("Returns/%")
-        ax1.grid(True)
-        ax2.grid(True)
-        ax3.grid(True)
-        ax4.grid(True)
-        ax5.grid(True)
-
-        plt.title(self.code, fontsize=20, color="blue")
         for ds in self.data_source:
             if ds.code in codes:
                 ds.plot(self.order_manager.buy_sell_points)
-        plt.show()
-        # plt.savefig('trade_result.png', dpi=300, bbox_inches='tight')
+        self.account.plot()
+        self.order_manager.plot()
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None

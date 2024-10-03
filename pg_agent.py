@@ -5,7 +5,7 @@ import numpy as np
 import gymnasium as gym
 import random
 from market_env import MarketEnv
-import utils
+import utils.utils as utils
 from loguru import logger
 
 from torch.utils.tensorboard import SummaryWriter
