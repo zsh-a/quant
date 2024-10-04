@@ -369,11 +369,10 @@ class MultiMarketEnv(gym.Env):
     def step(self, action: Any) -> Tuple[Any | SupportsFloat | bool | dict[str, Any]]:
         # assert self.action_space.contains(action)
 
-        obs = {ds.code: ds.step() for ds in self.data_source}
-        # print(obs)
+        obs = [ds.step() for ds in self.data_source]
         # obs, done, ori_obs = self.data_source.step()
         # self.data_source
-        ori_obs = {k: v[2] for k, v in obs.items()}
+        ori_obs = [v[2] for v in obs]
         self.order_manager.step(ori_obs)
         logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
         self.broker.step(ori_obs)
@@ -397,9 +396,9 @@ class MultiMarketEnv(gym.Env):
         }
         self.cur_step += 1
         done = False
-        for k, v in obs.items():
+        for v in obs:
             done = done or v[1]
-        return (obs.values, self.account.positions[-1]), reward, done, info
+        return (obs, self.account.positions[-1]), reward, done, info
 
     def result(self):
         account_res = self.account.result(self.market_returns[self.cur_step - 1])
@@ -427,16 +426,11 @@ class MultiMarketEnv(gym.Env):
         for ds in self.data_source:
             ds.reset()
 
-        obs = {}
-        for ds in self.data_source:
-            try:
-                obs[ds.code] = ds.step()
-            except Exception as e:
-                print(e)
-                print(ds.code)
+        obs = [ds.step() for ds in self.data_source]
+
         # obs = {ds.code: ds.step() for ds in self.data_source}
         # obs, done, ori_obs = self.data_source.step()
-        info = {"ori_obs": {k: v[2] for k, v in obs.items()}}
+        info = {"ori_obs": [v[2] for v in obs]}
         return obs, info
 
 

@@ -29,23 +29,22 @@ class BaseOrderPolicy(OrderPolicy):
     def order_callback(self, order: Order, order_manager: OrderManager):
         if order.order_type == "buy":
             order_manager.create_order(order.symbol, "stop", order.quantity)
-        pass
 
     def buy_policy(self, order: Order):
         action = order.quantity
-        idx = global_var.SYMBOLS.index(order.symbol)
-        obs = self.cur_obs[idx]
+        obs = self.cur_obs[order.symbol]
 
         trading_price = obs["open"]
         if action > self.account.min_action:
             if self.buy_cond(order.symbol):
                 trading_price = (
-                    max(self.last_obs[-1][idx]["high"], obs["open"]) + self.slip
+                    max(self.last_obs[-1][order.symbol]["high"], obs["open"])
+                    + self.slip
                 )
                 num_stakes = min(
                     self.account.capital // trading_price // 100 * 100, action
                 )
-                if num_stakes > 100 and sum(self.account.positions[-1]) == 0:
+                if num_stakes > 100:
                     amount = trading_price * num_stakes
                     cost = amount * self.account.trading_cost_bps
                     if self.account.capital >= amount + cost:
@@ -53,30 +52,29 @@ class BaseOrderPolicy(OrderPolicy):
                         return (True, trading_price)
             else:
                 logger.info(
-                    f"order fail -> tracking | datetime : {obs.name} | symbol : {order.symbol} | order_id : {order.order_id} | order_type : {order.order_type} | cur : {self.cur_obs[idx]["close"]} | cur high : {self.cur_obs[idx]["high"]} | last high : {self.last_obs[-1][idx]["high"]}"
+                    f"order fail -> tracking | datetime : {obs.name} | symbol : {order.symbol} | order_id : {order.order_id} | order_type : {order.order_type} | cur : {self.cur_obs[order.symbol]["close"]} | cur high : {self.cur_obs[order.symbol]["high"]} | last high : {self.last_obs[-1][order.symbol]["high"]}"
                 )
                 order.status = "tracking"
 
         return (False, trading_price)
 
     def buy_cond(self, code):
-        idx = global_var.SYMBOLS.index(code)
         logger.info(
-            f"buy cond | symbol : {code} | cur high : {self.cur_obs[idx]["high"]} | last high : {self.last_obs[-1][idx]["high"]}"
+            f"buy cond | symbol : {code} | cur high : {self.cur_obs[code]["high"]} | last high : {self.last_obs[-1][code]["high"]}"
         )
-        return self.cur_obs[idx]["high"] > self.last_obs[-1][idx]["high"]
+        return self.cur_obs[code]["high"] > self.last_obs[-1][code]["high"]
 
     def sell_policy(self, order):
         action = order.quantity
-        idx = global_var.SYMBOLS.index(order.symbol)
-        obs = self.cur_obs[idx]
+        obs = self.cur_obs[order.symbol]
         trading_price = obs["open"]
         # logger.debug(f"pos : {self.account.positions[-1]}")
+        idx = global_var.SYMBOLS.index(order.symbol)
         if self.sell_cond(order.symbol):
             num_stakes = min(self.account.positions[-1][idx], action)
             if num_stakes > 0:
                 trading_price = (
-                    min(self.last_obs[-1][idx]["low"], obs["open"]) - self.slip
+                    min(self.last_obs[-1][order.symbol]["low"], obs["open"]) - self.slip
                 )
                 order.quantity = num_stakes
                 return (True, trading_price)
@@ -91,15 +89,14 @@ class BaseOrderPolicy(OrderPolicy):
     def sell_cond(self, code):
         if len(self.last_obs) < 2:
             return False
-        idx = global_var.SYMBOLS.index(code)
         logger.info(
-            f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[idx]["low"]} | cur close : {self.cur_obs[idx]["close"]} last low : {min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])} | ema5 : {self.cur_obs[idx]["ema5"]}"
+            f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[code]["low"]} | cur close : {self.cur_obs[code]["close"]} last low : {min(self.last_obs[-1][code]["low"], self.last_obs[-2][code]["low"])} | ema5 : {self.cur_obs[code]["ema5"]}"
         )
         # print(self.cur_obs[code])
         return self.account.get_available(code) > 0 and (
-            self.cur_obs[idx]["low"]
-            < min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])
-            and self.cur_obs[idx]["low"] < self.cur_obs[idx]["ema5"]
+            self.cur_obs[code]["low"]
+            < min(self.last_obs[-1][code]["low"], self.last_obs[-2][code]["low"])
+            and self.cur_obs[code]["low"] < self.cur_obs[code]["ema5"]
         )
 
     def step(self, obs):
@@ -115,8 +112,8 @@ class BaseOrderPolicy(OrderPolicy):
 class ThreeAgent:
     class HisInfo:
         def __init__(self) -> None:
-            self.last_macd_close_weekly = None
-            self.cur_macd_close_weekly = None
+            self.last_ema13 = None
+            self.cur_ema13 = None
             self.last_force_index = None
 
     def __init__(self, market_env: MarketEnv) -> None:
@@ -149,20 +146,15 @@ class ThreeAgent:
         return intervals
 
     def select_action(self, code, info):
-        macd_close_weekly = info["macd_close_weekly"]
-        # macd_close_weekly_last = info["macd_close_weekly_last"]
+        ema13 = info["ema13"]
         force_index = info["force_index_close"]
         ret = 0
 
         if code not in self.his_info:
             self.his_info[code] = self.HisInfo()
         his = self.his_info[code]
-        if (
-            his.last_macd_close_weekly
-            and his.cur_macd_close_weekly
-            and his.last_force_index
-        ):
-            if his.cur_macd_close_weekly > his.last_macd_close_weekly:
+        if his.last_force_index:
+            if ema13 > his.last_ema13:
                 # trend up
                 if (
                     force_index < his.last_force_index
@@ -181,32 +173,26 @@ class ThreeAgent:
                     # sell
                     ret = -1
 
-        if macd_close_weekly != his.cur_macd_close_weekly:
-            his.last_macd_close_weekly = his.cur_macd_close_weekly
-            his.cur_macd_close_weekly = macd_close_weekly
-
+        his.last_ema13 = ema13
         his.last_force_index = force_index
-        return ret
+        return ret, force_index
 
     def action_decider(self, stocks_obs):
-        # print(stocks_obs)
-        return [
-            {
-                "idx": i,
-                "action": self.select_action(global_var.SYMBOLS[i], stocks_obs[i]),
-            }
-            for i in range(len(stocks_obs))
-        ]
+        return {code: self.select_action(code, stocks_obs[code]) for code in stocks_obs}
 
     def stock_decider(self, actions):
+        for code, action in actions.items():
+            # print(code,action)
+            if action[0] < 0:
+                self.market_env.order_manager.cancel_order(code)
+
         # print(actions)
-        buy_list = [v for v in actions if v["action"] == 1]
-        logger.debug(f"{buy_list}")
-        # buy_list = sorted(buy_list, key=lambda x: abs(x[1]))
+        buy_list = [(code, v[1]) for code, v in actions.items() if v[0] == 1]
+        buy_list = sorted(buy_list, key=lambda x: abs(x[1]))
         # print(buy_list)
         if len(buy_list) > 0:
             logger.info(f"buy list {buy_list}")
-            self.create_order(code=global_var.SYMBOLS[buy_list[0]["idx"]], action=1)
+            self.create_order(buy_list[0][0], 1)
 
     def create_order(self, code, action):
         action = int(action * self.market_env.max_stake)

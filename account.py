@@ -31,12 +31,13 @@ class Account:
         self.costs.append(self.costs[-1])
         self.positions.append(self.positions[-1].copy())
         self.capitals.append(self.capitals[-1])
-        self.tot_values.append(self.tot_values[-1])
+        closes = [info["close"] for info in ori_obs]
+        self.tot_values.append(np.dot(self.positions[-1], closes) + self.capitals[-1])
 
         # add deep copy self.positions[-1] to self.available
         self.available.append(self.positions[-1].copy())
         if ori_obs:
-            self.dates.append(next(iter(ori_obs.values())).name)
+            self.dates.append(ori_obs[0].name)
 
     def get_position(self, symbol):
         return self.positions[-1][global_var.SYMBOLS.index(symbol)]
@@ -101,4 +102,4 @@ class Account:
         )
 
         # 渲染图表到HTML文件
-        line.render(os.path.join("gen","revenue_curve.html"))
+        line.render(os.path.join("gen", "revenue_curve.html"))

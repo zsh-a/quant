@@ -458,8 +458,10 @@ class DBDataSource:
                         weekly_his_data["macd_close_weekly"].loc[current_day]
                     )
                     weekly_macd_data.loc[current_day, "macd_close_weekly_last"] = (
-                        weekly_his_data["macd_close_weekly"].iloc[-2]
-                    ) if len(weekly_his_data) > 1 else np.nan
+                        (weekly_his_data["macd_close_weekly"].iloc[-2])
+                        if len(weekly_his_data) > 1
+                        else np.nan
+                    )
 
                     # 如果不是周五
                     if current_day.weekday() != 4:
@@ -473,14 +475,31 @@ class DBDataSource:
 
         print(data_with_weekly_macd)
         df = data_with_weekly_macd
-
+        # weekly_df = (
+        #     df.resample("W-FRI")
+        #     .agg(
+        #         {
+        #             "open": "first",
+        #             "high": "max",
+        #             "low": "min",
+        #             "close": "last",
+        #             "volume": "sum",
+        #             "amount": "sum",
+        #         }
+        #     )
+        #     .dropna()
+        # )
+        # # print(self.code, weekly_df)
+        # weekly_df.rename(columns={"close": "close_weekly"}, inplace=True)
         # indictor.indictor_macd(weekly_df, colums=["close_weekly"])
         # df = df.join(weekly_df, rsuffix="_weekly", how="left").ffill()
         # print(self.code, df)
         indictor.indictor_force_index(df)
+        indictor.indictor_KDJ(df)
 
         df["ema5"] = df["close"].ewm(span=5, adjust=False).mean()
         df["ema10"] = df["close"].ewm(span=10, adjust=False).mean()
+        df["ema13"] = df["close"].ewm(span=13, adjust=False).mean()
         df["ema20"] = df["close"].ewm(span=20, adjust=False).mean()
         df.dropna(inplace=True)
 
@@ -490,7 +509,6 @@ class DBDataSource:
         df.dropna(inplace=True)
         self.data = df
         # self.data = df[['MA5','returns','MA10','MA20','MA30']]
-        # print(self.data)
 
     def _load(self):
         bucket = "stock"
@@ -608,17 +626,21 @@ class DBDataSource:
             yaxis_opts=opts.AxisOpts(is_scale=True),  # 设置y轴的刻度是否自适应
             xaxis_opts=opts.AxisOpts(is_scale=True),  # 设置x轴的刻度是否自适应
             title_opts=opts.TitleOpts(title=f"Kline-{self.code}"),  # 设置标题
-            tooltip_opts=opts.TooltipOpts(trigger="axis"),
+            tooltip_opts=opts.TooltipOpts(trigger="axis", axis_pointer_type="cross"),
+            # axispointer_opts=opts.AxisPointerOpts(
+            #     link=[{"xAxisIndex": "all"}],  # 使得所有图表同步
+            #     label=opts.LabelOpts(is_show=True)
+            # ),
             datazoom_opts=[
                 opts.DataZoomOpts(
                     type_="inside",
-                    xaxis_index=[0, 1, 2, 3],  # 影响两个图的x轴
+                    xaxis_index=[0, 1, 2, 3, 4],  # 影响两个图的x轴
                     range_start=0,
                     range_end=100,
                 ),
                 opts.DataZoomOpts(
                     type_="slider",
-                    xaxis_index=[0, 1, 2, 3],  # 滑动缩放器同时影响两个图的x轴
+                    xaxis_index=[0, 1, 2, 3, 4],  # 滑动缩放器同时影响两个图的x轴
                     range_start=0,
                     range_end=100,
                 ),
@@ -683,12 +705,12 @@ class DBDataSource:
         )
 
         # 创建均线图，并设置 yaxis_index=0 表示使用 K 线图的同一个 Y 轴
-        line = (
+        ma_line = (
             Line()
             .add_xaxis(x_data)
             .add_yaxis(
                 "EMA5",
-                df["ema5"],
+                df["ema13"],
                 is_smooth=True,
                 linestyle_opts=opts.LineStyleOpts(width=2, color="blue"),
                 yaxis_index=0,
@@ -755,28 +777,105 @@ class DBDataSource:
                 itemstyle_opts=opts.ItemStyleOpts(color="#00da3c"),  # 成交量颜色
             )
             .set_global_opts(
-                xaxis_opts=opts.AxisOpts(is_scale=True, grid_index=1),
-                yaxis_opts=opts.AxisOpts(is_scale=True),
-                legend_opts=opts.LegendOpts(is_show=False),  # 隐藏图例
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    is_scale=True,
+                    boundary_gap=False,
+                    axislabel_opts=opts.LabelOpts(is_show=True),
+                ),
+                yaxis_opts=opts.AxisOpts(
+                    is_scale=True, splitline_opts=opts.SplitLineOpts(is_show=False)
+                ),
                 datazoom_opts=[
                     opts.DataZoomOpts(type_="inside"),
                     opts.DataZoomOpts(type_="slider"),
                 ],  # 同步缩放功能
-            )
-            .set_global_opts(
                 legend_opts=opts.LegendOpts(
                     orient="vertical", pos_left="left", pos_top="middle", is_show=False
+                ),
+            )
+        )
+
+        force_line = (
+            Line()
+            .add_xaxis(x_data)
+            .add_yaxis(
+                "force index",
+                df["force_index_close"],
+                is_smooth=True,
+                linestyle_opts=opts.LineStyleOpts(width=2, color="blue"),
+                yaxis_index=0,
+                label_opts=opts.LabelOpts(is_show=False),
+                z_level=1,
+            )
+            .set_global_opts(
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    is_scale=True,
+                    boundary_gap=False,
+                    axislabel_opts=opts.LabelOpts(is_show=False),
+                ),
+                yaxis_opts=opts.AxisOpts(
+                    is_scale=True, splitline_opts=opts.SplitLineOpts(is_show=False)
+                ),
+                datazoom_opts=[
+                    opts.DataZoomOpts(type_="inside"),
+                    opts.DataZoomOpts(type_="slider"),
+                ],  # 同步缩放功能
+                legend_opts=opts.LegendOpts(
+                    orient="vertical", pos_left="left", pos_top="middle", is_show=False
+                ),
+            )
+        )
+
+        kdj_line = (
+            Line()
+            .add_xaxis(x_data)
+            .add_yaxis(
+                "KDJ",
+                df["D"],
+                is_smooth=True,
+                linestyle_opts=opts.LineStyleOpts(width=2, color="blue"),
+                yaxis_index=0,
+                label_opts=opts.LabelOpts(is_show=False),
+                z_level=1,
+            )
+            .set_global_opts(
+                xaxis_opts=opts.AxisOpts(
+                    type_="category",
+                    is_scale=True,
+                    boundary_gap=False,
+                    axislabel_opts=opts.LabelOpts(is_show=False),
+                ),
+                yaxis_opts=opts.AxisOpts(
+                    is_scale=True, splitline_opts=opts.SplitLineOpts(is_show=False)
+                ),
+                datazoom_opts=[
+                    opts.DataZoomOpts(type_="inside"),
+                    opts.DataZoomOpts(type_="slider"),
+                ],  # 同步缩放功能
+                legend_opts=opts.LegendOpts(
+                    orient="vertical", pos_left="left", pos_top="middle", is_show=False
+                ),
+            )
+            .set_series_opts(
+                markline_opts=opts.MarkLineOpts(
+                    data=[
+                        opts.MarkLineItem(y=80, name="80 常量线"),
+                        opts.MarkLineItem(y=20, name="20 常量线"),
+                    ],
+                    label_opts=opts.LabelOpts(position="end"),
                 )
             )
         )
 
-        kline.overlap(line)
+        kline.overlap(ma_line)
 
         grid = (
-            Grid(init_opts=opts.InitOpts(width="2160px", height="1080px"))
+            Grid(init_opts=opts.InitOpts(width="3000px", height="1500px"))
             .add(
                 kline,
-                grid_opts=opts.GridOpts(pos_left="10%", pos_right="8%", height="40%"),
+                grid_opts=opts.GridOpts(pos_left="10%", pos_right="8%", height="30%"),
             )
             # .add(
             #     kline_weekly,
@@ -787,13 +886,25 @@ class DBDataSource:
             .add(
                 macd_bar,
                 grid_opts=opts.GridOpts(
-                    pos_left="10%", pos_right="8%", pos_top="40%", height="30%"
+                    pos_left="10%", pos_right="8%", pos_top="30%", height="20%"
+                ),
+            )
+            .add(
+                kdj_line,
+                grid_opts=opts.GridOpts(
+                    pos_left="10%", pos_right="8%", pos_top="50%", height="20%"
+                ),
+            )
+            .add(
+                force_line,
+                grid_opts=opts.GridOpts(
+                    pos_left="10%", pos_right="8%", pos_top="65%", height="10%"
                 ),
             )
             .add(
                 bar,
                 grid_opts=opts.GridOpts(
-                    pos_left="10%", pos_right="8%", pos_top="60%", height="20%"
+                    pos_left="10%", pos_right="8%", pos_top="70%", height="20%"
                 ),
             )
         )

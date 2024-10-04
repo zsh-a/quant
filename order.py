@@ -61,6 +61,14 @@ class OrderManager:
         self.order_id_counter += 1
         return order
 
+    def cancel_order(self, symbol):
+        for od in self.orders:
+            if od.status == "tracking" and od.symbol == symbol:
+                od.status = "cancelled"
+                logger.info(
+                    f"cancel order | datetime : {self.get_current_timestamp()} | symbol : {od.symbol} | order_id : {od.order_id}  | order_type : {od.order_type}"
+                )
+
     def get_waiting_order(self):
         return [
             order
@@ -72,10 +80,8 @@ class OrderManager:
         """
         Match open orders with the latest market data.
         """
-        ts = None
-        for k, v in market_data.items():
-            ts = v.name
-            break
+        assert len(market_data) > 0
+        ts = market_data[0].name
         self.timestamp = ts
 
         for order in self.orders:
@@ -138,9 +144,8 @@ class OrderManager:
         self.account.positions[-1][idx] += self.account.actions[-1][idx]
         self.account.tot_values[-1] = self.account.capital + np.sum(
             [
-                self.account.positions[-1][global_var.SYMBOLS.index(code)]
-                * info["close"]
-                for code, info in self.obs.items()
+                self.account.positions[-1][idx] * info["close"]
+                for idx, info in enumerate(self.obs)
             ]
         )
         self.account.available[-1][idx] = 0
@@ -163,8 +168,9 @@ class OrderManager:
         order_returns = []
 
         for buy, sell in zip(it, it):
-
-            assert buy.symbol == sell.symbol, f"{buy.symbol} {buy.timestamp} != {sell.symbol} {sell.timestamp}"
+            assert (
+                buy.symbol == sell.symbol
+            ), f"{buy.symbol} {buy.timestamp} != {sell.symbol} {sell.timestamp}"
             order_return = (
                 sell.execution_price - buy.execution_price
             ) * sell.filled_quantity
