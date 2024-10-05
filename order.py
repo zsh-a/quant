@@ -1,4 +1,5 @@
 import os
+from typing import List, Type
 from loguru import logger
 import numpy as np
 import pandas as pd
@@ -30,7 +31,7 @@ class Order:
 
 class OrderManager:
     def __init__(self, account: Account, order_policy):
-        self.orders = []
+        self.orders: List[Type[Order]] = []
         self.order_id_counter = 1
 
         self.order_plolicy = order_policy
@@ -41,8 +42,11 @@ class OrderManager:
 
         self.obs = None
 
+        self.today_traded = False
+
     def step(self, obs):
         self.obs = obs
+        self.today_traded = False
         self.order_plolicy.step(obs)
 
     def create_order(self, symbol, order_type, quantity, price=None):
@@ -80,6 +84,7 @@ class OrderManager:
         """
         Match open orders with the latest market data.
         """
+
         assert len(market_data) > 0
         ts = market_data[0].name
         self.timestamp = ts
@@ -96,6 +101,8 @@ class OrderManager:
                         self.execute_order(order, exec_price)
 
     def execute_order(self, order, execution_price):
+        if self.today_traded:
+            return
         order.status = "filled"
         order.filled_quantity = max(
             order.quantity, self.account.get_position(order.symbol)
@@ -115,6 +122,7 @@ class OrderManager:
         )
         self.order_plolicy.order_callback(order, self)
         self.update_account(order)
+        self.today_traded = True
 
     def update_account(self, order):
         """
@@ -163,6 +171,7 @@ class OrderManager:
 
     def plot(self):
         order_history = [order for order in self.orders if order.status == "filled"]
+        order_history = sorted(order_history, key=lambda x: x.timestamp)
         it = iter(order_history)
 
         order_returns = []

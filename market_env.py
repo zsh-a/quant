@@ -370,8 +370,7 @@ class MultiMarketEnv(gym.Env):
         # assert self.action_space.contains(action)
 
         obs = [ds.step() for ds in self.data_source]
-        # obs, done, ori_obs = self.data_source.step()
-        # self.data_source
+        logger.info(f"{obs[0][0].name}")
         ori_obs = [v[2] for v in obs]
         self.order_manager.step(ori_obs)
         logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")

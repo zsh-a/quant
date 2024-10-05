@@ -99,7 +99,7 @@ class BaseOrderPolicy(OrderPolicy):
         return self.account.get_available(code) > 0 and (
             self.cur_obs[idx]["low"]
             < min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])
-            and self.cur_obs[idx]["low"] < self.cur_obs[idx]["ema5"]
+            and self.cur_obs[idx]["low"] < self.cur_obs[idx]["ema10"]
         )
 
     def step(self, obs):
@@ -115,8 +115,7 @@ class BaseOrderPolicy(OrderPolicy):
 class ThreeAgent:
     class HisInfo:
         def __init__(self) -> None:
-            self.last_macd_close_weekly = None
-            self.cur_macd_close_weekly = None
+            self.his_macd_weekly = []
             self.last_force_index = None
 
     def __init__(self, market_env: MarketEnv) -> None:
@@ -148,8 +147,40 @@ class ThreeAgent:
 
         return intervals
 
+    # def select_action(self, code, info):
+    #     macd_close_weekly = info["macd_close_weekly"]
+    #     macd_close_weekly_last = info["macd_close_weekly_last"]
+    #     force_index = info["force_index_close"]
+    #     ret = 0
+
+    #     if code not in self.his_info:
+    #         self.his_info[code] = self.HisInfo()
+    #     his = self.his_info[code]
+
+    #     if his.last_force_index:
+    #         logger.info(
+    #             f"macd_close_weekly : {macd_close_weekly} macd_close_weekly_last : {macd_close_weekly_last}"
+    #         )
+    #         if macd_close_weekly > macd_close_weekly_last:
+    #             # trend up
+    #             if (
+    #                 force_index < his.last_force_index
+    #                 and force_index < 0
+    #                 and his.last_force_index > 0
+    #             ):
+    #                 # buy
+    #                 ret = 1
+    #         else:
+    #             # trend down
+
+    #             # sell
+    #             ret = -1
+
+    #     his.last_force_index = force_index
+    #     return ret
+
     def select_action(self, code, info):
-        macd_close_weekly = info["macd_close_weekly"]
+        macd_close_weekly = info["macd_close_weekly_vis"]
         # macd_close_weekly_last = info["macd_close_weekly_last"]
         force_index = info["force_index_close"]
         ret = 0
@@ -157,56 +188,62 @@ class ThreeAgent:
         if code not in self.his_info:
             self.his_info[code] = self.HisInfo()
         his = self.his_info[code]
-        if (
-            his.last_macd_close_weekly
-            and his.cur_macd_close_weekly
-            and his.last_force_index
-        ):
-            if his.cur_macd_close_weekly > his.last_macd_close_weekly:
-                # trend up
-                if (
-                    force_index < his.last_force_index
-                    and force_index < 0
-                    and his.last_force_index > 0
-                ):
-                    # buy
-                    ret = 1
-            else:
-                # trend down
-                if (
-                    force_index > his.last_force_index
-                    and force_index > 0
-                    and his.last_force_index < 0
-                ):
+
+        if his.last_force_index and len(his.his_macd_weekly) > 1:
+            last_macd_close_weekly = (
+                his.his_macd_weekly[-1]
+                if macd_close_weekly != his.his_macd_weekly[-1]
+                else his.his_macd_weekly[-2]
+            )
+            if last_macd_close_weekly != 0:
+                logger.info(
+                    f"macd_close_weekly : {macd_close_weekly} macd_close_weekly_last : {last_macd_close_weekly}"
+                )
+                if macd_close_weekly > last_macd_close_weekly:
+                    # trend up
+                    if (
+                        force_index < his.last_force_index
+                        and force_index < 0
+                        and his.last_force_index > 0
+                    ):
+                        # buy
+                        ret = 1
+                else:
+                    # trend downz
                     # sell
                     ret = -1
 
-        if macd_close_weekly != his.cur_macd_close_weekly:
-            his.last_macd_close_weekly = his.cur_macd_close_weekly
-            his.cur_macd_close_weekly = macd_close_weekly
+        if (
+            len(his.his_macd_weekly) == 0
+            or macd_close_weekly != his.his_macd_weekly[-1]
+        ):
+            his.his_macd_weekly.append(macd_close_weekly)
 
         his.last_force_index = force_index
-        return ret
+        return ret, force_index
 
     def action_decider(self, stocks_obs):
         # print(stocks_obs)
         return [
-            {
-                "idx": i,
-                "action": self.select_action(global_var.SYMBOLS[i], stocks_obs[i]),
-            }
+            {"idx": i, "info": self.select_action(global_var.SYMBOLS[i], stocks_obs[i])}
             for i in range(len(stocks_obs))
         ]
 
     def stock_decider(self, actions):
-        # print(actions)
-        buy_list = [v for v in actions if v["action"] == 1]
-        logger.debug(f"{buy_list}")
-        # buy_list = sorted(buy_list, key=lambda x: abs(x[1]))
-        # print(buy_list)
+        buy_list = [v for v in actions if v["info"][0] == 1]
+        sell_list = [v for v in actions if v["info"][0] == -1]
+        # logger.debug(f"{buy_list}")
+        buy_list = sorted(buy_list, key=lambda x: x["info"][1])
         if len(buy_list) > 0:
             logger.info(f"buy list {buy_list}")
             self.create_order(code=global_var.SYMBOLS[buy_list[0]["idx"]], action=1)
+        # if len(sell_list) > 0:
+        #     logger.info(f"sell list {sell_list}")
+        #     for sell in sell_list:
+        #         self.cancel_order(global_var.SYMBOLS[sell["idx"]])
+
+    def cancel_order(self, code):
+        self.market_env.order_manager.cancel_order(code)
 
     def create_order(self, code, action):
         action = int(action * self.market_env.max_stake)

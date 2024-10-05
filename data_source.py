@@ -475,24 +475,25 @@ class DBDataSource:
 
         print(data_with_weekly_macd)
         df = data_with_weekly_macd
-        # weekly_df = (
-        #     df.resample("W-FRI")
-        #     .agg(
-        #         {
-        #             "open": "first",
-        #             "high": "max",
-        #             "low": "min",
-        #             "close": "last",
-        #             "volume": "sum",
-        #             "amount": "sum",
-        #         }
-        #     )
-        #     .dropna()
-        # )
-        # # print(self.code, weekly_df)
-        # weekly_df.rename(columns={"close": "close_weekly"}, inplace=True)
-        # indictor.indictor_macd(weekly_df, colums=["close_weekly"])
-        # df = df.join(weekly_df, rsuffix="_weekly", how="left").ffill()
+
+        weekly_df = (
+            df.resample("W-FRI")
+            .agg(
+                {
+                    "open": "first",
+                    "high": "max",
+                    "low": "min",
+                    "close": "last",
+                    "volume": "sum",
+                    "amount": "sum",
+                }
+            )
+            .dropna()
+        )
+        # print(self.code, weekly_df)
+        weekly_df.rename(columns={"close": "close_weekly_vis"}, inplace=True)
+        indictor.indictor_macd(weekly_df, colums=["close_weekly_vis"])
+        df = df.join(weekly_df, rsuffix="_weekly", how="left").ffill()
         # print(self.code, df)
         indictor.indictor_force_index(df)
         indictor.indictor_KDJ(df)
@@ -683,7 +684,7 @@ class DBDataSource:
             .add_xaxis(x_data)
             .add_yaxis(
                 "MACD Histogram",
-                df["macd_close_weekly"].tolist(),
+                df["macd_close_weekly_vis"].tolist(),
                 yaxis_index=1,
                 label_opts=opts.LabelOpts(is_show=False),
                 color="green",
@@ -861,8 +862,8 @@ class DBDataSource:
             .set_series_opts(
                 markline_opts=opts.MarkLineOpts(
                     data=[
-                        opts.MarkLineItem(y=80, name="80 常量线"),
-                        opts.MarkLineItem(y=20, name="20 常量线"),
+                        opts.MarkLineItem(y=70, name="70 常量线"),
+                        opts.MarkLineItem(y=30, name="30 常量线"),
                     ],
                     label_opts=opts.LabelOpts(position="end"),
                 )

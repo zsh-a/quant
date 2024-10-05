@@ -28,7 +28,7 @@ def run_policy():
     env = MultiMarketEnv(
         250,
         # code='000001',
-        start_date="20210901",
+        start_date="20211001",
         end_date=None,
         initial_capital=10000,
         max_stake=10000000,
@@ -68,7 +68,8 @@ if __name__ == "__main__":
     # logger.remove()
     # logger.remove()
     # logger.add(sys.stdout, level="WARNING")  # 设定日志输出的最低级别
-
+    os.system("rm -rf gen/*")
+    logger.add("logfile.log", rotation="10 MB", retention="10 days", compression="zip")
     run_policy()
     # schedule.every().day.at("09:30").do(run_policy)
     # while True:

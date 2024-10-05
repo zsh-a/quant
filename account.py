@@ -49,15 +49,30 @@ class Account:
         strategy_return = (
             np.array(self.tot_values) - self.tot_values[0]
         ) / self.tot_values[0]
+
+        cum_returns = np.array(self.tot_values) / self.tot_values[0]
+
+        rolling_max = np.maximum.accumulate(cum_returns)
+
+        drawdowns = cum_returns / rolling_max - 1
+
+        # 计算最大回撤
+        max_drawdown = np.min(drawdowns)
+
+        # 计算滚动最小值
+        rolling_min = np.minimum.accumulate(cum_returns)
+
+        # 计算盈利
+        gains = cum_returns / rolling_min - 1
+
+        # 计算最大盈利
+        max_gain = np.max(gains)
+
         # print(risk_free_rate, np.mean(strategy_return))
         return {
             "strategy_return": round(strategy_return[-1] * 100, 2),
-            "max_drawdown": round(
-                (min(self.tot_values) / self.tot_values[0] - 1) * 100, 2
-            ),
-            "max_profit": round(
-                (max(self.tot_values) / self.tot_values[0] - 1) * 100, 2
-            ),
+            "max_drawdown": f"{max_drawdown:.2%}",
+            "max_profit": f"{max_gain:.2%}",
             "code_returns": {
                 code: ret
                 for code, ret in zip(global_var.SYMBOLS, np.array(self.returns))
