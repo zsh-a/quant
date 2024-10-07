@@ -31,12 +31,14 @@ class Account:
         self.costs.append(self.costs[-1])
         self.positions.append(self.positions[-1].copy())
         self.capitals.append(self.capitals[-1])
-        closes = [info["close"] for info in ori_obs]
-        self.tot_values.append(np.dot(self.positions[-1], closes) + self.capitals[-1])
 
         # add deep copy self.positions[-1] to self.available
         self.available.append(self.positions[-1].copy())
         if ori_obs:
+            closes = [info["close"] for info in ori_obs]
+            self.tot_values.append(
+                np.dot(self.positions[-1], closes) + self.capitals[-1]
+            )
             self.dates.append(ori_obs[0].name)
 
     def get_position(self, symbol):

@@ -1,3 +1,4 @@
+import argparse
 import influxdb_client, os, time
 from influxdb_client import InfluxDBClient, Point, WritePrecision
 from influxdb_client.client.write_api import SYNCHRONOUS
@@ -138,10 +139,15 @@ def update_data():
 
 
 if __name__ == "__main__":
-    # update_data()
+    # 创建解析器
+    parser = argparse.ArgumentParser(description="策略运行")
 
-    # schedule.every().day.at(f"{18:02d}:{00:02d}").do(update_data)
-    # while True:
-    #     schedule.run_pending()
-    #     time.sleep(1)
-    write_data()
+    parser.add_argument("--update", action="store_true", help="更新数据")
+    args = parser.parse_args()
+    if args.update:
+        update_data()
+        schedule.every().day.at(f"{18:02d}:{00:02d}").do(update_data)
+        while True:
+            schedule.run_pending()
+            time.sleep(1)
+    # write_data()

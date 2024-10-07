@@ -221,7 +221,8 @@ class Broker:
         df = df.loc[global_var.SYMBOLS]
         df = {row[0]: row[1] for row in df.iterrows()}
         assert self.last_obs is not None
-        for k, v in self.last_obs.items():
+        for idx, v in enumerate(self.last_obs):
+            k = global_var.SYMBOLS[idx]
             df[k]["open"] *= v["adj_factor"]
             df[k]["high"] *= v["adj_factor"]
             df[k]["low"] *= v["adj_factor"]
@@ -242,7 +243,8 @@ class Broker:
             K = 2 / (N + 1)
             EMA_yesterday = v["ema5"]
             df[k]["ema5"] = (Value_today * K) + (EMA_yesterday * (1 - K))
-        return df
+        ret = [df[code] for code in global_var.SYMBOLS]
+        return ret
 
     def step(self, obs):
         # self.order_policy.step(obs)
@@ -252,6 +254,8 @@ class Broker:
     def run(self, orders: List[Type[Order]]):
         self.order_manager.step(None)
         self.account.step(None)
+        logger.info("live running")
+        logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
         while True:
             current_time = datetime.now().time()
             three_pm = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
@@ -264,7 +268,6 @@ class Broker:
                 continue
             self.order_policy.step_in_day(df)
             self.match_order(orders)
-            logger.info("live running")
             if current_time > three_pm:
                 logger.info("live runing end")
                 return
