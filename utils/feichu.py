@@ -1,6 +1,7 @@
 import hashlib
 import base64
 import hmac
+from loguru import logger
 import requests
 import time
 import json
@@ -36,6 +37,13 @@ def send(msg):
         },
     )
     return resp.json()
+
+
+def send_no_except(msg):
+    try:
+        send(msg)
+    except Exception as e:
+        logger.error(f"{e}")
 
 
 if __name__ == "__main__":

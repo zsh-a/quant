@@ -1,6 +1,6 @@
 from datetime import datetime
 import time
-from typing import Any, SupportsFloat, Tuple
+from typing import Any, List, SupportsFloat, Tuple, Type
 import gymnasium as gym
 import numpy as np
 from account import Account
@@ -14,7 +14,7 @@ import global_var
 import pandas as pd
 import akshare as ak
 import client as trader
-import dd
+import utils.feichu as msg
 
 INF = 1e9
 
@@ -249,7 +249,7 @@ class Broker:
         self.last_obs = obs
         # print(self.get_data())
 
-    def run(self, orders):
+    def run(self, orders: List[Type[Order]]):
         self.order_manager.step(None)
         self.account.step(None)
         while True:
@@ -270,31 +270,30 @@ class Broker:
                 return
             time.sleep(60)
 
-    def match_order(self, orders):
+    def match_order(self, orders: List[Type[Order]]):
         for order in orders:
             if order.status == "open" or order.status == "tracking":
                 if order.order_type == "buy":
                     ok, exec_price = self.order_policy.buy_policy(order)
                     if ok:
+                        msg.send_no_except(f"价格向上突破 等待买入{order.symbol}")
                         self.execute_order(order, exec_price)
                 elif order.order_type == "sell" or order.order_type == "stop":
                     ok, exec_price = self.order_policy.sell_policy(order)
                     if ok:
+                        msg.send_no_except(f"价格向上突破 等待卖出{order.symbol}")
                         self.execute_order(order, exec_price)
 
     def execute_order(self, order: Order, exec_price):
         logger.info(f"exec order : {order} , exec_price : {exec_price}")
         try:
             if order.order_type == "buy":
-                ret = trader.buy(order.symbol)
+                ret = trader.client.buy(order.symbol)
             else:
-                ret = trader.sell(order.symbol)
+                ret = trader.client.sell(order.symbol)
         except Exception as e:
             ret = e
-        try:
-            dd.Msg.send(ret)
-        except Exception as e:
-            logger.error(f"dd msg send error : {e}")
+            logger.error(ret)
 
 
 class MultiMarketEnv(gym.Env):
