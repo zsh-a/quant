@@ -259,7 +259,7 @@ class Broker:
         while True:
             current_time = datetime.now().time()
             three_pm = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
-
+            logger.info(f"start process")
             try:
                 df = self.get_data()
             except Exception as e:
@@ -284,7 +284,7 @@ class Broker:
                 elif order.order_type == "sell" or order.order_type == "stop":
                     ok, exec_price = self.order_policy.sell_policy(order)
                     if ok:
-                        msg.send_no_except(f"价格向上突破 等待卖出{order.symbol}")
+                        msg.send_no_except(f"价格向下突破 等待卖出{order.symbol}")
                         self.execute_order(order, exec_price)
 
     def execute_order(self, order: Order, exec_price):

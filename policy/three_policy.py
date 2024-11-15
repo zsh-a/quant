@@ -26,6 +26,8 @@ class BaseOrderPolicy(OrderPolicy):
         self.slip = 0.001
         self.tracking = []
 
+        self.running_in_day = False
+
     def order_callback(self, order: Order, order_manager: OrderManager):
         if order.order_type == "buy":
             order_manager.create_order(order.symbol, "stop", order.quantity)
@@ -61,10 +63,11 @@ class BaseOrderPolicy(OrderPolicy):
 
     def buy_cond(self, code):
         idx = global_var.SYMBOLS.index(code)
+        key = "close" if self.running_in_day else "high"
         logger.info(
             f"buy cond | symbol : {code} | cur high : {self.cur_obs[idx]["high"]} | last high : {self.last_obs[-1][idx]["high"]}"
         )
-        return self.cur_obs[idx]["high"] > self.last_obs[-1][idx]["high"]
+        return self.cur_obs[idx][key] > self.last_obs[-1][idx]["high"]
 
     def sell_policy(self, order):
         action = order.quantity
@@ -92,14 +95,15 @@ class BaseOrderPolicy(OrderPolicy):
         if len(self.last_obs) < 2:
             return False
         idx = global_var.SYMBOLS.index(code)
+        key = "close" if self.running_in_day else "low"
         logger.info(
-            f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[idx]["low"]} | cur close : {self.cur_obs[idx]["close"]} last low : {min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])} | ema5 : {self.cur_obs[idx]["ema5"]}"
+            f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[idx]["low"]} | cur close : {self.cur_obs[idx]["close"]} last low : {min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])} | ema10 : {self.cur_obs[idx]["ema10"]}"
         )
         # print(self.cur_obs[code])
         return self.account.get_available(code) > 0 and (
-            self.cur_obs[idx]["low"]
+            self.cur_obs[idx][key]
             < min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])
-            and self.cur_obs[idx]["low"] < self.cur_obs[idx]["ema10"]
+            and self.cur_obs[idx][key] < self.cur_obs[idx]["ema10"]
         )
 
     def step(self, obs):
@@ -110,6 +114,7 @@ class BaseOrderPolicy(OrderPolicy):
 
     def step_in_day(self, obs):
         self.cur_obs = obs
+        self.running_in_day = True
 
 
 class ThreeAgent:

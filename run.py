@@ -28,7 +28,7 @@ def run_policy(args):
     env = MultiMarketEnv(
         250,
         # code='000001',
-        start_date="20211001",
+        start_date="20230101",
         end_date=None,
         initial_capital=10000,
         max_stake=10000000,
@@ -73,17 +73,19 @@ if __name__ == "__main__":
 
     parser.add_argument("--live", action="store_true", help="显示详细信息")
     args = parser.parse_args()
-
-    if not args.live:
-        os.environ["INFLUXDB_TOKEN"] = (
-            "vH5FD5il70h2n5RNO9zj6i6dRO9TMQihKWL9xDhdbarA7wyXZNM-GOgkc6MKJS3zsmYEOBaW_gylF-XVZBSR0A=="
-        )
+    # os.environ["INFLUXDB_TOKEN"] = (
+    #     "vH5FD5il70h2n5RNO9zj6i6dRO9TMQihKWL9xDhdbarA7wyXZNM-GOgkc6MKJS3zsmYEOBaW_gylF-XVZBSR0A=="
+    # )
+    # if not args.live:
+    #     os.environ["INFLUXDB_TOKEN"] = (
+    #         "vH5FD5il70h2n5RNO9zj6i6dRO9TMQihKWL9xDhdbarA7wyXZNM-GOgkc6MKJS3zsmYEOBaW_gylF-XVZBSR0A=="
+    #     )
 
     os.system("rm -rf gen/*")
     logger.add("logfile.log", rotation="10 MB", retention="100 days", compression="zip")
     run_policy(args)
     if args.live:
-        schedule.every().day.at("09:30").do(run_policy)
+        schedule.every().day.at("09:30").do(run_policy, args)
         while True:
             schedule.run_pending()
             time.sleep(1)

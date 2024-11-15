@@ -118,7 +118,7 @@ if __name__ == "__main__":
     # print(sell('513060',100))
     # print(sell("513050"))
     client = TraderClient(url="http://172.19.112.1:11122")
-    print(client.sell("159869"))
+    print(client.buy("159869"))
     # print(client.position())
     # try:
     #    print(user.buy('510880',None,None))

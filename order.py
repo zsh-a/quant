@@ -11,9 +11,10 @@ from pyecharts.options import ComponentTitleOpts
 
 
 class Order:
-    def __init__(self, order_id, symbol, order_type, quantity, price=None):
+    def __init__(self, order_id, symbol, name, order_type, quantity, price=None):
         self.order_id = order_id
         self.symbol = symbol
+        self.name = name
         self.order_type = order_type  # 'buy' or 'sell'
         self.quantity = quantity
         self.price = price  # Limit price for limit orders
@@ -23,7 +24,7 @@ class Order:
         self.execution_price = None
 
     def __str__(self) -> str:
-        return f"Order({self.order_id}, {self.symbol}, {self.order_type}, {self.quantity}, {self.execution_price}, {self.status}, {self.filled_quantity}, {self.timestamp})"
+        return f"Order({self.order_id}, {self.symbol}, {self.name}, {self.order_type}, {self.quantity}, {self.execution_price}, {self.status}, {self.filled_quantity}, {self.timestamp})"
 
     def __repr__(self) -> str:
         return self.__str__()
@@ -50,7 +51,14 @@ class OrderManager:
         self.order_plolicy.step(obs)
 
     def create_order(self, symbol, order_type, quantity, price=None):
-        order = Order(self.order_id_counter, symbol, order_type, quantity, price)
+        all_etf = pd.read_csv("all_etf.csv")
+
+        all_etf.columns = ["代码", "freq", "name"]
+        # print(all_etf)
+        all_etf = all_etf.set_index("代码")
+        all_etf.index = all_etf.index.astype(str)
+        name = all_etf.loc[symbol]["name"]
+        order = Order(self.order_id_counter, symbol, name, order_type, quantity, price)
         for od in self.orders:
             if od.status == "tracking":
                 od.status = "cancelled"
