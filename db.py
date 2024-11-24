@@ -16,16 +16,20 @@ url = "http://localhost:8086"
 client = influxdb_client.InfluxDBClient(url=url, token=token, org=org)
 
 
-def write_data():
+def write_data(args):
     write_api = client.write_api(write_options=SYNCHRONOUS)
 
     for file in os.listdir("data/combine"):
         code = file.split(".")[0]
+
+        if args.symbol and code != args.symbol:
+            continue
         df = pd.read_csv(os.path.join("data", "combine", f"{code}.csv"))
-        print(df.iloc[-3:-1])
 
         # break
-        # df = df.iloc[-3:-1]
+        # df = df.iloc[-30:]
+        # print(df)
+        # breakpoint()
         df["ticker"] = f"{code}"
 
         df["datetime"] = pd.to_datetime(
@@ -100,7 +104,7 @@ def update_data():
         # df.set_index('代码',inplace=True)
         df = df.loc[all_etf.index.values]
         # print(df)
-        df["成交量"] = df["成交量"].astype(int)
+        df["成交量"] = df["成交量"].astype(int) * 100
         date = pd.to_datetime(df["数据日期"].unique()[0])
 
         write_api = client.write_api(write_options=SYNCHRONOUS)
@@ -143,6 +147,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="策略运行")
 
     parser.add_argument("--update", action="store_true", help="更新数据")
+    parser.add_argument("--symbol", help="code", required=False)
     args = parser.parse_args()
     if args.update:
         update_data()
@@ -150,4 +155,5 @@ if __name__ == "__main__":
         while True:
             schedule.run_pending()
             time.sleep(1)
-    # write_data()
+    else:
+        write_data(args)

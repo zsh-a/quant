@@ -23,6 +23,8 @@ class Order:
         self.timestamp = None  # Time when the order was created
         self.execution_price = None
 
+        self.extra_info = {}
+
     def __str__(self) -> str:
         return f"Order({self.order_id}, {self.symbol}, {self.name}, {self.order_type}, {self.quantity}, {self.execution_price}, {self.status}, {self.filled_quantity}, {self.timestamp})"
 
@@ -57,7 +59,10 @@ class OrderManager:
         # print(all_etf)
         all_etf = all_etf.set_index("代码")
         all_etf.index = all_etf.index.astype(str)
-        name = all_etf.loc[symbol]["name"]
+        try:
+            name = all_etf.loc[symbol]["name"]
+        except Exception as e:
+            name = "UNKNOW"
         order = Order(self.order_id_counter, symbol, name, order_type, quantity, price)
         for od in self.orders:
             if od.status == "tracking":
@@ -75,11 +80,11 @@ class OrderManager:
 
     def cancel_order(self, symbol):
         for od in self.orders:
-            if od.status == "tracking" and od.symbol == symbol:
+            if od.symbol == symbol and (od.status == "open" or od.status == "tracking"):
                 od.status = "cancelled"
-                logger.info(
-                    f"cancel order | datetime : {self.get_current_timestamp()} | symbol : {od.symbol} | order_id : {od.order_id}  | order_type : {od.order_type}"
-                )
+                # logger.info(
+                #     f"cancel order | datetime : {self.get_current_timestamp()} | symbol : {od.symbol} | order_id : {od.order_id}  | order_type : {od.order_type}"
+                # )
 
     def get_waiting_order(self):
         return [
@@ -107,6 +112,10 @@ class OrderManager:
                     ok, exec_price = self.order_plolicy.sell_policy(order)
                     if ok:
                         self.execute_order(order, exec_price)
+            # if order.status == "open" and order.order_type == "sell":
+            #     idx = global_var.SYMBOLS.index(order.symbol)
+            #     if market_data[idx]["low"] <= order.price <= market_data[idx]["high"]:
+            #         self.execute_order(order, order.price)
 
     def execute_order(self, order, execution_price):
         if self.today_traded:

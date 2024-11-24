@@ -15,6 +15,17 @@ def tdx_data_preprocess(file_path, fq):
 
 
 def combine():
+    with open("Book1.csv", "r", errors="ignore") as file:
+        lines = file.readlines()
+    del lines[2:4]
+    del lines[0]
+    del lines[-2:]
+
+    lines[0] = lines[0][1:]
+
+    with open("Book1.csv", "w") as file:
+        file.writelines(lines)
+
     df = pd.read_csv("Book1.csv")
     print(df)
     for column_name in df.columns:

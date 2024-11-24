@@ -3,7 +3,7 @@ import re, os
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
-import mplfinance as mpf
+# import mplfinance as mpf
 import indictor
 import matplotlib.dates as mdates
 
@@ -17,6 +17,7 @@ import schedule
 from pyecharts import options as opts
 from pyecharts.charts import Bar
 from pyecharts.charts import Kline, Line, Grid, Scatter
+import talib as ta
 
 from loguru import logger
 
@@ -228,75 +229,75 @@ class DataSource:
         # train_set,test_set = df.iloc[:train_size],df.iloc[train_size:]
         # return normilize(train_set),normilize(test_set)
 
-    def macd_bars(self, buy_sell_points):
-        colors = [
-            "green" if val >= 0 else "red"
-            for val in self.origin_data["macd_close_weekly"]
-        ]
+    # def macd_bars(self, buy_sell_points):
+    #     colors = [
+    #         "green" if val >= 0 else "red"
+    #         for val in self.origin_data["macd_close_weekly"]
+    #     ]
 
-        return [
-            mpf.make_addplot(self.origin_data["ema5"], color="lime"),
-            mpf.make_addplot(self.origin_data["ema10"], color="c"),
-            mpf.make_addplot(
-                self.origin_data["macd_close_weekly"],
-                type="bar",
-                width=0.7,
-                color=colors,
-                panel=1,
-                alpha=0.5,
-                secondary_y=False,
-            ),
-            mpf.make_addplot(
-                self.origin_data["force_index_close"],
-                type="bar",
-                width=0.7,
-                color="b",
-                panel=2,
-                alpha=0.5,
-                secondary_y=False,
-            ),
-        ]
+    #     return [
+    #         mpf.make_addplot(self.origin_data["ema5"], color="lime"),
+    #         mpf.make_addplot(self.origin_data["ema10"], color="c"),
+    #         mpf.make_addplot(
+    #             self.origin_data["macd_close_weekly"],
+    #             type="bar",
+    #             width=0.7,
+    #             color=colors,
+    #             panel=1,
+    #             alpha=0.5,
+    #             secondary_y=False,
+    #         ),
+    #         mpf.make_addplot(
+    #             self.origin_data["force_index_close"],
+    #             type="bar",
+    #             width=0.7,
+    #             color="b",
+    #             panel=2,
+    #             alpha=0.5,
+    #             secondary_y=False,
+    #         ),
+    #     ]
 
-    def plot(self, buy_sell_points):
-        custom_colors = mpf.make_marketcolors(
-            up="red",  # 上涨的颜色
-            down="green",  # 下跌的颜色
-            edge="black",  # K线边缘颜色
-            wick="black",  # K线上下影线颜色
-            volume="blue",  # 成交量条颜色
-        )
-        style = mpf.make_mpf_style(marketcolors=custom_colors)
-        apds = self.macd_bars(buy_sell_points)
+    # def plot(self, buy_sell_points):
+    #     custom_colors = mpf.make_marketcolors(
+    #         up="red",  # 上涨的颜色
+    #         down="green",  # 下跌的颜色
+    #         edge="black",  # K线边缘颜色
+    #         wick="black",  # K线上下影线颜色
+    #         volume="blue",  # 成交量条颜色
+    #     )
+    #     style = mpf.make_mpf_style(marketcolors=custom_colors)
+    #     apds = self.macd_bars(buy_sell_points)
 
-        fig, axes = mpf.plot(
-            self.origin_data,
-            title=f"{self.code}",
-            addplot=apds,
-            type="candle",
-            style=style,
-            returnfig=True,
-            volume=False,
-        )
-        ax = axes[0]
-        for date, symbol, action in buy_sell_points:
-            if symbol != self.code:
-                continue
-            if action == "buy":
-                ax.scatter(
-                    self.origin_data.index.get_loc(date),
-                    self.origin_data.loc[date, "low"],
-                    color="red",
-                    marker="^",
-                    s=100,
-                )
-            elif action == "sell" or action == "stop":
-                ax.scatter(
-                    self.origin_data.index.get_loc(date),
-                    self.origin_data.loc[date, "high"],
-                    color="green",
-                    marker="v",
-                    s=100,
-                )
+    #     fig, axes = mpf.plot(
+    #         self.origin_data,
+    #         title=f"{self.code}",
+    #         addplot=apds,
+    #         type="candle",
+    #         style=style,
+    #         returnfig=True,
+    #         volume=False,
+    #     )
+    #     ax = axes[0]
+    #     for date, symbol, action in buy_sell_points:
+    #         if symbol != self.code:
+    #             continue
+    #         if action == "buy":
+    #             ax.scatter(
+    #                 self.origin_data.index.get_loc(date),
+    #                 self.origin_data.loc[date, "low"],
+    #                 color="red",
+    #                 marker="^",
+    #                 s=100,
+    #             )
+    #         elif action == "sell" or action == "stop":
+    #             ax.scatter(
+    #                 self.origin_data.index.get_loc(date),
+    #                 self.origin_data.loc[date, "high"],
+    #                 color="green",
+    #                 marker="v",
+    #                 s=100,
+    #             )
 
         # # 获取当前图表的Axes对象
         # # 设置x轴日期格式为matplotlib的日期格式
@@ -507,6 +508,16 @@ class DBDataSource:
         df["amplitude"] = (df["high"] - df["low"]) / df["close"].shift(1)
         df["returns"] = np.log(df["close"] / df["close"].shift(1))
 
+
+        # turtle
+        df['up']=ta.MAX(df.high,timeperiod=20).shift(1)
+        #最近N2个交易日最低价
+        df['down']=ta.MIN(df.low,timeperiod=10).shift(1)
+        #每日真实波动幅度
+        df['ATR']=ta.ATR(df.high,df.low,df.close,timeperiod=20)
+        df["turtle_short"] = df['up'] - 2 * df['ATR']
+
+
         df.dropna(inplace=True)
         self.data = df
         # self.data = df[['MA5','returns','MA10','MA20','MA30']]
@@ -526,8 +537,10 @@ class DBDataSource:
             "%Y-%m-%dT%H:%M:%SZ"
         )
         # ="20230601"
+        if not self.end_date:
+            self.end_date = datetime.now().strftime("%Y%m%d")
         end_date = datetime.strptime(
-            datetime.now().strftime("%Y%m%d"), "%Y%m%d"
+            self.end_date, "%Y%m%d"
         ).strftime("%Y-%m-%dT%H:%M:%SZ")
         # print(start_date,end_date)
         query = f"""
@@ -713,12 +726,57 @@ class DBDataSource:
                 "EMA5",
                 df["ema13"],
                 is_smooth=True,
-                linestyle_opts=opts.LineStyleOpts(width=2, color="blue"),
+                linestyle_opts=opts.LineStyleOpts(width=1, color="blue"),
                 yaxis_index=0,
                 label_opts=opts.LabelOpts(is_show=False),
                 z_level=1,
             )
         )
+
+        up_line = (
+            Line()
+            .add_xaxis(x_data)
+            .add_yaxis(
+                "up",
+                df["up"],
+                is_smooth=True,
+                linestyle_opts=opts.LineStyleOpts(width=1, color="blue"),
+                yaxis_index=0,
+                label_opts=opts.LabelOpts(is_show=False),
+                z_level=1,
+            )
+        )
+
+        down_line = (
+            Line()
+            .add_xaxis(x_data)
+            .add_yaxis(
+                "down",
+                df["down"],
+                is_smooth=True,
+                linestyle_opts=opts.LineStyleOpts(width=1, color="red"),
+                yaxis_index=0,
+                label_opts=opts.LabelOpts(is_show=False),
+                z_level=1,
+            )
+        )
+
+        
+
+        turtle_short_line = (
+            Line()
+            .add_xaxis(x_data)
+            .add_yaxis(
+                "turtle_short",
+                df["turtle_short"],
+                is_smooth=True,
+                linestyle_opts=opts.LineStyleOpts(width=1, color="red"),
+                yaxis_index=0,
+                label_opts=opts.LabelOpts(is_show=False),
+                z_level=1,
+            )
+        )
+
 
         buy_points_x = []
         buy_points_y = []
@@ -870,7 +928,22 @@ class DBDataSource:
             )
         )
 
-        kline.overlap(ma_line)
+        atr_line = (
+            Line()
+            .add_xaxis(x_data)
+            .add_yaxis(
+                "ATR",
+                df["ATR"],
+                is_smooth=True,
+                linestyle_opts=opts.LineStyleOpts(width=1, color="blue"),
+                yaxis_index=0,
+                label_opts=opts.LabelOpts(is_show=False),
+                z_level=1,
+            )
+        )
+
+
+        kline.overlap(ma_line).overlap(up_line).overlap(down_line).overlap(turtle_short_line)
 
         grid = (
             Grid(init_opts=opts.InitOpts(width="3000px", height="1500px"))
@@ -893,21 +966,28 @@ class DBDataSource:
             .add(
                 kdj_line,
                 grid_opts=opts.GridOpts(
-                    pos_left="10%", pos_right="8%", pos_top="50%", height="20%"
+                    pos_left="10%", pos_right="8%", pos_top="50%", height="10%"
                 ),
             )
             .add(
                 force_line,
                 grid_opts=opts.GridOpts(
-                    pos_left="10%", pos_right="8%", pos_top="65%", height="10%"
+                    pos_left="10%", pos_right="8%", pos_top="60%", height="10%"
+                ),
+            )
+            .add(
+                atr_line,
+                grid_opts=opts.GridOpts(
+                    pos_left="10%", pos_right="8%", pos_top="75%", height="10%"
                 ),
             )
             .add(
                 bar,
                 grid_opts=opts.GridOpts(
-                    pos_left="10%", pos_right="8%", pos_top="70%", height="20%"
+                    pos_left="10%", pos_right="8%", pos_top="85%", height="10%"
                 ),
             )
+            
         )
         grid.render(os.path.join("gen", f"kline_{self.code}.html"))
 

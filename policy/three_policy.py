@@ -11,7 +11,7 @@ sys.path.append(parent_dir)
 import global_var
 
 from account import Account
-from market_env import MarketEnv, MultiMarketEnv
+from market_env import MultiMarketEnv
 from order import Order, OrderManager
 
 
@@ -103,7 +103,7 @@ class BaseOrderPolicy(OrderPolicy):
         return self.account.get_available(code) > 0 and (
             self.cur_obs[idx][key]
             < min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])
-            and self.cur_obs[idx][key] < self.cur_obs[idx]["ema10"]
+            # and self.cur_obs[idx][key] < self.cur_obs[idx]["ema10"]
         )
 
     def step(self, obs):
@@ -123,7 +123,7 @@ class ThreeAgent:
             self.his_macd_weekly = []
             self.last_force_index = None
 
-    def __init__(self, market_env: MarketEnv) -> None:
+    def __init__(self, market_env: MultiMarketEnv) -> None:
         self.market_env = market_env
 
         self.his_info = {}

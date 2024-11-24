@@ -8,6 +8,8 @@ import argparse
 from account import Account
 from market_env import MultiMarketEnv
 from policy.three_policy import BaseOrderPolicy, ThreeAgent
+# from policy.turtle_policy import BaseOrderPolicy, ThreeAgent
+# from policy.kdj_policy import BaseOrderPolicy, ThreeAgent
 # from policy.ema_policy import BaseOrderPolicy, ThreeAgent
 
 
@@ -28,8 +30,8 @@ def run_policy(args):
     env = MultiMarketEnv(
         250,
         # code='000001',
-        start_date="20230101",
-        end_date=None,
+        start_date="20240101",
+        # end_date="20220101",
         initial_capital=10000,
         max_stake=10000000,
         account=account,

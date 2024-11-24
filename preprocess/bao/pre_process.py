@@ -27,6 +27,7 @@ def write_data():
     write_api = client.write_api(write_options=SYNCHRONOUS)
 
     for file in os.listdir("data/bao"):
+        ps = []
         code = file.split(".")[0]
         df = pd.read_csv(os.path.join("data", "bao", f"{code}.csv"))
         # print(df.iloc[-3:-1])
@@ -43,7 +44,6 @@ def write_data():
 
         df["adj_factor"] = df["adj_factor"].cumprod()
         print(code, df)
-
         # 将 pandas DataFrame 插入 InfluxDB
         for index, row in df.iterrows():
             point = (
@@ -60,8 +60,9 @@ def write_data():
                 )
                 .time(row["date"], WritePrecision.S)
             )
+            ps.append(point)
             # print(point)
-            write_api.write(bucket=bucket, org="zs", record=point)
+        write_api.write(bucket=bucket, org="zs", record=ps)
             # print(row["volume"])
             # break
         # break
