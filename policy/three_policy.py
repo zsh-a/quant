@@ -96,9 +96,9 @@ class BaseOrderPolicy(OrderPolicy):
             return False
         idx = global_var.SYMBOLS.index(code)
         key = "close" if self.running_in_day else "low"
-        logger.info(
-            f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[idx]["low"]} | cur close : {self.cur_obs[idx]["close"]} last low : {min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])} | ema10 : {self.cur_obs[idx]["ema10"]}"
-        )
+        # logger.info(
+        #     f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[idx]["low"]} | cur close : {self.cur_obs[idx]["close"]} last low : {min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])} | ema10 : {self.cur_obs[idx]["ema10"]}"
+        # )
         # print(self.cur_obs[code])
         return self.account.get_available(code) > 0 and (
             self.cur_obs[idx][key]
@@ -185,6 +185,7 @@ class ThreeAgent:
     #     return ret
 
     def select_action(self, code, info):
+        info = info[2] # ori obs
         macd_close_weekly = info["macd_close_weekly_vis"]
         # macd_close_weekly_last = info["macd_close_weekly_last"]
         force_index = info["force_index_close"]
@@ -210,6 +211,7 @@ class ThreeAgent:
                         force_index < his.last_force_index
                         and force_index < 0
                         and his.last_force_index > 0
+                        # and (info['ma_30'] > info['ma_60'] > info['ma_120'])
                     ):
                         # buy
                         ret = 1
@@ -228,7 +230,6 @@ class ThreeAgent:
         return ret, force_index
 
     def action_decider(self, stocks_obs):
-        # print(stocks_obs)
         return [
             {"idx": i, "info": self.select_action(global_var.SYMBOLS[i], stocks_obs[i])}
             for i in range(len(stocks_obs))

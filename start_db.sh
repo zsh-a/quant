@@ -1,7 +1,6 @@
-docker run \
-    -p 8086:8086 \
-    -v "$PWD/db:/var/lib/influxdb2" \
-    -v "$PWD/config:/etc/influxdb2" \
-    -v "$PWD/bakup:/bakup" \
-    --name=stock_db \
-    influxdb:2.7.6-alpine
+nohup docker run \
+    --volume $PWD/db:/bitnami/clickhouse \
+    --env ALLOW_EMPTY_PASSWORD=yes \
+    -p 9000:9000 \
+    -p 8123:8123 \
+    bitnami/clickhouse:latest > /dev/null 2>&1 &

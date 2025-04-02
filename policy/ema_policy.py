@@ -11,7 +11,7 @@ sys.path.append(parent_dir)
 import global_var
 
 from account import Account
-from market_env import MarketEnv, MultiMarketEnv
+from market_env import MultiMarketEnv
 from order import Order, OrderManager
 
 
@@ -116,7 +116,7 @@ class ThreeAgent:
             self.cur_ema13 = None
             self.last_force_index = None
 
-    def __init__(self, market_env: MarketEnv) -> None:
+    def __init__(self, market_env: MultiMarketEnv) -> None:
         self.market_env = market_env
 
         self.his_info = {}

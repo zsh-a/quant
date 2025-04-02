@@ -1,123 +1,103 @@
-import gymnasium as gym
-import numpy as np
-import random
-import torch
-import torch.nn as nn
-import torch.optim as optim
-import torch.nn.functional as F
-
-# 定义双重深度Q网络（DDQN）
-class DDQN(nn.Module):
-    def __init__(self, input_size, output_size, hidden_size=128):
-        super(DDQN, self).__init__()
-        self.fc1 = nn.Linear(input_size, hidden_size)
-        self.fc2 = nn.Linear(hidden_size, hidden_size)
-        self.fc3_adv = nn.Linear(hidden_size, output_size)
-        self.fc3_val = nn.Linear(hidden_size, 1)
-        
-    def forward(self, x):
-        x = F.relu(self.fc1(x))
-        x = F.relu(self.fc2(x))
-        adv = self.fc3_adv(x)
-        val = self.fc3_val(x)
-        return val + adv - adv.mean()
-
-# 定义经验回放缓冲区
-class ReplayBuffer():
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.buffer = []
-        self.position = 0
-        
-    def push(self, state, action, reward, next_state, done):
-        if len(self.buffer) < self.capacity:
-            self.buffer.append(None)
-        self.buffer[self.position] = (state, action, reward, next_state, done)
-        self.position = (self.position + 1) % self.capacity
-        
-    def sample(self, batch_size):
-        return random.sample(self.buffer, batch_size)
-    
-    def __len__(self):
-        return len(self.buffer)
-
-# 定义DDQN Agent
-class DDQNAgent():
-    def __init__(self, input_size, output_size):
-        self.input_size = input_size
-        self.output_size = output_size
-        self.buffer = ReplayBuffer(capacity=10000)
-        self.gamma = 0.99  # 折扣因子
-        self.epsilon = 1.0  # 初始ε贪婪值
-        self.epsilon_decay = 0.995  # ε贪婪值衰减率
-        self.epsilon_min = 0.01  # 最小ε贪婪值
-        self.batch_size = 64
-        self.target_update = 100  # 目标网络更新频率
-        self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.policy_net = DDQN(input_size, output_size).to(self.device)
-        self.target_net = DDQN(input_size, output_size).to(self.device)
-        self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.target_net.eval()
-        self.optimizer = optim.Adam(self.policy_net.parameters(), lr=0.001)
-        
-    def select_action(self, state):
-        if np.random.rand() < self.epsilon:
-            return random.randrange(self.output_size)
-        with torch.no_grad():
-            state = torch.FloatTensor(state).unsqueeze(0).to(self.device)
-            q_values = self.policy_net(state)
-            return q_values.max(1)[1].item()
-        
-    def train(self):
-        if len(self.buffer) < self.batch_size:
-            return
-        
-        transitions = self.buffer.sample(self.batch_size)
-        batch = list(zip(*transitions))
-        state_batch = torch.FloatTensor(batch[0]).to(self.device)
-        action_batch = torch.LongTensor(batch[1]).to(self.device)
-        reward_batch = torch.FloatTensor(batch[2]).to(self.device)
-        next_state_batch = torch.FloatTensor(batch[3]).to(self.device)
-        done_batch = torch.BoolTensor(batch[4]).to(self.device)
-        
-        current_q_values = self.policy_net(state_batch).gather(1, action_batch.unsqueeze(1))
-        next_q_values = self.target_net(next_state_batch).max(1)[0].detach()
-        expected_q_values = reward_batch + self.gamma * next_q_values * ~done_batch
-        
-        loss = F.smooth_l1_loss(current_q_values, expected_q_values.unsqueeze(1))
-        
-        self.optimizer.zero_grad()
-        loss.backward()
-        self.optimizer.step()
-        
-        if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
-            
-        if self.target_update % self.target_update == 0:
-            self.target_net.load_state_dict(self.policy_net.state_dict())
-        self.target_update += 1
-
-# 创建CartPole环境
-# env = gym.make('CartPole-v1')
-# input_size = env.observation_space.shape[0]
-# output_size = env.action_space.n
-
-# # 初始化DDQN Agent
-# agent = DDQNAgent(input_size, output_size)
-
-# # 训练
-# num_episodes = 1000
-# for episode in range(num_episodes):
-#     state = env.reset()
-#     total_reward = 0
-#     done = False
-#     while not done:
-#         action = agent.select_action(state)
-#         next_state, reward, done,_,_ = env.step(action)
-#         agent.buffer.push(state, action, reward, next_state, done)
-#         state = next_state
-#         total_reward += reward
-#         agent.train()
-#     print(f"Episode: {episode+1}, Total Reward: {total_reward}")
+# import numpy as np
+# import random
+# import torch
+# import torch.nn as nn
+# import torch.optim as optim
+# import torch.nn.functional as F
+# from torchvision import datasets, transforms
+# from data_source import DBDataSource
+# import matplotlib.pyplot as plt 
 
 
+# class Model(nn.Module):
+#     def __init__(self, input_dim, hidden_dim, output_dim):
+#         super(Model, self).__init__()
+#         self.fc1 = nn.Linear(input_dim, hidden_dim)
+#         self.fc2 = nn.Linear(hidden_dim, output_dim)
+#         self._initialize_weights()
+
+#     def _initialize_weights(self):
+#         for m in self.modules():
+#             if isinstance(m, nn.Linear):
+#                 nn.init.kaiming_normal_(m.weight)
+#                 if m.bias is not None:
+#                     nn.init.zeros_(m.bias)
+
+#     def forward(self, x):
+#         x = torch.relu(self.fc1(x))
+#         x = torch.softmax(self.fc2(x), dim=-1)
+#         return x
+
+
+# code = "sh.000001"
+
+
+# db = DBDataSource(code, 220, start_date="20210401", end_date="20240401")
+
+# df = db.get_data()
+
+# df["future_ret_1d"] = df["close"].pct_change().shift(-1)  #
+
+# # 计算分割点
+# train_idx = int(len(df) * 0.6)
+# valid_idx = int(len(df) * 0.8)
+
+# split_date_1 = df.index[train_idx]
+# split_date_2 = df.index[valid_idx]
+
+# train_data = df.iloc[:train_idx].copy()
+# valid_data = df.iloc[train_idx:valid_idx].copy()
+# test_data = df.iloc[valid_idx:].copy()
+
+# print("训练集范围:", train_data.index.min(), "→", train_data.index.max())
+# print("验证集范围:", valid_data.index.min(), "→", valid_data.index.max())
+# print("测试集范围:", test_data.index.min(), "→", test_data.index.max())
+# print("\n训练集样本数:", len(train_data))
+# print("验证集样本数:", len(valid_data))
+# print("测试集样本数:", len(test_data))
+
+
+# # 可视化训练集和测试集的划分
+# plt.figure(figsize=(15, 6))  # JayBee黄原创内容
+# plt.plot(train_data.index, train_data['future_ret_1d'], label='训练集', color='blue')  # JayBee黄授权使用
+# plt.plot(valid_data.index, valid_data['future_ret_1d'], label='验证集', color='green')  # JayBee黄授权使用
+# plt.plot(test_data.index, test_data['future_ret_1d'], label='测试集', color='red')  # JayBee黄授权使用
+# plt.axvline(split_date_1, color='black', linestyle='--', label='划分点')  # Copyright © JayBee黄
+# plt.axvline(split_date_2, color='black', linestyle='--', label='划分点')  # JayBee黄 - 量化交易研究
+# plt.title('训练集、验证集、测试集划分')  # Copyright © JayBee黄
+# plt.xlabel('日期')  # Copyright © JayBee黄
+# plt.ylabel('收益率')  # JayBee黄量化策略
+# plt.legend()  # JayBee黄授权使用
+# plt.grid(True)  # Copyright © JayBee黄
+# plt.show()  # JayBee黄量化策略# JayBee黄版权所有，未经授权禁止复制
+
+# transform = transforms.Compose(
+#     [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
+# )
+
+# num_epochs = 1000
+# batch_size = 64
+# learning_rate = 0.01
+
+# model = Model(input_dim=3, hidden_dim=64, output_dim=3)
+# criterion = nn.CrossEntropyLoss()
+# optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+
+# train_dataset = torch.utils.data.TensorDataset(train_X, train_Y)
+# eval_dataset = torch.utils.data.TensorDataset(eval_X, eval_Y)
+# test_dataset = torch.utils.data.TensorDataset(test_X, test_Y)
+
+
+# train_loader = torch.utils.data.DataLoader(
+#     train_dataset, batch_size=batch_size, shuffle=True
+# )
+
+
+# # for epoch in range(num_epochs):
+# #     for i, (inputs, labels) in enumerate(train_loader):
+# #         optimizer.zero_grad()
+# #         outputs = model(inputs)
+# #         loss = criterion(outputs, labels)
+# #         loss.backward()
+# #         optimizer.step()
+# #     print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")

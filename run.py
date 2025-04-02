@@ -14,7 +14,7 @@ from policy.three_policy import BaseOrderPolicy, ThreeAgent
 
 
 def run_policy(args):
-    account = Account(init_capital=10000)
+    account = Account(init_capital=1000000)
     order_policy = BaseOrderPolicy(account)
 
     # env = MarketEnv(
@@ -32,7 +32,6 @@ def run_policy(args):
         # code='000001',
         start_date="20240101",
         # end_date="20220101",
-        initial_capital=10000,
         max_stake=10000000,
         account=account,
         order_policy=order_policy,
@@ -55,6 +54,7 @@ def run_policy(args):
         env.live()
     ret = env.result()
     logger.info("\n" + env.order_manager.get_order_history())
+    print(env.order_manager.buy_sell_points)
     code_returns = sorted(ret["code_returns"].items(), key=lambda x: x[1])
     # print(code_returns)re
     code_returns = [key for key, value in code_returns]
@@ -75,14 +75,7 @@ if __name__ == "__main__":
 
     parser.add_argument("--live", action="store_true", help="显示详细信息")
     args = parser.parse_args()
-    # os.environ["INFLUXDB_TOKEN"] = (
-    #     "vH5FD5il70h2n5RNO9zj6i6dRO9TMQihKWL9xDhdbarA7wyXZNM-GOgkc6MKJS3zsmYEOBaW_gylF-XVZBSR0A=="
-    # )
-    # if not args.live:
-    #     os.environ["INFLUXDB_TOKEN"] = (
-    #         "vH5FD5il70h2n5RNO9zj6i6dRO9TMQihKWL9xDhdbarA7wyXZNM-GOgkc6MKJS3zsmYEOBaW_gylF-XVZBSR0A=="
-    #     )
-
+ 
     os.system("rm -rf gen/*")
     logger.add("logfile.log", rotation="10 MB", retention="100 days", compression="zip")
     run_policy(args)

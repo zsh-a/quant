@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from account import Account
 import global_var
+import db
 
 from pyecharts.components import Table
 from pyecharts.options import ComponentTitleOpts
@@ -52,18 +53,22 @@ class OrderManager:
         self.today_traded = False
         self.order_plolicy.step(obs)
 
-    def create_order(self, symbol, order_type, quantity, price=None):
-        all_etf = pd.read_csv("all_etf.csv")
+    def check_order_condition(self, order):
+        pos = self.account.positions[-1]
+        if order.order_type == "buy":
+            if pos[global_var.SYMBOLS.index(order.symbol)] > 0:
+                return False
+        elif order.order_type == "sell":
+            if pos[global_var.SYMBOLS.index(order.symbol)] <= 0:
+                return False
+        return True
 
-        all_etf.columns = ["代码", "freq", "name"]
-        # print(all_etf)
-        all_etf = all_etf.set_index("代码")
-        all_etf.index = all_etf.index.astype(str)
-        try:
-            name = all_etf.loc[symbol]["name"]
-        except Exception as e:
-            name = "UNKNOW"
+    def create_order(self, symbol, order_type, quantity, price=None):
+        name = db.get_meta(symbol).iloc[0]["name"]
         order = Order(self.order_id_counter, symbol, name, order_type, quantity, price)
+
+        if not self.check_order_condition(order):
+            return None
         for od in self.orders:
             if od.status == "tracking":
                 od.status = "cancelled"
@@ -107,17 +112,31 @@ class OrderManager:
                 if order.order_type == "buy":
                     ok, exec_price = self.order_plolicy.buy_policy(order)
                     if ok:
-                        self.execute_order(order, exec_price)
+                        self.execute_order(
+                            order,
+                            exec_price,
+                            {
+                                "high": market_data[0]["high"],
+                                "low": market_data[0]["low"],
+                            },
+                        )
                 elif order.order_type == "sell" or order.order_type == "stop":
                     ok, exec_price = self.order_plolicy.sell_policy(order)
                     if ok:
-                        self.execute_order(order, exec_price)
+                        self.execute_order(
+                            order,
+                            exec_price,
+                            {
+                                "high": market_data[0]["high"],
+                                "low": market_data[0]["low"],
+                            },
+                        )
             # if order.status == "open" and order.order_type == "sell":
             #     idx = global_var.SYMBOLS.index(order.symbol)
             #     if market_data[idx]["low"] <= order.price <= market_data[idx]["high"]:
             #         self.execute_order(order, order.price)
 
-    def execute_order(self, order, execution_price):
+    def execute_order(self, order, execution_price, info):
         if self.today_traded:
             return
         order.status = "filled"
@@ -133,6 +152,7 @@ class OrderManager:
                 "symbol": order.symbol,
                 "order_type": order.order_type,
             }
+            | info
         )
         logger.info(
             f"complete order | datetime : {self.get_current_timestamp()} | order_id : {order.order_id} | symbol : {order.symbol} | order_type : {order.order_type} | price : {order.execution_price} | quantity : {order.filled_quantity}"
@@ -186,7 +206,7 @@ class OrderManager:
             [str(order) for order in self.orders if order.status == "filled"]
         )
 
-    def plot(self):
+    def get_order_stats(self):
         order_history = [order for order in self.orders if order.status == "filled"]
         order_history = sorted(order_history, key=lambda x: x.timestamp)
         it = iter(order_history)
@@ -194,9 +214,9 @@ class OrderManager:
         order_returns = []
 
         for buy, sell in zip(it, it):
-            assert (
-                buy.symbol == sell.symbol
-            ), f"{buy.symbol} {buy.timestamp} != {sell.symbol} {sell.timestamp}"
+            assert buy.symbol == sell.symbol, (
+                f"{buy.symbol} {buy.timestamp} != {sell.symbol} {sell.timestamp}"
+            )
             order_return = (
                 sell.execution_price - buy.execution_price
             ) * sell.filled_quantity
@@ -214,28 +234,30 @@ class OrderManager:
             )
         order_returns.sort(key=lambda x: x["return"], reverse=True)
 
-        # 创建表格
-        table = Table()
+        win = 0
+        loss = 0
 
-        # 表头数据
-        headers = ["symbol", "order_revenue", "order_return", "buy_time", "sell_time"]
+        for order in order_returns:
+            if order["return"] > 0:
+                win += 1
+            else:
+                loss += 1
 
-        rows = [
-            [
-                order["symbol"],
-                order["order_revenue"],
-                order["return"],
-                pd.to_datetime(order["buy_time"]).strftime("%Y-%m-%d"),
-                pd.to_datetime(order["sell_time"]).strftime("%Y-%m-%d"),
-            ]
-            for order in order_returns
-        ]
+        return {
+            "win": win,
+            "loss": loss,
+            # "total_revenue": sum([order["order_revenue"] for order in order_returns]),
+        }
 
-        # 向表格中添加数据
-        table.add(headers, rows)
+        # headers = ["symbol", "order_revenue", "order_return", "buy_time", "sell_time"]
 
-        # 设置表格标题
-        table.set_global_opts(title_opts=ComponentTitleOpts(title="交易订单"))
-
-        # 渲染表格为HTML文件
-        table.render(os.path.join("gen", "order_table.html"))
+        # rows = [
+        #     [
+        #         order["symbol"],
+        #         order["order_revenue"],
+        #         order["return"],
+        #         pd.to_datetime(order["buy_time"]).strftime("%Y-%m-%d"),
+        #         pd.to_datetime(order["sell_time"]).strftime("%Y-%m-%d"),
+        #     ]
+        #     for order in order_returns
+        # ]

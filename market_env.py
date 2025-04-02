@@ -255,7 +255,7 @@ class Broker:
         self.order_manager.step(None)
         self.account.step(None)
         logger.info("live running")
-        logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
+        # logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
         while True:
             current_time = datetime.now().time()
             three_pm = current_time.replace(hour=15, minute=0, second=0, microsecond=0)
@@ -375,7 +375,7 @@ class MultiMarketEnv(gym.Env):
         logger.info(f"{obs[0][0].name}")
         ori_obs = [v[2] for v in obs]
         self.order_manager.step(ori_obs)
-        logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
+        # logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
         self.broker.step(ori_obs)
         self.account.step(ori_obs)
 
@@ -432,7 +432,7 @@ class MultiMarketEnv(gym.Env):
         # obs = {ds.code: ds.step() for ds in self.data_source}
         # obs, done, ori_obs = self.data_source.step()
         info = {"ori_obs": [v[2] for v in obs]}
-        return obs, info
+        return (obs, 0), 0, False, info
 
 
 if __name__ == "__main__":

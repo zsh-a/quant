@@ -8,8 +8,8 @@ lg = bs.login()
 print("login respond error_code:" + lg.error_code)
 print("login respond  error_msg:" + lg.error_msg)
 
-#### 获取证券信息 ####
-rs = bs.query_all_stock(day="2024-09-30")
+# #### 获取证券信息 ####
+rs = bs.query_all_stock(day="2024-12-31")
 print('query_all_stock respond error_code:'+rs.error_code)
 print('query_all_stock respond  error_msg:'+rs.error_msg)
 
@@ -20,15 +20,13 @@ while (rs.error_code == '0') & rs.next():
     data_list.append(rs.get_row_data())
 result = pd.DataFrame(data_list, columns=rs.fields)
 
-#### 结果集输出到csv文件 ####   
-result.to_csv("all_stock2.csv", encoding="utf-8", index=False)
+#### 结果集输出到csv文件 ####
+result.to_csv("all_stock.csv", encoding="utf-8", index=False)
 print(result)
 
-# df = pd.read_csv("all_stock.csv")
+# df = pd.read_csv("all_stock2.csv")
 # for code in df["code"]:
 #     mk = code.split(".")[1][0]
-#     if mk == "3":
-#         continue
 
 #     #### 获取沪深A股历史K线数据 ####
 #     # 详细指标参数，参见“历史行情指标参数”章节；“分钟线”参数与“日线”参数不同。“分钟线”不包含指数。
@@ -37,7 +35,7 @@ print(result)
 
 #     rs = bs.query_history_k_data_plus(
 #         code,
-#         "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,isST",
+#         "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,peTTM,pbMRQ,isST",
 #         start_date="2010-01-01",
 #         # end_date="2024-08-20",
 #         frequency="d",
@@ -54,7 +52,7 @@ print(result)
 #     result = pd.DataFrame(data_list, columns=rs.fields)
 
 #     #### 结果集输出到csv文件 ####
-#     result.to_csv(f"data/bao/{code.split('.')[1]}.csv", index=False)
+#     result.to_csv(f"data/bao/{code}.csv", index=False)
 #     # break
 #     # print(result)
 
