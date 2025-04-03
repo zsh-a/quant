@@ -70,6 +70,9 @@ class Account:
         # 计算最大盈利
         max_gain = np.max(gains)
 
+        x_data = [pd.to_datetime(date).strftime("%Y-%m-%d") for date in self.dates[1:]]
+        y_data = np.array(self.tot_values).astype(float).tolist()
+
         # print(risk_free_rate, np.mean(strategy_return))
         return {
             "strategy_return": round(strategy_return[-1] * 100, 2),
@@ -81,6 +84,7 @@ class Account:
             },
             "sharpe_ratio": (np.mean(strategy_return) - risk_free_rate)
             / np.std(strategy_return),
+            "revenue": {"x": x_data, "y": y_data},
         }
 
     def plot(self):

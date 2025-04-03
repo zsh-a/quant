@@ -330,12 +330,14 @@ class DBDataSource:
         df['MACD'], df['Signal'], _ = talib.MACD(df['close'], fastperiod=12, slowperiod=26, signalperiod=9)
         
 
-        df["ma_20"] = talib.EMA(df["close"], timeperiod=20)
+
+        df["ma_30"] = talib.EMA(df["close"], timeperiod=30)
+        df["ma_60"] = talib.EMA(df["close"], timeperiod=60)
 
         # 计算均线斜率（20日均线）
-        df['MA20_slope'] = df['ma_20'].diff().rolling(5).mean()
+        df['MA20_slope'] = df['ma_30'].diff().rolling(5).mean()
         # 判断支撑条件
-        df['support_condition'] = (abs(df['close'] - df['ma_20']) / df['ma_20'] < 0.05) 
+        df['support_condition'] = (abs(df['close'] - df['ma_30']) / df['ma_30'] < 0.01) & (df['MA20_slope'] > 0) & (df['ma_30'] > df['ma_60'])
 
 
         # 计算成交量均量
@@ -347,8 +349,7 @@ class DBDataSource:
 
 
 
-                    
-
+                
         # df["ma_60"] = talib.EMA(df["close"], timeperiod=60)
         # df["ma_120"] = talib.EMA(df["close"], timeperiod=120)
 

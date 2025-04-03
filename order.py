@@ -70,7 +70,7 @@ class OrderManager:
         if not self.check_order_condition(order):
             return None
         for od in self.orders:
-            if od.status == "tracking":
+            if od.status == "tracking" :
                 od.status = "cancelled"
                 logger.info(
                     f"cancel order | datetime : {self.get_current_timestamp()} | symbol : {od.symbol} | order_id : {od.order_id}  | order_type : {od.order_type}"

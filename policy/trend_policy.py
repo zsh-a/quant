@@ -70,7 +70,7 @@ class BaseOrderPolicy(OrderPolicy):
         # print(self.last_obs)
         if len(self.last_obs) < 2:
             return False
-        # return True
+        return True
         return self.cur_obs[idx][key] > self.last_obs[-1][idx]["high"]
 
     def sell_policy(self, order):
