@@ -27,7 +27,7 @@ def run_policy(symbol):
     env = MultiMarketEnv(
         250,
         # code='000001',
-        start_date="20231001",
+        start_date="20201001",
         # end_date="20220101",
         max_stake=10000000,
         account=account,

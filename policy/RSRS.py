@@ -55,7 +55,7 @@ class OrderPolicy(OrderPolicy):
                     while num_stakes > 0 and self.account.capital < amount + cost:
                         num_stakes -= 100
                         amount = trading_price * num_stakes
-                        cost = amount * self.account.trading_fee_open
+                        cost = amount * self.account.trading_cost_bps
                     if num_stakes > 0:
                         order.quantity = num_stakes
                         return (True, trading_price)

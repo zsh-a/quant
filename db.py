@@ -79,3 +79,5 @@ if __name__ == "__main__":
 
     # print(df)
     print(get_meta("sz.000001"))
+    # update_meta()
+    # opt_table("stock_data.stock_daily_meta")

@@ -231,24 +231,39 @@ class OrderManager:
                         (sell.execution_price / buy.execution_price - 1) * 100,
                         2,
                     ),
-                    "buy_time": buy.timestamp,
-                    "sell_time": sell.timestamp,
+                    "open_time": buy.timestamp,
+                    "close_time": sell.timestamp,
                 }
             )
         order_returns.sort(key=lambda x: x["return"], reverse=True)
 
         win = 0
         loss = 0
-
+        order_history = []
         for order in order_returns:
             if order["return"] > 0:
                 win += 1
             else:
                 loss += 1
 
+            order_history.append(
+                {
+                    "symbol": order["symbol"],
+                    "order_revenue": order["order_revenue"],
+                    "order_return": order["return"],
+                    "open_time": pd.to_datetime(order["open_time"]).strftime(
+                        "%Y-%m-%d"
+                    ),
+                    "close_time": pd.to_datetime(order["close_time"]).strftime(
+                        "%Y-%m-%d"
+                    ),
+                }
+            )
+
         return {
             "win": win,
             "loss": loss,
+            "order_history": order_history,
             # "total_revenue": sum([order["order_revenue"] for order in order_returns]),
         }
 
