@@ -10,6 +10,9 @@ import db
 from pyecharts.components import Table
 from pyecharts.options import ComponentTitleOpts
 
+import utils
+import utils.utils
+
 
 class Order:
     def __init__(self, order_id, symbol, name, order_type, quantity, price=None):
@@ -64,13 +67,15 @@ class OrderManager:
         return True
 
     def create_order(self, symbol, order_type, quantity, price=None):
-        name = db.get_meta(symbol).iloc[0]["name"]
+        name = utils.utils.get_name(symbol=symbol)
         order = Order(self.order_id_counter, symbol, name, order_type, quantity, price)
 
         if not self.check_order_condition(order):
             return None
         for od in self.orders:
-            if od.status == "tracking" :
+            if od.status == "tracking" or (
+                od.status == "open" and order.order_type == order_type
+            ):
                 od.status = "cancelled"
                 logger.info(
                     f"cancel order | datetime : {self.get_current_timestamp()} | symbol : {od.symbol} | order_id : {od.order_id}  | order_type : {od.order_type}"
@@ -111,6 +116,7 @@ class OrderManager:
             if order.status == "open" or order.status == "tracking":
                 if order.order_type == "buy":
                     ok, exec_price = self.order_plolicy.buy_policy(order)
+                    logger.info(f"exec order : {ok} {exec_price}")
                     if ok:
                         self.execute_order(
                             order,
@@ -131,10 +137,6 @@ class OrderManager:
                                 "low": market_data[0]["low"],
                             },
                         )
-            # if order.status == "open" and order.order_type == "sell":
-            #     idx = global_var.SYMBOLS.index(order.symbol)
-            #     if market_data[idx]["low"] <= order.price <= market_data[idx]["high"]:
-            #         self.execute_order(order, order.price)
 
     def execute_order(self, order, execution_price, info):
         if self.today_traded:
@@ -169,11 +171,12 @@ class OrderManager:
 
         idx = global_var.SYMBOLS.index(order.symbol)
         amount = order.execution_price * order.filled_quantity
-        cost = amount * self.account.trading_cost_bps
         if order.order_type == "buy":
+            cost = amount * self.account.trading_fee_open
             self.account.capital = self.account.capital - amount - cost
             self.account.cost_price[idx] = order.execution_price
         else:
+            cost = amount * self.account.trading_fee_close
             self.account.capital = self.account.capital + amount - cost
             self.account.returns[idx] += (
                 order.execution_price - self.account.cost_price[idx]
@@ -189,8 +192,8 @@ class OrderManager:
         self.account.positions[-1][idx] += self.account.actions[-1][idx]
         self.account.tot_values[-1] = self.account.capital + np.sum(
             [
-                self.account.positions[-1][idx] * info["close"]
-                for idx, info in enumerate(self.obs)
+                self.account.positions[-1][idx] * obs["close"]
+                for idx, obs in enumerate(self.obs)
             ]
         )
         self.account.available[-1][idx] = 0

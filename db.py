@@ -75,7 +75,7 @@ def opt_table(table_name):
 
 
 if __name__ == "__main__":
-    df = get_kline("sh.600718", "20220101", "20221231")
+    # df = get_kline("sz.300059", "20220101", "20221231")
 
-    print(df)
-    # print(get_meta("sz.000001"))
+    # print(df)
+    print(get_meta("sz.000001"))

@@ -9,7 +9,7 @@ import BTStat from './BTStat'
 
 export default function App() {
   // 2. Wrap ChakraProvider at the root of your app
-  const [code, setCode] = useState('sh.000001');
+  const [code, setCode] = useState('sz.300059');
   const [name, setName] = useState('');
 
   const [btres, setBtres] = useState({'revenue': {'x': [], 'y': []}});
@@ -19,7 +19,9 @@ export default function App() {
   const inputRef = useRef('');
 
   function handleClick() {
+    setisBting(true)
     setCode(inputRef.current.value)
+
     const url = `http://localhost:8000/meta/${inputRef.current.value}`;
     fetch(url)
       .then(response => response.json())

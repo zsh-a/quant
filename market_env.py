@@ -5,7 +5,6 @@ import gymnasium as gym
 import numpy as np
 from account import Account
 from data_source import DBDataSource
-import matplotlib.pyplot as plt
 from loguru import logger
 from order import Order, OrderManager
 from policy.base_policy import OrderPolicy
@@ -17,151 +16,6 @@ import client as trader
 import utils.feichu as msg
 
 INF = 1e9
-
-
-# class MarketEnv(gym.Env):
-#     def __init__(
-#         self,
-#         num_step,
-#         code="510880",
-#         start_date="20100531",
-#         end_date="20110901",
-#         work_dir="",
-#         initial_capital=100000,
-#         max_stake=10000,
-#         account=Account(),
-#         order_policy=None,
-#     ) -> None:
-#         super().__init__()
-
-#         self.code = code
-
-#         self.data_source = DataSource(
-#             code=code,
-#             trading_days=num_step,
-#             start_date=start_date,
-#             end_date=end_date,
-#             work_dir=work_dir,
-#         )
-
-#         self.action_space = gym.spaces.Box(low=-1, high=1, dtype=np.float32)
-#         self.observation_space = self.observation_space = gym.spaces.Box(
-#             low=np.array(self.data_source.min_values),
-#             high=np.array(self.data_source.max_values),
-#         )
-
-#         self.capital = initial_capital
-#         self.max_stake = max_stake
-#         self.num_step = num_step
-#         self.tot_values = self.capital
-#         self.min_action = 100
-
-#         self.tot_values = np.zeros(self.num_step + 1)
-#         self.tot_values[0] = self.capital
-
-#         self.capitals = np.zeros(self.num_step + 1)
-#         self.capitals[0] = self.capital
-#         self.trading_cost_bps = 1e-4
-#         # state
-#         self.cur_step = 1
-#         self.actions = np.zeros(self.num_step + 1)
-#         self.positions = np.zeros(self.num_step + 1)
-#         self.navs = np.ones(self.num_step + 1)
-#         self.trades = np.zeros(self.num_step + 1)
-#         self.costs = np.zeros(self.num_step + 1)
-#         self.strategy_returns = np.zeros(self.num_step + 1)
-#         self.market_returns = np.zeros(self.num_step + 1)
-
-#         self.account = account
-
-#         self.order_manager = OrderManager(account, order_policy)
-
-#     def exec_order(self, obs):
-#         self.order_manager.match_orders(obs)
-
-#     def step(self, action: Any) -> Tuple[Any | SupportsFloat | bool | dict[str, Any]]:
-#         # assert self.action_space.contains(action)
-#         obs, done, ori_obs = self.data_source.step()
-#         self.order_manager.step(ori_obs)
-#         self.account.step()
-#         self.exec_order(ori_obs)
-
-#         self.market_returns[self.cur_step] = ori_obs["returns"]
-
-#         # print(self.account.tot_values,self.cur_step)
-#         reward = (
-#             self.account.tot_values[self.cur_step]
-#             - self.account.tot_values[self.cur_step - 1]
-#         )
-#         info = {
-#             "reward": reward,
-#             "costs": self.costs[self.cur_step],
-#             "ori_obs": ori_obs,
-#         }
-#         self.cur_step += 1
-#         return (obs.values, self.account.positions[-1]), reward, done, info
-
-#     def result(self):
-#         account_res = self.account.result(self.market_returns[self.cur_step - 1])
-
-#         return account_res | {
-#             "market_return": log2percent(np.exp(sum(self.market_returns)))
-#         }
-
-#     def plot(self):
-#         fig, (ax1, ax2, ax3, ax4, ax5) = plt.subplots(5, 1, figsize=(15, 20))
-#         ax1.plot(self.account.positions[: self.cur_step], label="Position")
-#         ax1.set_ylabel("Position/stake")
-
-#         ax2.plot(self.account.tot_values[: self.cur_step], label="Value")
-#         ax2.set_ylabel("Value/CNY")
-
-#         ax3.plot(
-#             (
-#                 np.array(self.account.tot_values[: self.cur_step])
-#                 - self.account.tot_values[0]
-#             )
-#             / self.account.tot_values[0]
-#             * 100,
-#             label="Strategy Return",
-#         )
-#         ax3.set_ylabel("Strategy Returns/%")
-#         ax4.plot(self.account.capitals[: self.cur_step], label="Capital")
-#         ax4.set_ylabel("Capital/CNY")
-
-#         ax5.plot(
-#             log2percent(np.exp(np.cumsum(self.market_returns))), label="Market Return"
-#         )
-#         ax5.set_ylabel("Market Return/%")
-
-#         ax1.legend(loc="best")
-#         # ax1.set_title("Market vs Strategy Returns")``
-#         # ax1.set_ylabel("Returns/%")
-#         ax1.grid(True)
-#         ax2.grid(True)
-#         ax3.grid(True)
-#         ax4.grid(True)
-#         ax5.grid(True)
-
-#         plt.title(self.code, fontsize=20, color="blue")
-#         self.data_source.plot(self.order_manager.buy_sell_points)
-#         plt.show()
-#         # plt.savefig('trade_result.png', dpi=300, bbox_inches='tight')
-
-#     def reset(
-#         self, *, seed: int | None = None, options: dict | None = None
-#     ) -> Tuple[Any, dict]:
-#         self.cur_step = 1
-#         self.actions.fill(0)
-#         self.navs.fill(1)
-#         self.strategy_returns.fill(0)
-#         self.costs.fill(0)
-#         self.trades.fill(0)
-#         self.market_returns.fill(0)
-#         self.data_source.reset()
-#         obs, done, ori_obs = self.data_source.step()
-#         info = {"ori_obs": ori_obs}
-#         return (obs.values, 0), info
 
 
 class Broker:
@@ -176,7 +30,6 @@ class Broker:
         self.order_policy = order_policy
 
     def get_data(self):
-        # name = "daily/etf_day_2024-07-16 18:00:01.310199.csv"
         name = "tmp.csv"
         df = ak.fund_etf_spot_em()
         df.to_csv(name)
@@ -315,7 +168,7 @@ class MultiMarketEnv(gym.Env):
         super().__init__()
 
         self.code = global_var.SYMBOLS
-        self.data_source = [
+        self.data_source : List[DBDataSource] = [
             DBDataSource(
                 code=c,
                 # trading_days=num_step,
@@ -325,12 +178,6 @@ class MultiMarketEnv(gym.Env):
             )
             for c in self.code
         ]
-
-        # self.action_space = gym.spaces.Box(low=-1, high=1, dtype=np.float32)
-        # self.observation_space = self.observation_space = gym.spaces.Box(
-        #     low=np.array(self.data_source.min_values),
-        #     high=np.array(self.data_source.max_values),
-        # )
 
         self.capital = initial_capital
         self.max_stake = max_stake
@@ -344,7 +191,7 @@ class MultiMarketEnv(gym.Env):
 
         self.capitals = np.zeros(self.num_step + 1)
         self.capitals[0] = self.capital
-        self.trading_cost_bps = 1e-4
+        self.trading_cost_bps = 5e-4
         # state
         self.cur_step = 1
         self.actions = np.zeros(self.num_step + 1)
@@ -361,6 +208,13 @@ class MultiMarketEnv(gym.Env):
         self.broker.account = self.account
         self.broker.order_manager = self.order_manager
         self.broker.set_policy(self.order_manager.order_plolicy)
+    def add_indicator(self, indicator):
+        for ds in self.data_source:
+            ds.add_indicator(indicator)
+
+    def clean_data(self):
+        for ds in self.data_source:
+            ds.clean_data()
 
     def exec_order(self, obs):
         self.order_manager.match_orders(obs)
@@ -371,49 +225,45 @@ class MultiMarketEnv(gym.Env):
     def step(self, action: Any) -> Tuple[Any | SupportsFloat | bool | dict[str, Any]]:
         # assert self.action_space.contains(action)
 
-        obs = [ds.step() for ds in self.data_source]
-        logger.info(f"{obs[0][0].name}")
-        ori_obs = [v[2] for v in obs]
-        self.order_manager.step(ori_obs)
-        # logger.info(f"waiting orders : {self.order_manager.get_waiting_order()}")
-        self.broker.step(ori_obs)
-        self.account.step(ori_obs)
+        obs_list = [ds.step() for ds in self.data_source]
 
-        self.exec_order(ori_obs)
+        # 如果obs_list中有None,则返回None
+        if any(x is None for x in obs_list):
+            return None, None
 
-        # self.market_returns[self.cur_step] = ori_obs['510880']["returns"]
+        self.order_manager.step(obs_list)
+        self.broker.step(obs_list)
+        self.account.step(obs_list)
 
-        # print(self.account.tot_values,self.cur_step)
+        self.exec_order(obs_list)
+
+        self.market_returns[self.cur_step] = np.mean(
+            [obs["returns"] for obs in obs_list]
+        )
+
         reward = (
             self.account.tot_values[self.cur_step]
             - self.account.tot_values[self.cur_step - 1]
         )
-        # print(obs)
-        # print(self.cur_step, obs["510880"][0].name)
+
         info = {
             "reward": reward,
             "costs": self.costs[self.cur_step],
-            "ori_obs": ori_obs,
         }
         self.cur_step += 1
-        done = False
-        for v in obs:
-            done = done or v[1]
-        return (obs, self.account.positions[-1]), reward, done, info
+        return obs_list, info
 
     def result(self):
         account_res = self.account.result(self.market_returns[self.cur_step - 1])
-
-        return account_res | {
-            "market_return": log2percent(np.exp(sum(self.market_returns)))
+        market_res = {
+            "market_return": log2percent(np.exp(sum(self.market_returns[1:-1]))).astype(
+                float
+            ),
+            "market_value": (
+                np.exp(self.market_returns[1:-1].cumsum()) * self.account.capitals[0]
+            ).tolist(),
         }
-
-    def plot(self, codes):
-        for ds in self.data_source:
-            if ds.code in codes:
-                ds.plot(self.order_manager.buy_sell_points)
-        self.account.plot()
-        self.order_manager.plot()
+        return account_res | market_res
 
     def reset(
         self, *, seed: int | None = None, options: dict | None = None
@@ -427,12 +277,11 @@ class MultiMarketEnv(gym.Env):
         for ds in self.data_source:
             ds.reset()
 
-        obs = [ds.step() for ds in self.data_source]
+        obs_list = [ds.step() for ds in self.data_source]
 
-        # obs = {ds.code: ds.step() for ds in self.data_source}
-        # obs, done, ori_obs = self.data_source.step()
-        info = {"ori_obs": [v[2] for v in obs]}
-        return (obs, 0), 0, False, info
+        # info = {"ori_obs": [v[2] for v in obs]}
+        info = {}
+        return obs_list, 0, False, info
 
 
 if __name__ == "__main__":

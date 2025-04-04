@@ -126,12 +126,13 @@ WHERE rn = 1
 
 def update_meta(code, last_update_date, adjfactor):
     update_query = f"""
-    INSERT INTO stock_data.stock_daily_meta (code, last_update_date, last_adjfactor, error_update_count)
+    INSERT INTO stock_data.stock_daily_meta (code, last_update_date, last_adjfactor, error_update_count,name)
     SELECT 
         code,
         '{last_update_date}',
         '{adjfactor}',
-        error_update_count
+        error_update_count,
+        name
     FROM stock_data.stock_daily_meta
     WHERE code = '{code}';
     """

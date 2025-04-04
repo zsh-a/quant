@@ -14,16 +14,17 @@ from account import Account
 from market_env import MultiMarketEnv
 from order import Order, OrderManager
 
+import indictor
 
-class BaseOrderPolicy(OrderPolicy):
+
+class OrderPolicy(OrderPolicy):
     def __init__(self, account) -> None:
         self.last_obs = []
-        self.last_obs
         self.cur_obs = None
 
         self.account: Account = account
 
-        self.slip = 0.001
+        self.slip = 0.0015  # 改为百分比滑点，0.001表示0.1%
         self.tracking = []
 
         self.running_in_day = False
@@ -37,22 +38,29 @@ class BaseOrderPolicy(OrderPolicy):
         action = order.quantity
         idx = global_var.SYMBOLS.index(order.symbol)
         obs = self.cur_obs[idx]
-
         trading_price = obs["open"]
         if action > self.account.min_action:
             if self.buy_cond(order.symbol):
                 trading_price = (
-                    max(self.last_obs[-1][idx]["high"], obs["open"]) + self.slip
+                    max(self.last_obs[-1][idx]["high"], obs["open"]) * (1 + self.slip)
                 )
+                logger.info(f"price : {trading_price}")
                 num_stakes = min(
                     self.account.capital // trading_price // 100 * 100, action
                 )
                 if num_stakes > 100 and sum(self.account.positions[-1]) == 0:
                     amount = trading_price * num_stakes
-                    cost = amount * self.account.trading_cost_bps
-                    if self.account.capital >= amount + cost:
+                    cost = amount * self.account.trading_fee_open
+
+                    while num_stakes > 0 and self.account.capital < amount + cost:
+                        num_stakes -= 100
+                        amount = trading_price * num_stakes
+                        cost = amount * self.account.trading_cost_bps
+                    if num_stakes > 0:
                         order.quantity = num_stakes
                         return (True, trading_price)
+
+                    logger.info(f"num_stakes : {num_stakes} {trading_price} : {self.account.capital}")
             else:
                 # logger.info(
                 #     f"order fail -> tracking | datetime : {obs.name} | symbol : {order.symbol} | order_id : {order.order_id} | order_type : {order.order_type} | cur : {self.cur_obs[idx]["close"]} | cur high : {self.cur_obs[idx]["high"]} | last high : {self.last_obs[-1][idx]["high"]}"
@@ -64,26 +72,25 @@ class BaseOrderPolicy(OrderPolicy):
     def buy_cond(self, code):
         idx = global_var.SYMBOLS.index(code)
         key = "close" if self.running_in_day else "high"
-        # logger.info(
-        #     f"buy cond | symbol : {code} | cur high : {self.cur_obs[idx]["high"]} | last high : {self.last_obs[-1][idx]["high"]}"
-        # )
         # print(self.last_obs)
         if len(self.last_obs) < 2:
             return False
-        return True
-        return self.cur_obs[idx][key] > self.last_obs[-1][idx]["high"]
+        logger.info(
+            f"buy cond | symbol : {code} | cur high : {self.cur_obs[idx]["high"]} | last high : {self.last_obs[-1][idx]["high"]}"
+        )
+        return self.cur_obs[idx]['high'] > self.last_obs[-1][idx]["high"]
 
     def sell_policy(self, order):
         action = order.quantity
         idx = global_var.SYMBOLS.index(order.symbol)
         obs = self.cur_obs[idx]
         trading_price = obs["open"]
-        # logger.debug(f"pos : {self.account.positions[-1]}")
         if self.sell_cond(order.symbol):
             num_stakes = min(self.account.positions[-1][idx], action)
+            prev_low = min(self.last_obs[-1][idx]["low"],self.last_obs[-2][idx]["low"])
             if num_stakes > 0:
                 trading_price = (
-                    min(self.last_obs[-1][idx]["low"], obs["open"]) - self.slip
+                    prev_low * (1 - self.slip)
                 )
                 order.quantity = num_stakes
                 return (True, trading_price)
@@ -99,10 +106,11 @@ class BaseOrderPolicy(OrderPolicy):
         if len(self.last_obs) < 2:
             return False
         idx = global_var.SYMBOLS.index(code)
-        key = "close" if self.running_in_day else "low"
-        # logger.info(
-        #     f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[idx]["low"]} | cur close : {self.cur_obs[idx]["close"]} last low : {min(self.last_obs[-1][idx]["low"], self.last_obs[-2][idx]["low"])} | ema10 : {self.cur_obs[idx]["ema10"]}"
-        # )
+        # key = "close" if self.running_in_day else "low"
+        key = 'low'
+        logger.info(
+            f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[idx]["low"]} | cur close : {self.cur_obs[idx]["close"]} last low : {self.last_obs[-1][idx]["low"]}, {self.last_obs[-2][idx]["low"]})"
+        )
         # print(self.cur_obs[code])
         return self.account.get_available(code) > 0 and (
             self.cur_obs[idx][key]
@@ -111,7 +119,8 @@ class BaseOrderPolicy(OrderPolicy):
         )
 
     def step(self, obs):
-        self.last_obs.append(self.cur_obs)
+        if self.cur_obs:
+            self.last_obs.append(self.cur_obs)
         if len(self.last_obs) > 2:
             self.last_obs = self.last_obs[-2:]
         self.cur_obs = obs
@@ -121,121 +130,34 @@ class BaseOrderPolicy(OrderPolicy):
         self.running_in_day = True
 
 
-class ThreeAgent:
-    class HisInfo:
-        def __init__(self) -> None:
-            self.his_macd_weekly = []
-            self.last_force_index = None
-
-
+class Agent:
     def __init__(self, market_env: MultiMarketEnv) -> None:
         self.market_env = market_env
+        self.init_indicators()
 
-        self.his_info = {}
+    def signal_indicator(df):
+        # 计算均线斜率（20日均线）
+        df['MA20_slope'] = df['ema_20'].diff().rolling(2).mean()
+        # 判断支撑条件
+        # df['support_condition'] = (abs(df['close'] - df['ema_20']) / df['ema_20'] < 0.05)  & (df["ema_30"] > df["ema_60"])
 
+        # 计算成交量均量
+        df['vol_ma10'] = df['volume'].rolling(10).mean()
+        # 缩量条件
+        df['low_volume'] = df['volume'] < 0.5 * df['vol_ma10'].shift(5)
+        # 综合信号
+        df['buy_signal'] = (df['close'] > 0)
+        return df
 
-    def find_monotonic_intervals(series):
-        values = series.values
-        diffs = np.diff(values)
-        trends = np.sign(diffs)
-
-        # Append a zero at the beginning to align trends with the original series length
-        trends = np.insert(trends, 0, 0)
-
-        # Find the change points
-        change_points = np.where(trends[:-1] != trends[1:])[0] + 1
-
-        intervals = []
-        start = 0
-        for cp in change_points:
-            if trends[start] != 0:
-                intervals.append((start, cp - 1, trends[start]))
-            start = cp
-
-        # Add the last interval
-        if trends[start] != 0:
-            intervals.append((start, len(series) - 1, trends[start]))
-
-        return intervals
-
-    # def select_action(self, code, info):
-    #     macd_close_weekly = info["macd_close_weekly"]
-    #     macd_close_weekly_last = info["macd_close_weekly_last"]
-    #     force_index = info["force_index_close"]
-    #     ret = 0
-
-    #     if code not in self.his_info:
-    #         self.his_info[code] = self.HisInfo()
-    #     his = self.his_info[code]
-
-    #     if his.last_force_index:
-    #         logger.info(
-    #             f"macd_close_weekly : {macd_close_weekly} macd_close_weekly_last : {macd_close_weekly_last}"
-    #         )
-    #         if macd_close_weekly > macd_close_weekly_last:
-    #             # trend up
-    #             if (
-    #                 force_index < his.last_force_index
-    #                 and force_index < 0
-    #                 and his.last_force_index > 0
-    #             ):
-    #                 # buy
-    #                 ret = 1
-    #         else:
-    #             # trend down
-
-    #             # sell
-    #             ret = -1
-
-    #     his.last_force_index = force_index
-    #     return ret
+    def init_indicators(self):
+        self.market_env.add_indicator(Agent.signal_indicator)
+        self.market_env.clean_data()
 
     def select_action(self, code, info):
-        info = info[2] # ori obs
-        # print(info)
-        macd_close_weekly = info["macd_close_weekly_vis"]
-        # macd_close_weekly_last = info["macd_close_weekly_last"]
-        force_index = info["force_index_close"]
         ret = 0
         if info['buy_signal']:
-            return (1,force_index)
-        # if code not in self.his_info:
-        #     self.his_info[code] = self.HisInfo()
-        # his = self.his_info[code]
-
-        # if his.last_force_index and len(his.his_macd_weekly) > 1:
-        #     last_macd_close_weekly = (
-        #         his.his_macd_weekly[-1]
-        #         if macd_close_weekly != his.his_macd_weekly[-1]
-        #         else his.his_macd_weekly[-2]
-        #     )
-        #     if last_macd_close_weekly != 0:
-        #         logger.info(
-        #             f"macd_close_weekly : {macd_close_weekly} macd_close_weekly_last : {last_macd_close_weekly}"
-        #         )
-        #         if macd_close_weekly > last_macd_close_weekly:
-        #             # trend up
-        #             if (
-        #                 force_index < his.last_force_index
-        #                 and force_index < 0
-        #                 and his.last_force_index > 0
-        #                 # and (info['ma_30'] > info['ma_60'] > info['ma_120'])
-        #             ):
-        #                 # buy
-        #                 ret = 1
-        #         else:
-        #             # trend downz
-        #             # sell
-        #             ret = -1
-
-        # if (
-        #     len(his.his_macd_weekly) == 0
-        #     or macd_close_weekly != his.his_macd_weekly[-1]
-        # ):
-        #     his.his_macd_weekly.append(macd_close_weekly)
-
-        # his.last_force_index = force_index
-        return ret, force_index
+            return (1,0)
+        return ret, 0
 
     def action_decider(self, stocks_obs):
         return [

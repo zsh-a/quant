@@ -144,7 +144,7 @@ export default ({code, handlbacktest}) => {
 
     chart.createIndicator({
       name: 'EMA',
-      calcParams: [30,60,120],
+      calcParams: [20,30,60,120],
     }, false, { id: 'candle_pane' });
     chart?.createIndicator("VOL");
 

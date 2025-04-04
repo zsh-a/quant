@@ -50,7 +50,7 @@ export default ({ name, btres, onclick, inputRef }) => {
                 </Stat>
                 <Stat>
                     <StatLabel>Buy & Hold</StatLabel>
-                    <StatNumber>{btres['market_return']}</StatNumber>
+                    <StatNumber>{btres['market_return']}%</StatNumber>
 
                 </Stat>
             </StatGroup>

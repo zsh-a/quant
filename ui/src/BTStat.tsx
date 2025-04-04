@@ -33,6 +33,11 @@ export default ({ isBting, btres }) => {
                 type: 'line',
                 smooth: false,
             },
+            {
+                data: btres['market_value'],
+                type: 'line',
+                smooth: false,
+            },
         ],
         tooltip: {
             trigger: 'axis',

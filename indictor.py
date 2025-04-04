@@ -1,3 +1,4 @@
+import talib
 def indictor_macd(
     df, short_window=12, long_window=26, signal_window=9, colums=["close"]
 ):
@@ -45,3 +46,12 @@ def indictor_KDJ(df, colums=[("close")]):
 
         # 计算J值
         df["J"] = 3 * df["K"] - 2 * df["D"]
+
+
+
+def indictor_ema(period=[20,30]):
+    def indictor_ema_impl(df):
+        for p in period:
+            df[f"ema_{p}"] = talib.EMA(df["close"], timeperiod=p)
+        return df
+    return indictor_ema_impl

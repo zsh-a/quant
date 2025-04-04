@@ -11,7 +11,8 @@ from pyecharts.charts import Kline, Line, Grid, Scatter
 class Account:
     def __init__(self, init_capital=10000) -> None:
         self.capital = init_capital
-        self.trading_cost_bps = 1e-4
+        self.trading_fee_open = 0.0001
+        self.trading_fee_close = 0.0006
         self.available = [np.zeros(len(global_var.SYMBOLS))]
         self.min_action = 100
 
@@ -26,7 +27,7 @@ class Account:
 
         self.dates = [0]
 
-    def step(self, ori_obs):
+    def step(self, obs_list):
         self.actions.append(np.zeros(len(global_var.SYMBOLS)))
         self.costs.append(self.costs[-1])
         self.positions.append(self.positions[-1].copy())
@@ -34,12 +35,12 @@ class Account:
 
         # add deep copy self.positions[-1] to self.available
         self.available.append(self.positions[-1].copy())
-        if ori_obs:
-            closes = [info["close"] for info in ori_obs]
+        if obs_list:
+            closes = [obs["close"] for obs in obs_list]
             self.tot_values.append(
                 np.dot(self.positions[-1], closes) + self.capitals[-1]
             )
-            self.dates.append(ori_obs[0].name)
+            self.dates.append(obs_list[0].name)
 
     def get_position(self, symbol):
         return self.positions[-1][global_var.SYMBOLS.index(symbol)]
@@ -71,7 +72,7 @@ class Account:
         max_gain = np.max(gains)
 
         x_data = [pd.to_datetime(date).strftime("%Y-%m-%d") for date in self.dates[1:]]
-        y_data = np.array(self.tot_values).astype(float).tolist()
+        y_data = np.array(self.tot_values[1:]).astype(float).tolist()
 
         # print(risk_free_rate, np.mean(strategy_return))
         return {
