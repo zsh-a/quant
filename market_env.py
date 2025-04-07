@@ -162,8 +162,9 @@ class MultiMarketEnv(gym.Env):
         work_dir="",
         initial_capital=100000,
         max_stake=10000,
-        account=Account(),
+        account=None,
         order_policy=None,
+        **args
     ) -> None:
         super().__init__()
 
@@ -175,6 +176,7 @@ class MultiMarketEnv(gym.Env):
                 start_date=start_date,
                 end_date=end_date,
                 work_dir=work_dir,
+                db_client=args['db_client']
             )
             for c in self.code
         ]
@@ -226,15 +228,15 @@ class MultiMarketEnv(gym.Env):
         # assert self.action_space.contains(action)
 
         obs_list = [ds.step() for ds in self.data_source]
-
         # 如果obs_list中有None,则返回None
         if any(x is None for x in obs_list):
             return None, None
 
+        logger.info(f"market open date : {obs_list[0].name}")
         self.order_manager.step(obs_list)
         self.broker.step(obs_list)
         self.account.step(obs_list)
-
+        logger.info(f"match order...")
         self.exec_order(obs_list)
 
         self.market_returns[self.cur_step] = np.mean(
@@ -242,8 +244,7 @@ class MultiMarketEnv(gym.Env):
         )
 
         reward = (
-            self.account.tot_values[self.cur_step]
-            - self.account.tot_values[self.cur_step - 1]
+            0
         )
 
         info = {
@@ -260,7 +261,7 @@ class MultiMarketEnv(gym.Env):
                 float
             ),
             "market_value": (
-                np.exp(self.market_returns[1:-1].cumsum()) * self.account.capitals[0]
+                np.exp(self.market_returns[1:-1].cumsum()) * self.account.init_cash
             ).tolist(),
         }
         return account_res | market_res

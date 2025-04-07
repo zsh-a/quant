@@ -32,18 +32,36 @@ ORDER BY (code)
 -- OPTIMIZE TABLE stock_data.stock_daily_meta FINAL;
 
 
--- CREATE TABLE stock_daily_data (
---     stock_code String,
---     trade_date Date,
---     open Float64,
---     high Float64,
---     low Float64,
---     close Float64,
---     volume UInt64,
---     turnover Float64
--- ) 
--- ENGINE = MergeTree
--- ORDER BY (stock_code, trade_date)
--- PARTITION BY toYYYYMM(trade_date)
--- SETTINGS index_granularity = 8192;
+CREATE TABLE stock_data.finicial_data
+(   `date` Date,
+    `code` String,
+    `industry` String,
+    `industryClassification` String,
+    `total_shares` Float64,
+) ENGINE = ReplacingMergeTree() 
+ORDER BY (code, date)
+
+
+CREATE TABLE stock_data.index_stocks
+(   
+    `index` String,
+    `code` String,
+    `enter_date` Date,
+) ENGINE = ReplacingMergeTree() 
+ORDER BY (index, code)
+
+
+CREATE TABLE stock_data.finicial_report
+(   
+    `report_date` Date,
+    `code` String,
+    `publish_date` Date,
+    `net_profit` Float64,
+    `adjusted_profit` Float64,
+    `roa` Float64,
+    `total_shares` Float64,
+    `circulating_a` Float64
+
+) ENGINE = ReplacingMergeTree() 
+ORDER BY (report_date, code)
 

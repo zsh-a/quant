@@ -18,7 +18,7 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
 sys.path.append(parent_dir)
 
-import db
+from db import DB
 import backtest
 from loguru import logger
 
@@ -43,6 +43,7 @@ app.add_middleware(
 # 定义API端点，用于根据股票代码获取股票数据
 @app.get("/stocks/{symbol}")
 def get_stock_by_symbol(symbol: str):
+    db = DB()
     df = db.get_kline(symbol, None, None)
 
     # df["datetime"] = pd.to_datetime(df["datetime"])
@@ -109,12 +110,13 @@ def get_stock_by_symbol(symbol: str):
 @app.get("/backtest/{symbol}/{start_date}/{end_date}")
 def run_backtest(symbol: str, start_date: str, end_date: str):
     
-    return backtest.run_policy(symbol)
+    return backtest.run_policy(symbol,start_date=start_date,end_date=end_date)
 
 
 @app.get("/meta/{symbol}")
 def get_meta(symbol: str):
     # print(db.get_meta(symbol).iloc[0])
+    db = DB()
     return db.get_meta(symbol).iloc[0].to_dict()
 
 

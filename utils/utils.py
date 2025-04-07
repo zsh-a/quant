@@ -1,5 +1,5 @@
 import numpy as np
-import db
+from db import DB
 
 
 def log2percent(x):
@@ -8,9 +8,9 @@ def log2percent(x):
 
 name_cache = {}
 
-
 def get_name(symbol):
     if symbol not in name_cache:
+        db = DB()
         name_cache[symbol] = db.get_meta(symbol).iloc[0]["name"]
 
     return name_cache[symbol]

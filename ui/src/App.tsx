@@ -9,7 +9,7 @@ import BTStat from './BTStat'
 
 export default function App() {
   // 2. Wrap ChakraProvider at the root of your app
-  const [code, setCode] = useState('sh.000300');
+  const [code, setCode] = useState('sz.002883');
   const [name, setName] = useState('');
 
   const [btres, setBtres] = useState({ 'revenue': { 'x': [], 'y': [] } });
@@ -45,7 +45,7 @@ export default function App() {
     <Provider>
       <Menu code={code} name={name} btres={btres} onclick={handleClick} inputRef={inputRef} />
       <Chart code={code} handlbacktest={handlbacktest} />
-      <BTStat isBting={isBting} btres={btres} />
+      {/* <BTStat isBting={isBting} btres={btres} /> */}
     </Provider>
   )
 }

@@ -71,11 +71,11 @@ const BuySellPoint: OverlayTemplate = {
   }
 }
 registerOverlay(BuySellPoint);
-export default ({code, handlbacktest}) => {
+export default ({ code, handlbacktest }) => {
   useEffect(() => {
 
     const chart = init('chart');
-    
+
     async function fetchData() {
       try {
         const apiUrl: string = `http://localhost:8000/stocks/${code}`;
@@ -90,7 +90,7 @@ export default ({code, handlbacktest}) => {
       }
     }
     async function backtest() {
-      const url = `http://localhost:8000/backtest/${code}/20201010/20211010`;
+      const url = `http://localhost:8000/backtest/${code}/20240301/20260101`;
       const resp = await fetch(url);
       return resp.json();
     }
@@ -118,6 +118,8 @@ export default ({code, handlbacktest}) => {
       console.log(result);
       handlbacktest(result);
       result['buy_sell_points'].forEach((item: any) => {
+        if (item["symbol"] != 'sz.002883')
+          return;
         if (item['order_type'] === 'buy') {
 
           chart.createOverlay({
@@ -144,7 +146,7 @@ export default ({code, handlbacktest}) => {
 
     chart.createIndicator({
       name: 'EMA',
-      calcParams: [20,30,60,120],
+      calcParams: [20, 30, 60, 120],
     }, false, { id: 'candle_pane' });
     chart?.createIndicator("VOL");
 

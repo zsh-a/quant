@@ -48,7 +48,7 @@ class OrderPolicy(OrderPolicy):
                 num_stakes = min(
                     self.account.capital // trading_price // 100 * 100, action
                 )
-                if num_stakes > 100 and sum(self.account.positions[-1]) == 0:
+                if num_stakes >= 100 and sum(self.account.positions[-1]) == 0:
                     amount = trading_price * num_stakes
                     cost = amount * self.account.trading_fee_open
 

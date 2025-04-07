@@ -2,7 +2,8 @@ import re
 import os
 import numpy as np
 import indictor
-import db
+
+
 
 def data_preprocess(file_path):
     with open(file_path, "r", errors="ignore") as file:
@@ -24,9 +25,11 @@ class DBDataSource:
         end_date=None,
         work_dir=".",
         random_start=False,
+        **args
     ) -> None:
         self.code = code
 
+        self.db_client = args["db_client"]
         self.start_date = start_date
         self.end_date = end_date
 
@@ -37,7 +40,6 @@ class DBDataSource:
 
         self.data = self._load()
         self._preprocess()
-
 
     def add_indicator(self, indicator_func):
         self.data = indicator_func(self.data)
@@ -70,10 +72,10 @@ class DBDataSource:
         df = (df - mean) / std
         df = df.astype(float)
         self.data = df
-    
+
     def _preprocess(self):
         df = self.data
-        
+
         df["close"] = df["close"] * df["adjfactor"]
         df["open"] = df["open"] * df["adjfactor"]
         df["high"] = df["high"] * df["adjfactor"]
@@ -83,6 +85,7 @@ class DBDataSource:
 
     def clean_data(self):
         self.data.dropna(inplace=True)
+        self.data = self.data[self.start_date : self.end_date]
         print(self.data)
 
     def _init_basic_indicator(self):
@@ -95,11 +98,15 @@ class DBDataSource:
         self.data = df
 
     def _load(self):
-        df = db.get_kline(self.code, self.start_date, self.end_date)
+        df = self.db_client.get_kline(self.code, "20100101", self.end_date)
 
-        df = df[["open", "high", "low", "close", "volume", "amount", "adjfactor","turn"]]
+        df = df[
+            ["open", "high", "low", "close", "volume", "amount", "adjfactor", "turn"]
+        ]
+
+        if self.end_date is None:
+            self.end_date = df.index.iloc[-1]
         df = df.astype(float)
-        df = df[self.start_date :]
         return df
 
 

@@ -3,55 +3,87 @@ import numpy as np
 import pandas as pd
 
 import global_var
-from pyecharts import options as opts
-from pyecharts.charts import Bar
-from pyecharts.charts import Kline, Line, Grid, Scatter
 
 
 class Account:
-    def __init__(self, init_capital=10000) -> None:
-        self.capital = init_capital
+    def __init__(self, init_capital=10000,**args) -> None:
+        self.cash = init_capital
+        self.init_cash = init_capital
         self.trading_fee_open = 0.0001
         self.trading_fee_close = 0.0006
-        self.available = [np.zeros(len(global_var.SYMBOLS))]
-        self.min_action = 100
+        self.min_action = 10
 
-        self.actions = [np.zeros(len(global_var.SYMBOLS))]
 
-        self.costs = [0]
-        self.positions = [np.zeros(len(global_var.SYMBOLS))]
+        self.positions = [{}]
         self.returns = np.zeros(len(global_var.SYMBOLS))
         self.cost_price = np.zeros(len(global_var.SYMBOLS))
-        self.capitals = [init_capital]
+        self.cashs = [init_capital]
         self.tot_values = [init_capital]
 
         self.dates = [0]
 
+        self.current_date = None
+
+        self.db_client = args['db_client']
+
     def step(self, obs_list):
-        self.actions.append(np.zeros(len(global_var.SYMBOLS)))
-        self.costs.append(self.costs[-1])
+        # self.actions.append(np.zeros(len(global_var.SYMBOLS)))
+        # self.costs.append(self.costs[-1])
         self.positions.append(self.positions[-1].copy())
-        self.capitals.append(self.capitals[-1])
+        # self.capitals.append(self.capitals[-1])
 
         # add deep copy self.positions[-1] to self.available
-        self.available.append(self.positions[-1].copy())
+        # self.available.append(self.positions[-1].copy())
         if obs_list:
-            closes = [obs["close"] for obs in obs_list]
-            self.tot_values.append(
-                np.dot(self.positions[-1], closes) + self.capitals[-1]
-            )
+            # closes = [obs["close"] for obs in obs_list]
+            # self.tot_values.append(
+            #     np.dot(self.positions[-1], closes) + self.capitals[-1]
+            # )
             self.dates.append(obs_list[0].name)
+            self.current_date = obs_list[0].name
+
+
+    def get_position_price(self,date):
+        pos_info = self.positions[-1]
+        stocks = list(pos_info.keys())
+        pos_df = pd.DataFrame({
+            'code': list(pos_info.keys()),
+            'position': list(pos_info.values()),
+
+        },index=stocks)
+        if len(pos_df) == 0:
+            return pos_df
+
+        df = self.db_client.get_price(stocks, date, ["close"], 1)
+        df.reset_index(level="date",drop=True,inplace=True)
+        pos_df['close'] = df['close']
+        pos_df['position_value'] = pos_df['position'] * pos_df['close']
+        return pos_df
+
+    def get_position_value(self, date):
+        pos_df = self.get_position_price(date)
+        if len(pos_df) == 0:
+            return 0
+
+        return np.dot(pos_df['position'], pos_df['close'])
+
+
+    def get_total_value(self):
+        if self.current_date is None:
+            return self.cash
+        return self.get_position_value(str(self.current_date.date())) + self.cash
 
     def get_position(self, symbol):
-        return self.positions[-1][global_var.SYMBOLS.index(symbol)]
+        return self.positions[-1][symbol]
 
     def get_available(self, symbol):
         return self.available[-1][global_var.SYMBOLS.index(symbol)]
 
     def result(self, risk_free_rate):
-        strategy_return = (
-            np.array(self.tot_values) - self.tot_values[0]
-        ) / self.tot_values[0]
+        strategy_return = self.get_total_value()
+        return {
+            "strategy_return": strategy_return,
+        }
 
         cum_returns = np.array(self.tot_values) / self.tot_values[0]
 
@@ -75,53 +107,15 @@ class Account:
         y_data = np.array(self.tot_values[1:]).astype(float).tolist()
 
         # print(risk_free_rate, np.mean(strategy_return))
-        return {
-            "strategy_return": round(strategy_return[-1] * 100, 2),
-            "max_drawdown": f"{max_drawdown:.2%}",
-            "max_profit": f"{max_gain:.2%}",
-            "code_returns": {
-                code: ret
-                for code, ret in zip(global_var.SYMBOLS, np.array(self.returns))
-            },
-            "sharpe_ratio": (np.mean(strategy_return) - risk_free_rate)
-            / np.std(strategy_return),
-            "revenue": {"x": x_data, "y": y_data},
-        }
-
-    def plot(self):
-        x_data = [pd.to_datetime(date).strftime("%Y-%m-%d") for date in self.dates[1:]]
-
-        # 创建折线图
-        line = (
-            Line()
-            .add_xaxis(x_data)  # 添加X轴数据
-            .add_yaxis(
-                "收益",
-                np.array(self.tot_values).astype(float).tolist(),
-                label_opts=opts.LabelOpts(is_show=False),
-            )  # 添加Y轴数据
-            .set_global_opts(
-                title_opts=opts.TitleOpts(title="收益曲线"),
-                xaxis_opts=opts.AxisOpts(name="月份"),
-                yaxis_opts=opts.AxisOpts(name="收益 (元)"),
-                tooltip_opts=opts.TooltipOpts(trigger="axis"),
-                legend_opts=opts.LegendOpts(is_show=True),
-                datazoom_opts=[
-                    opts.DataZoomOpts(
-                        type_="inside",
-                        xaxis_index=[0],  # 影响两个图的x轴
-                        range_start=0,
-                        range_end=100,
-                    ),
-                    opts.DataZoomOpts(
-                        type_="slider",
-                        xaxis_index=[0],  # 滑动缩放器同时影响两个图的x轴
-                        range_start=0,
-                        range_end=100,
-                    ),
-                ],
-            )
-        )
-
-        # 渲染图表到HTML文件
-        line.render(os.path.join("gen", "revenue_curve.html"))
+        # return {
+        #     "strategy_return": strategy_return,
+        #     "max_drawdown": f"{max_drawdown:.2%}",
+        #     "max_profit": f"{max_gain:.2%}",
+        #     "code_returns": {
+        #         code: ret
+        #         for code, ret in zip(global_var.SYMBOLS, np.array(self.returns))
+        #     },
+        #     "sharpe_ratio": (np.mean(strategy_return) - risk_free_rate)
+        #     / np.std(strategy_return),
+        #     "revenue": {"x": x_data, "y": y_data},
+        # }
