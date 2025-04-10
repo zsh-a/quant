@@ -50,10 +50,10 @@ def get_stock_by_symbol(symbol: str):
     # df.index = df.index.strftime("%Y-%m-%d")
     # df.set_index("datetime", inplace=True)
 
-    df["close"] = df["close"] * df["adjfactor"]
-    df["open"] = df["open"] * df["adjfactor"]
-    df["high"] = df["high"] * df["adjfactor"]
-    df["low"] = df["low"] * df["adjfactor"]
+    # df["close"] = df["close"] * df["adjfactor"]
+    # df["open"] = df["open"] * df["adjfactor"]
+    # df["high"] = df["high"] * df["adjfactor"]
+    # df["low"] = df["low"] * df["adjfactor"]
 
     df = df[["open", "high", "low", "close", "volume", "amount", "adjfactor"]]
 

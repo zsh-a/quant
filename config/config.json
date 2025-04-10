@@ -1,0 +1,10 @@
+{
+    "db": {
+        "host": "localhost",
+        "username": "default",
+        "password": ""
+    },
+    "fin_data":{
+        "path":"fin_data"  
+    }
+}

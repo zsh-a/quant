@@ -88,7 +88,7 @@ class DB:
     #     assert len(data.result_rows) == 1
     #     return data.result_rows[0][2]
 
-    def get_price(self, stocks, end_date, fields, count):
+    def get_price(self, stocks, end_date, fields, count, price_adj=True, start_date=None):
         """
         查询多个股票的指定字段数据
         :param stocks: 股票代码列表
@@ -115,19 +115,33 @@ class DB:
                 code, 
                 date, 
                 {fields_str},
+                adjfactor,
+                tradestatus,
                 ROW_NUMBER() OVER(PARTITION BY code ORDER BY date DESC) AS rn
             FROM stock_data.stock_daily
             WHERE code IN ({stocks_str})
+            AND tradestatus = 1
             AND date <= '{end_date}'
+            """
+        if start_date:
+            query += f" AND date >= '{start_date}'"
+        query += f"""
         ) t
         WHERE rn <= {count}
-        ORDER BY code, date
+        ORDER BY code, date 
         """
 
         logger.debug(f"exec query: {query}")
         data = self.client.query(query)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
 
+        if len(df) == 0:
+            return df
+
+        if price_adj:
+            # 计算复权价
+            for field in set(fields) & set(["close", "open", "high", "low"]):
+                df[field] = df[field] * df["adjfactor"]
         # 转换为多层索引DataFrame
         df["date"] = pd.to_datetime(df["date"])
         df.set_index(["code", "date"], inplace=True)
@@ -172,10 +186,15 @@ class DB:
         return df
 
     def get_index_stocks(self, index_code, date=None):
+        if not isinstance(index_code, list):
+            index_code = [index_code]
+
+        index_code_str = ", ".join([f"'{code}'" for code in index_code])
+
         sql = f"""
         SELECT *
         FROM stock_data.index_stocks
-        WHERE index = '{index_code}'
+        WHERE index in ({index_code_str})
         """
         if date:
             sql += f" AND enter_date <= '{date}'"
@@ -211,6 +230,28 @@ class DB:
         df.set_index("code", inplace=True)
         return df
 
+    def get_stock_industry_sw(self, stocks, date=None):
+        stocks_str = ", ".join([f"'{code}'" for code in stocks])
+
+        sql = f"""
+        SELECT * FROM (
+            SELECT 
+                *,
+                ROW_NUMBER() OVER(PARTITION BY code ORDER BY enter_date DESC) AS rn
+            FROM stock_data.industry_info
+            WHERE code IN ({stocks_str})
+        """
+        if date:
+            sql += f" AND enter_date <= '{date}'"
+        sql += """
+        ) t
+        WHERE rn = 1
+        """
+        data = self.client.query(sql)
+        df = pd.DataFrame(data.result_rows, columns=data.column_names)
+        df.set_index(keys="code",inplace=True)
+        return df
+
 
 if __name__ == "__main__":
     # df = get_kline("sz.300059", "20220101", "20221231")
@@ -223,6 +264,7 @@ if __name__ == "__main__":
     # print(get_zz500_stocks())
     # print(get_price(['sh.000001'],"20200101",['close',"open"],10))
     # print(get_stock_industry('sh.601228', "20210101"))
-
-    print(get_stock_fincial(["sh.600000"], "20211001"))
+    db_client = DB()
+    db_client.get_stock_industry_sw(["sz.002193"], date="2022-01-01")
+    # print(db_client.get_stock_fincial(["sz.002193"], "20220301")['adjusted_profit'].iloc[0])
     # print(get_index_stocks("399101","20240101"))

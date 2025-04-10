@@ -15,7 +15,9 @@ import utils.utils
 
 
 class Order:
-    def __init__(self, order_id, symbol, name, order_type, quantity, price=None):
+    def __init__(
+        self, order_id, symbol, name, order_type, quantity, price=None, exec_time="open"
+    ):
         self.order_id = order_id
         self.symbol = symbol
         self.name = name
@@ -26,6 +28,8 @@ class Order:
         self.filled_quantity = 0
         self.timestamp = None  # Time when the order was created
         self.execution_price = None
+
+        self.exec_time = exec_time
 
         self.extra_info = {}
 
@@ -57,13 +61,15 @@ class OrderManager:
         self.obs = obs
         self.order_plolicy.step(obs)
 
-    def create_order(self, symbol, order_type, quantity, price=None):
+    def create_order(self, symbol, order_type, quantity, price=None, exec_time="open"):
         name = utils.utils.get_name(symbol=symbol)
-        order = Order(self.order_id_counter, symbol, name, order_type, quantity, price)
+        order = Order(
+            self.order_id_counter, symbol, name, order_type, quantity, price, exec_time
+        )
 
         self.orders.append(order)
         logger.info(
-            f"create order | datetime : {self.get_current_timestamp()} | symbol : {symbol} | order_id : {order.order_id}  | order_type : {order_type} | quantity : {quantity}"
+            f"create order | datetime : {self.get_current_timestamp()} | symbol : {symbol} | order_id : {order.order_id}  | order_type : {order_type} | quantity : {quantity} | exec_time : {exec_time}"
         )
         self.order_id_counter += 1
         return order
@@ -109,11 +115,11 @@ class OrderManager:
                     order,
                     exec_price,
                     {
-                        "high": market_data[0]["high"],
-                        "low": market_data[0]["low"],
+                        "high": exec_price,
+                        "low": exec_price,
                     },
                 )
-        for order in buy_waiting_orders:        
+        for order in buy_waiting_orders:
             ok, exec_price = self.order_plolicy.buy_policy(order)
             logger.info(f"exec order : {ok} {exec_price}")
             if ok:
@@ -121,11 +127,13 @@ class OrderManager:
                     order,
                     exec_price,
                     {
-                        "high": market_data[0]["high"],
-                        "low": market_data[0]["low"],
+                        "high": exec_price,
+                        "low": exec_price,
                     },
                 )
-        logger.info(f"match order...\n{self.account.get_position_price(str(ts.date()))}")
+        logger.info(
+            f"match order...\n{self.account.get_position_price(str(ts.date()))}"
+        )
 
     def execute_order(self, order, execution_price, info):
         order.status = "filled"
@@ -149,6 +157,11 @@ class OrderManager:
         self.order_plolicy.order_callback(order, self)
         self.update_account(order)
 
+    def cancel_all(self):
+        for od in self.orders:
+            if (od.status == "open" or od.status == "tracking"):
+                od.status = "cancelled"
+
     def update_account(self, order):
         """
         Update account balance and positions based on the filled order.
@@ -165,14 +178,18 @@ class OrderManager:
 
         if order.symbol not in self.account.positions[-1]:
             self.account.positions[-1][order.symbol] = 0
-        self.account.positions[-1][order.symbol] += order.filled_quantity if order.order_type == "buy" else -order.filled_quantity
+        self.account.positions[-1][order.symbol] += (
+            order.filled_quantity
+            if order.order_type == "buy"
+            else -order.filled_quantity
+        )
         if self.account.positions[-1][order.symbol] == 0:
             del self.account.positions[-1][order.symbol]
             # TODO
             # self.completed_position.append(
             #     {
             #         "code" : order.symbol,
-            #         "profit": 
+            #         "profit":
             #     }
             # )
 

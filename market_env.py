@@ -164,19 +164,19 @@ class MultiMarketEnv(gym.Env):
         max_stake=10000,
         account=None,
         order_policy=None,
-        **args
+        **args,
     ) -> None:
         super().__init__()
 
         self.code = global_var.SYMBOLS
-        self.data_source : List[DBDataSource] = [
+        self.data_source: List[DBDataSource] = [
             DBDataSource(
                 code=c,
                 # trading_days=num_step,
                 start_date=start_date,
                 end_date=end_date,
                 work_dir=work_dir,
-                db_client=args['db_client']
+                db_client=args["db_client"],
             )
             for c in self.code
         ]
@@ -210,6 +210,11 @@ class MultiMarketEnv(gym.Env):
         self.broker.account = self.account
         self.broker.order_manager = self.order_manager
         self.broker.set_policy(self.order_manager.order_plolicy)
+
+        self.obs_list = None
+
+        self.cur_date = None
+
     def add_indicator(self, indicator):
         for ds in self.data_source:
             ds.add_indicator(indicator)
@@ -224,13 +229,20 @@ class MultiMarketEnv(gym.Env):
     def live(self):
         self.broker.run(self.order_manager.orders)
 
+    def run_end(self):
+        self.exec_order(self.obs_list)
+        self.account.run_end()
+
     def step(self, action: Any) -> Tuple[Any | SupportsFloat | bool | dict[str, Any]]:
         # assert self.action_space.contains(action)
 
         obs_list = [ds.step() for ds in self.data_source]
+        self.obs_list = obs_list
         # 如果obs_list中有None,则返回None
         if any(x is None for x in obs_list):
             return None, None
+
+        self.cur_date = obs_list[0].name
 
         logger.info(f"market open date : {obs_list[0].name}")
         self.order_manager.step(obs_list)
@@ -243,9 +255,7 @@ class MultiMarketEnv(gym.Env):
             [obs["returns"] for obs in obs_list]
         )
 
-        reward = (
-            0
-        )
+        reward = 0
 
         info = {
             "reward": reward,
@@ -253,7 +263,6 @@ class MultiMarketEnv(gym.Env):
         }
         self.cur_step += 1
         return obs_list, info
-
     def result(self):
         account_res = self.account.result(self.market_returns[self.cur_step - 1])
         market_res = {
@@ -278,8 +287,8 @@ class MultiMarketEnv(gym.Env):
         for ds in self.data_source:
             ds.reset()
 
-        obs_list = [ds.step() for ds in self.data_source]
-
+        # obs_list = [ds.step() for ds in self.data_source]
+        obs_list = []
         # info = {"ori_obs": [v[2] for v in obs]}
         info = {}
         return obs_list, 0, False, info

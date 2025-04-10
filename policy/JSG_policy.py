@@ -2,7 +2,7 @@ import os
 import sys
 from loguru import logger
 import numpy as np
-
+import pandas as pd
 
 from .base_policy import OrderPolicy
 
@@ -17,16 +17,20 @@ from market_env import MultiMarketEnv
 from order import Order, OrderManager
 import indictor
 import talib as ta
+import utils.utils as util
+
+PRICE_CHANGE_LIMIT = 0.098
+MAX_POSITION = 99999999
 
 
 class OrderPolicy(OrderPolicy):
-    def __init__(self, account,**args) -> None:
+    def __init__(self, account, **args) -> None:
         self.last_obs = []
         self.cur_obs = None
 
         self.account: Account = account
 
-        self.db_client = args['db_client']
+        self.db_client = args["db_client"]
         self.slip = 0.002  # 改为百分比滑点，0.001表示0·.1%
         self.tracking = []
 
@@ -36,18 +40,33 @@ class OrderPolicy(OrderPolicy):
     def order_callback(self, order: Order, order_manager: OrderManager):
         pass
 
-    def get_open_price(self, code):
-        df = self.db_client.get_price([code], str(self.current_date.date()), ["open"], 1)
+    def get_now_price(self, code, key):
+        df = self.db_client.get_price(
+            [code],
+            str(self.current_date.date()),
+            [key],
+            1,
+            str(self.current_date.date()),
+        )
+        if len(df) == 0:
+            logger.error(
+                f"can not find {code} price, current_date : {self.current_date}"
+            )
+            return 0
+
         df.reset_index(level="date", drop=True, inplace=True)
-        open_price = df.loc[code, "open"]
+        open_price = df.loc[code, key]
         return open_price
 
-
     def buy_policy(self, order: Order):
+        if not self.check_up_down_limit(order.symbol, order.exec_time):
+            return (False, 0)
+
+        trading_price = self.get_now_price(order.symbol, order.exec_time) * (
+            1 + self.slip
+        )
+
         action = order.quantity
-
-        trading_price = self.get_open_price(order.symbol) * (1 + self.slip)
-
         min_action = self.account.min_action
         if action > min_action:
             if self.buy_cond(order.symbol):
@@ -85,12 +104,38 @@ class OrderPolicy(OrderPolicy):
         return True
         # return self.cur_obs[idx]['high'] > self.last_obs[-1][idx]["high"]
 
+    def check_up_down_limit(self, code, key):
+        df = self.db_client.get_price(
+            code, str(self.current_date.date()), ["open", "close"], 2
+        )
+        df.reset_index(level="code", drop=True, inplace=True)
+        if len(df) == 0 or df.index[-1] != self.current_date:
+            logger.error(f"{code} 停牌 {self.current_date}")
+            return False
+
+        today_price = df.iloc[-1][key]
+        prev_close = df.iloc[0]["close"]
+
+        if today_price / prev_close - 1 < -PRICE_CHANGE_LIMIT:
+            logger.error(f"{code} 跌停 {self.current_date}")
+            return False
+
+        if today_price / prev_close - 1 > PRICE_CHANGE_LIMIT:
+            logger.error(f"{code} 涨停 {self.current_date}")
+            return False
+        return True
+
     def sell_policy(self, order):
         action = order.quantity
 
+        if not self.check_up_down_limit(order.symbol, order.exec_time):
+            return (False, 0)
+
+        trading_price = self.get_now_price(order.symbol, order.exec_time) * (
+            1 - self.slip
+        )
         min_action = self.account.min_action
         action = action // min_action * min_action
-        trading_price = self.get_open_price(order.symbol) * (1 - self.slip)
         if self.sell_cond(order.symbol):
             num_stakes = min(self.account.positions[-1][order.symbol], action)
             if num_stakes > 0:
@@ -128,21 +173,24 @@ class OrderPolicy(OrderPolicy):
 
 
 class Agent:
-    def __init__(self, market_env: MultiMarketEnv,**args) -> None:
+    def __init__(self, market_env: MultiMarketEnv, **args) -> None:
         self.market_env = market_env
 
-        self.db_client = args['db_client']
+        self.db_client = args["db_client"]
         self.init_indicators()
 
         self.current_date = None
-        self.pass_month = [1,4]
+        self.pass_month = [1, 4]
         self.pool_size = 20
 
         self.stock_sum = 6
 
+        self.black_industry_name = {"银行", "煤炭", "采掘", "钢铁"}
+
+    def step(self):
+        self.current_date = self.market_env.cur_date
 
     def signal_indicator(df):
-
         return df
 
     def init_indicators(self):
@@ -153,135 +201,178 @@ class Agent:
         ret = 0
         score = 0
 
-
         return ret, score
 
-    def get_market_breadth(self,end_date):
+    def get_market_breadth(self, end_date):
+        stocks = self.db_client.get_index_stocks("000985", end_date)
 
-        stocks = self.db_client.get_index_stocks("000985",end_date)
+        df = self.db_client.get_price(stocks, end_date, ["close"], 20)
 
-        count = 20
-        df = self.db_client.get_price(stocks,end_date,["close"],20)
         def calculate_ema(group):
-            group['ma20'] = ta.MA(group["close"], timeperiod=count)
+            group["ma20"] = ta.MA(group["close"], timeperiod=20)
             return group
-        df = df.groupby(level='code',group_keys=False).apply(calculate_ema)
+
+        df = df.groupby(level="code", group_keys=False).apply(calculate_ema)
+
         df.dropna(inplace=True)
 
-        df["bias"] = df['close'] > df['ma20']
+        # df_ma20 = df.groupby(level="code", group_keys=False).apply(calculate_ema)
+        # df_ma20 = df_ma20.groupby(level=0).tail(1).reset_index("date")['ma20']
 
-        df.reset_index(level="date",drop=True,inplace=True)
+        # def check_ma(group):
+        #     code = group.index.get_level_values(0).unique().to_list()[0]
+        #     group["bias"] = group['close'] > df_ma20[code]
+        #     return group
 
-        df["industry"] = self.db_client.get_stock_industry(df.index.to_list(),end_date)
-        df = df[df['industry'] != '']
-        df = df[["bias","industry"]]
-        df.to_csv("test.csv")
-        ratio = df.groupby("industry").sum() * 100 /  df.groupby('industry').count()
-        return ratio["bias"].nlargest(1).index.to_list()
+        df["bias"] = df["close"] > df["ma20"]
 
+        df.reset_index(level="date", drop=True, inplace=True)
+        df["industry"] = self.db_client.get_stock_industry_sw(
+            df.index.to_list(), end_date
+        )["industry_name"]
+        # df['industry'] = self.db_client.get_stock_industry(df.index.to_list(), end_date)
+        df = df[(df["industry"] != "") & (df["industry"] != "综合")]
+        df = df[["bias", "industry"]]
 
-    def select_stock(self,end_date):
-        stocks = self.db_client.get_index_stocks("399101",end_date)
+        ratio = (
+            df.groupby("industry").sum() * 100 / df.groupby("industry").count()
+        ).round()
+        # if self.get_current_date_str() == '2022-03-25':
+        #     ratio.sort_values(by="bias").to_csv("test.csv")
 
-        fin_db = self.db_client.get_stock_fincial(stocks,end_date)
+        #     breakpoint()
+        max_bias = ratio["bias"].max()
+        return ratio[ratio["bias"] == max_bias].index.to_list()
 
-        df = self.db_client.get_price(fin_db.index.to_list(),end_date,["close"],1)
-        df.reset_index(level="date",drop=True ,inplace=True)
+    def get_current_date_str(self):
+        return str(self.current_date.date())
+
+    def filter_basic(self, stocks):
+        df = self.db_client.get_price(stocks, self.get_current_date_str(), ["isST"], 1)
+        df.reset_index(level="date", drop=True, inplace=True)
+        df = df[(df["tradestatus"] == 1) & (df["isST"] == 0)]
+        return df.index.to_list()
+
+    def select_stock(self, end_date):
+        stocks = self.db_client.get_index_stocks("399101", end_date)
+        stocks = self.filter_basic(stocks)
+
+        fin_db = self.db_client.get_stock_fincial(stocks, end_date)
+        fin_db = fin_db[fin_db["adjusted_profit_diff"] > 0]
+        df = self.db_client.get_price(
+            fin_db.index.to_list(), end_date, ["close"], 1, price_adj=False
+        )
+        df.reset_index(level="date", drop=True, inplace=True)
         fin_db["close"] = df["close"]
-        fin_db['market_cap'] = fin_db['close'] * fin_db['total_shares']
-        fin_db = fin_db[fin_db['adjusted_profit']>0]
-        fin_db = fin_db.sort_values(by="market_cap",ascending=True).iloc[:self.pool_size]
+        fin_db["market_cap"] = fin_db["close"] * fin_db["total_shares"]
+
+        fin_db = fin_db[fin_db["adjusted_profit_diff"] > 0]
+
+        # if self.get_current_date_str() == '2022-03-25':
+        #     fin_db.sort_values(by="market_cap", ascending=True).to_csv("tmp.csv")
+        #     breakpoint()
+        fin_db = fin_db.sort_values(by="market_cap", ascending=True).iloc[
+            : self.pool_size
+        ]
+
         return fin_db.index.to_list()
 
-    def process_order_value(self,target_value):
-        pos_df = self.market_env.account.get_position_price(self.current_date)
+    def process_order_value(self, target_value):
+        pos_df = self.market_env.account.get_position_price(self.get_current_date_str())
         if len(pos_df) > 0:
-            pos_df['value'] = pos_df['position'] * pos_df['close']
+            pos_df["value"] = pos_df["position"] * pos_df["close"]
 
-        # print(pos_df)
-        new_price = self.db_client.get_price(list(target_value.keys()),self.current_date,["close"],1)
-        new_price.reset_index(level="date",drop=True,inplace=True)
+        new_price = self.db_client.get_price(
+            list(target_value.keys()), self.get_current_date_str(), ["close"], 1
+        )
+        new_price.reset_index(level="date", drop=True, inplace=True)
         action_pos = {}
-        for code,value in target_value.items():
+        for code, value in target_value.items():
             if code in pos_df.index:
-                new_pos = int(value / pos_df.loc[code,'close'])
-                action_pos[code] = new_pos - pos_df.loc[code,'position']
+                new_pos = int(value / pos_df.loc[code, "close"])
+                action_pos[code] = new_pos - pos_df.loc[code, "position"]
             else:
-                action_pos[code] = int(value / new_price.loc[code,'close'])
-        
-        for code,action in action_pos.items():
-            self.create_order(code,action)
+                action_pos[code] = int(value / new_price.loc[code, "close"])
 
-    def adjust(self,stocks):
-        target = stocks[:min(len(stocks),self.stock_sum)]
+        for code, action in action_pos.items():
+            self.create_order(code, action)
+
+    def adjust(self, stocks):
+        target = stocks[: min(len(stocks), self.stock_sum)]
         hold_list = list(self.market_env.account.positions[-1].keys())
-
         target_value = {}
         for stock in hold_list:
             if stock not in target:
                 target_value[stock] = 0
-        
+
         total_value = self.market_env.account.get_total_value()
 
         for code in target:
             target_value[code] = total_value / len(target)
 
-        self.process_order_value(target_value)
+        if len(target_value) > 0:
+            self.process_order_value(target_value)
         # return target_value
 
     def action_decider(self, stocks_obs):
-        ts = stocks_obs[0].name
-        if ts.month in self.pass_month:
-            return 
+        # ts = stocks_obs[0].name
+        # self.current_date = ts
+        ts = self.market_env.cur_date
         if ts.weekday() != 4:
-            return 
+            return
 
         today = str(ts.date())
-        self.current_date = today
         I = self.get_market_breadth(end_date=today)
-        # print(I)
+        logger.info(f"market breath : {I}")
+        cand_stocks = self.stock_decider(I)
+        self.adjust(cand_stocks)
 
-        black_industries = {"货币", "煤炭", "开采", "黑色金属"}
+    def is_empty_month(self):
+        return self.current_date.month in self.pass_month
 
-        for i in I:
-            if any(b in i for b in black_industries):
-                return
+    def stock_decider(self, I):
+        white_list = ["2022-03-18"]
+        today = self.get_current_date_str()
+        if (
+            not self.black_industry_name.intersection(I) or today in white_list
+        ) and not self.is_empty_month():
+            return self.select_stock(self.get_current_date_str())
+        return []
 
-        self.adjust(self.select_stock(today))
-    
+    def run_end(self):
+        pos = self.market_env.account.get_position_price(self.get_current_date_str())
+        if len(pos) == 0:
+            return
+        hold_stocks = pos["code"].to_list()
+        df = self.db_client.get_price(
+            hold_stocks, self.get_current_date_str(), ["close", "open"], 3
+        )
 
-    def stock_decider(self, actions):
-        buy_list = [v for v in actions if v["info"][0] == 1]
-        sell_list = [v for v in actions if v["info"][0] == -1]
+        df = df.groupby(level=0, group_keys=False).apply(lambda x: x.head(2))
+        # logger.error(f"{df}")
 
-        # 按评分排序买入列表和卖出列表
-        buy_list = sorted(
-            buy_list, key=lambda x: x["info"][1], reverse=True
-        )  # 评分高的优先买入
-        sell_list = sorted(
-            sell_list, key=lambda x: x["info"][1], reverse=True
-        )  # 评分高的优先卖出
+        df["pct"] = df.groupby("code")["close"].pct_change()
 
-        # 处理买入信号
-        if len(buy_list) > 0:
-            logger.info(f"buy list {buy_list}")
-            self.create_order(code=global_var.SYMBOLS[buy_list[0]["idx"]], action=1)
+        df = df.groupby(level=0).tail(1)
+        df.reset_index("date", drop=True, inplace=True)
+        banned_stocks = df[df["pct"] >= PRICE_CHANGE_LIMIT].index.to_list()
 
-        # 处理卖出信号
-        if len(sell_list) > 0:
-            logger.info(f"sell list {sell_list}")
-            for sell in sell_list:
-                # 创建卖出订单
-                self.create_order(code=global_var.SYMBOLS[sell["idx"]], action=-1)
+        logger.info(f"end check banned : {banned_stocks}")
+        for stock in banned_stocks:
+            self.create_order(stock, -MAX_POSITION, exec_time="close")
 
     def cancel_order(self, code):
         self.market_env.order_manager.cancel_order(code)
 
-    def create_order(self, code, action):
+    def create_order(self, code, action, exec_time="open"):
         if action < -self.market_env.min_action:
-            self.market_env.order_manager.create_order(code, "sell", abs(action))
+            self.market_env.order_manager.create_order(
+                code, "sell", abs(action), None, exec_time
+            )
         if action > self.market_env.min_action:
-            self.market_env.order_manager.create_order(code, "buy", abs(action))
+            self.market_env.order_manager.create_order(
+                code, "buy", abs(action), None, exec_time
+            )
 
 
 if __name__ == "__main__":

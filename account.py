@@ -6,13 +6,12 @@ import global_var
 
 
 class Account:
-    def __init__(self, init_capital=10000,**args) -> None:
+    def __init__(self, init_capital=10000, **args) -> None:
         self.cash = init_capital
         self.init_cash = init_capital
         self.trading_fee_open = 0.0001
         self.trading_fee_close = 0.0006
         self.min_action = 10
-
 
         self.positions = [{}]
         self.returns = np.zeros(len(global_var.SYMBOLS))
@@ -24,7 +23,7 @@ class Account:
 
         self.current_date = None
 
-        self.db_client = args['db_client']
+        self.db_client = args["db_client"]
 
     def step(self, obs_list):
         # self.actions.append(np.zeros(len(global_var.SYMBOLS)))
@@ -36,28 +35,29 @@ class Account:
         # self.available.append(self.positions[-1].copy())
         if obs_list:
             # closes = [obs["close"] for obs in obs_list]
-            # self.tot_values.append(
-            #     np.dot(self.positions[-1], closes) + self.capitals[-1]
-            # )
             self.dates.append(obs_list[0].name)
             self.current_date = obs_list[0].name
 
+    def run_end(self):
+        self.tot_values.append(self.get_total_value())
 
-    def get_position_price(self,date):
+    def get_position_price(self, date):
         pos_info = self.positions[-1]
         stocks = list(pos_info.keys())
-        pos_df = pd.DataFrame({
-            'code': list(pos_info.keys()),
-            'position': list(pos_info.values()),
-
-        },index=stocks)
+        pos_df = pd.DataFrame(
+            {
+                "code": list(pos_info.keys()),
+                "position": list(pos_info.values()),
+            },
+            index=stocks,
+        )
         if len(pos_df) == 0:
             return pos_df
 
         df = self.db_client.get_price(stocks, date, ["close"], 1)
-        df.reset_index(level="date",drop=True,inplace=True)
-        pos_df['close'] = df['close']
-        pos_df['position_value'] = pos_df['position'] * pos_df['close']
+        df.reset_index(level="date", drop=True, inplace=True)
+        pos_df["close"] = df["close"]
+        pos_df["position_value"] = pos_df["position"] * pos_df["close"]
         return pos_df
 
     def get_position_value(self, date):
@@ -65,8 +65,7 @@ class Account:
         if len(pos_df) == 0:
             return 0
 
-        return np.dot(pos_df['position'], pos_df['close'])
-
+        return np.dot(pos_df["position"], pos_df["close"])
 
     def get_total_value(self):
         if self.current_date is None:
@@ -80,10 +79,10 @@ class Account:
         return self.available[-1][global_var.SYMBOLS.index(symbol)]
 
     def result(self, risk_free_rate):
-        strategy_return = self.get_total_value()
-        return {
-            "strategy_return": strategy_return,
-        }
+        strategy_return = self.tot_values[-1] / self.tot_values[0] - 1
+
+        x_data = [pd.to_datetime(date).strftime("%Y-%m-%d") for date in self.dates[1:]]
+        y_data = np.array(self.tot_values[1:]).astype(float).tolist()
 
         cum_returns = np.array(self.tot_values) / self.tot_values[0]
 
@@ -93,6 +92,11 @@ class Account:
 
         # 计算最大回撤
         max_drawdown = np.min(drawdowns)
+        return {
+            "strategy_return": f"{strategy_return:.2%}",
+            "revenue": {"x": x_data, "y": y_data},
+            "max_drawdown": f"{max_drawdown:.2%}",
+        }
 
         # 计算滚动最小值
         rolling_min = np.minimum.accumulate(cum_returns)
@@ -102,9 +106,6 @@ class Account:
 
         # 计算最大盈利
         max_gain = np.max(gains)
-
-        x_data = [pd.to_datetime(date).strftime("%Y-%m-%d") for date in self.dates[1:]]
-        y_data = np.array(self.tot_values[1:]).astype(float).tolist()
 
         # print(risk_free_rate, np.mean(strategy_return))
         # return {

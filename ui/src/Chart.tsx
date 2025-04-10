@@ -71,7 +71,7 @@ const BuySellPoint: OverlayTemplate = {
   }
 }
 registerOverlay(BuySellPoint);
-export default ({ code, handlbacktest }) => {
+export default ({ code, btres }) => {
   useEffect(() => {
 
     const chart = init('chart');
@@ -88,11 +88,6 @@ export default ({ code, handlbacktest }) => {
       } catch (error) {
         console.error('请求出错：', error);
       }
-    }
-    async function backtest() {
-      const url = `http://localhost:8000/backtest/${code}/20240301/20260101`;
-      const resp = await fetch(url);
-      return resp.json();
     }
 
     (async () => {
@@ -112,36 +107,6 @@ export default ({ code, handlbacktest }) => {
       } catch (error) {
         // 错误处理
       }
-
-      const result = await backtest();
-
-      console.log(result);
-      handlbacktest(result);
-      result['buy_sell_points'].forEach((item: any) => {
-        if (item["symbol"] != 'sz.002883')
-          return;
-        if (item['order_type'] === 'buy') {
-
-          chart.createOverlay({
-            name: 'BuySellPoint',
-            extendData: 'buy', points: [
-              {
-                timestamp: new Date(item['timestamp']).getTime(),
-                value: item['low']
-              }
-            ]
-          });
-        }
-        else {
-          chart.createOverlay({
-            name: 'BuySellPoint',
-            extendData: 'sell', points: [{
-              timestamp: new Date(item['timestamp']).getTime(),
-              value: item['high']
-            }]
-          });
-        }
-      });
     })();
 
     chart.createIndicator({
@@ -149,6 +114,33 @@ export default ({ code, handlbacktest }) => {
       calcParams: [20, 30, 60, 120],
     }, false, { id: 'candle_pane' });
     chart?.createIndicator("VOL");
+    if(!btres.hasOwnProperty('buy_sell_points'))
+      return;
+    btres['buy_sell_points'].forEach((item: any) => {
+      if (item["symbol"] != code)
+        return;
+      if (item['order_type'] === 'buy') {
+
+        chart.createOverlay({
+          name: 'BuySellPoint',
+          extendData: 'buy', points: [
+            {
+              timestamp: new Date(item['timestamp']).getTime(),
+              value: item['low']
+            }
+          ]
+        });
+      }
+      else {
+        chart.createOverlay({
+          name: 'BuySellPoint',
+          extendData: 'sell', points: [{
+            timestamp: new Date(item['timestamp']).getTime(),
+            value: item['high']
+          }]
+        });
+      }
+    });
 
 
 
@@ -159,7 +151,7 @@ export default ({ code, handlbacktest }) => {
     return () => {
       dispose('chart')
     }
-  }, [code])
+  }, [code,btres])
 
   return <div id="chart" style={{ width: 1920, height: 1080 }} />
 }

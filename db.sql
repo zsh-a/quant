@@ -60,8 +60,20 @@ CREATE TABLE stock_data.finicial_report
     `adjusted_profit` Float64,
     `roa` Float64,
     `total_shares` Float64,
-    `circulating_a` Float64
+    `circulating_a` Float64,
+    `adjusted_profit_diff` Float64,
 
 ) ENGINE = ReplacingMergeTree() 
 ORDER BY (report_date, code)
 
+
+
+CREATE TABLE stock_data.industry_info
+(   
+    `code` String,
+    `enter_date` Date,
+    `industry_code` String,
+    `industry_name` String,
+
+) ENGINE = ReplacingMergeTree() 
+ORDER BY (code,enter_date)

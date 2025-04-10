@@ -5,7 +5,6 @@ import sys
 import json
 
 
-
 # 获取当前文件的绝对路径，并找到上层目录
 current_dir = os.path.dirname(os.path.abspath(__file__))
 parent_dir = os.path.dirname(current_dir)
@@ -18,15 +17,15 @@ from policy.JSG_policy import OrderPolicy, Agent
 from db import DB
 
 logger.remove()  # 这行很关键，先删除logger自动产生的handler，不然会出现重复输出的问题
-logger.add(sys.stderr, level='ERROR')  # 只输出警告以上的日志
-logger.add("bt.log",level="INFO")
+logger.add(sys.stderr, level="ERROR")  # 只输出警告以上的日志
+logger.add("bt.log", level="INFO")
 
-def run_policy(symbol,start_date,end_date):
 
+def run_policy(symbol, start_date, end_date):
     db_client = DB()
     global_var.SYMBOLS = [symbol]
-    account = Account(init_capital=1000000,db_client=db_client)
-    order_policy = OrderPolicy(account,db_client=db_client)
+    account = Account(init_capital=1000000, db_client=db_client)
+    order_policy = OrderPolicy(account, db_client=db_client)
 
     env = MultiMarketEnv(
         250,
@@ -36,15 +35,22 @@ def run_policy(symbol,start_date,end_date):
         max_stake=10000000,
         account=account,
         order_policy=order_policy,
-        db_client=db_client
+        db_client=db_client,
     )
-    agent = Agent(env,db_client=db_client)
+    agent = Agent(env, db_client=db_client)
     obs_list, reward, done, info = env.reset()
     total_reward = 0
-    while obs_list:
-        actions = agent.action_decider(obs_list)
-        # agent.stock_decider(actions)
+    actions = []
+    while True:
+        # today
         obs_list, info = env.step(actions)
+        if not obs_list:
+            break
+        agent.step()
+        agent.run_end()
+        env.run_end()
+        env.order_manager.cancel_all()
+        actions = agent.action_decider(obs_list)
         total_reward += reward
 
     ret = env.result()
@@ -61,4 +67,5 @@ def run_policy(symbol,start_date,end_date):
 
 
 if __name__ == "__main__":
-    run_policy("sh.000905","20220101","20230101")
+    run_policy("sh.000905", "20220201", "20230101")
+    # run_policy("sh.000905", "20250101", "20260101")
