@@ -120,7 +120,6 @@ class DB:
                 ROW_NUMBER() OVER(PARTITION BY code ORDER BY date DESC) AS rn
             FROM stock_data.stock_daily
             WHERE code IN ({stocks_str})
-            AND tradestatus = 1
             AND date <= '{end_date}'
             """
         if start_date:
@@ -196,22 +195,26 @@ class DB:
         FROM stock_data.index_stocks
         WHERE index in ({index_code_str})
         """
-        if date:
-            sql += f" AND enter_date <= '{date}'"
+        # if date:
+        #     sql += f" AND enter_date <= '{date}'"
         logger.debug(f"exec query: {sql}")
         data = self.client.query(sql)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         return df["code"].tolist()
 
-    def get_stock_fincial(self, stocks, date=None):
+    def get_stock_fincial(self, stocks, fields, date=None):
         if not isinstance(stocks, list):
             stocks = [stocks]
+
+        if not isinstance(fields, list):
+            fields = [fields]
+        fields_str = ", ".join(fields)
         stocks_str = ", ".join([f"'{code}'" for code in stocks])
         # 仅获取距离date最近的一条数据
         query = f"""
         SELECT * FROM (
             SELECT
-                *,
+                code,{fields_str},
                 ROW_NUMBER() OVER(PARTITION BY code ORDER BY (publish_date,report_date) DESC) AS rn
             FROM stock_data.finicial_report
             WHERE code IN ({stocks_str})
@@ -247,10 +250,36 @@ class DB:
         ) t
         WHERE rn = 1
         """
+        logger.debug(f"{sql}")
         data = self.client.query(sql)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         df.set_index(keys="code",inplace=True)
         return df
+    
+    def get_stock_shares_info(self,stocks,date=None):
+        stocks_str = ", ".join([f"'{code}'" for code in stocks])
+
+        sql = f"""
+        SELECT * FROM (
+            SELECT 
+                *,
+                ROW_NUMBER() OVER(PARTITION BY code ORDER BY change_date DESC) AS rn
+            FROM stock_data.shares_info
+            WHERE code IN ({stocks_str})
+        """
+        if date:
+            sql += f" AND change_date <= '{date}'"
+        sql += """
+        ) t
+        WHERE rn = 1
+        """
+        logger.debug(f"{sql}")
+        data = self.client.query(sql)
+        df = pd.DataFrame(data.result_rows, columns=data.column_names)
+        df.set_index(keys="code",inplace=True)
+
+        return df
+
 
 
 if __name__ == "__main__":
@@ -265,6 +294,7 @@ if __name__ == "__main__":
     # print(get_price(['sh.000001'],"20200101",['close',"open"],10))
     # print(get_stock_industry('sh.601228', "20210101"))
     db_client = DB()
-    db_client.get_stock_industry_sw(["sz.002193"], date="2022-01-01")
+    # db_client.get_stock_industry_sw(["sz.002193"], date="2022-01-01")
+    print(db_client.get_stock_shares_info(["sz.002166","sz.002193"], date="2022-01-01"))
     # print(db_client.get_stock_fincial(["sz.002193"], "20220301")['adjusted_profit'].iloc[0])
     # print(get_index_stocks("399101","20240101"))

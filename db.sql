@@ -77,3 +77,28 @@ CREATE TABLE stock_data.industry_info
 
 ) ENGINE = ReplacingMergeTree() 
 ORDER BY (code,enter_date)
+
+CREATE TABLE stock_data.etf_daily
+(   `date` Date,
+    `code` String,
+    `open` Float64,
+    `high` Float64,
+    `low` Float64,
+    `close` Float64,
+    `volume` UInt64,
+    `amount` Float64,
+    `turn` Float64,
+) ENGINE = ReplacingMergeTree() 
+ORDER BY (code, date)
+
+-- OPTIMIZE TABLE stock_data.finicial_report FINAL;
+
+
+CREATE TABLE stock_data.shares_info
+(   `publish_date` Date,
+    `change_date` Date,
+    `code` String,
+    `total_shares` Float64,
+    `circulating_a` Float64,
+) ENGINE = ReplacingMergeTree() 
+ORDER BY (publish_date, code)

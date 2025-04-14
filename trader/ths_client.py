@@ -13,8 +13,20 @@ def position():
 
     return json.loads(resp.text)
 
+def try_buy(code):
+    url = f"{URL_BASE}/buy/?code={code}"
+
+    resp = requests.get(url)
+
+    return json.loads(resp.text)
+
+def buy(code):
+    
+
 if __name__ == "__main__":
 
+    # print(try_buy("002205",None,None))
+    # print(position())
     print(balance())
 
 

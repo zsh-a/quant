@@ -1,22 +1,13 @@
-# import baostock as bs
-# import pandas as pd
+# from mootdx.affair import Affair
 
-# # 登陆系统
-# lg = bs.login()
-# # 显示登陆返回信息
-# print('login respond error_code:'+lg.error_code)
-# print('login respond  error_msg:'+lg.error_msg)
 
-# # 查询季频估值指标盈利能力
-# profit_list = []
-# rs_profit = bs.query_profit_data(code="sz.002973", year=2025, quarter=1)
-# while (rs_profit.error_code == '0') & rs_profit.next():
-#     profit_list.append(rs_profit.get_row_data())
-# result_profit = pd.DataFrame(profit_list, columns=rs_profit.fields)
-# # 打印输出
-# print(result_profit)
-# # 结果集输出到csv文件
-# # result_profit.to_csv("D:\\profit_data.csv", encoding="gbk", index=False)
+# df = Affair.parse(downdir="fin_data", filename="gpcw20150930.zip")
 
-# # 登出系统
-# bs.logout()
+
+# df.to_csv('gpcw20150930.csv')
+
+
+import akshare as ak
+
+index_stock_cons_df = ak.index_stock_cons_csindex(symbol="000985")
+index_stock_cons_df.to_csv("index_stock_cons.csv")

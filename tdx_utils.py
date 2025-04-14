@@ -18,8 +18,8 @@ def convert_to_date(num):
 
 
 class TDXProcess:
-
     table_name = "stock_data.finicial_report"
+
     def __init__(self):
         self.client = clickhouse_connect.get_client(
             host=cm.get("db.host"),
@@ -125,70 +125,77 @@ class TDXProcess:
         years = [str(year) for year in range(int(start_year), now_year + 1)]
         dates = [year + date for year in years for date in dates_def]
 
-        # for date in dates:
-        #     filename = f"gpcw{date}.zip"
+        for date in dates:
+            filename = f"gpcw{date}.zip"
 
-        #     try:
-        #         df = Affair.parse(downdir=self.fin_path, filename=filename)
+            # try:
+            try:
+                df = Affair.parse(downdir=self.fin_path, filename=filename)
+            except Exception as e:
+                logger.error(f"parse {filename} error : {e}")
+                continue
+            if len(df) == 0:
+                continue
 
-        #         df["report_date"] = df["report_date"].apply(
-        #             lambda x: datetime.strptime(str(int(x)), "%Y%m%d").strftime("%Y-%m-%d")
-        #         )
-        #         df["publish_date"] = df["财报公告日期"].apply(convert_to_date)
-        #         df["net_profit"] = df["五、净利润"]
-        #         df["roa"] = df["净资产收益率"].iloc[:, [0]]  # 保留第一列
-        #         df["adjusted_profit"] = df["扣除非经常性损益后的净利润"].iloc[:, [0]]
-        #         df["total_shares"] = df["总股本"]
-        #         df["circulating_a"] = df["已上市流通A股"]
-        #         # df['circulating_b'] = df["已上市流通B股"]
-        #         # df['circulating_h'] = df["已上市流通H股"]
+            df["report_date"] = df["report_date"].apply(
+                lambda x: datetime.strptime(str(int(x)), "%Y%m%d").strftime("%Y-%m-%d")
+            )
+            df["publish_date"] = df["财报公告日期"].apply(convert_to_date)
+            df["net_profit"] = df["五、净利润"]
+            df["roa"] = df["净资产收益率"].iloc[:, [0]]  # 保留第一列
+            df["adjusted_profit"] = df["扣除非经常性损益后的净利润"].iloc[:, [0]]
+            df["total_shares"] = df["总股本"]
+            df["circulating_a"] = df["已上市流通A股"]
+            # df['circulating_b'] = df["已上市流通B股"]
+            # df['circulating_h'] = df["已上市流通H股"]
 
-        #         # 计算更多财务指标
-        #         df["gross_profit_margin"] = df["销售毛利率(%)(非金融类指标)"]
+            # 计算更多财务指标
+            df["gross_profit_margin"] = df["销售毛利率(%)(非金融类指标)"]
 
-        #         for code, row in df.iterrows():
-        #             if (
-        #                 not code.startswith("6")
-        #                 and not code.startswith("0")
-        #                 and not code.startswith("3")
-        #             ):
-        #                 continue
-        #             if code.startswith("6"):
-        #                 code = "sh." + code
-        #             else:
-        #                 code = "sz." + code
-        #             adjusted_profit_diff = (
-        #                 row["adjusted_profit"] if date[4:] == "0331" else 0
-        #             )
-        #             sql = f"""
-        #             INSERT INTO stock_data.finicial_report
-        #             (
-        #                 report_date,
-        #                 code,
-        #                 publish_date,
-        #                 net_profit,
-        #                 adjusted_profit,
-        #                 roa,
-        #                 total_shares,
-        #                 circulating_a,
-        #                 adjusted_profit_diff
-        #             )
-        #             VALUES
-        #             (
-        #                 '{row["report_date"]}',
-        #                 '{code}',
-        #                 '{row["publish_date"]}',
-        #                 {row["net_profit"]},
-        #                 {row["adjusted_profit"]},
-        #                 {row["roa"]},
-        #                 {row["total_shares"]},
-        #                 {row["circulating_a"]},
-        #                 {adjusted_profit_diff}
-        #             )"""
-        #             logger.debug(f"{sql}")
-        #             self.client.command(sql)
-        #     except Exception as e:
-        #         logger.error(f"{e}")
+            for code, row in df.iterrows():
+                if (
+                    not code.startswith("6")
+                    and not code.startswith("0")
+                    and not code.startswith("3")
+                ):
+                    continue
+                if code.startswith("6"):
+                    code = "sh." + code
+                else:
+                    code = "sz." + code
+                adjusted_profit_diff = (
+                    row["adjusted_profit"] if date[4:] == "0331" else 0
+                )
+                sql = f"""
+                INSERT INTO stock_data.finicial_report
+                (
+                    report_date,
+                    code,
+                    publish_date,
+                    net_profit,
+                    adjusted_profit,
+                    roa,
+                    total_shares,
+                    circulating_a,
+                    adjusted_profit_diff
+                )
+                VALUES
+                (
+                    '{row["report_date"]}',
+                    '{code}',
+                    '{row["publish_date"]}',
+                    {row["net_profit"]},
+                    {row["adjusted_profit"]},
+                    {row["roa"]},
+                    {row["total_shares"]},
+                    {row["circulating_a"]},
+                    {adjusted_profit_diff}
+                )"""
+                logger.debug(f"{sql}")
+                self.client.command(sql)
+            # except Exception as e:
+            #     logger.error(f"{e}")
+        self.client.command("OPTIMIZE TABLE stock_data.finicial_report FINAL")
 
         self.update(start_year)
 
@@ -214,41 +221,41 @@ class TDXProcess:
         """
         df = self.client.query_df(sql)
         for code in df["code"].unique():
-            try:
-                dates_def = ["-03-31", "-06-30", "-09-30", "-12-31"]
-                years = [str(year) for year in range(int(start_year), now_year)]
-                dates = [year + date for year in years for date in dates_def[1:]]
-                prev_dates = [year + date for year in years for date in dates_def[:-1]]
-                for date, prev_date in zip(reversed(dates), reversed(prev_dates)):
-                    sql = f"""
-                    INSERT INTO stock_data.finicial_report 
-                    (report_date, code, publish_date, net_profit, adjusted_profit, roa, total_shares, circulating_a, adjusted_profit_diff)
-                    SELECT
-                        report_date,
-                        code,
-                        publish_date,
-                        net_profit,
-                        adjusted_profit,
-                        roa,
-                        total_shares,
-                        circulating_a,
-                        adjusted_profit - (
-                            SELECT adjusted_profit
-                            FROM stock_data.finicial_report
-                            WHERE report_date = '{prev_date}'
-                            AND code = '{code}'
-                        )
-                    FROM
-                        stock_data.finicial_report
-                    WHERE 
-                        report_date = '{date}'
+            # try:
+            dates_def = ["-03-31", "-06-30", "-09-30", "-12-31"]
+            years = [str(year) for year in range(int(start_year), now_year)]
+            dates = [year + date for year in years for date in dates_def[1:]]
+            prev_dates = [year + date for year in years for date in dates_def[:-1]]
+            for date, prev_date in zip(reversed(dates), reversed(prev_dates)):
+                sql = f"""
+                INSERT INTO stock_data.finicial_report 
+                (report_date, code, publish_date, net_profit, adjusted_profit, roa, total_shares, circulating_a, adjusted_profit_diff)
+                SELECT
+                    report_date,
+                    code,
+                    publish_date,
+                    net_profit,
+                    adjusted_profit,
+                    roa,
+                    total_shares,
+                    circulating_a,
+                    adjusted_profit - (
+                        SELECT adjusted_profit
+                        FROM stock_data.finicial_report
+                        WHERE report_date = '{prev_date}'
                         AND code = '{code}'
-                    """
-                    logger.info(sql)
-                    self.client.command(sql)
-            except Exception as e:
-                logger.error(f"update adjusted_profit_diff error {e}")
-                continue
+                    )
+                FROM
+                    stock_data.finicial_report
+                WHERE 
+                    report_date = '{date}'
+                    AND code = '{code}'
+                """
+                logger.info(sql)
+                self.client.command(sql)
+            # except Exception as e:
+            #     logger.error(f"update adjusted_profit_diff error {e}")
+            #     continue
 
 
 if __name__ == "__main__":

@@ -3,7 +3,7 @@ from typing import List, Type
 from loguru import logger
 import numpy as np
 import pandas as pd
-from account import Account
+from account import Account, PositionInfo
 import global_var
 import db
 
@@ -121,7 +121,6 @@ class OrderManager:
                 )
         for order in buy_waiting_orders:
             ok, exec_price = self.order_plolicy.buy_policy(order)
-            logger.info(f"exec order : {ok} {exec_price}")
             if ok:
                 self.execute_order(
                     order,
@@ -159,7 +158,7 @@ class OrderManager:
 
     def cancel_all(self):
         for od in self.orders:
-            if (od.status == "open" or od.status == "tracking"):
+            if od.status == "open" or od.status == "tracking":
                 od.status = "cancelled"
 
     def update_account(self, order):
@@ -177,21 +176,39 @@ class OrderManager:
             self.account.cash = self.account.cash + amount - cost
 
         if order.symbol not in self.account.positions[-1]:
-            self.account.positions[-1][order.symbol] = 0
-        self.account.positions[-1][order.symbol] += (
+            self.account.positions[-1][order.symbol] = PositionInfo(
+                order.symbol, 0, order.execution_price, str(order.timestamp.date())
+            )
+        self.account.positions[-1][order.symbol].quantity += (
             order.filled_quantity
             if order.order_type == "buy"
             else -order.filled_quantity
         )
-        if self.account.positions[-1][order.symbol] == 0:
+
+        if order.order_type == "buy":
+            self.account.availables[-1][order.symbol] = False
+
+        if self.account.positions[-1][order.symbol].quantity == 0:
+            self.completed_position.append(
+                {
+                    "symbol": order.symbol,
+                    "return": round(
+                        (
+                            (
+                                order.execution_price
+                                / self.account.positions[-1][order.symbol].cost_price
+                            )
+                            - 1
+                        )
+                        * 100,
+                        2,
+                    ),
+                    "open_time": self.account.positions[-1][order.symbol].timestamp,
+                    "close_time": str(order.timestamp),
+                }
+            )
             del self.account.positions[-1][order.symbol]
-            # TODO
-            # self.completed_position.append(
-            #     {
-            #         "code" : order.symbol,
-            #         "profit":
-            #     }
-            # )
+            del self.account.availables[-1][order.symbol]
 
     def get_current_timestamp(self):
         """
@@ -211,56 +228,37 @@ class OrderManager:
 
         # order_returns = []
 
-        # for buy, sell in zip(it, it):
-        #     assert buy.symbol == sell.symbol, (
-        #         f"{buy.symbol} {buy.timestamp} != {sell.symbol} {sell.timestamp}"
-        #     )
-        #     order_return = (
-        #         sell.execution_price - buy.execution_price
-        #     ) * sell.filled_quantity
-        #     order_returns.append(
-        #         {
-        #             "symbol": buy.symbol,
-        #             "order_revenue": order_return,
-        #             "return": round(
-        #                 (sell.execution_price / buy.execution_price - 1) * 100,
-        #                 2,
-        #             ),
-        #             "open_time": buy.timestamp,
-        #             "close_time": sell.timestamp,
-        #         }
-        #     )
         # order_returns.sort(key=lambda x: x["return"], reverse=True)
+        trade_infos = self.completed_position
 
-        # win = 0
-        # loss = 0
-        # order_history = []
-        # for order in order_returns:
-        #     if order["return"] > 0:
-        #         win += 1
-        #     else:
-        #         loss += 1
+        win = 0
+        loss = 0
+        order_history = []
+        for order in trade_infos:
+            if order["return"] > 0:
+                win += 1
+            else:
+                loss += 1
 
-        #     order_history.append(
-        #         {
-        #             "symbol": order["symbol"],
-        #             "order_revenue": order["order_revenue"],
-        #             "order_return": order["return"],
-        #             "open_time": pd.to_datetime(order["open_time"]).strftime(
-        #                 "%Y-%m-%d"
-        #             ),
-        #             "close_time": pd.to_datetime(order["close_time"]).strftime(
-        #                 "%Y-%m-%d"
-        #             ),
-        #         }
-        #     )
-        return {}
-        # return {
-        #     "win": win,
-        #     "loss": loss,
-        #     "order_history": order_history,
-        #     # "total_revenue": sum([order["order_revenue"] for order in order_returns]),
-        # }
+            order_history.append(
+                {
+                    "symbol": order["symbol"],
+                    "order_return": order["return"],
+                    "open_time": pd.to_datetime(order["open_time"]).strftime(
+                        "%Y-%m-%d"
+                    ),
+                    "close_time": pd.to_datetime(order["close_time"]).strftime(
+                        "%Y-%m-%d"
+                    ),
+                }
+            )
+
+        return {
+            "win": win,
+            "loss": loss,
+            "order_history": order_history,
+            # "total_revenue": sum([order["order_revenue"] for order in order_returns]),
+        }
 
         # headers = ["symbol", "order_revenue", "order_return", "buy_time", "sell_time"]
 

@@ -4,6 +4,16 @@ import pandas as pd
 
 import global_var
 
+from loguru import logger
+
+
+class PositionInfo:
+    def __init__(self, code, quantity, cost_price, timestamp):
+        self.code = code
+        self.quantity = quantity
+        self.cost_price = cost_price
+        self.timestamp = timestamp
+
 
 class Account:
     def __init__(self, init_capital=10000, **args) -> None:
@@ -14,6 +24,7 @@ class Account:
         self.min_action = 10
 
         self.positions = [{}]
+        self.availables = [{}]
         self.returns = np.zeros(len(global_var.SYMBOLS))
         self.cost_price = np.zeros(len(global_var.SYMBOLS))
         self.cashs = [init_capital]
@@ -29,6 +40,9 @@ class Account:
         # self.actions.append(np.zeros(len(global_var.SYMBOLS)))
         # self.costs.append(self.costs[-1])
         self.positions.append(self.positions[-1].copy())
+        self.availables.append(self.availables[-1].copy())
+        for key, value in self.availables[-1].items():
+            self.availables[-1][key] = True
         # self.capitals.append(self.capitals[-1])
 
         # add deep copy self.positions[-1] to self.available
@@ -44,10 +58,17 @@ class Account:
     def get_position_price(self, date):
         pos_info = self.positions[-1]
         stocks = list(pos_info.keys())
+
+        codes = []
+        posotions = []
+        for code, val in pos_info.items():
+            codes.append(code)
+            posotions.append(val.quantity)
+
         pos_df = pd.DataFrame(
             {
-                "code": list(pos_info.keys()),
-                "position": list(pos_info.values()),
+                "code": codes,
+                "position": posotions,
             },
             index=stocks,
         )
@@ -92,10 +113,20 @@ class Account:
 
         # 计算最大回撤
         max_drawdown = np.min(drawdowns)
+
+        # 计算年化收益
+        start_date = pd.to_datetime(self.dates[1])
+        end_date = pd.to_datetime(self.dates[-1])
+        years = (end_date - start_date).days / 365
+        logger.info(f"run span : {start_date} - {end_date}")
+        annualized_return = (self.tot_values[-1] / self.tot_values[0]) ** (
+            1 / years
+        ) - 1
         return {
             "strategy_return": f"{strategy_return:.2%}",
-            "revenue": {"x": x_data, "y": y_data},
+            "annualized_return": f"{annualized_return:.2%}",
             "max_drawdown": f"{max_drawdown:.2%}",
+            "revenue": {"x": x_data, "y": y_data},
         }
 
         # 计算滚动最小值

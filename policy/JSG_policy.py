@@ -22,6 +22,8 @@ import utils.utils as util
 PRICE_CHANGE_LIMIT = 0.098
 MAX_POSITION = 99999999
 
+NUM_STOCKS = 6
+
 
 class OrderPolicy(OrderPolicy):
     def __init__(self, account, **args) -> None:
@@ -62,6 +64,12 @@ class OrderPolicy(OrderPolicy):
         if not self.check_up_down_limit(order.symbol, order.exec_time):
             return (False, 0)
 
+        if (
+            len(self.account.get_position_price(str(self.current_date.date())))
+            >= NUM_STOCKS
+        ):
+            return (False, 0)
+
         trading_price = self.get_now_price(order.symbol, order.exec_time) * (
             1 + self.slip
         )
@@ -77,6 +85,7 @@ class OrderPolicy(OrderPolicy):
                     self.account.cash // trading_price // min_action * min_action,
                     action,
                 )
+
                 if num_stakes >= min_action:
                     amount = trading_price * num_stakes
                     cost = amount * self.account.trading_fee_open
@@ -137,7 +146,7 @@ class OrderPolicy(OrderPolicy):
         min_action = self.account.min_action
         action = action // min_action * min_action
         if self.sell_cond(order.symbol):
-            num_stakes = min(self.account.positions[-1][order.symbol], action)
+            num_stakes = min(self.account.positions[-1][order.symbol].quantity, action)
             if num_stakes > 0:
                 order.quantity = num_stakes
                 return (True, trading_price)
@@ -152,10 +161,8 @@ class OrderPolicy(OrderPolicy):
     def sell_cond(self, code):
         if len(self.last_obs) < 2:
             return False
-        key = "low"
-        # logger.info(
-        #     f"sell cond | avail : {self.account.get_available(code)} | cur low : {self.cur_obs[idx]["low"]} | cur close : {self.cur_obs[idx]["close"]} last low : {self.last_obs[-1][idx]["low"]}, {self.last_obs[-2][idx]["low"]})"
-        # )
+        if not self.account.availables[-1][code]:
+            return False
         return True
         # print(self.cur_obs[code])
 
@@ -180,15 +187,28 @@ class Agent:
         self.init_indicators()
 
         self.current_date = None
-        self.pass_month = [1, 4]
+        self.pass_month = []
         self.pool_size = 20
 
-        self.stock_sum = 6
+        self.stock_sum = 4
 
         self.black_industry_name = {"银行", "煤炭", "采掘", "钢铁"}
 
+        self.trad_days = pd.read_csv(
+            "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
+        )
+        print(self.trad_days)
+
+    def get_next_trading_day(self):
+        date = pd.to_datetime(self.current_date)
+        next_date = date + pd.DateOffset(days=1)
+        while self.trad_days.loc[next_date, "is_trading_day"] == 0:
+            next_date += pd.DateOffset(days=1)
+        return next_date
+
     def step(self):
         self.current_date = self.market_env.cur_date
+        self.next_trading_day = self.get_next_trading_day()
 
     def signal_indicator(df):
         return df
@@ -227,22 +247,24 @@ class Agent:
         df["bias"] = df["close"] > df["ma20"]
 
         df.reset_index(level="date", drop=True, inplace=True)
-        df["industry"] = self.db_client.get_stock_industry_sw(
-            df.index.to_list(), end_date
-        )["industry_name"]
+
+        industry_df = self.db_client.get_stock_industry_sw(df.index.to_list(), end_date)
+        df["industry"] = industry_df["industry_name"]
         # df['industry'] = self.db_client.get_stock_industry(df.index.to_list(), end_date)
-        df = df[(df["industry"] != "") & (df["industry"] != "综合")]
+        df = df[(df["industry"] != "")]
         df = df[["bias", "industry"]]
 
         ratio = (
             df.groupby("industry").sum() * 100 / df.groupby("industry").count()
         ).round()
-        # if self.get_current_date_str() == '2022-03-25':
+        # if self.get_current_date_str() == '2022-06-02':
         #     ratio.sort_values(by="bias").to_csv("test.csv")
 
         #     breakpoint()
-        max_bias = ratio["bias"].max()
-        return ratio[ratio["bias"] == max_bias].index.to_list()
+        # max_bias = ratio["bias"].max()
+        # return ratio[ratio["bias"] == max_bias].index.to_list()
+
+        return ratio["bias"].nlargest(1).index.to_list()
 
     def get_current_date_str(self):
         return str(self.current_date.date())
@@ -251,24 +273,35 @@ class Agent:
         df = self.db_client.get_price(stocks, self.get_current_date_str(), ["isST"], 1)
         df.reset_index(level="date", drop=True, inplace=True)
         df = df[(df["tradestatus"] == 1) & (df["isST"] == 0)]
+
+        # df = self.db_client.get_price(df.index.to_list(), self.get_next_trading_day().date(), ["isST"], 1)
+        # df.reset_index(level="date", drop=True, inplace=True)
+        # df.to_csv("0201.csv")
+        # df = df[(df["tradestatus"] == 1)]
         return df.index.to_list()
 
     def select_stock(self, end_date):
         stocks = self.db_client.get_index_stocks("399101", end_date)
         stocks = self.filter_basic(stocks)
+        fin_date = (self.get_next_trading_day() - pd.DateOffset(days=1)).date()
 
-        fin_db = self.db_client.get_stock_fincial(stocks, end_date)
+        fin_db = self.db_client.get_stock_fincial(
+            stocks, fields=["adjusted_profit_diff","total_shares"],date=fin_date
+        )
         fin_db = fin_db[fin_db["adjusted_profit_diff"] > 0]
+        fin_db["total_shares_bak"] = fin_db["total_shares"]
         df = self.db_client.get_price(
             fin_db.index.to_list(), end_date, ["close"], 1, price_adj=False
         )
         df.reset_index(level="date", drop=True, inplace=True)
+        df.to_csv('close.csv')
         fin_db["close"] = df["close"]
+
+        df = self.db_client.get_stock_shares_info(fin_db.index.to_list(), fin_date)
+        fin_db["total_shares"] = df["total_shares"]
         fin_db["market_cap"] = fin_db["close"] * fin_db["total_shares"]
 
-        fin_db = fin_db[fin_db["adjusted_profit_diff"] > 0]
-
-        # if self.get_current_date_str() == '2022-03-25':
+        # if self.get_current_date_str() == "2020-06-12":
         #     fin_db.sort_values(by="market_cap", ascending=True).to_csv("tmp.csv")
         #     breakpoint()
         fin_db = fin_db.sort_values(by="market_cap", ascending=True).iloc[
@@ -308,7 +341,8 @@ class Agent:
         total_value = self.market_env.account.get_total_value()
 
         for code in target:
-            target_value[code] = total_value / len(target)
+            if code not in hold_list:
+                target_value[code] = total_value / len(target)
 
         if len(target_value) > 0:
             self.process_order_value(target_value)
@@ -318,10 +352,11 @@ class Agent:
         # ts = stocks_obs[0].name
         # self.current_date = ts
         ts = self.market_env.cur_date
-        if ts.weekday() != 4:
+        today = str(ts.date())
+
+        if self.trad_days.loc[today, "is_last_trading_day"] == 0:
             return
 
-        today = str(ts.date())
         I = self.get_market_breadth(end_date=today)
         logger.info(f"market breath : {I}")
         cand_stocks = self.stock_decider(I)
@@ -331,12 +366,149 @@ class Agent:
         return self.current_date.month in self.pass_month
 
     def stock_decider(self, I):
-        white_list = ["2022-03-18"]
         today = self.get_current_date_str()
-        if (
-            not self.black_industry_name.intersection(I) or today in white_list
-        ) and not self.is_empty_month():
-            return self.select_stock(self.get_current_date_str())
+        # return self.select_stock(today)
+        if (not self.black_industry_name.intersection(I)) and not self.is_empty_month():
+            return self.select_stock(today)
+        return []
+
+    def run_end(self):
+        pos = self.market_env.account.get_position_price(self.get_current_date_str())
+        if len(pos) == 0:
+            return
+        hold_stocks = pos["code"].to_list()
+        df = self.db_client.get_price(
+            hold_stocks, self.get_current_date_str(), ["close", "open"], 3
+        )
+
+        df = df.groupby(level=0, group_keys=False).apply(lambda x: x.head(2))
+        # logger.error(f"{df}")
+
+        df["pct"] = df.groupby("code")["close"].pct_change()
+
+        df = df.groupby(level=0).tail(1)
+        df.reset_index("date", drop=True, inplace=True)
+        banned_stocks = df[df["pct"] >= PRICE_CHANGE_LIMIT].index.to_list()
+
+        logger.info(f"end check banned : {banned_stocks}")
+        for stock in banned_stocks:
+            self.create_order(stock, -MAX_POSITION, exec_time="close")
+
+    def cancel_order(self, code):
+        self.market_env.order_manager.cancel_order(code)
+
+    def create_order(self, code, action, exec_time="open"):
+        if action < -self.market_env.min_action:
+            self.market_env.order_manager.create_order(
+                code, "sell", abs(action), None, exec_time
+            )
+        if action > self.market_env.min_action:
+            self.market_env.order_manager.create_order(
+                code, "buy", abs(action), None, exec_time
+            )
+
+
+class AllDay:
+    def __init__(self, market_env: MultiMarketEnv, **args) -> None:
+        self.market_env = market_env
+
+        self.db_client = args["db_client"]
+        self.init_indicators()
+
+        self.current_date = None
+        self.pass_month = []
+        self.pool_size = 20
+
+        self.stock_sum = 6
+
+        self.black_industry_name = {"银行", "煤炭", "采掘", "钢铁"}
+
+        self.trad_days = pd.read_csv(
+            "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
+        )
+
+        # 全天候ETF组合参数
+        self.etf_pool = [
+            "511260",  # 十年国债ETF
+            "518880",  # 黄金ETF
+            "513100",  # 纳指100
+            # 2020年之后成立(注意回测时间)
+            "159980",  # 有色ETF
+            "162411",  # 华宝油气LOF
+            "159985",  # 豆粕ETF
+        ]
+        # 标的仓位占比
+        self.rates = [0.45, 0.25, 0.15, 0.05, 0.05, 0.05]
+
+    def get_next_trading_day(self):
+        date = pd.to_datetime(self.current_date)
+        next_date = date + pd.DateOffset(days=1)
+        while self.trad_days.loc[next_date, "is_trading_day"] == 0:
+            next_date += pd.DateOffset(days=1)
+        return next_date
+
+    def step(self):
+        self.current_date = self.market_env.cur_date
+        self.next_trading_day = self.get_next_trading_day()
+
+    def signal_indicator(df):
+        return df
+
+    def init_indicators(self):
+        # self.market_env.add_indicator(Agent.signal_indicator)
+        self.market_env.clean_data()
+
+    def select_action(self, code, info):
+        ret = 0
+        score = 0
+
+        return ret, score
+
+    def get_current_date_str(self):
+        return str(self.current_date.date())
+
+    def process_order_value(self, target_value):
+        pos_df = self.market_env.account.get_position_price(self.get_current_date_str())
+        if len(pos_df) > 0:
+            pos_df["value"] = pos_df["position"] * pos_df["close"]
+
+        new_price = self.db_client.get_price(
+            list(target_value.keys()), self.get_current_date_str(), ["close"], 1
+        )
+        new_price.reset_index(level="date", drop=True, inplace=True)
+        action_pos = {}
+        for code, value in target_value.items():
+            if code in pos_df.index:
+                new_pos = int(value / pos_df.loc[code, "close"])
+                action_pos[code] = new_pos - pos_df.loc[code, "position"]
+            else:
+                action_pos[code] = int(value / new_price.loc[code, "close"])
+
+        for code, action in action_pos.items():
+            self.create_order(code, action)
+
+    def adjust(self):
+        total_value = self.market_env.account.get_total_value()
+        targets = {
+            code:total_value * rate for code,rate in zip(self.etf_pool,self.rates)
+        }
+        self.process_order_value(targets)
+
+    def action_decider(self, stocks_obs):
+        # ts = stocks_obs[0].name
+        # self.current_date = ts
+        ts = self.market_env.cur_date
+        today = str(ts.date())
+
+        if self.trad_days.loc[today, "is_last_trading_day_monthly"] == 0:
+            return
+        self.adjust()
+
+    def stock_decider(self, I):
+        today = self.get_current_date_str()
+        # return self.select_stock(today)
+        if (not self.black_industry_name.intersection(I)) and not self.is_empty_month():
+            return self.select_stock(today)
         return []
 
     def run_end(self):

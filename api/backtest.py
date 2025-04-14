@@ -13,7 +13,7 @@ sys.path.append(parent_dir)
 from account import Account
 import global_var
 from market_env import MultiMarketEnv
-from policy.JSG_policy import OrderPolicy, Agent
+from policy.JSG_policy import OrderPolicy, Agent,AllDay
 from db import DB
 
 logger.remove()  # 这行很关键，先删除logger自动产生的handler，不然会出现重复输出的问题
@@ -58,6 +58,7 @@ def run_policy(symbol, start_date, end_date):
     ret["buy_sell_points"] = env.order_manager.buy_sell_points
 
     ret["order_stats"] = env.order_manager.get_order_stats()
+    print(ret["order_stats"])
     # code_returns = sorted(ret["code_returns"].items(), key=lambda x: x[1])
     # code_returns = [key for key, value in code_returns]
 
@@ -67,5 +68,5 @@ def run_policy(symbol, start_date, end_date):
 
 
 if __name__ == "__main__":
-    run_policy("sh.000905", "20220201", "20230101")
+    run_policy("sh.000300", "20221226", "20260101")
     # run_policy("sh.000905", "20250101", "20260101")
