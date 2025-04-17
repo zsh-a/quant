@@ -193,11 +193,13 @@ class AKDataProcessor:
 
 if __name__ == "__main__":
     # insert_index_stocks("399101")
-    dp = AKDataProcessor()
+    # dp = AKDataProcessor()
     # etfs = ["511260","518880","513100","159980","162411","159985"]
     # for code in etfs:
     #     dp.update_etf_data(code)
     # dp.create_etf_meta()
-    dp.update_shares()
+    # dp.update_shares()
     # dp.insert_index_stocks("399101")
     # dp.insert_sw_industry()
+
+    print(ak.stock_zh_a_hist())

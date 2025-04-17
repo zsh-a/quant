@@ -547,6 +547,134 @@ class AllDay:
             )
 
 
+
+
+class ROAAgent:
+    def __init__(self, market_env: MultiMarketEnv, **args) -> None:
+        self.market_env = market_env
+
+        self.db_client = args["db_client"]
+        self.init_indicators()
+
+        self.current_date = None
+        self.pass_month = []
+        self.pool_size = 20
+
+        self.stock_sum = 6
+
+        self.black_industry_name = {"银行", "煤炭", "采掘", "钢铁"}
+
+        self.trad_days = pd.read_csv(
+            "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
+        )
+        self.stock_sum = 1
+
+    def get_next_trading_day(self):
+        date = pd.to_datetime(self.current_date)
+        next_date = date + pd.DateOffset(days=1)
+        while self.trad_days.loc[next_date, "is_trading_day"] == 0:
+            next_date += pd.DateOffset(days=1)
+        return next_date
+
+    def step(self):
+        self.current_date = self.market_env.cur_date
+        self.next_trading_day = self.get_next_trading_day()
+
+    def signal_indicator(df):
+        return df
+
+    def init_indicators(self):
+        # self.market_env.add_indicator(Agent.signal_indicator)
+        self.market_env.clean_data()
+
+    def select_action(self, code, info):
+        ret = 0
+        score = 0
+
+        return ret, score
+
+    def get_current_date_str(self):
+        return str(self.current_date.date())
+
+    def process_order_value(self, target_value):
+        pos_df = self.market_env.account.get_position_price(self.get_current_date_str())
+        if len(pos_df) > 0:
+            pos_df["value"] = pos_df["position"] * pos_df["close"]
+
+        new_price = self.db_client.get_price(
+            list(target_value.keys()), self.get_current_date_str(), ["close"], 1
+        )
+        new_price.reset_index(level="date", drop=True, inplace=True)
+        action_pos = {}
+        for code, value in target_value.items():
+            if code in pos_df.index:
+                new_pos = int(value / pos_df.loc[code, "close"])
+                action_pos[code] = new_pos - pos_df.loc[code, "position"]
+            else:
+                action_pos[code] = int(value / new_price.loc[code, "close"])
+
+        for code, action in action_pos.items():
+            self.create_order(code, action)
+
+    def adjust(self):
+        total_value = self.market_env.account.get_total_value()
+        targets = {
+            code:total_value * rate for code,rate in zip(self.etf_pool,self.rates)
+        }
+        self.process_order_value(targets)
+
+    def action_decider(self, stocks_obs):
+        # ts = stocks_obs[0].name
+        # self.current_date = ts
+        ts = self.market_env.cur_date
+        today = str(ts.date())
+
+        if self.trad_days.loc[today, "is_last_trading_day_monthly"] == 0:
+            return
+        self.adjust()
+
+    def stock_decider(self, I):
+        today = self.get_current_date_str()
+        # return self.select_stock(today)
+        if (not self.black_industry_name.intersection(I)) and not self.is_empty_month():
+            return self.select_stock(today)
+        return []
+
+    def run_end(self):
+        pos = self.market_env.account.get_position_price(self.get_current_date_str())
+        if len(pos) == 0:
+            return
+        hold_stocks = pos["code"].to_list()
+        df = self.db_client.get_price(
+            hold_stocks, self.get_current_date_str(), ["close", "open"], 3
+        )
+
+        df = df.groupby(level=0, group_keys=False).apply(lambda x: x.head(2))
+        # logger.error(f"{df}")
+
+        df["pct"] = df.groupby("code")["close"].pct_change()
+
+        df = df.groupby(level=0).tail(1)
+        df.reset_index("date", drop=True, inplace=True)
+        banned_stocks = df[df["pct"] >= PRICE_CHANGE_LIMIT].index.to_list()
+
+        logger.info(f"end check banned : {banned_stocks}")
+        for stock in banned_stocks:
+            self.create_order(stock, -MAX_POSITION, exec_time="close")
+
+    def cancel_order(self, code):
+        self.market_env.order_manager.cancel_order(code)
+
+    def create_order(self, code, action, exec_time="open"):
+        if action < -self.market_env.min_action:
+            self.market_env.order_manager.create_order(
+                code, "sell", abs(action), None, exec_time
+            )
+        if action > self.market_env.min_action:
+            self.market_env.order_manager.create_order(
+                code, "buy", abs(action), None, exec_time
+            )
+
 if __name__ == "__main__":
     agent = Agent(None)
     print(agent.get_market_breadth("20250101"))

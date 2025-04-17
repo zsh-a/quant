@@ -1,103 +1,247 @@
-# import numpy as np
-# import random
-# import torch
-# import torch.nn as nn
-# import torch.optim as optim
-# import torch.nn.functional as F
-# from torchvision import datasets, transforms
-# from data_source import DBDataSource
-# import matplotlib.pyplot as plt 
+from db import DB
+from utils import *
+import torch
+import numpy as np
+import torch.nn as nn
+from torch.optim import lr_scheduler
+from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler
+from torch.utils.tensorboard import SummaryWriter
+
+writer = SummaryWriter()
 
 
-# class Model(nn.Module):
-#     def __init__(self, input_dim, hidden_dim, output_dim):
-#         super(Model, self).__init__()
-#         self.fc1 = nn.Linear(input_dim, hidden_dim)
-#         self.fc2 = nn.Linear(hidden_dim, output_dim)
-#         self._initialize_weights()
+def build_dataset(start_date, end_data):
+    total_samples = []
+    total_labels = []
+    db_client = DB()
 
-#     def _initialize_weights(self):
-#         for m in self.modules():
-#             if isinstance(m, nn.Linear):
-#                 nn.init.kaiming_normal_(m.weight)
-#                 if m.bias is not None:
-#                     nn.init.zeros_(m.bias)
+    for code in ["sz.000001", "sz.002594", "sz.300750"]:
+        samples = []
+        labels = []
+        df = db_client.get_kline(code, start_date, end_data)
 
-#     def forward(self, x):
-#         x = torch.relu(self.fc1(x))
-#         x = torch.softmax(self.fc2(x), dim=-1)
-#         return x
+        df = df[df["tradestatus"] == 1]
+        df = df[["open", "high", "low", "close", "amount", "turn"]]
 
+        df = df.dropna()
 
-# code = "sh.000001"
+        # 每列进行标准化
+        for col in df.columns:
+            df[col] = (df[col] - df[col].mean()) / df[col].std()
 
+        num_samples = len(df)
+        if num_samples < 180:
+            return
 
-# db = DBDataSource(code, 220, start_date="20210401", end_date="20240401")
+        for i in range(num_samples - 85):
+            sample = df.iloc[i : i + 60]
+            samples.append(sample.values)
+            labels.append(
+                (np.mean(df.iloc[i + 60 : i + 85]["low"]) - sample["low"].values[-1])
+                / sample["low"].values[-1]
+            )
 
-# df = db.get_data()
+        labels = (np.array(labels) - np.mean(labels)) / np.std(labels) 
 
-# df["future_ret_1d"] = df["close"].pct_change().shift(-1)  #
+        total_samples.extend(samples)
+        total_labels.extend(labels)
+    feature = torch.tensor(np.array(total_samples), dtype=torch.float32)
+    labels = torch.tensor(np.array(total_labels), dtype=torch.float32)
 
-# # 计算分割点
-# train_idx = int(len(df) * 0.6)
-# valid_idx = int(len(df) * 0.8)
-
-# split_date_1 = df.index[train_idx]
-# split_date_2 = df.index[valid_idx]
-
-# train_data = df.iloc[:train_idx].copy()
-# valid_data = df.iloc[train_idx:valid_idx].copy()
-# test_data = df.iloc[valid_idx:].copy()
-
-# print("训练集范围:", train_data.index.min(), "→", train_data.index.max())
-# print("验证集范围:", valid_data.index.min(), "→", valid_data.index.max())
-# print("测试集范围:", test_data.index.min(), "→", test_data.index.max())
-# print("\n训练集样本数:", len(train_data))
-# print("验证集样本数:", len(valid_data))
-# print("测试集样本数:", len(test_data))
+    return TensorDataset(feature, labels)
 
 
-# # 可视化训练集和测试集的划分
-# plt.figure(figsize=(15, 6))  # JayBee黄原创内容
-# plt.plot(train_data.index, train_data['future_ret_1d'], label='训练集', color='blue')  # JayBee黄授权使用
-# plt.plot(valid_data.index, valid_data['future_ret_1d'], label='验证集', color='green')  # JayBee黄授权使用
-# plt.plot(test_data.index, test_data['future_ret_1d'], label='测试集', color='red')  # JayBee黄授权使用
-# plt.axvline(split_date_1, color='black', linestyle='--', label='划分点')  # Copyright © JayBee黄
-# plt.axvline(split_date_2, color='black', linestyle='--', label='划分点')  # JayBee黄 - 量化交易研究
-# plt.title('训练集、验证集、测试集划分')  # Copyright © JayBee黄
-# plt.xlabel('日期')  # Copyright © JayBee黄
-# plt.ylabel('收益率')  # JayBee黄量化策略
-# plt.legend()  # JayBee黄授权使用
-# plt.grid(True)  # Copyright © JayBee黄
-# plt.show()  # JayBee黄量化策略# JayBee黄版权所有，未经授权禁止复制
+class Model(nn.Module):
+    def __init__(
+        self,
+        fc1_size=2000,
+        fc2_size=1000,
+        fc3_size=100,
+        fc1_dropout=0.2,
+        fc2_dropout=0.2,
+        fc3_dropout=0.2,
+        num_of_classes=50,
+    ):
+        super(Model, self).__init__()
 
-# transform = transforms.Compose(
-#     [transforms.ToTensor(), transforms.Normalize((0.5,), (0.5,))]
-# )
+        self.f_model = nn.Sequential(
+            nn.Linear(3296, fc1_size),  # 887
+            nn.BatchNorm1d(fc1_size),
+            nn.ReLU(),
+            nn.Dropout(fc1_dropout),
+            nn.Linear(fc1_size, fc2_size),
+            nn.BatchNorm1d(fc2_size),
+            nn.ReLU(),
+            nn.Dropout(fc2_dropout),
+            nn.Linear(fc2_size, fc3_size),
+            nn.BatchNorm1d(fc3_size),
+            nn.ReLU(),
+            nn.Dropout(fc3_dropout),
+            nn.Linear(fc3_size, 1),
+        )
 
-# num_epochs = 1000
-# batch_size = 64
-# learning_rate = 0.01
+        self.conv_layers1 = nn.Sequential(
+            nn.Conv1d(6, 16, kernel_size=1),
+            nn.BatchNorm1d(16),
+            nn.Dropout(fc3_dropout),
+            nn.ReLU(),
+            nn.MaxPool1d(kernel_size=2),
+            nn.Conv1d(16, 32, kernel_size=1),
+            nn.BatchNorm1d(32),
+            nn.Dropout(fc3_dropout),
+            nn.ReLU(),
+        )
 
-# model = Model(input_dim=3, hidden_dim=64, output_dim=3)
-# criterion = nn.CrossEntropyLoss()
-# optimizer = optim.Adam(model.parameters(), lr=learning_rate)
+        self.conv_2D = nn.Sequential(
+            nn.Conv2d(1, 16, kernel_size=2),
+            nn.BatchNorm2d(16),
+            nn.Dropout(fc3_dropout),
+            nn.ReLU(),
+            nn.MaxPool2d(kernel_size=2),
+            nn.Conv2d(16, 32, kernel_size=2),
+            nn.BatchNorm2d(32),
+            nn.Dropout(fc3_dropout),
+            nn.ReLU(),
+        )
+        hidden_dim = 32
+        self.lstm = nn.LSTM(
+            input_size=hidden_dim,
+            hidden_size=hidden_dim,
+            num_layers=4,
+            batch_first=True,
+            bidirectional=True,
+        )
+        hidden_dim = 1
+        self.l = nn.LSTM(
+            input_size=hidden_dim,
+            hidden_size=hidden_dim,
+            num_layers=4,
+            batch_first=True,
+            bidirectional=True,
+        )
 
-# train_dataset = torch.utils.data.TensorDataset(train_X, train_Y)
-# eval_dataset = torch.utils.data.TensorDataset(eval_X, eval_Y)
-# test_dataset = torch.utils.data.TensorDataset(test_X, test_Y)
+        for name, module in self.named_modules():
+            if isinstance(module, nn.Linear):
+                nn.init.kaiming_normal_(
+                    module.weight, mode="fan_in", nonlinearity="relu"
+                )
+            if isinstance(module, nn.Conv2d):
+                nn.init.kaiming_normal_(
+                    module.weight, mode="fan_in", nonlinearity="relu"
+                )
+            if isinstance(module, nn.Conv1d):
+                nn.init.kaiming_normal_(
+                    module.weight, mode="fan_in", nonlinearity="relu"
+                )
+
+    def forward(self, x):
+        apply = torch.narrow(x, dim=-1, start=0, length=1)[
+            :,
+            -90:,
+        ].squeeze(1)
+        redeem = torch.narrow(x, dim=-1, start=1, length=1)[
+            :,
+            -90:,
+        ].squeeze(1)
+        apply, _ = self.l(apply)
+        redeem, _ = self.l(redeem)
+        apply = torch.reshape(apply, (apply.shape[0], apply.shape[1] * apply.shape[2]))
+        redeem = torch.reshape(
+            redeem, (redeem.shape[0], redeem.shape[1] * redeem.shape[2])
+        )
+
+        ZFF = torch.narrow(x, dim=-1, start=2, length=1)[
+            :,
+            -90:,
+        ].squeeze(1)
+        HS = torch.narrow(x, dim=-1, start=3, length=1)[
+            :,
+            -90:,
+        ].squeeze(1)
+        ZFF, _ = self.l(ZFF)
+        HS, _ = self.l(HS)
+        ZFF = torch.reshape(ZFF, (ZFF.shape[0], ZFF.shape[1] * ZFF.shape[2]))
+        HS = torch.reshape(HS, (HS.shape[0], HS.shape[1] * HS.shape[2]))
+
+        min_vals, _ = torch.min(x, dim=1, keepdim=True)
+        max_vals, _ = torch.max(x, dim=1, keepdim=True)
+        x = (x - min_vals) / (max_vals - min_vals + 0.00001)
+
+        xx = x.unsqueeze(1)
+        xx = self.conv_2D(xx)
+        xx = torch.reshape(xx, (xx.shape[0], xx.shape[1] * xx.shape[2] * xx.shape[3]))
+        x = x.transpose(1, 2)
+        x = self.conv_layers1(x)
+        out = x.transpose(1, 2)
+        out2, _ = self.lstm(out)
+        out2 = torch.reshape(out2, (out2.shape[0], out2.shape[1] * out2.shape[2]))
+
+        IN = torch.cat((xx, out2, apply, redeem, ZFF, HS), dim=1)
+        out = self.f_model(IN)
+        return out
 
 
-# train_loader = torch.utils.data.DataLoader(
-#     train_dataset, batch_size=batch_size, shuffle=True
-# )
+if __name__ == "__main__":
+    learning_rate = 0.0001
+    num_epochs = 500
+    batch_size = 40000
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    train_dataset = build_dataset("20100101", "20200101")
 
+    valid_dataset = build_dataset("20200101", "20250101")
 
-# # for epoch in range(num_epochs):
-# #     for i, (inputs, labels) in enumerate(train_loader):
-# #         optimizer.zero_grad()
-# #         outputs = model(inputs)
-# #         loss = criterion(outputs, labels)
-# #         loss.backward()
-# #         optimizer.step()
-# #     print(f"Epoch [{epoch + 1}/{num_epochs}], Loss: {loss.item():.4f}")
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+    )
+
+    valid_loader = DataLoader(
+        valid_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+    )
+    criterion = nn.MSELoss()
+
+    model = Model().to(device)
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=15)
+    for epoch in range(num_epochs):
+        epoch_loss = 0.0
+        for i, (x, y) in enumerate(train_loader):
+            x = x.to(device)
+            # print(x)
+            # print(y)
+            y = y.to(device)
+            output = model(x).squeeze(1)
+            loss = criterion(output, y)
+            epoch_loss += loss.item()
+            optimizer.zero_grad()
+            loss.backward()
+            optimizer.step()
+
+        scheduler.step()
+        # print(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(train_loader)}")
+
+        writer.add_scalar("Loss/train", epoch_loss / len(train_loader), epoch)
+
+        with torch.no_grad():
+            model.eval()
+            valid_loss = 0.0
+            for x, y in valid_loader:
+                x = x.to(device)
+                y = y.to(device)
+                output = model(x).squeeze(1)
+                loss = criterion(output, y)
+                valid_loss += loss.item()
+            print(
+                f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader)} Valid Loss: {valid_loss / len(valid_loader)}"
+            )
+            writer.add_scalar("Loss/valid", valid_loss / len(valid_loader), epoch)
+
+        model.train()
+    # torch.save(model.state_dict(), "model.pth")
