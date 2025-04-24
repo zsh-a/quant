@@ -7,6 +7,7 @@ INDEX_LIST = [
     # "399101"
 ]
 
+last_update_date = "20250101"
 
 def update_kline_daily():
     proc = bao.BaoStockProcessor()
@@ -29,9 +30,14 @@ def update_fincial_daily():
     # proc.fetch_tdx()
     proc.init_fincial_db(start_year="2024")
 
+def update_share_info():
+    proc = ak.AKDataProcessor()
+    proc.update_shares(start_date=last_update_date)
+
 
 if __name__ == "__main__":
-    update_fincial_daily()
-    # update_kline_daily()
+    # update_fincial_daily()
+    update_kline_daily()
     # update_index_stocks_weekly()
     # update_industry_weekly()
+    # update_share_info()

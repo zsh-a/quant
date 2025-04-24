@@ -9,5 +9,7 @@
 
 import akshare as ak
 
-index_stock_cons_df = ak.index_stock_cons_csindex(symbol="000985")
-index_stock_cons_df.to_csv("index_stock_cons.csv")
+
+df = ak.fund_etf_fund_daily_em()
+
+df.to_csv("tmp.csv")

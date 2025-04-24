@@ -6,6 +6,8 @@ import torch.nn as nn
 from torch.optim import lr_scheduler
 from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
+from sklearn.preprocessing import MinMaxScaler
+
 
 writer = SummaryWriter()
 
@@ -15,36 +17,39 @@ def build_dataset(start_date, end_data):
     total_labels = []
     db_client = DB()
 
-    for code in ["sz.000001", "sz.002594", "sz.300750"]:
+    for code in [""]:
         samples = []
         labels = []
         df = db_client.get_kline(code, start_date, end_data)
 
         df = df[df["tradestatus"] == 1]
-        df = df[["open", "high", "low", "close", "amount", "turn"]]
+        df = df[["open", "high", "low", "close", "volume", "turn"]]
 
         df = df.dropna()
 
-        # 每列进行标准化
-        for col in df.columns:
-            df[col] = (df[col] - df[col].mean()) / df[col].std()
-
         num_samples = len(df)
         if num_samples < 180:
-            return
+            continue
 
-        for i in range(num_samples - 85):
+        for i in range(num_samples - 80):
             sample = df.iloc[i : i + 60]
-            samples.append(sample.values)
-            labels.append(
-                (np.mean(df.iloc[i + 60 : i + 85]["low"]) - sample["low"].values[-1])
-                / sample["low"].values[-1]
-            )
-
-        labels = (np.array(labels) - np.mean(labels)) / np.std(labels) 
+            future_slice = df.iloc[i + 60 : i + 80]
+            change_percentage = (
+                (np.mean(future_slice["low"]) - sample["close"].iloc[-1])
+                / sample["close"].iloc[-1]
+            ) * 100
+            if not np.isnan(change_percentage):
+                scaler = MinMaxScaler()
+                normalized_data = scaler.fit_transform(sample.values)
+                samples.append(normalized_data)
+                labels.append(change_percentage)
 
         total_samples.extend(samples)
         total_labels.extend(labels)
+    
+    scaler = MinMaxScaler()
+    total_labels = scaler.fit_transform(np.array(total_labels).reshape(-1, 1)).flatten()
+    
     feature = torch.tensor(np.array(total_samples), dtype=torch.float32)
     labels = torch.tensor(np.array(total_labels), dtype=torch.float32)
 
@@ -180,42 +185,37 @@ class Model(nn.Module):
         out = self.f_model(IN)
         return out
 
+class LeNet(nn.Module):  # 继承于nn.Module这个父类
+    def __init__(self):  # 初始化网络结构
+        super(LeNet, self).__init__()  # 多继承需用到super函数
+        self.conv1 = nn.Conv2d(1, 16, 5)
+        self.pool1 = nn.MaxPool2d(2, 2)
+        self.conv2 = nn.Conv2d(16, 32, 1)
+        self.pool2 = nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1))
+        self.fc1 = nn.Linear(32 * 14 * 1, 120)
+        self.fc2 = nn.Linear(120, 84)
+        self.fc3 = nn.Linear(84, 1)
+        self.relu = nn.ReLU()
 
-if __name__ == "__main__":
-    learning_rate = 0.0001
-    num_epochs = 500
-    batch_size = 40000
-    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
-    train_dataset = build_dataset("20100101", "20200101")
+    def forward(self, x):  # 正向传播过程
+        x = x.unsqueeze(1)
+        x = self.relu(self.conv1(x))  # input(1, 60, 6) output(16, 28, 28)
+        x = self.pool1(x)  # output(16, 52, 2)
+        x = self.relu(self.conv2(x))  # output(32, 28, 1)
+        x = self.pool2(x)  # output(32, 14, 1)
+        x = x.view(-1, 32 * 14 * 1)  # output(32*14*1)
+        x = self.relu(self.fc1(x))  # output(120)
+        x = self.relu(self.fc2(x))  # output(84)
+        x = self.fc3(x)  # output(1)
+        return x
 
-    valid_dataset = build_dataset("20200101", "20250101")
 
-    train_loader = DataLoader(
-        train_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-    )
-
-    valid_loader = DataLoader(
-        valid_dataset,
-        batch_size=batch_size,
-        shuffle=True,
-        num_workers=4,
-        pin_memory=True,
-    )
-    criterion = nn.MSELoss()
-
-    model = Model().to(device)
-    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
-    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=15)
+def train_model(model, train_loader, valid_loader, criterion, optimizer, scheduler, num_epochs, device, writer):
     for epoch in range(num_epochs):
         epoch_loss = 0.0
+        model.train()
         for i, (x, y) in enumerate(train_loader):
             x = x.to(device)
-            # print(x)
-            # print(y)
             y = y.to(device)
             output = model(x).squeeze(1)
             loss = criterion(output, y)
@@ -225,8 +225,6 @@ if __name__ == "__main__":
             optimizer.step()
 
         scheduler.step()
-        # print(f"Epoch {epoch+1}/{num_epochs}, Loss: {epoch_loss/len(train_loader)}")
-
         writer.add_scalar("Loss/train", epoch_loss / len(train_loader), epoch)
 
         with torch.no_grad():
@@ -243,5 +241,88 @@ if __name__ == "__main__":
             )
             writer.add_scalar("Loss/valid", valid_loss / len(valid_loader), epoch)
 
-        model.train()
-    # torch.save(model.state_dict(), "model.pth")
+    return model
+
+def k_fold_cross_validation(k=5, start_date="20100101", end_date="20250101", num_epochs=300, batch_size=4096, learning_rate=0.0001):
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+    if torch.backends.mps.is_available():
+        device = torch.device("mps")
+        
+    full_dataset = build_dataset(start_date, end_date)
+    dataset_size = len(full_dataset)
+    fold_size = dataset_size // k
+    indices = torch.randperm(dataset_size).tolist()
+
+      # Plot and save labels distribution
+    import matplotlib.pyplot as plt
+    plt.figure(figsize=(10, 6))
+    plt.hist(full_dataset.tensors[1].numpy(), bins=50, alpha=0.7)
+    plt.title('Labels Distribution')
+    plt.xlabel('Change Percentage')
+    plt.ylabel('Frequency')
+    plt.savefig('labels_distribution.png')
+    plt.close()
+    
+    fold_results = []
+    
+    for i in range(k):
+        print(f"\nFold {i+1}/{k}")
+        valid_indices = indices[i*fold_size : (i+1)*fold_size]
+        train_indices = indices[:i*fold_size] + indices[(i+1)*fold_size:]
+        
+        train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
+        valid_dataset = torch.utils.data.Subset(full_dataset, valid_indices)
+        
+        train_loader = DataLoader(
+            train_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=4,
+            pin_memory=True,
+        )
+        
+        valid_loader = DataLoader(
+            valid_dataset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=4,
+            pin_memory=True,
+        )
+        
+        model = LeNet().to(device)
+        criterion = nn.MSELoss()
+        optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+        scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=15)
+        
+        trained_model = train_model(model, train_loader, valid_loader, criterion, optimizer, scheduler, num_epochs, device, writer)
+        
+        # Evaluate on validation set
+        with torch.no_grad():
+            model.eval()
+            valid_loss = 0.0
+            for x, y in valid_loader:
+                x = x.to(device)
+                y = y.to(device)
+                output = model(x).squeeze(1)
+                plt.figure(figsize=(10, 6))
+                plt.hist(output.cpu().numpy(), bins=50, alpha=0.7)
+                plt.title('Labels Distribution')
+                plt.xlabel('Change Percentage')
+                plt.ylabel('Frequency')
+                plt.savefig('labels_distribution.png')
+                plt.close()
+                loss = criterion(output, y)
+                valid_loss += loss.item()
+            avg_valid_loss = valid_loss / len(valid_loader)
+            fold_results.append(avg_valid_loss)
+            print(f"Fold {i+1} Validation Loss: {avg_valid_loss}")
+        torch.save(model, f"model_{i+1}.pth")
+    
+    print(f"\nAverage Validation Loss across {k} folds: {sum(fold_results)/len(fold_results)}")
+    
+  
+    
+    return sum(fold_results)/len(fold_results)
+
+if __name__ == "__main__":
+    k_fold_cross_validation()

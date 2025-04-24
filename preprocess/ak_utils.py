@@ -111,9 +111,13 @@ class AKDataProcessor:
         db_client = DB()
         stocks = db_client.get_index_stocks("399101")
         for code in stocks:
-            stock_share_change_cninfo_df = ak.stock_share_change_cninfo(
-                symbol=code.split(".")[1], start_date=start_date, end_date=end_date
-            )
+            try:
+                stock_share_change_cninfo_df = ak.stock_share_change_cninfo(
+                    symbol=code.split(".")[1], start_date=start_date, end_date=end_date
+                )
+            except Exception as e:
+                logger.error(f"fetch {code} shares {start_date} {end_date} error : {e}")    
+                continue
 
             for index, row in stock_share_change_cninfo_df.iterrows():
                 sql = f"""
