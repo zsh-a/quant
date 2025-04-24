@@ -106,7 +106,6 @@ class AKDataProcessor:
                 self.client.command(sql)
 
     def update_shares(self, start_date="20100101", end_date="20260101"):
-
         logger.info("update shares index : 399101")
         db_client = DB()
         stocks = db_client.get_index_stocks("399101")
@@ -116,7 +115,7 @@ class AKDataProcessor:
                     symbol=code.split(".")[1], start_date=start_date, end_date=end_date
                 )
             except Exception as e:
-                logger.error(f"fetch {code} shares {start_date} {end_date} error : {e}")    
+                logger.error(f"fetch {code} shares {start_date} {end_date} error : {e}")
                 continue
 
             for index, row in stock_share_change_cninfo_df.iterrows():
@@ -128,6 +127,7 @@ class AKDataProcessor:
                 self.client.command(sql)
 
     def update_etf_data(self, code):
+        logger.info(f"update etf data : {code}")
         df = ak.fund_etf_hist_em(
             symbol=code,
             period="daily",
@@ -197,13 +197,15 @@ class AKDataProcessor:
 
 if __name__ == "__main__":
     # insert_index_stocks("399101")
-    # dp = AKDataProcessor()
+    dp = AKDataProcessor()
     # etfs = ["511260","518880","513100","159980","162411","159985"]
-    # for code in etfs:
-    #     dp.update_etf_data(code)
+    all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
+    all_etfs = all_etfs["基金代码"].astype(str).to_list()
+    for code in all_etfs:
+        dp.update_etf_data(code)
     # dp.create_etf_meta()
     # dp.update_shares()
     # dp.insert_index_stocks("399101")
     # dp.insert_sw_industry()
 
-    print(ak.stock_zh_a_hist())
+    # print(ak.stock_zh_a_hist())

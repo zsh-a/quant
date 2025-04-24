@@ -102,3 +102,8 @@ CREATE TABLE stock_data.shares_info
     `circulating_a` Float64,
 ) ENGINE = ReplacingMergeTree() 
 ORDER BY (publish_date, code)
+
+
+-- BACKUP DATABASE stock_data TO Disk('backups', '1.zip')
+
+-- RESTORE DATABASE stock_data FROM Disk('backups', '1.zip')
