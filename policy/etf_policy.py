@@ -33,7 +33,7 @@ class OrderPolicy(OrderPolicy):
         self.account: Account = account
 
         self.db_client = args["db_client"]
-        self.slip = 0.002  # 改为百分比滑点，0.001表示0·.1%
+        self.slip = 0.00  # 改为百分比滑点，0.001表示0·.1%
         self.tracking = []
 
         self.running_in_day = False
@@ -58,11 +58,12 @@ class OrderPolicy(OrderPolicy):
 
         df.reset_index(level="date", drop=True, inplace=True)
         open_price = df.loc[code, key]
+        logger.info(f"{code} {key} : {open_price}")
         return open_price
 
     def buy_policy(self, order: Order):
-        if not self.check_up_down_limit(order.symbol, order.exec_time):
-            return (False, 0)
+        # if not self.check_up_down_limit(order.symbol, order.exec_time):
+        #     return (False, 0)
 
         if (
             len(self.account.get_position_price(str(self.current_date.date())))
@@ -70,9 +71,7 @@ class OrderPolicy(OrderPolicy):
         ):
             return (False, 0)
 
-        trading_price = self.get_now_price(order.symbol, order.exec_time) * (
-            1 + self.slip
-        )
+        trading_price = self.get_now_price(order.symbol, order.exec_time) + self.slip
 
         action = order.quantity
         min_action = self.account.min_action
@@ -137,12 +136,10 @@ class OrderPolicy(OrderPolicy):
     def sell_policy(self, order):
         action = order.quantity
 
-        if not self.check_up_down_limit(order.symbol, order.exec_time):
-            return (False, 0)
+        # if not self.check_up_down_limit(order.symbol, order.exec_time):
+        #     return (False, 0)
 
-        trading_price = self.get_now_price(order.symbol, order.exec_time) * (
-            1 - self.slip
-        )
+        trading_price = self.get_now_price(order.symbol, order.exec_time) - self.slip
         min_action = self.account.min_action
         action = action // min_action * min_action
         if self.sell_cond(order.symbol):
@@ -219,14 +216,6 @@ class Agent:
         )
         print(self.trad_days)
 
-    def etf_price(self,code):
-        df = pd.read_csv(f"{code}.csv")
-        df = df.rename(columns={"日期": "date","开盘":"open","收盘":"close","最高":"high","最低":"low","成交量":"volume","成交额":"amount","换手率":"turn"})
-        df['date'] = pd.to_datetime(df["date"])
-        df.set_index(keys='date',inplace=True)
-        df = df[["open", "high", "low", "close", "volume", "turn"]]
-        return df
-
     def get_next_trading_day(self):
         date = pd.to_datetime(self.current_date)
         next_date = date + pd.DateOffset(days=1)
@@ -254,27 +243,39 @@ class Agent:
     def get_etf_rank(self):
         scores = {}
         for etf in self.etf_pool:
-            df = self.etf_price(etf)
-            df = df[:self.current_date]
-            df = df.iloc[-self.m_days :]
-
+            df = self.db_client.get_price(
+                etf,
+                self.current_date.date(),
+                ["close"],
+                self.m_days,
+                self.current_date.date(),
+            )
+            if len(df) == 0:
+                continue
+            # logger.info(f"{df}")
+            df.reset_index(level="date", drop=True, inplace=True)
             prices = df["close"].values
             y = np.log(prices)
             x = np.arange(len(y))
-            weights = np.linspace(1, 2, len(y))
-            slope, intercept = np.polyfit(x, y, 1, w=weights)
-            annualized_returns = np.exp(slope * 250) - 1
-            # 计算R²
-            ss_res = np.sum(weights * (y - (slope * x + intercept)) ** 2)
-            ss_tot = np.sum(weights * (y - np.mean(y)) ** 2)
-            r2 = 1 - ss_res / ss_tot if ss_tot else 0
-            scores[etf] = annualized_returns * r2
+            try:
+                weights = np.linspace(1, 2, len(y))
+                slope, intercept = np.polyfit(x, y, 1, w=weights)
+                annualized_returns = np.exp(slope * 250) - 1
+                # 计算R²
+                ss_res = np.sum(weights * (y - (slope * x + intercept)) ** 2)
+                ss_tot = np.sum(weights * (y - np.mean(y)) ** 2)
+                r2 = 1 - ss_res / ss_tot if ss_tot else 0
+                scores[etf] = annualized_returns * r2
+            except Exception as e:
+                logger.error(f"计算{etf}动量失败：{e} {df} ")
         rank_list = sorted(
             [etf for etf, score in scores.items() if 0 < score <= 6],
             key=lambda x: scores[x],
             reverse=True,
         )
+        logger.info(f"{rank_list}")
         return rank_list
+
     def get_current_date_str(self):
         return str(self.current_date.date())
 
@@ -288,36 +289,6 @@ class Agent:
         # df.to_csv("0201.csv")
         # df = df[(df["tradestatus"] == 1)]
         return df.index.to_list()
-
-    def select_stock(self, end_date):
-        stocks = self.db_client.get_index_stocks("399101", end_date)
-        stocks = self.filter_basic(stocks)
-        fin_date = (self.get_next_trading_day() - pd.DateOffset(days=1)).date()
-
-        fin_db = self.db_client.get_stock_fincial(
-            stocks, fields=["adjusted_profit_diff","total_shares"],date=fin_date
-        )
-        fin_db = fin_db[fin_db["adjusted_profit_diff"] > 0]
-        fin_db["total_shares_bak"] = fin_db["total_shares"]
-        df = self.db_client.get_price(
-            fin_db.index.to_list(), end_date, ["close"], 1, price_adj=False
-        )
-        df.reset_index(level="date", drop=True, inplace=True)
-        df.to_csv('close.csv')
-        fin_db["close"] = df["close"]
-
-        df = self.db_client.get_stock_shares_info(fin_db.index.to_list(), fin_date)
-        fin_db["total_shares"] = df["total_shares"]
-        fin_db["market_cap"] = fin_db["close"] * fin_db["total_shares"]
-
-        # if self.get_current_date_str() == "2020-06-12":
-        #     fin_db.sort_values(by="market_cap", ascending=True).to_csv("tmp.csv")
-        #     breakpoint()
-        fin_db = fin_db.sort_values(by="market_cap", ascending=True).iloc[
-            : self.pool_size
-        ]
-
-        return fin_db.index.to_list()
 
     def process_order_value(self, target_value):
         pos_df = self.market_env.account.get_position_price(self.get_current_date_str())
@@ -340,8 +311,6 @@ class Agent:
             self.create_order(code, action)
 
     def adjust(self, stocks):
-
-
         target = stocks[: min(len(stocks), self.stock_sum)]
         hold_list = list(self.market_env.account.positions[-1].keys())
         target_value = {}
@@ -355,8 +324,8 @@ class Agent:
                 target_value[code] = total_value / len(target)
 
         if len(target_value) > 0:
+            logger.info(f"target_value : {target_value}")
             self.process_order_value(target_value)
-        # return target_value
 
     def action_decider(self, stocks_obs):
         # ts = stocks_obs[0].name
@@ -364,13 +333,11 @@ class Agent:
         ts = self.market_env.cur_date
         today = str(ts.date())
 
-
-
         # I = self.get_market_breadth(end_date=today)
         # logger.info(f"market breath : {I}")
         # cand_stocks = self.stock_decider(I)
         stocks = self.get_etf_rank()
-        print(stocks)
+        # print(stocks)
         self.adjust(stocks)
 
     def is_empty_month(self):
@@ -384,26 +351,7 @@ class Agent:
         return []
 
     def run_end(self):
-        pos = self.market_env.account.get_position_price(self.get_current_date_str())
-        if len(pos) == 0:
-            return
-        hold_stocks = pos["code"].to_list()
-        df = self.db_client.get_price(
-            hold_stocks, self.get_current_date_str(), ["close", "open"], 3
-        )
-
-        df = df.groupby(level=0, group_keys=False).apply(lambda x: x.head(2))
-        # logger.error(f"{df}")
-
-        df["pct"] = df.groupby("code")["close"].pct_change()
-
-        df = df.groupby(level=0).tail(1)
-        df.reset_index("date", drop=True, inplace=True)
-        banned_stocks = df[df["pct"] >= PRICE_CHANGE_LIMIT].index.to_list()
-
-        logger.info(f"end check banned : {banned_stocks}")
-        for stock in banned_stocks:
-            self.create_order(stock, -MAX_POSITION, exec_time="close")
+        pass
 
     def cancel_order(self, code):
         self.market_env.order_manager.cancel_order(code)

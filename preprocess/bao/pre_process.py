@@ -16,7 +16,7 @@ class BaoStockProcessor:
         )
 
         self.lg = bs.login()
-        
+
     def __del__(self):
         bs.logout()
 
@@ -45,7 +45,6 @@ class BaoStockProcessor:
         #### 登出系统 ####
 
         return result
-
 
     def insert_data(self):
         for file in os.listdir("data/bao"):
@@ -86,7 +85,6 @@ class BaoStockProcessor:
                 data=df,
             )
 
-
     def create_meta(self):
         # 查询最新的 K 线数据
         query = """
@@ -125,7 +123,6 @@ class BaoStockProcessor:
                 self.client.command(error_query)
                 print(f"Error updating code {code}: {e}")
 
-
     def update_meta(self, code, last_update_date, adjfactor):
         update_query = f"""
         INSERT INTO stock_data.stock_daily_meta (code, last_update_date, last_adjfactor, error_update_count,name)
@@ -140,7 +137,6 @@ class BaoStockProcessor:
         """
         self.client.command(update_query)
 
-
     def update_meta_error(self, code, error_update_count_delta):
         update_query = f"""
         INSERT INTO stock_data.stock_daily_meta (code, last_update_date, last_adjfactor, error_update_count)
@@ -154,12 +150,11 @@ class BaoStockProcessor:
         """
         self.client.command(update_query)
 
-
     def fetch_update(self, code, last_update_date, last_adjfactor):
         df = self.fetch_bao_data(code, last_update_date)
-        df['peTTM'] = df['peTTM'].replace('', '0')
-        df['pbMRQ'] = df['pbMRQ'].replace('', '0')
-        df.replace('',np.nan, inplace=True)
+        df["peTTM"] = df["peTTM"].replace("", "0")
+        df["pbMRQ"] = df["pbMRQ"].replace("", "0")
+        df.replace("", np.nan, inplace=True)
 
         df.dropna(inplace=True)
         # print(df)
@@ -181,18 +176,14 @@ class BaoStockProcessor:
             }
         )
         df["date"] = pd.to_datetime(df["date"])  # 确保 timestamp 是 datetime 类型
-        # print(df["close"].shift(1) / df["preclose"])
-
         df["adjfactor"] = df["close"].shift(1) / df["preclose"]
-        df.loc[0, "adjfactor"] = last_adjfactor
+        df.loc[df.index[0], "adjfactor"] = last_adjfactor
         df["adjfactor"] = df["adjfactor"].cumprod()
-
         del df["adjustflag"]
         df = df[1:]
+        
         print(code, df)
-
         return df
-
 
     def update_daily_data(self):
         query = """
@@ -208,6 +199,8 @@ class BaoStockProcessor:
         df = self.client.query(query).result_rows
 
         for code, last_update_date, last_adjfactor, error_update_count in df:
+            if len(code) != 9:
+                continue
             try:
                 new_df = self.fetch_update(code, last_update_date, last_adjfactor)
                 if len(new_df) > 0:
@@ -246,13 +239,13 @@ class BaoStockProcessor:
         """
         从2010年开始每周一更新股票行业信息
         """
-        
+
         # 获取当前日期
         today = datetime.date.today()
-        
+
         # 从2010年开始循环
-        start_date = datetime.date(2023,11,1)
-        
+        start_date = datetime.date(2023, 11, 1)
+
         # 每周一执行更新
         while start_date <= today:
             if start_date.weekday() == 0:  # 0代表周一
@@ -261,23 +254,24 @@ class BaoStockProcessor:
                     rs = bs.query_stock_industry(date=start_date.strftime("%Y-%m-%d"))
                     # 打印结果集
                     industry_list = []
-                    while (rs.error_code == '0') & rs.next():
+                    while (rs.error_code == "0") & rs.next():
                         # 获取一条记录，将记录合并在一起
                         industry_list.append(rs.get_row_data())
                     df = pd.DataFrame(industry_list, columns=rs.fields)
-                    df['date'] = df['updateDate']
+                    df["date"] = df["updateDate"]
                     for index, row in df.iterrows():
                         cmd = f"""
                         INSERT INTO stock_data.finicial_data (date, code, industry, industryClassification)
-                        VALUES ('{row['date']}', '{row['code']}', '{row['industry']}', '{row['industryClassification']}')
+                        VALUES ('{row["date"]}', '{row["code"]}', '{row["industry"]}', '{row["industryClassification"]}')
                         """
                         self.client.command(cmd)
 
                 except Exception as e:
-                    print(f"Error updating industry data for {start_date}: {e}")    
+                    print(f"Error updating industry data for {start_date}: {e}")
                 # print(type(df['date'][0]))
                 # df.to_csv('tmp.csv')
             start_date += datetime.timedelta(days=1)
+
 
 if __name__ == "__main__":
     processor = BaoStockProcessor()

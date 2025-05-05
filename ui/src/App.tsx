@@ -36,7 +36,7 @@ export default function App() {
 
   useEffect(() => {
     async function backtest() {
-      const url = `http://localhost:8000/backtest/sh.000300/20200101/20260101`;
+      const url = `http://localhost:8000/backtest/sh.000300/20230101/20260101`;
       const resp = await fetch(url);
       return resp.json();
     }

@@ -135,19 +135,80 @@ class AKDataProcessor:
             end_date="20260201",
             adjust="hfq",
         )
-        df.set_index("日期", inplace=True)
-        for index, row in df.iterrows():
-            sql = f"""
-            INSERT INTO stock_data.stock_daily (date,code,open,high,low,close,volume,amount,turn,adjfactor,tradestatus)
-            VALUES ('{index}','{code}',{float(row["开盘"])},{float(row["最高"])},{float(row["最低"])},{float(row["收盘"])},{int(row["成交量"])},{float(row["成交额"])},{float(row["换手率"])},1,1)
-            """
+        df = df.rename(
+            columns={
+                "日期": "date",
+                "开盘": "open",
+                "收盘": "close",
+                "最高": "high",
+                "最低": "low",
+                "成交量": "volume",
+                "成交额": "amount",
+                "换手率": "turn",
+            }
+        )
+        df["date"] = pd.to_datetime(df["date"])  # 确保 timestamp 是 datetime 类型
+        # df.set_index("date", inplace=True)
+        df["tradestatus"] = 1.0
+        df["adjfactor"] = 1.0
 
-            self.client.command(sql)
+        df["code"] = f"{code}"
+        df = df.astype(
+            {
+                "open": float,
+                "high": float,
+                "code": str,
+                "low": float,
+                "close": float,
+                "volume": float,
+                "amount": float,
+                "turn": float,
+                "tradestatus": float,
+            }
+        )
+        df = df[
+            [
+                "date",
+                "code",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "amount",
+                "turn",
+                "tradestatus",
+                "adjfactor",
+            ]
+        ]
+        self.client.insert(
+            table="stock_data.stock_daily",
+            column_names=[
+                "date",
+                "code",
+                "open",
+                "high",
+                "low",
+                "close",
+                "volume",
+                "amount",
+                "turn",
+                "tradestatus",
+                "adjfactor",
+            ],
+            data=df,
+        )
+        self.client.command("OPTIMIZE TABLE stock_data.stock_daily FINAL")
 
     def create_etf_meta(self):
         # 查询最新的 K 线数据
 
-        sql = """
+        all_etfs = pd.read_csv("all_etf.csv", names=["code", "type", "name"], dtype=str)
+        all_etfs = all_etfs.set_index("code")
+
+        code_str = ",".join([f"'{code}'" for code in all_etfs.index])
+
+        sql = f"""
             SELECT
         code,
         date,
@@ -159,21 +220,15 @@ class AKDataProcessor:
             adjfactor,
             ROW_NUMBER() OVER (PARTITION BY code ORDER BY date DESC) AS rn 
         FROM stock_data.stock_daily
-        WHERE code in ('511260','518880','513100','159980','162411','159985')
+        WHERE code in ({code_str})
     ) AS t
     WHERE rn = 1
     """
 
         kline_data = self.client.query(sql)
 
-        names = {
-            "511260": "国泰上证10年期国债ETF",
-            "518880": "华安黄金易ETF",
-            "513100": "国泰纳斯达克100ETF",
-            "159980": "大成有色金属期货ETF",
-            "162411": "华宝油气LOF",
-            "159985": "华夏饲料豆粕期货ETF",
-        }
+        all_etfs = pd.read_csv("all_etf.csv", names=["code", "type", "name"], dtype=str)
+        all_etfs = all_etfs.set_index("code")
 
         df = kline_data.result_rows
         # 构建更新语句
@@ -182,30 +237,32 @@ class AKDataProcessor:
                 # 插入或更新数据
                 update_query = f"""
                 INSERT INTO stock_data.stock_daily_meta (code,name, last_update_date, last_adjfactor, error_update_count)
-                VALUES ('{code}','{names[code]}', '{last_update_date}', '{adjfactor}', 0)
+                VALUES ('{code}','{all_etfs.loc[code]["name"]}', '{last_update_date}', '{adjfactor}', 0)
                 """
                 self.client.command(update_query)
             except Exception as e:
                 # 处理失败的情况，更新 error_update_count
-                error_query = f"""
-                INSERT INTO stock_data.stock_daily_meta (code, last_update_date, last_adjfactor, error_update_count)
-                VALUES ('{code}','{names[code]}', '{last_update_date}', '{adjfactor}',error_update_count + 1)
-                """
-                self.client.command(error_query)
+                # error_query = f"""
+                # INSERT INTO stock_data.stock_daily_meta (code, last_update_date, last_adjfactor, error_update_count)
+                # VALUES ('{code}','{all_etfs.loc[code]['name']}', '{last_update_date}', '{adjfactor}',error_update_count + 1)
+                # """
+                # self.client.command(error_query)
                 print(f"Error updating code {code}: {e}")
+        self.client.command("OPTIMIZE TABLE stock_data.stock_daily_meta FINAL")
 
 
 if __name__ == "__main__":
     # insert_index_stocks("399101")
     dp = AKDataProcessor()
     # etfs = ["511260","518880","513100","159980","162411","159985"]
-    all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
-    all_etfs = all_etfs["基金代码"].astype(str).to_list()
-    for code in all_etfs:
-        dp.update_etf_data(code)
+    # all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
+    # all_etfs = all_etfs["基金代码"].astype(str).to_list()
+    # for code in all_etfs:
+    #     dp.update_etf_data(code)
     # dp.create_etf_meta()
     # dp.update_shares()
-    # dp.insert_index_stocks("399101")
+    dp.insert_index_stocks("000852")
+    # print(ak.index_stock_cons_csindex(symbol="000852"))
     # dp.insert_sw_industry()
 
     # print(ak.stock_zh_a_hist())

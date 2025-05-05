@@ -1,3 +1,5 @@
+import os
+import pickle
 from db import DB
 from utils import *
 import torch
@@ -7,31 +9,45 @@ from torch.optim import lr_scheduler
 from torch.utils.data import TensorDataset, DataLoader, WeightedRandomSampler
 from torch.utils.tensorboard import SummaryWriter
 from sklearn.preprocessing import MinMaxScaler
-
+from models import LeNet, TransformerModel
 
 writer = SummaryWriter()
 
 
-def build_dataset(start_date, end_data):
-    total_samples = []
-    total_labels = []
+def build_dataset(index, start_date, end_data):
+    cache_file = f"dataset_cache_{index}_{start_date}_{end_data}.pkl"
+
+    # 检查缓存文件是否存在
+    if os.path.exists(cache_file):
+        with open(cache_file, "rb") as f:
+            return pickle.load(f)
+
     db_client = DB()
+    stocks = (
+        db_client.get_index_stocks(index)
+        if len(index) == 6
+        else db_client.get_all_etf_code()
+    )
+    fields = ["open", "high", "low", "close", "volume", "turn"]
+    all_data = db_client.get_price(stocks, end_data, fields, 99999, True, start_date)
 
-    for code in [""]:
-        samples = []
-        labels = []
-        df = db_client.get_kline(code, start_date, end_data)
-
-        df = df[df["tradestatus"] == 1]
-        df = df[["open", "high", "low", "close", "volume", "turn"]]
-
-        df = df.dropna()
-
-        num_samples = len(df)
-        if num_samples < 180:
+    # 预处理所有股票数据
+    valid_dfs = []
+    for code in stocks:
+        try:
+            df = all_data.loc[code].reset_index()
+            df = df[df["tradestatus"] == 1][fields].dropna()
+            if len(df) >= 180:
+                valid_dfs.append(df)
+        except KeyError:
             continue
 
-        for i in range(num_samples - 80):
+    # 批量计算所有样本和标签
+    all_samples = []
+    all_labels = []
+    for df in valid_dfs:
+        # 使用rolling窗口批量计算
+        for i in range(len(df) - 80):
             sample = df.iloc[i : i + 60]
             future_slice = df.iloc[i + 60 : i + 80]
             change_percentage = (
@@ -39,21 +55,25 @@ def build_dataset(start_date, end_data):
                 / sample["close"].iloc[-1]
             ) * 100
             if not np.isnan(change_percentage):
-                scaler = MinMaxScaler()
-                normalized_data = scaler.fit_transform(sample.values)
-                samples.append(normalized_data)
-                labels.append(change_percentage)
+                all_samples.append(sample.values)
+                all_labels.append(change_percentage)
 
-        total_samples.extend(samples)
-        total_labels.extend(labels)
-    
+    # 批量归一化
     scaler = MinMaxScaler()
-    total_labels = scaler.fit_transform(np.array(total_labels).reshape(-1, 1)).flatten()
-    
-    feature = torch.tensor(np.array(total_samples), dtype=torch.float32)
-    labels = torch.tensor(np.array(total_labels), dtype=torch.float32)
+    normalized_samples = np.array(
+        [scaler.fit_transform(sample) for sample in all_samples]
+    )
 
-    return TensorDataset(feature, labels)
+    feature = torch.tensor(normalized_samples, dtype=torch.float32)
+    labels = torch.tensor(all_labels, dtype=torch.float32)
+
+    dataset = TensorDataset(feature, labels)
+
+    # 保存缓存
+    with open(cache_file, "wb") as f:
+        pickle.dump(dataset, f)
+
+    return dataset
 
 
 class Model(nn.Module):
@@ -185,32 +205,18 @@ class Model(nn.Module):
         out = self.f_model(IN)
         return out
 
-class LeNet(nn.Module):  # 继承于nn.Module这个父类
-    def __init__(self):  # 初始化网络结构
-        super(LeNet, self).__init__()  # 多继承需用到super函数
-        self.conv1 = nn.Conv2d(1, 16, 5)
-        self.pool1 = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(16, 32, 1)
-        self.pool2 = nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1))
-        self.fc1 = nn.Linear(32 * 14 * 1, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 1)
-        self.relu = nn.ReLU()
 
-    def forward(self, x):  # 正向传播过程
-        x = x.unsqueeze(1)
-        x = self.relu(self.conv1(x))  # input(1, 60, 6) output(16, 28, 28)
-        x = self.pool1(x)  # output(16, 52, 2)
-        x = self.relu(self.conv2(x))  # output(32, 28, 1)
-        x = self.pool2(x)  # output(32, 14, 1)
-        x = x.view(-1, 32 * 14 * 1)  # output(32*14*1)
-        x = self.relu(self.fc1(x))  # output(120)
-        x = self.relu(self.fc2(x))  # output(84)
-        x = self.fc3(x)  # output(1)
-        return x
-
-
-def train_model(model, train_loader, valid_loader, criterion, optimizer, scheduler, num_epochs, device, writer):
+def train_model(
+    model,
+    train_loader,
+    valid_loader,
+    criterion,
+    optimizer,
+    scheduler,
+    num_epochs,
+    device,
+    writer,
+):
     for epoch in range(num_epochs):
         epoch_loss = 0.0
         model.train()
@@ -240,39 +246,50 @@ def train_model(model, train_loader, valid_loader, criterion, optimizer, schedul
                 f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss / len(train_loader)} Valid Loss: {valid_loss / len(valid_loader)}"
             )
             writer.add_scalar("Loss/valid", valid_loss / len(valid_loader), epoch)
+            if epoch % 10 == 0:
+                torch.save(model, f"model_{epoch}.pth")
 
     return model
 
-def k_fold_cross_validation(k=5, start_date="20100101", end_date="20250101", num_epochs=300, batch_size=4096, learning_rate=0.0001):
+
+def k_fold_cross_validation(
+    k=5,
+    start_date="20100101",
+    end_date="20250101",
+    num_epochs=300,
+    batch_size=4096,
+    learning_rate=0.0001,
+):
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     if torch.backends.mps.is_available():
         device = torch.device("mps")
-        
+
     full_dataset = build_dataset(start_date, end_date)
     dataset_size = len(full_dataset)
     fold_size = dataset_size // k
     indices = torch.randperm(dataset_size).tolist()
 
-      # Plot and save labels distribution
+    # Plot and save labels distribution
     import matplotlib.pyplot as plt
+
     plt.figure(figsize=(10, 6))
     plt.hist(full_dataset.tensors[1].numpy(), bins=50, alpha=0.7)
-    plt.title('Labels Distribution')
-    plt.xlabel('Change Percentage')
-    plt.ylabel('Frequency')
-    plt.savefig('labels_distribution.png')
+    plt.title("Labels Distribution")
+    plt.xlabel("Change Percentage")
+    plt.ylabel("Frequency")
+    plt.savefig("labels_distribution.png")
     plt.close()
-    
+
     fold_results = []
-    
+
     for i in range(k):
-        print(f"\nFold {i+1}/{k}")
-        valid_indices = indices[i*fold_size : (i+1)*fold_size]
-        train_indices = indices[:i*fold_size] + indices[(i+1)*fold_size:]
-        
+        print(f"\nFold {i + 1}/{k}")
+        valid_indices = indices[i * fold_size : (i + 1) * fold_size]
+        train_indices = indices[: i * fold_size] + indices[(i + 1) * fold_size :]
+
         train_dataset = torch.utils.data.Subset(full_dataset, train_indices)
         valid_dataset = torch.utils.data.Subset(full_dataset, valid_indices)
-        
+
         train_loader = DataLoader(
             train_dataset,
             batch_size=batch_size,
@@ -280,7 +297,7 @@ def k_fold_cross_validation(k=5, start_date="20100101", end_date="20250101", num
             num_workers=4,
             pin_memory=True,
         )
-        
+
         valid_loader = DataLoader(
             valid_dataset,
             batch_size=batch_size,
@@ -288,14 +305,24 @@ def k_fold_cross_validation(k=5, start_date="20100101", end_date="20250101", num
             num_workers=4,
             pin_memory=True,
         )
-        
+
         model = LeNet().to(device)
         criterion = nn.MSELoss()
         optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
         scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=15)
-        
-        trained_model = train_model(model, train_loader, valid_loader, criterion, optimizer, scheduler, num_epochs, device, writer)
-        
+
+        trained_model = train_model(
+            model,
+            train_loader,
+            valid_loader,
+            criterion,
+            optimizer,
+            scheduler,
+            num_epochs,
+            device,
+            writer,
+        )
+
         # Evaluate on validation set
         with torch.no_grad():
             model.eval()
@@ -306,23 +333,71 @@ def k_fold_cross_validation(k=5, start_date="20100101", end_date="20250101", num
                 output = model(x).squeeze(1)
                 plt.figure(figsize=(10, 6))
                 plt.hist(output.cpu().numpy(), bins=50, alpha=0.7)
-                plt.title('Labels Distribution')
-                plt.xlabel('Change Percentage')
-                plt.ylabel('Frequency')
-                plt.savefig('labels_distribution.png')
+                plt.title("Labels Distribution")
+                plt.xlabel("Change Percentage")
+                plt.ylabel("Frequency")
+                plt.savefig("labels_distribution.png")
                 plt.close()
                 loss = criterion(output, y)
                 valid_loss += loss.item()
             avg_valid_loss = valid_loss / len(valid_loader)
             fold_results.append(avg_valid_loss)
-            print(f"Fold {i+1} Validation Loss: {avg_valid_loss}")
-        torch.save(model, f"model_{i+1}.pth")
-    
-    print(f"\nAverage Validation Loss across {k} folds: {sum(fold_results)/len(fold_results)}")
-    
-  
-    
-    return sum(fold_results)/len(fold_results)
+            print(f"Fold {i + 1} Validation Loss: {avg_valid_loss}")
+        torch.save(model, f"model_{i + 1}.pth")
+
+    print(
+        f"\nAverage Validation Loss across {k} folds: {sum(fold_results) / len(fold_results)}"
+    )
+
+    return sum(fold_results) / len(fold_results)
+
 
 if __name__ == "__main__":
-    k_fold_cross_validation()
+    # k_fold_cross_validation()
+    batch_size = 8192
+    learning_rate = 0.0001
+    num_epochs = 100
+    ZZ1000 = "000852"
+    ETF = "etf"
+    train_dataset = build_dataset(ETF,"20200101", "20230101")
+
+    valid_dataset = build_dataset(ETF,"20230101", "20250101")
+    print(f"len(train_dataset): {len(train_dataset)}")
+    print(f"len(valid_dataset): {len(valid_dataset)}")
+
+    train_loader = DataLoader(
+        train_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+    )
+
+    valid_loader = DataLoader(
+        valid_dataset,
+        batch_size=batch_size,
+        shuffle=True,
+        num_workers=4,
+        pin_memory=True,
+    )
+    device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
+    # model = LeNet().to(device)
+    model = TransformerModel(output_steps=1).to(device)
+    trainable_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    print(f"Number of trainable parameters: {trainable_params}")
+    criterion = nn.MSELoss()
+    optimizer = torch.optim.AdamW(model.parameters(), lr=learning_rate)
+    scheduler = lr_scheduler.CosineAnnealingLR(optimizer, T_max=15)
+
+    trained_model = train_model(
+        model,
+        train_loader,
+        valid_loader,
+        criterion,
+        optimizer,
+        scheduler,
+        num_epochs,
+        device,
+        writer,
+    )

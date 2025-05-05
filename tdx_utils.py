@@ -128,7 +128,6 @@ class TDXProcess:
         for date in dates:
             filename = f"gpcw{date}.zip"
 
-            # try:
             try:
                 df = Affair.parse(downdir=self.fin_path, filename=filename)
             except Exception as e:

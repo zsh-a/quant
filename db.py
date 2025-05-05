@@ -28,10 +28,12 @@ class DB:
 
         data = self.client.query(query)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
-
-        df.rename(columns={"date": "datetime"}, inplace=True)
-        df.set_index("datetime", inplace=True)
-        df.index = pd.to_datetime(df.index)
+        try:
+            df.rename(columns={"date": "datetime"}, inplace=True)
+            df.set_index("datetime", inplace=True)
+            df.index = pd.to_datetime(df.index)
+        except Exception as e:
+            print(e)
         return df
 
     def update_meta(self):
@@ -280,7 +282,10 @@ class DB:
 
         return df
 
-
+    def get_all_etf_code(self):
+        all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
+        all_etfs = all_etfs["基金代码"].astype(str).to_list()
+        return all_etfs
 
 if __name__ == "__main__":
     # df = get_kline("sz.300059", "20220101", "20221231")
@@ -295,6 +300,7 @@ if __name__ == "__main__":
     # print(get_stock_industry('sh.601228', "20210101"))
     db_client = DB()
     # db_client.get_stock_industry_sw(["sz.002193"], date="2022-01-01")
-    print(db_client.get_stock_shares_info(["sz.002166","sz.002193"], date="2022-01-01"))
+    # print(db_client.get_stock_shares_info(["sz.002166","sz.002193"], date="2022-01-01"))
     # print(db_client.get_stock_fincial(["sz.002193"], "20220301")['adjusted_profit'].iloc[0])
-    # print(get_index_stocks("399101","20240101"))
+    print(len(db_client.get_index_stocks("000852","20240101")))
+    

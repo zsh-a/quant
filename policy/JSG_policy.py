@@ -190,7 +190,7 @@ class Agent:
         self.pass_month = []
         self.pool_size = 20
 
-        self.stock_sum = 4
+        self.stock_sum = 5
 
         self.black_industry_name = {"银行", "煤炭", "采掘", "钢铁"}
 

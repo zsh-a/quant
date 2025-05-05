@@ -1,0 +1,1228 @@
+2025-05-05 23:27:04.454 | INFO     | market_env:step:247 - market open date : 2025-01-02 00:00:00
+2025-05-05 23:27:04.454 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:04.455 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:04.455 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:04.456 | INFO     | market_env:step:247 - market open date : 2025-01-03 00:00:00
+2025-05-05 23:27:04.456 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:04.456 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:04.457 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.408 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['银行']
+2025-05-05 23:27:06.408 | INFO     | market_env:step:247 - market open date : 2025-01-06 00:00:00
+2025-05-05 23:27:06.408 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:06.408 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.409 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.409 | INFO     | market_env:step:247 - market open date : 2025-01-07 00:00:00
+2025-05-05 23:27:06.409 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:06.409 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.410 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.411 | INFO     | market_env:step:247 - market open date : 2025-01-08 00:00:00
+2025-05-05 23:27:06.411 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:06.411 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.412 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.412 | INFO     | market_env:step:247 - market open date : 2025-01-09 00:00:00
+2025-05-05 23:27:06.412 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:06.412 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.413 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.413 | INFO     | market_env:step:247 - market open date : 2025-01-10 00:00:00
+2025-05-05 23:27:06.413 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:06.414 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:06.414 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.324 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['银行']
+2025-05-05 23:27:08.325 | INFO     | market_env:step:247 - market open date : 2025-01-13 00:00:00
+2025-05-05 23:27:08.325 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:08.325 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.326 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.326 | INFO     | market_env:step:247 - market open date : 2025-01-14 00:00:00
+2025-05-05 23:27:08.326 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:08.326 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.327 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.327 | INFO     | market_env:step:247 - market open date : 2025-01-15 00:00:00
+2025-05-05 23:27:08.327 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:08.328 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.328 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.328 | INFO     | market_env:step:247 - market open date : 2025-01-16 00:00:00
+2025-05-05 23:27:08.329 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:08.329 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.329 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.330 | INFO     | market_env:step:247 - market open date : 2025-01-17 00:00:00
+2025-05-05 23:27:08.330 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:08.330 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:08.331 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:10.282 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['有色金属']
+2025-05-05 23:27:10.568 | INFO     | order:create_order:71 - create order | datetime : 2025-01-17 00:00:00 | symbol : sz.002188 | order_id : 1  | order_type : buy | quantity : 34791 | exec_time : open
+2025-05-05 23:27:10.577 | INFO     | order:create_order:71 - create order | datetime : 2025-01-17 00:00:00 | symbol : sz.002800 | order_id : 2  | order_type : buy | quantity : 10119 | exec_time : open
+2025-05-05 23:27:10.585 | INFO     | order:create_order:71 - create order | datetime : 2025-01-17 00:00:00 | symbol : sz.002205 | order_id : 3  | order_type : buy | quantity : 14491 | exec_time : open
+2025-05-05 23:27:10.593 | INFO     | order:create_order:71 - create order | datetime : 2025-01-17 00:00:00 | symbol : sz.002633 | order_id : 4  | order_type : buy | quantity : 12329 | exec_time : open
+2025-05-05 23:27:10.601 | INFO     | order:create_order:71 - create order | datetime : 2025-01-17 00:00:00 | symbol : sz.003017 | order_id : 5  | order_type : buy | quantity : 6882 | exec_time : open
+2025-05-05 23:27:10.601 | INFO     | market_env:step:247 - market open date : 2025-01-20 00:00:00
+2025-05-05 23:27:10.601 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:10.610 | INFO     | policy.JSG_policy:buy_policy:81 - price : 5.746879853479854
+2025-05-05 23:27:10.610 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 34790 5.746879853479854 : 1000000
+2025-05-05 23:27:10.610 | INFO     | order:execute_order:153 - complete order | datetime : 2025-01-20 00:00:00 | order_id : 1 | symbol : sz.002188 | order_type : buy | price : 5.746879853479854 | quantity : 34790
+2025-05-05 23:27:10.625 | INFO     | policy.JSG_policy:buy_policy:81 - price : 19.80280152144394
+2025-05-05 23:27:10.626 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 10110 19.80280152144394 : 800046.0565024256
+2025-05-05 23:27:10.626 | INFO     | order:execute_order:153 - complete order | datetime : 2025-01-20 00:00:00 | order_id : 2 | symbol : sz.002800 | order_type : buy | price : 19.80280152144394 | quantity : 10110
+2025-05-05 23:27:10.640 | INFO     | policy.JSG_policy:buy_policy:81 - price : 14.0288180712358
+2025-05-05 23:27:10.640 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 14490 14.0288180712358 : 599819.7124882892
+2025-05-05 23:27:10.640 | INFO     | order:execute_order:153 - complete order | datetime : 2025-01-20 00:00:00 | order_id : 3 | symbol : sz.002205 | order_type : buy | price : 14.0288180712358 | quantity : 14490
+2025-05-05 23:27:10.656 | INFO     | policy.JSG_policy:buy_policy:81 - price : 16.207796211950395
+2025-05-05 23:27:10.657 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 12320 16.207796211950395 : 396521.81087869726
+2025-05-05 23:27:10.657 | INFO     | order:execute_order:153 - complete order | datetime : 2025-01-20 00:00:00 | order_id : 4 | symbol : sz.002633 | order_type : buy | price : 16.207796211950395 | quantity : 12320
+2025-05-05 23:27:10.671 | INFO     | policy.JSG_policy:buy_policy:81 - price : 29.285273395822564
+2025-05-05 23:27:10.672 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 6720.0 29.285273395822564 : 196821.79354253528
+2025-05-05 23:27:10.672 | INFO     | order:execute_order:153 - complete order | datetime : 2025-01-20 00:00:00 | order_id : 5 | symbol : sz.003017 | order_type : buy | price : 29.285273395822564 | quantity : 6720.0
+2025-05-05 23:27:10.680 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.918315   205898.179487
+sz.002800  sz.002800   10110.0  20.485588   207109.290224
+sz.002205  sz.002205   14490.0  14.300834   207219.083696
+sz.002633  sz.002633   12320.0  16.693303   205661.496280
+sz.003017  sz.003017    6720.0  29.940039   201197.063005
+2025-05-05 23:27:10.695 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:10.703 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.918315   205898.179487
+sz.002800  sz.002800   10110.0  20.485588   207109.290224
+sz.002205  sz.002205   14490.0  14.300834   207219.083696
+sz.002633  sz.002633   12320.0  16.693303   205661.496280
+sz.003017  sz.003017    6720.0  29.940039   201197.063005
+2025-05-05 23:27:10.710 | INFO     | market_env:step:247 - market open date : 2025-01-21 00:00:00
+2025-05-05 23:27:10.710 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:10.718 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.813797   202262.008547
+sz.002800  sz.002800   10110.0  20.184624   204066.548448
+sz.002205  sz.002205   14490.0  14.100822   204320.914693
+sz.002633  sz.002633   12320.0  16.464837   202846.786020
+sz.003017  sz.003017    6720.0  29.985564   201502.988595
+2025-05-05 23:27:10.732 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:10.741 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.813797   202262.008547
+sz.002800  sz.002800   10110.0  20.184624   204066.548448
+sz.002205  sz.002205   14490.0  14.100822   204320.914693
+sz.002633  sz.002633   12320.0  16.464837   202846.786020
+sz.003017  sz.003017    6720.0  29.985564   201502.988595
+2025-05-05 23:27:10.747 | INFO     | market_env:step:247 - market open date : 2025-01-22 00:00:00
+2025-05-05 23:27:10.748 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:10.756 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.657021   196807.752137
+sz.002800  sz.002800   10110.0  20.124431   203458.000093
+sz.002205  sz.002205   14490.0  13.884143   201181.231607
+sz.002633  sz.002633   12320.0  16.373450   201720.901917
+sz.003017  sz.003017    6720.0  29.575842   198749.658286
+2025-05-05 23:27:10.773 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:10.782 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.657021   196807.752137
+sz.002800  sz.002800   10110.0  20.124431   203458.000093
+sz.002205  sz.002205   14490.0  13.884143   201181.231607
+sz.002633  sz.002633   12320.0  16.373450   201720.901917
+sz.003017  sz.003017    6720.0  29.575842   198749.658286
+2025-05-05 23:27:10.788 | INFO     | market_env:step:247 - market open date : 2025-01-23 00:00:00
+2025-05-05 23:27:10.788 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:10.796 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.552503   193171.581197
+sz.002800  sz.002800   10110.0  20.024110   202443.752834
+sz.002205  sz.002205   14490.0  13.600793   197075.492186
+sz.002633  sz.002633   12320.0  16.266832   200407.370462
+sz.003017  sz.003017    6720.0  30.319411   203746.442922
+2025-05-05 23:27:10.812 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:10.821 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.552503   193171.581197
+sz.002800  sz.002800   10110.0  20.024110   202443.752834
+sz.002205  sz.002205   14490.0  13.600793   197075.492186
+sz.002633  sz.002633   12320.0  16.266832   200407.370462
+sz.003017  sz.003017    6720.0  30.319411   203746.442922
+2025-05-05 23:27:10.827 | INFO     | market_env:step:247 - market open date : 2025-01-24 00:00:00
+2025-05-05 23:27:10.828 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:10.836 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.591697   194535.145299
+sz.002800  sz.002800   10110.0  20.104367   203255.150641
+sz.002205  sz.002205   14490.0  13.550790   196350.949936
+sz.002633  sz.002633   12320.0  16.282063   200595.017813
+sz.003017  sz.003017    6720.0  30.152487   202624.715759
+2025-05-05 23:27:10.851 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:10.860 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.591697   194535.145299
+sz.002800  sz.002800   10110.0  20.104367   203255.150641
+sz.002205  sz.002205   14490.0  13.550790   196350.949936
+sz.002633  sz.002633   12320.0  16.282063   200595.017813
+sz.003017  sz.003017    6720.0  30.152487   202624.715759
+2025-05-05 23:27:12.753 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['计算机']
+2025-05-05 23:27:13.027 | INFO     | market_env:step:247 - market open date : 2025-01-27 00:00:00
+2025-05-05 23:27:13.027 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:13.035 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.657021   196807.752137
+sz.002800  sz.002800   10110.0  20.204688   204269.397900
+sz.002205  sz.002205   14490.0  13.667464   198041.548521
+sz.002633  sz.002633   12320.0  16.601917   204535.612176
+sz.003017  sz.003017    6720.0  30.380111   204154.343708
+2025-05-05 23:27:13.052 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:13.061 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34790.0   5.657021   196807.752137
+sz.002800  sz.002800   10110.0  20.204688   204269.397900
+sz.002205  sz.002205   14490.0  13.667464   198041.548521
+sz.002633  sz.002633   12320.0  16.601917   204535.612176
+sz.003017  sz.003017    6720.0  30.380111   204154.343708
+2025-05-05 23:27:15.032 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['银行']
+2025-05-05 23:27:15.052 | INFO     | order:create_order:71 - create order | datetime : 2025-01-27 00:00:00 | symbol : sz.002188 | order_id : 6  | order_type : sell | quantity : 34790.0 | exec_time : open
+2025-05-05 23:27:15.052 | INFO     | order:create_order:71 - create order | datetime : 2025-01-27 00:00:00 | symbol : sz.002800 | order_id : 7  | order_type : sell | quantity : 10110.0 | exec_time : open
+2025-05-05 23:27:15.052 | INFO     | order:create_order:71 - create order | datetime : 2025-01-27 00:00:00 | symbol : sz.002205 | order_id : 8  | order_type : sell | quantity : 14490.0 | exec_time : open
+2025-05-05 23:27:15.052 | INFO     | order:create_order:71 - create order | datetime : 2025-01-27 00:00:00 | symbol : sz.002633 | order_id : 9  | order_type : sell | quantity : 12320.0 | exec_time : open
+2025-05-05 23:27:15.052 | INFO     | order:create_order:71 - create order | datetime : 2025-01-27 00:00:00 | symbol : sz.003017 | order_id : 10  | order_type : sell | quantity : 6720.0 | exec_time : open
+2025-05-05 23:27:15.053 | INFO     | market_env:step:247 - market open date : 2025-02-05 00:00:00
+2025-05-05 23:27:15.053 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:15.062 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-05 00:00:00 | order_id : 6 | symbol : sz.002188 | order_type : sell | price : 5.6848224664224665 | quantity : 34790
+2025-05-05 23:27:15.070 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-05 00:00:00 | order_id : 7 | symbol : sz.002800 | order_type : sell | price : 20.324471723737368 | quantity : 10110
+2025-05-05 23:27:15.078 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-05 00:00:00 | order_id : 8 | symbol : sz.002205 | order_type : sell | price : 13.706665952044604 | quantity : 14490
+2025-05-05 23:27:15.087 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-05 00:00:00 | order_id : 9 | symbol : sz.002633 | order_type : sell | price : 16.751120586245772 | quantity : 12320
+2025-05-05 23:27:15.095 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-05 00:00:00 | order_id : 10 | symbol : sz.003017 | order_type : sell | price : 30.819119962452 | quantity : 6720.0
+2025-05-05 23:27:15.095 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:15.096 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:15.096 | INFO     | market_env:step:247 - market open date : 2025-02-06 00:00:00
+2025-05-05 23:27:15.096 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:15.097 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:15.097 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:15.097 | INFO     | market_env:step:247 - market open date : 2025-02-07 00:00:00
+2025-05-05 23:27:15.097 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:15.098 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:15.098 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:17.015 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['计算机']
+2025-05-05 23:27:17.286 | INFO     | order:create_order:71 - create order | datetime : 2025-02-07 00:00:00 | symbol : sz.002188 | order_id : 11  | order_type : buy | quantity : 34140 | exec_time : open
+2025-05-05 23:27:17.286 | INFO     | order:create_order:71 - create order | datetime : 2025-02-07 00:00:00 | symbol : sz.002800 | order_id : 12  | order_type : buy | quantity : 9651 | exec_time : open
+2025-05-05 23:27:17.286 | INFO     | order:create_order:71 - create order | datetime : 2025-02-07 00:00:00 | symbol : sz.002205 | order_id : 13  | order_type : buy | quantity : 13514 | exec_time : open
+2025-05-05 23:27:17.286 | INFO     | order:create_order:71 - create order | datetime : 2025-02-07 00:00:00 | symbol : sz.002633 | order_id : 14  | order_type : buy | quantity : 11844 | exec_time : open
+2025-05-05 23:27:17.286 | INFO     | order:create_order:71 - create order | datetime : 2025-02-07 00:00:00 | symbol : sz.003017 | order_id : 15  | order_type : buy | quantity : 6555 | exec_time : open
+2025-05-05 23:27:17.286 | INFO     | market_env:step:247 - market open date : 2025-02-10 00:00:00
+2025-05-05 23:27:17.286 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:17.295 | INFO     | policy.JSG_policy:buy_policy:81 - price : 5.969424175824175
+2025-05-05 23:27:17.296 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 34140 5.969424175824175 : 1014739.1348095704
+2025-05-05 23:27:17.296 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-10 00:00:00 | order_id : 11 | symbol : sz.002188 | order_type : buy | price : 5.969424175824175 | quantity : 34140
+2025-05-05 23:27:17.310 | INFO     | policy.JSG_policy:buy_policy:81 - price : 21.089481011162125
+2025-05-05 23:27:17.310 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 9650 21.089481011162125 : 810922.6138327968
+2025-05-05 23:27:17.310 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-10 00:00:00 | order_id : 12 | symbol : sz.002800 | order_type : buy | price : 21.089481011162125 | quantity : 9650
+2025-05-05 23:27:17.324 | INFO     | policy.JSG_policy:buy_policy:81 - price : 14.947371635423856
+2025-05-05 23:27:17.324 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 13510 14.947371635423856 : 607388.7707259065
+2025-05-05 23:27:17.324 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-10 00:00:00 | order_id : 13 | symbol : sz.002205 | order_type : buy | price : 14.947371635423856 | quantity : 13510
+2025-05-05 23:27:17.338 | INFO     | policy.JSG_policy:buy_policy:81 - price : 17.18453722660654
+2025-05-05 23:27:17.338 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 11840 17.18453722660654 : 405429.5860322507
+2025-05-05 23:27:17.338 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-10 00:00:00 | order_id : 14 | symbol : sz.002633 | order_type : buy | price : 17.18453722660654 | quantity : 11840
+2025-05-05 23:27:17.352 | INFO     | policy.JSG_policy:buy_policy:81 - price : 31.03387487065101
+2025-05-05 23:27:17.352 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 6500.0 31.03387487065101 : 201944.31877715298
+2025-05-05 23:27:17.352 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-10 00:00:00 | order_id : 15 | symbol : sz.003017 | order_type : buy | price : 31.03387487065101 | quantity : 6500.0
+2025-05-05 23:27:17.361 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.035897   206065.538462
+sz.002800  sz.002800    9650.0  21.288157   205430.716027
+sz.002205  sz.002205   13510.0  15.834257   213920.807831
+sz.002633  sz.002633   11840.0  17.241623   204140.821646
+sz.003017  sz.003017    6500.0  30.820182   200331.184327
+2025-05-05 23:27:17.377 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:17.386 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.035897   206065.538462
+sz.002800  sz.002800    9650.0  21.288157   205430.716027
+sz.002205  sz.002205   13510.0  15.834257   213920.807831
+sz.002633  sz.002633   11840.0  17.241623   204140.821646
+sz.003017  sz.003017    6500.0  30.820182   200331.184327
+2025-05-05 23:27:17.393 | INFO     | market_env:step:247 - market open date : 2025-02-11 00:00:00
+2025-05-05 23:27:17.393 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:17.401 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   5.983639   204281.421245
+sz.002800  sz.002800    9650.0  21.207900   204656.236419
+sz.002205  sz.002205   13510.0  15.884260   214596.347224
+sz.002633  sz.002633   11840.0  17.256855   204321.158061
+sz.003017  sz.003017    6500.0  31.032631   201712.098448
+2025-05-05 23:27:17.415 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:17.424 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   5.983639   204281.421245
+sz.002800  sz.002800    9650.0  21.207900   204656.236419
+sz.002205  sz.002205   13510.0  15.884260   214596.347224
+sz.002633  sz.002633   11840.0  17.256855   204321.158061
+sz.003017  sz.003017    6500.0  31.032631   201712.098448
+2025-05-05 23:27:17.430 | INFO     | market_env:step:247 - market open date : 2025-02-12 00:00:00
+2025-05-05 23:27:17.430 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:17.438 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.048962   206511.567766
+sz.002800  sz.002800    9650.0  21.207900   204656.236419
+sz.002205  sz.002205   13510.0  16.584300   224053.898728
+sz.002633  sz.002633   11840.0  17.135006   202878.466742
+sz.003017  sz.003017    6500.0  31.260254   203191.649292
+2025-05-05 23:27:17.452 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:17.462 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.048962   206511.567766
+sz.002800  sz.002800    9650.0  21.207900   204656.236419
+sz.002205  sz.002205   13510.0  16.584300   224053.898728
+sz.002633  sz.002633   11840.0  17.135006   202878.466742
+sz.003017  sz.003017    6500.0  31.260254   203191.649292
+2025-05-05 23:27:17.468 | INFO     | market_env:step:247 - market open date : 2025-02-13 00:00:00
+2025-05-05 23:27:17.468 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:17.476 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   5.983639   204281.421245
+sz.002800  sz.002800    9650.0  20.967129   202332.797595
+sz.002205  sz.002205   13510.0  16.384289   221351.741156
+sz.002633  sz.002633   11840.0  16.678072   197468.374295
+sz.003017  sz.003017    6500.0  30.349761   197273.445915
+2025-05-05 23:27:17.491 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:17.499 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   5.983639   204281.421245
+sz.002800  sz.002800    9650.0  20.967129   202332.797595
+sz.002205  sz.002205   13510.0  16.384289   221351.741156
+sz.002633  sz.002633   11840.0  16.678072   197468.374295
+sz.003017  sz.003017    6500.0  30.349761   197273.445915
+2025-05-05 23:27:17.506 | INFO     | market_env:step:247 - market open date : 2025-02-14 00:00:00
+2025-05-05 23:27:17.506 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:17.514 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   5.879121   200713.186813
+sz.002800  sz.002800    9650.0  20.806615   200783.838379
+sz.002205  sz.002205   13510.0  16.234280   219325.122976
+sz.002633  sz.002633   11840.0  16.540992   195845.346561
+sz.003017  sz.003017    6500.0  30.547034   198555.723313
+2025-05-05 23:27:17.528 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:17.537 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   5.879121   200713.186813
+sz.002800  sz.002800    9650.0  20.806615   200783.838379
+sz.002205  sz.002205   13510.0  16.234280   219325.122976
+sz.002633  sz.002633   11840.0  16.540992   195845.346561
+sz.003017  sz.003017    6500.0  30.547034   198555.723313
+2025-05-05 23:27:19.434 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['计算机']
+2025-05-05 23:27:19.719 | INFO     | order:create_order:71 - create order | datetime : 2025-02-14 00:00:00 | symbol : sz.002205 | order_id : 16  | order_type : sell | quantity : 13510.0 | exec_time : open
+2025-05-05 23:27:19.728 | INFO     | order:create_order:71 - create order | datetime : 2025-02-14 00:00:00 | symbol : sz.002780 | order_id : 17  | order_type : buy | quantity : 9412 | exec_time : open
+2025-05-05 23:27:19.729 | INFO     | market_env:step:247 - market open date : 2025-02-17 00:00:00
+2025-05-05 23:27:19.729 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:19.737 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-17 00:00:00 | order_id : 16 | symbol : sz.002205 | order_type : sell | price : 16.118639936324296 | quantity : 13510
+2025-05-05 23:27:19.754 | INFO     | policy.JSG_policy:buy_policy:81 - price : 21.795285913791595
+2025-05-05 23:27:19.754 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 9410 21.795285913791595 : 217836.12794367285
+2025-05-05 23:27:19.754 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-17 00:00:00 | order_id : 17 | symbol : sz.002780 | order_type : buy | price : 21.795285913791595 | quantity : 9410
+2025-05-05 23:27:19.763 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.140415   209633.772894
+sz.002800  sz.002800    9650.0  21.207900   204656.236419
+sz.002633  sz.002633   11840.0  17.302548   204862.167306
+sz.003017  sz.003017    6500.0  31.533402   204967.110306
+sz.002780  sz.002780    9410.0  21.927831   206340.889214
+2025-05-05 23:27:19.778 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:19.787 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.140415   209633.772894
+sz.002800  sz.002800    9650.0  21.207900   204656.236419
+sz.002633  sz.002633   11840.0  17.302548   204862.167306
+sz.003017  sz.003017    6500.0  31.533402   204967.110306
+sz.002780  sz.002780    9410.0  21.927831   206340.889214
+2025-05-05 23:27:19.794 | INFO     | market_env:step:247 - market open date : 2025-02-18 00:00:00
+2025-05-05 23:27:19.794 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:19.802 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.035897   206065.538462
+sz.002800  sz.002800    9650.0  20.686230   199622.118967
+sz.002633  sz.002633   11840.0  16.784690   198730.729200
+sz.003017  sz.003017    6500.0  31.624451   205558.930643
+sz.002780  sz.002780    9410.0  21.301880   200450.694339
+2025-05-05 23:27:19.818 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:19.826 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.035897   206065.538462
+sz.002800  sz.002800    9650.0  20.686230   199622.118967
+sz.002633  sz.002633   11840.0  16.784690   198730.729200
+sz.003017  sz.003017    6500.0  31.624451   205558.930643
+sz.002780  sz.002780    9410.0  21.301880   200450.694339
+2025-05-05 23:27:19.833 | INFO     | market_env:step:247 - market open date : 2025-02-19 00:00:00
+2025-05-05 23:27:19.833 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:19.841 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.075092   207403.626374
+sz.002800  sz.002800    9650.0  21.167772   204268.996615
+sz.002633  sz.002633   11840.0  17.165468   203239.139572
+sz.003017  sz.003017    6500.0  32.034173   208222.122163
+sz.002780  sz.002780    9410.0  21.458368   201923.243057
+2025-05-05 23:27:19.856 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:19.864 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.075092   207403.626374
+sz.002800  sz.002800    9650.0  21.167772   204268.996615
+sz.002633  sz.002633   11840.0  17.165468   203239.139572
+sz.003017  sz.003017    6500.0  32.034173   208222.122163
+sz.002780  sz.002780    9410.0  21.458368   201923.243057
+2025-05-05 23:27:19.871 | INFO     | market_env:step:247 - market open date : 2025-02-20 00:00:00
+2025-05-05 23:27:19.871 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:19.879 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.075092   207403.626374
+sz.002800  sz.002800    9650.0  21.468735   207173.295145
+sz.002633  sz.002633   11840.0  18.140259   214780.670124
+sz.003017  sz.003017    6500.0  32.110047   208715.305778
+sz.002780  sz.002780    9410.0  21.595295   203211.723186
+2025-05-05 23:27:19.893 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:19.901 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.075092   207403.626374
+sz.002800  sz.002800    9650.0  21.468735   207173.295145
+sz.002633  sz.002633   11840.0  18.140259   214780.670124
+sz.003017  sz.003017    6500.0  32.110047   208715.305778
+sz.002780  sz.002780    9410.0  21.595295   203211.723186
+2025-05-05 23:27:19.907 | INFO     | market_env:step:247 - market open date : 2025-02-21 00:00:00
+2025-05-05 23:27:19.908 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:19.916 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.022833   205619.509158
+sz.002800  sz.002800    9650.0  21.107579   203688.136909
+sz.002633  sz.002633   11840.0  17.668095   209190.241263
+sz.003017  sz.003017    6500.0  32.929491   214041.688818
+sz.002780  sz.002780    9410.0  21.067149   198241.871260
+2025-05-05 23:27:19.930 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:19.938 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.022833   205619.509158
+sz.002800  sz.002800    9650.0  21.107579   203688.136909
+sz.002633  sz.002633   11840.0  17.668095   209190.241263
+sz.003017  sz.003017    6500.0  32.929491   214041.688818
+sz.002780  sz.002780    9410.0  21.067149   198241.871260
+2025-05-05 23:27:21.880 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['通信']
+2025-05-05 23:27:22.164 | INFO     | order:create_order:71 - create order | datetime : 2025-02-21 00:00:00 | symbol : sz.002633 | order_id : 18  | order_type : sell | quantity : 11840.0 | exec_time : open
+2025-05-05 23:27:22.164 | INFO     | order:create_order:71 - create order | datetime : 2025-02-21 00:00:00 | symbol : sz.003017 | order_id : 19  | order_type : sell | quantity : 6500.0 | exec_time : open
+2025-05-05 23:27:22.164 | INFO     | order:create_order:71 - create order | datetime : 2025-02-21 00:00:00 | symbol : sz.002205 | order_id : 20  | order_type : buy | quantity : 13654 | exec_time : open
+2025-05-05 23:27:22.173 | INFO     | order:create_order:71 - create order | datetime : 2025-02-21 00:00:00 | symbol : sz.002830 | order_id : 21  | order_type : buy | quantity : 7387 | exec_time : open
+2025-05-05 23:27:22.173 | INFO     | market_env:step:247 - market open date : 2025-02-24 00:00:00
+2025-05-05 23:27:22.173 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:22.182 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-24 00:00:00 | order_id : 18 | symbol : sz.002633 | order_type : sell | price : 17.328745434047352 | quantity : 11840
+2025-05-05 23:27:22.190 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-24 00:00:00 | order_id : 19 | symbol : sz.003017 | order_type : sell | price : 32.65160817643562 | quantity : 6500.0
+2025-05-05 23:27:22.204 | INFO     | policy.JSG_policy:buy_policy:81 - price : 15.398297930570726
+2025-05-05 23:27:22.204 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 13650 15.398297930570726 : 429879.33253734966
+2025-05-05 23:27:22.204 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-24 00:00:00 | order_id : 20 | symbol : sz.002205 | order_type : buy | price : 15.398297930570726 | quantity : 13650
+2025-05-05 23:27:22.220 | INFO     | policy.JSG_policy:buy_policy:81 - price : 28.636041487851976
+2025-05-05 23:27:22.220 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 7380 28.636041487851976 : 219671.54710838405
+2025-05-05 23:27:22.220 | INFO     | order:execute_order:153 - complete order | datetime : 2025-02-24 00:00:00 | order_id : 21 | symbol : sz.002830 | order_type : buy | price : 28.636041487851976 | quantity : 7380
+2025-05-05 23:27:22.228 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.088156   207849.655678
+sz.002800  sz.002800      9650  21.569056   208141.394655
+sz.002780  sz.002780      9410  21.184515   199346.282800
+sz.002205  sz.002205     13650  15.634245   213407.444562
+sz.002830  sz.002830      7380  28.885948   213178.294064
+2025-05-05 23:27:22.243 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:22.251 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.088156   207849.655678
+sz.002800  sz.002800      9650  21.569056   208141.394655
+sz.002780  sz.002780      9410  21.184515   199346.282800
+sz.002205  sz.002205     13650  15.634245   213407.444562
+sz.002830  sz.002830      7380  28.885948   213178.294064
+2025-05-05 23:27:22.258 | INFO     | market_env:step:247 - market open date : 2025-02-25 00:00:00
+2025-05-05 23:27:22.258 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:22.266 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.062027   206957.597070
+sz.002800  sz.002800      9650  21.589121   208335.014557
+sz.002780  sz.002780      9410  21.008466   197689.665491
+sz.002205  sz.002205     13650  15.434233   210677.285356
+sz.002830  sz.002830      7380  28.535017   210588.428684
+2025-05-05 23:27:22.281 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:22.288 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.062027   206957.597070
+sz.002800  sz.002800      9650  21.589121   208335.014557
+sz.002780  sz.002780      9410  21.008466   197689.665491
+sz.002205  sz.002205     13650  15.434233   210677.285356
+sz.002830  sz.002830      7380  28.535017   210588.428684
+2025-05-05 23:27:22.295 | INFO     | market_env:step:247 - market open date : 2025-02-26 00:00:00
+2025-05-05 23:27:22.295 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:22.303 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.218803   212309.948718
+sz.002800  sz.002800      9650  21.528928   207754.154851
+sz.002780  sz.002780      9410  21.380124   201186.968698
+sz.002205  sz.002205     13650  15.450901   210904.798623
+sz.002830  sz.002830      7380  29.127212   214958.826512
+2025-05-05 23:27:22.319 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:22.326 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.218803   212309.948718
+sz.002800  sz.002800      9650  21.528928   207754.154851
+sz.002780  sz.002780      9410  21.380124   201186.968698
+sz.002205  sz.002205     13650  15.450901   210904.798623
+sz.002830  sz.002830      7380  29.127212   214958.826512
+2025-05-05 23:27:22.333 | INFO     | market_env:step:247 - market open date : 2025-02-27 00:00:00
+2025-05-05 23:27:22.333 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:22.341 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.218803   212309.948718
+sz.002800  sz.002800      9650  21.368414   206205.195635
+sz.002780  sz.002780      9410  21.497490   202291.380237
+sz.002205  sz.002205     13650  15.400898   210222.258822
+sz.002830  sz.002830      7380  29.083346   214635.093340
+2025-05-05 23:27:22.356 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:22.364 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.218803   212309.948718
+sz.002800  sz.002800      9650  21.368414   206205.195635
+sz.002780  sz.002780      9410  21.497490   202291.380237
+sz.002205  sz.002205     13650  15.400898   210222.258822
+sz.002830  sz.002830      7380  29.083346   214635.093340
+2025-05-05 23:27:22.370 | INFO     | market_env:step:247 - market open date : 2025-02-28 00:00:00
+2025-05-05 23:27:22.370 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:22.379 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.062027   206957.597070
+sz.002800  sz.002800      9650  20.967129   202332.797595
+sz.002780  sz.002780      9410  21.634417   203579.860366
+sz.002205  sz.002205     13650  15.600910   212952.418027
+sz.002830  sz.002830      7380  28.359552   209293.495994
+2025-05-05 23:27:22.394 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:22.402 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.062027   206957.597070
+sz.002800  sz.002800      9650  20.967129   202332.797595
+sz.002780  sz.002780      9410  21.634417   203579.860366
+sz.002205  sz.002205     13650  15.600910   212952.418027
+sz.002830  sz.002830      7380  28.359552   209293.495994
+2025-05-05 23:27:24.306 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['食品饮料']
+2025-05-05 23:27:24.586 | INFO     | order:create_order:71 - create order | datetime : 2025-02-28 00:00:00 | symbol : sz.002780 | order_id : 22  | order_type : sell | quantity : 9410 | exec_time : open
+2025-05-05 23:27:24.586 | INFO     | order:create_order:71 - create order | datetime : 2025-02-28 00:00:00 | symbol : sz.002205 | order_id : 23  | order_type : sell | quantity : 13650 | exec_time : open
+2025-05-05 23:27:24.586 | INFO     | order:create_order:71 - create order | datetime : 2025-02-28 00:00:00 | symbol : sz.002633 | order_id : 24  | order_type : buy | quantity : 12467 | exec_time : open
+2025-05-05 23:27:24.595 | INFO     | order:create_order:71 - create order | datetime : 2025-02-28 00:00:00 | symbol : sz.003003 | order_id : 25  | order_type : buy | quantity : 20617 | exec_time : open
+2025-05-05 23:27:24.595 | INFO     | market_env:step:247 - market open date : 2025-03-03 00:00:00
+2025-05-05 23:27:24.595 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:24.603 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-03 00:00:00 | order_id : 22 | symbol : sz.002780 | order_type : sell | price : 21.591147783759997 | quantity : 9410
+2025-05-05 23:27:24.612 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-03 00:00:00 | order_id : 23 | symbol : sz.002205 | order_type : sell | price : 15.23702185931172 | quantity : 13650
+2025-05-05 23:27:24.626 | INFO     | policy.JSG_policy:buy_policy:81 - price : 16.802997767756484
+2025-05-05 23:27:24.626 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 12460 16.802997767756484 : 419227.7817247901
+2025-05-05 23:27:24.627 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-03 00:00:00 | order_id : 24 | symbol : sz.002633 | order_type : buy | price : 16.802997767756484 | quantity : 12460
+2025-05-05 23:27:24.641 | INFO     | policy.JSG_policy:buy_policy:81 - price : 10.245601300099127
+2025-05-05 23:27:24.641 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 20470.0 10.245601300099127 : 209841.4930033257
+2025-05-05 23:27:24.641 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-03 00:00:00 | order_id : 25 | symbol : sz.003003 | order_type : buy | price : 10.245601300099127 | quantity : 20470.0
+2025-05-05 23:27:24.649 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.140415   209633.772894
+sz.002800  sz.002800    9650.0  21.187836   204462.616517
+sz.002830  sz.002830    7380.0  28.973680   213825.760409
+sz.002633  sz.002633   12460.0  16.799921   209327.016685
+sz.003003  sz.003003   20470.0  10.225151   209308.840931
+2025-05-05 23:27:24.664 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:24.672 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.140415   209633.772894
+sz.002800  sz.002800    9650.0  21.187836   204462.616517
+sz.002830  sz.002830    7380.0  28.973680   213825.760409
+sz.002633  sz.002633   12460.0  16.799921   209327.016685
+sz.003003  sz.003003   20470.0  10.225151   209308.840931
+2025-05-05 23:27:24.679 | INFO     | market_env:step:247 - market open date : 2025-03-04 00:00:00
+2025-05-05 23:27:24.679 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:24.687 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.192674   211417.890110
+sz.002800  sz.002800    9650.0  21.890084   211239.313088
+sz.002830  sz.002830    7380.0  29.302677   216253.759202
+sz.002633  sz.002633   12460.0  17.074081   212743.051409
+sz.003003  sz.003003   20470.0  10.390740   212698.457788
+2025-05-05 23:27:24.703 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:24.711 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.192674   211417.890110
+sz.002800  sz.002800    9650.0  21.890084   211239.313088
+sz.002830  sz.002830    7380.0  29.302677   216253.759202
+sz.002633  sz.002633   12460.0  17.074081   212743.051409
+sz.003003  sz.003003   20470.0  10.390740   212698.457788
+2025-05-05 23:27:24.717 | INFO     | market_env:step:247 - market open date : 2025-03-05 00:00:00
+2025-05-05 23:27:24.717 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:24.726 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.218803   212309.948718
+sz.002800  sz.002800    9650.0  21.970341   212013.792696
+sz.002830  sz.002830    7380.0  29.214945   215606.292857
+sz.002633  sz.002633   12460.0  17.515784   218246.662909
+sz.003003  sz.003003   20470.0  10.473535   214393.266217
+2025-05-05 23:27:24.741 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:24.750 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.218803   212309.948718
+sz.002800  sz.002800    9650.0  21.970341   212013.792696
+sz.002830  sz.002830    7380.0  29.214945   215606.292857
+sz.002633  sz.002633   12460.0  17.515784   218246.662909
+sz.003003  sz.003003   20470.0  10.473535   214393.266217
+2025-05-05 23:27:24.757 | INFO     | market_env:step:247 - market open date : 2025-03-06 00:00:00
+2025-05-05 23:27:24.757 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:24.764 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.271062   214094.065934
+sz.002800  sz.002800    9650.0  21.789763   210271.213577
+sz.002830  sz.002830    7380.0  29.324611   216415.625788
+sz.002633  sz.002633   12460.0  17.546246   218626.222322
+sz.003003  sz.003003   20470.0  10.525282   215452.521485
+2025-05-05 23:27:24.781 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:24.789 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.271062   214094.065934
+sz.002800  sz.002800    9650.0  21.789763   210271.213577
+sz.002830  sz.002830    7380.0  29.324611   216415.625788
+sz.002633  sz.002633   12460.0  17.546246   218626.222322
+sz.003003  sz.003003   20470.0  10.525282   215452.521485
+2025-05-05 23:27:24.796 | INFO     | market_env:step:247 - market open date : 2025-03-07 00:00:00
+2025-05-05 23:27:24.796 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:24.804 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.166545   210525.831502
+sz.002800  sz.002800    9650.0  21.468735   207173.295145
+sz.002830  sz.002830    7380.0  28.995613   213987.626995
+sz.002633  sz.002633   12460.0  16.952232   211224.813754
+sz.003003  sz.003003   20470.0  10.452837   213969.564110
+2025-05-05 23:27:24.819 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:24.828 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.166545   210525.831502
+sz.002800  sz.002800    9650.0  21.468735   207173.295145
+sz.002830  sz.002830    7380.0  28.995613   213987.626995
+sz.002633  sz.002633   12460.0  16.952232   211224.813754
+sz.003003  sz.003003   20470.0  10.452837   213969.564110
+2025-05-05 23:27:26.786 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['国防军工']
+2025-05-05 23:27:27.074 | INFO     | order:create_order:71 - create order | datetime : 2025-03-07 00:00:00 | symbol : sz.003003 | order_id : 26  | order_type : sell | quantity : 20470.0 | exec_time : open
+2025-05-05 23:27:27.074 | INFO     | order:create_order:71 - create order | datetime : 2025-03-07 00:00:00 | symbol : sz.002205 | order_id : 27  | order_type : buy | quantity : 13308 | exec_time : open
+2025-05-05 23:27:27.075 | INFO     | market_env:step:247 - market open date : 2025-03-10 00:00:00
+2025-05-05 23:27:27.075 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:27.084 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-10 00:00:00 | order_id : 26 | symbol : sz.003003 | order_type : sell | price : 10.380287651404098 | quantity : 20470.0
+2025-05-05 23:27:27.099 | INFO     | policy.JSG_policy:buy_policy:81 - price : 16.383655390336095
+2025-05-05 23:27:27.100 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 12960.0 16.383655390336095 : 212450.05917574262
+2025-05-05 23:27:27.100 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-10 00:00:00 | order_id : 27 | symbol : sz.002205 | order_type : buy | price : 16.383655390336095 | quantity : 12960.0
+2025-05-05 23:27:27.108 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.375580   217662.300366
+sz.002800  sz.002800    9650.0  21.508864   207560.534949
+sz.002830  sz.002830    7380.0  29.522009   217872.425064
+sz.002633  sz.002633   12460.0  17.850868   222421.816460
+sz.002205  sz.002205   12960.0  17.467685   226381.201108
+2025-05-05 23:27:27.122 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:27.131 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.375580   217662.300366
+sz.002800  sz.002800    9650.0  21.508864   207560.534949
+sz.002830  sz.002830    7380.0  29.522009   217872.425064
+sz.002633  sz.002633   12460.0  17.850868   222421.816460
+sz.002205  sz.002205   12960.0  17.467685   226381.201108
+2025-05-05 23:27:27.137 | INFO     | market_env:step:247 - market open date : 2025-03-11 00:00:00
+2025-05-05 23:27:27.138 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:27.146 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   34140.0   6.493162   221676.564103
+sz.002800  sz.002800    9650.0  21.849956   210852.073284
+sz.002830  sz.002830    7380.0  29.851006   220300.423858
+sz.002633  sz.002633   12460.0  17.698557   220524.019391
+sz.002205  sz.002205   12960.0  17.701032   229405.377459
+2025-05-05 23:27:27.161 | INFO     | policy.JSG_policy:run_end:393 - end check banned : ['sz.002205']
+2025-05-05 23:27:27.161 | INFO     | order:create_order:71 - create order | datetime : 2025-03-11 00:00:00 | symbol : sz.002205 | order_id : 28  | order_type : sell | quantity : 99999999 | exec_time : close
+2025-05-05 23:27:27.170 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-11 00:00:00 | order_id : 28 | symbol : sz.002205 | order_type : sell | price : 17.66563014693127 | quantity : 12960.0
+2025-05-05 23:27:27.178 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.493162   221676.564103
+sz.002800  sz.002800      9650  21.849956   210852.073284
+sz.002830  sz.002830      7380  29.851006   220300.423858
+sz.002633  sz.002633     12460  17.698557   220524.019391
+2025-05-05 23:27:27.185 | INFO     | market_env:step:247 - market open date : 2025-03-12 00:00:00
+2025-05-05 23:27:27.185 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:27.192 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.506227   222122.593407
+sz.002800  sz.002800      9650  22.632461   218403.249462
+sz.002830  sz.002830      7380  30.158070   222566.556065
+sz.002633  sz.002633     12460  18.140259   226027.630891
+2025-05-05 23:27:27.207 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:27.215 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.506227   222122.593407
+sz.002800  sz.002800      9650  22.632461   218403.249462
+sz.002830  sz.002830      7380  30.158070   222566.556065
+sz.002633  sz.002633     12460  18.140259   226027.630891
+2025-05-05 23:27:27.221 | INFO     | market_env:step:247 - market open date : 2025-03-13 00:00:00
+2025-05-05 23:27:27.221 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:27.230 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.427839   219446.417582
+sz.002800  sz.002800      9650  22.411754   216273.430540
+sz.002830  sz.002830      7380  30.004538   221433.489962
+sz.002633  sz.002633     12460  18.581962   231531.242390
+2025-05-05 23:27:27.246 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:27.255 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.427839   219446.417582
+sz.002800  sz.002800      9650  22.411754   216273.430540
+sz.002830  sz.002830      7380  30.004538   221433.489962
+sz.002633  sz.002633     12460  18.581962   231531.242390
+2025-05-05 23:27:27.262 | INFO     | market_env:step:247 - market open date : 2025-03-14 00:00:00
+2025-05-05 23:27:27.262 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:27.270 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.467033   220784.505495
+sz.002800  sz.002800      9650  22.712718   219177.729070
+sz.002830  sz.002830      7380  30.245802   223214.022410
+sz.002633  sz.002633     12460  18.307802   228115.207666
+2025-05-05 23:27:27.285 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:27.294 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188     34140   6.467033   220784.505495
+sz.002800  sz.002800      9650  22.712718   219177.729070
+sz.002830  sz.002830      7380  30.245802   223214.022410
+sz.002633  sz.002633     12460  18.307802   228115.207666
+2025-05-05 23:27:29.215 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['煤炭']
+2025-05-05 23:27:29.236 | INFO     | order:create_order:71 - create order | datetime : 2025-03-14 00:00:00 | symbol : sz.002188 | order_id : 29  | order_type : sell | quantity : 34140 | exec_time : open
+2025-05-05 23:27:29.236 | INFO     | order:create_order:71 - create order | datetime : 2025-03-14 00:00:00 | symbol : sz.002800 | order_id : 30  | order_type : sell | quantity : 9650 | exec_time : open
+2025-05-05 23:27:29.236 | INFO     | order:create_order:71 - create order | datetime : 2025-03-14 00:00:00 | symbol : sz.002830 | order_id : 31  | order_type : sell | quantity : 7380 | exec_time : open
+2025-05-05 23:27:29.236 | INFO     | order:create_order:71 - create order | datetime : 2025-03-14 00:00:00 | symbol : sz.002633 | order_id : 32  | order_type : sell | quantity : 12460 | exec_time : open
+2025-05-05 23:27:29.236 | INFO     | market_env:step:247 - market open date : 2025-03-17 00:00:00
+2025-05-05 23:27:29.236 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:29.245 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-17 00:00:00 | order_id : 29 | symbol : sz.002188 | order_type : sell | price : 6.454098901098901 | quantity : 34140
+2025-05-05 23:27:29.254 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-17 00:00:00 | order_id : 30 | symbol : sz.002800 | order_type : sell | price : 22.627244382091845 | quantity : 9650
+2025-05-05 23:27:29.263 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-17 00:00:00 | order_id : 31 | symbol : sz.002830 | order_type : sell | price : 30.119643063152093 | quantity : 7380
+2025-05-05 23:27:29.273 | INFO     | order:execute_order:153 - complete order | datetime : 2025-03-17 00:00:00 | order_id : 32 | symbol : sz.002633 | order_type : sell | price : 18.210383359639234 | quantity : 12460
+2025-05-05 23:27:29.273 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.274 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.274 | INFO     | market_env:step:247 - market open date : 2025-03-18 00:00:00
+2025-05-05 23:27:29.274 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:29.274 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.275 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.275 | INFO     | market_env:step:247 - market open date : 2025-03-19 00:00:00
+2025-05-05 23:27:29.275 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:29.275 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.276 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.276 | INFO     | market_env:step:247 - market open date : 2025-03-20 00:00:00
+2025-05-05 23:27:29.276 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:29.276 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.277 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.277 | INFO     | market_env:step:247 - market open date : 2025-03-21 00:00:00
+2025-05-05 23:27:29.277 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:29.277 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:29.278 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.187 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['煤炭']
+2025-05-05 23:27:31.187 | INFO     | market_env:step:247 - market open date : 2025-03-24 00:00:00
+2025-05-05 23:27:31.187 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:31.188 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.188 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.188 | INFO     | market_env:step:247 - market open date : 2025-03-25 00:00:00
+2025-05-05 23:27:31.189 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:31.189 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.189 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.189 | INFO     | market_env:step:247 - market open date : 2025-03-26 00:00:00
+2025-05-05 23:27:31.190 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:31.190 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.190 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.191 | INFO     | market_env:step:247 - market open date : 2025-03-27 00:00:00
+2025-05-05 23:27:31.191 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:31.191 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.191 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.192 | INFO     | market_env:step:247 - market open date : 2025-03-28 00:00:00
+2025-05-05 23:27:31.192 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:31.192 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:31.192 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:33.147 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['银行']
+2025-05-05 23:27:33.148 | INFO     | market_env:step:247 - market open date : 2025-03-31 00:00:00
+2025-05-05 23:27:33.148 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:33.148 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:33.148 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:33.149 | INFO     | market_env:step:247 - market open date : 2025-04-01 00:00:00
+2025-05-05 23:27:33.149 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:33.149 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:33.149 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:33.150 | INFO     | market_env:step:247 - market open date : 2025-04-02 00:00:00
+2025-05-05 23:27:33.150 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:33.150 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:33.151 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:33.151 | INFO     | market_env:step:247 - market open date : 2025-04-03 00:00:00
+2025-05-05 23:27:33.151 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:33.151 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:33.152 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.057 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['银行']
+2025-05-05 23:27:35.057 | INFO     | market_env:step:247 - market open date : 2025-04-07 00:00:00
+2025-05-05 23:27:35.057 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:35.058 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.059 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.059 | INFO     | market_env:step:247 - market open date : 2025-04-08 00:00:00
+2025-05-05 23:27:35.059 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:35.060 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.060 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.061 | INFO     | market_env:step:247 - market open date : 2025-04-09 00:00:00
+2025-05-05 23:27:35.061 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:35.061 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.062 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.062 | INFO     | market_env:step:247 - market open date : 2025-04-10 00:00:00
+2025-05-05 23:27:35.063 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:35.063 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.063 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.064 | INFO     | market_env:step:247 - market open date : 2025-04-11 00:00:00
+2025-05-05 23:27:35.064 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:35.064 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:35.065 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:37.029 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['农林牧渔']
+2025-05-05 23:27:37.313 | INFO     | order:create_order:71 - create order | datetime : 2025-04-11 00:00:00 | symbol : sz.002188 | order_id : 33  | order_type : buy | quantity : 39647 | exec_time : open
+2025-05-05 23:27:37.313 | INFO     | order:create_order:71 - create order | datetime : 2025-04-11 00:00:00 | symbol : sz.002633 | order_id : 34  | order_type : buy | quantity : 14216 | exec_time : open
+2025-05-05 23:27:37.313 | INFO     | order:create_order:71 - create order | datetime : 2025-04-11 00:00:00 | symbol : sz.002830 | order_id : 35  | order_type : buy | quantity : 8489 | exec_time : open
+2025-05-05 23:27:37.313 | INFO     | order:create_order:71 - create order | datetime : 2025-04-11 00:00:00 | symbol : sz.003003 | order_id : 36  | order_type : buy | quantity : 23627 | exec_time : open
+2025-05-05 23:27:37.322 | INFO     | order:create_order:71 - create order | datetime : 2025-04-11 00:00:00 | symbol : sz.002809 | order_id : 37  | order_type : buy | quantity : 10502 | exec_time : open
+2025-05-05 23:27:37.322 | INFO     | market_env:step:247 - market open date : 2025-04-14 00:00:00
+2025-05-05 23:27:37.322 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:37.331 | INFO     | policy.JSG_policy:buy_policy:81 - price : 5.694516483516483
+2025-05-05 23:27:37.331 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 39640 5.694516483516483 : 1116253.309989335
+2025-05-05 23:27:37.331 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-14 00:00:00 | order_id : 33 | symbol : sz.002188 | order_type : buy | price : 5.694516483516483 | quantity : 39640
+2025-05-05 23:27:37.346 | INFO     | policy.JSG_policy:buy_policy:81 - price : 16.009395693348367
+2025-05-05 23:27:37.346 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 14210 16.009395693348367 : 890500.103519401
+2025-05-05 23:27:37.346 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-14 00:00:00 | order_id : 34 | symbol : sz.002633 | order_type : buy | price : 16.009395693348367 | quantity : 14210
+2025-05-05 23:27:37.360 | INFO     | policy.JSG_policy:buy_policy:81 - price : 26.943811868078683
+2025-05-05 23:27:37.360 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 8480 26.943811868078683 : 662983.8413656405
+2025-05-05 23:27:37.360 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-14 00:00:00 | order_id : 35 | symbol : sz.002830 | order_type : buy | price : 26.943811868078683 | quantity : 8480
+2025-05-05 23:27:37.373 | INFO     | policy.JSG_policy:buy_policy:81 - price : 9.54043845758218
+2025-05-05 23:27:37.374 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 23620 9.54043845758218 : 434477.4683718691
+2025-05-05 23:27:37.374 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-14 00:00:00 | order_id : 36 | symbol : sz.003003 | order_type : buy | price : 9.54043845758218 | quantity : 23620
+2025-05-05 23:27:37.389 | INFO     | policy.JSG_policy:buy_policy:81 - price : 21.520598256568306
+2025-05-05 23:27:37.389 | INFO     | policy.JSG_policy:buy_policy:99 - num_stakes : 9710.0 21.520598256568306 : 209109.77748814123
+2025-05-05 23:27:37.389 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-14 00:00:00 | order_id : 37 | symbol : sz.002809 | order_type : buy | price : 21.520598256568306 | quantity : 9710.0
+2025-05-05 23:27:37.397 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   5.774603   228905.269841
+sz.002633  sz.002633   14210.0  16.510530   234614.629538
+sz.002830  sz.002830    8480.0  27.416427   232491.302714
+sz.003003  sz.003003   23620.0   9.686985   228806.589387
+sz.002809  sz.002809    9710.0  21.836063   212028.173671
+2025-05-05 23:27:37.412 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:37.420 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   5.774603   228905.269841
+sz.002633  sz.002633   14210.0  16.510530   234614.629538
+sz.002830  sz.002830    8480.0  27.416427   232491.302714
+sz.003003  sz.003003   23620.0   9.686985   228806.589387
+sz.002809  sz.002809    9710.0  21.836063   212028.173671
+2025-05-05 23:27:37.427 | INFO     | market_env:step:247 - market open date : 2025-04-15 00:00:00
+2025-05-05 23:27:37.427 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:37.435 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   5.813797   230458.925519
+sz.002633  sz.002633   14210.0  16.906539   240241.917700
+sz.002830  sz.002830    8480.0  27.306761   231561.337503
+sz.003003  sz.003003   23620.0  10.266548   242495.872513
+sz.002809  sz.002809    9710.0  22.525333   218720.982184
+2025-05-05 23:27:37.450 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:37.457 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   5.813797   230458.925519
+sz.002633  sz.002633   14210.0  16.906539   240241.917700
+sz.002830  sz.002830    8480.0  27.306761   231561.337503
+sz.003003  sz.003003   23620.0  10.266548   242495.872513
+sz.002809  sz.002809    9710.0  22.525333   218720.982184
+2025-05-05 23:27:37.465 | INFO     | market_env:step:247 - market open date : 2025-04-16 00:00:00
+2025-05-05 23:27:37.465 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:37.473 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   5.774603   228905.269841
+sz.002633  sz.002633   14210.0  16.236370   230718.814656
+sz.002830  sz.002830    8480.0  26.692634   226353.532322
+sz.003003  sz.003003   23620.0   9.676636   228562.137903
+sz.002809  sz.002809    9710.0  21.836063   212028.173671
+2025-05-05 23:27:37.487 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:37.495 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   5.774603   228905.269841
+sz.002633  sz.002633   14210.0  16.236370   230718.814656
+sz.002830  sz.002830    8480.0  26.692634   226353.532322
+sz.003003  sz.003003   23620.0   9.676636   228562.137903
+sz.002809  sz.002809    9710.0  21.836063   212028.173671
+2025-05-05 23:27:37.502 | INFO     | market_env:step:247 - market open date : 2025-04-17 00:00:00
+2025-05-05 23:27:37.502 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:37.510 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   6.349451   251692.219780
+sz.002633  sz.002633   14210.0  16.342988   232233.853777
+sz.002830  sz.002830    8480.0  27.153230   230259.386208
+sz.003003  sz.003003   23620.0   9.976767   235651.230950
+sz.002809  sz.002809    9710.0  24.014155   233177.448570
+2025-05-05 23:27:37.525 | INFO     | policy.JSG_policy:run_end:393 - end check banned : []
+2025-05-05 23:27:37.533 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   6.349451   251692.219780
+sz.002633  sz.002633   14210.0  16.342988   232233.853777
+sz.002830  sz.002830    8480.0  27.153230   230259.386208
+sz.003003  sz.003003   23620.0   9.976767   235651.230950
+sz.002809  sz.002809    9710.0  24.014155   233177.448570
+2025-05-05 23:27:37.539 | INFO     | market_env:step:247 - market open date : 2025-04-18 00:00:00
+2025-05-05 23:27:37.540 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:37.548 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002188  sz.002188   39640.0   6.244933   247549.137973
+sz.002633  sz.002633   14210.0  16.556223   235263.932018
+sz.002830  sz.002830    8480.0  26.780366   227097.504491
+sz.003003  sz.003003   23620.0  10.970304   259118.573451
+sz.002809  sz.002809    9710.0  26.412814   256468.422193
+2025-05-05 23:27:37.562 | INFO     | policy.JSG_policy:run_end:393 - end check banned : ['sz.002188', 'sz.002809']
+2025-05-05 23:27:37.563 | INFO     | order:create_order:71 - create order | datetime : 2025-04-18 00:00:00 | symbol : sz.002188 | order_id : 38  | order_type : sell | quantity : 99999999 | exec_time : close
+2025-05-05 23:27:37.563 | INFO     | order:create_order:71 - create order | datetime : 2025-04-18 00:00:00 | symbol : sz.002809 | order_id : 39  | order_type : sell | quantity : 99999999 | exec_time : close
+2025-05-05 23:27:37.571 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-18 00:00:00 | order_id : 38 | symbol : sz.002188 | order_type : sell | price : 6.232442979242979 | quantity : 39640
+2025-05-05 23:27:37.576 | ERROR    | policy.JSG_policy:check_up_down_limit:133 - sz.002809 涨停 2025-04-18 00:00:00
+2025-05-05 23:27:37.584 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.002633  sz.002633   14210.0  16.556223   235263.932018
+sz.002830  sz.002830    8480.0  26.780366   227097.504491
+sz.003003  sz.003003   23620.0  10.970304   259118.573451
+sz.002809  sz.002809    9710.0  26.412814   256468.422193
+2025-05-05 23:27:39.511 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['银行']
+2025-05-05 23:27:39.529 | INFO     | order:create_order:71 - create order | datetime : 2025-04-18 00:00:00 | symbol : sz.002633 | order_id : 40  | order_type : sell | quantity : 14210.0 | exec_time : open
+2025-05-05 23:27:39.529 | INFO     | order:create_order:71 - create order | datetime : 2025-04-18 00:00:00 | symbol : sz.002830 | order_id : 41  | order_type : sell | quantity : 8480.0 | exec_time : open
+2025-05-05 23:27:39.529 | INFO     | order:create_order:71 - create order | datetime : 2025-04-18 00:00:00 | symbol : sz.003003 | order_id : 42  | order_type : sell | quantity : 23620.0 | exec_time : open
+2025-05-05 23:27:39.530 | INFO     | order:create_order:71 - create order | datetime : 2025-04-18 00:00:00 | symbol : sz.002809 | order_id : 43  | order_type : sell | quantity : 9710.0 | exec_time : open
+2025-05-05 23:27:39.530 | INFO     | market_env:step:247 - market open date : 2025-04-21 00:00:00
+2025-05-05 23:27:39.530 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:39.539 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-21 00:00:00 | order_id : 40 | symbol : sz.002633 | order_type : sell | price : 16.59911404735062 | quantity : 14210
+2025-05-05 23:27:39.549 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-21 00:00:00 | order_id : 41 | symbol : sz.002830 | order_type : sell | price : 26.74869463893304 | quantity : 8480
+2025-05-05 23:27:39.553 | ERROR    | policy.JSG_policy:check_up_down_limit:133 - sz.003003 涨停 2025-04-21 00:00:00
+2025-05-05 23:27:39.562 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-21 00:00:00 | order_id : 43 | symbol : sz.002809 | order_type : sell | price : 27.020363679539738 | quantity : 9710.0
+2025-05-05 23:27:39.568 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  12.067334   285030.430796
+2025-05-05 23:27:39.580 | INFO     | policy.JSG_policy:run_end:393 - end check banned : ['sz.003003']
+2025-05-05 23:27:39.580 | INFO     | order:create_order:71 - create order | datetime : 2025-04-21 00:00:00 | symbol : sz.003003 | order_id : 44  | order_type : sell | quantity : 99999999 | exec_time : close
+2025-05-05 23:27:39.585 | ERROR    | policy.JSG_policy:check_up_down_limit:133 - sz.003003 涨停 2025-04-21 00:00:00
+2025-05-05 23:27:39.591 | ERROR    | policy.JSG_policy:check_up_down_limit:133 - sz.003003 涨停 2025-04-21 00:00:00
+2025-05-05 23:27:39.598 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  12.067334   285030.430796
+2025-05-05 23:27:39.603 | INFO     | market_env:step:247 - market open date : 2025-04-22 00:00:00
+2025-05-05 23:27:39.603 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:39.609 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  13.278207    313631.25447
+2025-05-05 23:27:39.620 | INFO     | policy.JSG_policy:run_end:393 - end check banned : ['sz.003003']
+2025-05-05 23:27:39.621 | INFO     | order:create_order:71 - create order | datetime : 2025-04-22 00:00:00 | symbol : sz.003003 | order_id : 45  | order_type : sell | quantity : 99999999 | exec_time : close
+2025-05-05 23:27:39.625 | ERROR    | policy.JSG_policy:check_up_down_limit:133 - sz.003003 涨停 2025-04-22 00:00:00
+2025-05-05 23:27:39.632 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  13.278207    313631.25447
+2025-05-05 23:27:39.637 | INFO     | market_env:step:247 - market open date : 2025-04-23 00:00:00
+2025-05-05 23:27:39.638 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:39.644 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  14.602923   344921.044471
+2025-05-05 23:27:39.655 | INFO     | policy.JSG_policy:run_end:393 - end check banned : ['sz.003003']
+2025-05-05 23:27:39.655 | INFO     | order:create_order:71 - create order | datetime : 2025-04-23 00:00:00 | symbol : sz.003003 | order_id : 46  | order_type : sell | quantity : 99999999 | exec_time : close
+2025-05-05 23:27:39.659 | ERROR    | policy.JSG_policy:check_up_down_limit:133 - sz.003003 涨停 2025-04-23 00:00:00
+2025-05-05 23:27:39.665 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  14.602923   344921.044471
+2025-05-05 23:27:39.671 | INFO     | market_env:step:247 - market open date : 2025-04-24 00:00:00
+2025-05-05 23:27:39.671 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:39.677 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  16.062181    379388.70377
+2025-05-05 23:27:39.688 | INFO     | policy.JSG_policy:run_end:393 - end check banned : ['sz.003003']
+2025-05-05 23:27:39.688 | INFO     | order:create_order:71 - create order | datetime : 2025-04-24 00:00:00 | symbol : sz.003003 | order_id : 47  | order_type : sell | quantity : 99999999 | exec_time : close
+2025-05-05 23:27:39.692 | ERROR    | policy.JSG_policy:check_up_down_limit:133 - sz.003003 涨停 2025-04-24 00:00:00
+2025-05-05 23:27:39.699 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  16.062181    379388.70377
+2025-05-05 23:27:39.704 | INFO     | market_env:step:247 - market open date : 2025-04-25 00:00:00
+2025-05-05 23:27:39.704 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:39.710 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  17.666329    417278.68385
+2025-05-05 23:27:39.722 | INFO     | policy.JSG_policy:run_end:393 - end check banned : ['sz.003003']
+2025-05-05 23:27:39.722 | INFO     | order:create_order:71 - create order | datetime : 2025-04-25 00:00:00 | symbol : sz.003003 | order_id : 48  | order_type : sell | quantity : 99999999 | exec_time : close
+2025-05-05 23:27:39.727 | ERROR    | policy.JSG_policy:check_up_down_limit:133 - sz.003003 涨停 2025-04-25 00:00:00
+2025-05-05 23:27:39.733 | INFO     | order:match_orders:133 - match order...
+                code  position      close  position_value
+sz.003003  sz.003003     23620  17.666329    417278.68385
+2025-05-05 23:27:41.626 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['银行']
+2025-05-05 23:27:41.641 | INFO     | order:create_order:71 - create order | datetime : 2025-04-25 00:00:00 | symbol : sz.003003 | order_id : 49  | order_type : sell | quantity : 23620 | exec_time : open
+2025-05-05 23:27:41.641 | INFO     | market_env:step:247 - market open date : 2025-04-28 00:00:00
+2025-05-05 23:27:41.641 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:41.650 | INFO     | order:execute_order:153 - complete order | datetime : 2025-04-28 00:00:00 | order_id : 49 | symbol : sz.003003 | order_type : sell | price : 16.53615973124175 | quantity : 23620
+2025-05-05 23:27:41.650 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:41.651 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:41.651 | INFO     | market_env:step:247 - market open date : 2025-04-29 00:00:00
+2025-05-05 23:27:41.651 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:41.651 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:41.652 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:41.652 | INFO     | market_env:step:247 - market open date : 2025-04-30 00:00:00
+2025-05-05 23:27:41.652 | INFO     | market_env:step:251 - match order...
+2025-05-05 23:27:41.652 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:41.653 | INFO     | order:match_orders:133 - match order...
+Empty DataFrame
+Columns: [code, position]
+Index: []
+2025-05-05 23:27:43.613 | INFO     | policy.JSG_policy:action_decider:361 - market breath : ['汽车']
+2025-05-05 23:27:43.907 | INFO     | order:create_order:71 - create order | datetime : 2025-04-30 00:00:00 | symbol : sz.002591 | order_id : 50  | order_type : buy | quantity : 14975 | exec_time : open
+2025-05-05 23:27:43.907 | INFO     | order:create_order:71 - create order | datetime : 2025-04-30 00:00:00 | symbol : sz.002188 | order_id : 51  | order_type : buy | quantity : 43168 | exec_time : open
+2025-05-05 23:27:43.916 | INFO     | order:create_order:71 - create order | datetime : 2025-04-30 00:00:00 | symbol : sz.002883 | order_id : 52  | order_type : buy | quantity : 8752 | exec_time : open
+2025-05-05 23:27:43.924 | INFO     | order:create_order:71 - create order | datetime : 2025-04-30 00:00:00 | symbol : sz.002828 | order_id : 53  | order_type : buy | quantity : 18628 | exec_time : open
+2025-05-05 23:27:43.933 | INFO     | order:create_order:71 - create order | datetime : 2025-04-30 00:00:00 | symbol : sz.003011 | order_id : 54  | order_type : buy | quantity : 11014 | exec_time : open
+2025-05-05 23:27:43.934 | INFO     | account:result:121 - run span : 2025-01-02 00:00:00 - 2025-04-30 00:00:00
+2025-05-05 23:27:43.934 | INFO     | __main__:run_policy:57 - 
+Order(1, sz.002188, 中天服务, buy, 34790, 5.746879853479854, filled, 34790, 2025-01-20 00:00:00)
+Order(2, sz.002800, 天顺股份, buy, 10110, 19.80280152144394, filled, 10110, 2025-01-20 00:00:00)
+Order(3, sz.002205, 国统股份, buy, 14490, 14.0288180712358, filled, 14490, 2025-01-20 00:00:00)
+Order(4, sz.002633, 申科股份, buy, 12320, 16.207796211950395, filled, 12320, 2025-01-20 00:00:00)
+Order(5, sz.003017, 大洋生物, buy, 6720.0, 29.285273395822564, filled, 6720.0, 2025-01-20 00:00:00)
+Order(6, sz.002188, 中天服务, sell, 34790, 5.6848224664224665, filled, 34790, 2025-02-05 00:00:00)
+Order(7, sz.002800, 天顺股份, sell, 10110, 20.324471723737368, filled, 10110, 2025-02-05 00:00:00)
+Order(8, sz.002205, 国统股份, sell, 14490, 13.706665952044604, filled, 14490, 2025-02-05 00:00:00)
+Order(9, sz.002633, 申科股份, sell, 12320, 16.751120586245772, filled, 12320, 2025-02-05 00:00:00)
+Order(10, sz.003017, 大洋生物, sell, 6720.0, 30.819119962452, filled, 6720.0, 2025-02-05 00:00:00)
+Order(11, sz.002188, 中天服务, buy, 34140, 5.969424175824175, filled, 34140, 2025-02-10 00:00:00)
+Order(12, sz.002800, 天顺股份, buy, 9650, 21.089481011162125, filled, 9650, 2025-02-10 00:00:00)
+Order(13, sz.002205, 国统股份, buy, 13510, 14.947371635423856, filled, 13510, 2025-02-10 00:00:00)
+Order(14, sz.002633, 申科股份, buy, 11840, 17.18453722660654, filled, 11840, 2025-02-10 00:00:00)
+Order(15, sz.003017, 大洋生物, buy, 6500.0, 31.03387487065101, filled, 6500.0, 2025-02-10 00:00:00)
+Order(16, sz.002205, 国统股份, sell, 13510, 16.118639936324296, filled, 13510, 2025-02-17 00:00:00)
+Order(17, sz.002780, 三夫户外, buy, 9410, 21.795285913791595, filled, 9410, 2025-02-17 00:00:00)
+Order(18, sz.002633, 申科股份, sell, 11840, 17.328745434047352, filled, 11840, 2025-02-24 00:00:00)
+Order(19, sz.003017, 大洋生物, sell, 6500.0, 32.65160817643562, filled, 6500.0, 2025-02-24 00:00:00)
+Order(20, sz.002205, 国统股份, buy, 13650, 15.398297930570726, filled, 13650, 2025-02-24 00:00:00)
+Order(21, sz.002830, 名雕股份, buy, 7380, 28.636041487851976, filled, 7380, 2025-02-24 00:00:00)
+Order(22, sz.002780, 三夫户外, sell, 9410, 21.591147783759997, filled, 9410, 2025-03-03 00:00:00)
+Order(23, sz.002205, 国统股份, sell, 13650, 15.23702185931172, filled, 13650, 2025-03-03 00:00:00)
+Order(24, sz.002633, 申科股份, buy, 12460, 16.802997767756484, filled, 12460, 2025-03-03 00:00:00)
+Order(25, sz.003003, 天元股份, buy, 20470.0, 10.245601300099127, filled, 20470.0, 2025-03-03 00:00:00)
+Order(26, sz.003003, 天元股份, sell, 20470.0, 10.380287651404098, filled, 20470.0, 2025-03-10 00:00:00)
+Order(27, sz.002205, 国统股份, buy, 12960.0, 16.383655390336095, filled, 12960.0, 2025-03-10 00:00:00)
+Order(28, sz.002205, 国统股份, sell, 12960.0, 17.66563014693127, filled, 12960.0, 2025-03-11 00:00:00)
+Order(29, sz.002188, 中天服务, sell, 34140, 6.454098901098901, filled, 34140, 2025-03-17 00:00:00)
+Order(30, sz.002800, 天顺股份, sell, 9650, 22.627244382091845, filled, 9650, 2025-03-17 00:00:00)
+Order(31, sz.002830, 名雕股份, sell, 7380, 30.119643063152093, filled, 7380, 2025-03-17 00:00:00)
+Order(32, sz.002633, 申科股份, sell, 12460, 18.210383359639234, filled, 12460, 2025-03-17 00:00:00)
+Order(33, sz.002188, 中天服务, buy, 39640, 5.694516483516483, filled, 39640, 2025-04-14 00:00:00)
+Order(34, sz.002633, 申科股份, buy, 14210, 16.009395693348367, filled, 14210, 2025-04-14 00:00:00)
+Order(35, sz.002830, 名雕股份, buy, 8480, 26.943811868078683, filled, 8480, 2025-04-14 00:00:00)
+Order(36, sz.003003, 天元股份, buy, 23620, 9.54043845758218, filled, 23620, 2025-04-14 00:00:00)
+Order(37, sz.002809, 红墙股份, buy, 9710.0, 21.520598256568306, filled, 9710.0, 2025-04-14 00:00:00)
+Order(38, sz.002188, 中天服务, sell, 39640, 6.232442979242979, filled, 39640, 2025-04-18 00:00:00)
+Order(40, sz.002633, 申科股份, sell, 14210, 16.59911404735062, filled, 14210, 2025-04-21 00:00:00)
+Order(41, sz.002830, 名雕股份, sell, 8480, 26.74869463893304, filled, 8480, 2025-04-21 00:00:00)
+Order(43, sz.002809, 红墙股份, sell, 9710.0, 27.020363679539738, filled, 9710.0, 2025-04-21 00:00:00)
+Order(49, sz.003003, 天元股份, sell, 23620, 16.53615973124175, filled, 23620, 2025-04-28 00:00:00)
+2025-05-05 23:27:43.943 | INFO     | __main__:run_policy:65 - bt res : {'strategy_return': '36.20%', 'annualized_return': '160.05%', 'max_drawdown': '-3.17%', 'revenue': {'x': ['2025-01-02', '2025-01-03', '2025-01-06', '2025-01-07', '2025-01-08', '2025-01-09', '2025-01-10', '2025-01-13', '2025-01-14', '2025-01-15', '2025-01-16', '2025-01-17', '2025-01-20', '2025-01-21', '2025-01-22', '2025-01-23', '2025-01-24', '2025-01-27', '2025-02-05', '2025-02-06', '2025-02-07', '2025-02-10', '2025-02-11', '2025-02-12', '2025-02-13', '2025-02-14', '2025-02-17', '2025-02-18', '2025-02-19', '2025-02-20', '2025-02-21', '2025-02-24', '2025-02-25', '2025-02-26', '2025-02-27', '2025-02-28', '2025-03-03', '2025-03-04', '2025-03-05', '2025-03-06', '2025-03-07', '2025-03-10', '2025-03-11', '2025-03-12', '2025-03-13', '2025-03-14', '2025-03-17', '2025-03-18', '2025-03-19', '2025-03-20', '2025-03-21', '2025-03-24', '2025-03-25', '2025-03-26', '2025-03-27', '2025-03-28', '2025-03-31', '2025-04-01', '2025-04-02', '2025-04-03', '2025-04-07', '2025-04-08', '2025-04-09', '2025-04-10', '2025-04-11', '2025-04-14', '2025-04-15', '2025-04-16', '2025-04-17', '2025-04-18', '2025-04-21', '2025-04-22', '2025-04-23', '2025-04-24', '2025-04-25', '2025-04-28', '2025-04-29', '2025-04-30'], 'y': [1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 1000000.0, 1027090.1893113401, 1015004.3229230312, 1001922.6206577852, 996849.7162202543, 997366.0560664722, 1007813.7310605851, 1014739.1348095704, 1014739.1348095704, 1014739.1348095704, 1030093.0283918001, 1029771.221497099, 1041495.7790466658, 1022911.7403059604, 1015427.1781427452, 1043182.1542685913, 1023149.9897410315, 1037779.105911873, 1054006.598738058, 1043503.4255384706, 1050239.4992875785, 1042564.4186877944, 1055431.1249324519, 1053980.3042816385, 1043432.5965820004, 1046651.0690809346, 1064445.5332416398, 1072663.0250408305, 1074952.7107516727, 1056974.1931506936, 1091994.9300482548, 1102258.9314990158, 1118025.8806878873, 1117590.431337488, 1120197.3155043845, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1116253.309989335, 1136969.837067239, 1163602.9073344518, 1126691.8003095777, 1183138.0112010243, 1224978.111342737, 1256695.1404214043, 1285295.9640947822, 1316585.7540964265, 1351053.4133951126, 1388943.3934752285, 1362014.452021396, 1362014.452021396, 1362014.452021396]}, 'market_return': np.float64(-4.18), 'market_value': [970897.5113007007, 959402.8672923701, 957828.4733207047, 964724.6396354234, 962973.5961746934, 960600.4801785981, 948555.3027388752, 946022.183119826, 970934.1830332167, 964704.4358742659, 965811.8561210624, 968851.1371375652, 973256.192408321, 974002.8675109263, 964956.1823623503, 966665.8271728592, 974066.1980427562, 970055.0525807332, 964465.243672989, 976599.3430753412, 989273.4292916264, 991397.7467698187, 986841.9638167665, 996175.466133172, 992434.110769827, 1001041.3450530733, 1003173.4899003684, 994376.4927434569, 1001334.0327477298, 998471.3758067556, 1011063.3000609998, 1008845.4353566172, 997646.604907877, 1006361.109726779, 1008438.5646445003, 988598.9286313951, 988198.6908521865, 987371.9885245683, 991781.1862016999, 1005419.6906974436, 1002313.4958405282, 998447.4616693351, 1001653.0996928035, 998048.3929127847, 994070.6154235918, 1018207.731209365, 1015725.0574593697, 1018504.1038667482, 1019125.4902366404, 1010185.9739695757, 994862.5774474335, 999984.1673670424, 999335.232724075, 996047.1023625974, 999364.8649071062, 994982.1735480719, 987901.8099240821, 987998.0001580212, 987159.7854985737, 981344.55852609, 912203.7807768404, 927786.954464458, 936944.7984197049, 949224.8223460407, 953138.9135138993, 955330.9580656576, 955862.7617209833, 958807.0723532772, 958655.0231671063, 958731.4924970727, 961871.9956276517, 961636.0563589886, 962380.7237922463, 961739.0320070521, 962409.0090578668, 961043.0569088613, 959380.4779671119, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491, 958235.2932057491], 'buy_sell_points': [{'timestamp': '2025-01-20', 'symbol': 'sz.002188', 'order_type': 'buy', 'quantity': 34790.0, 'price': 5.746879853479854, 'high': np.float64(5.746879853479854), 'low': np.float64(5.746879853479854)}, {'timestamp': '2025-01-20', 'symbol': 'sz.002800', 'order_type': 'buy', 'quantity': 10110.0, 'price': 19.80280152144394, 'high': np.float64(19.80280152144394), 'low': np.float64(19.80280152144394)}, {'timestamp': '2025-01-20', 'symbol': 'sz.002205', 'order_type': 'buy', 'quantity': 14490.0, 'price': 14.0288180712358, 'high': np.float64(14.0288180712358), 'low': np.float64(14.0288180712358)}, {'timestamp': '2025-01-20', 'symbol': 'sz.002633', 'order_type': 'buy', 'quantity': 12320.0, 'price': 16.207796211950395, 'high': np.float64(16.207796211950395), 'low': np.float64(16.207796211950395)}, {'timestamp': '2025-01-20', 'symbol': 'sz.003017', 'order_type': 'buy', 'quantity': 6720.0, 'price': 29.285273395822564, 'high': np.float64(29.285273395822564), 'low': np.float64(29.285273395822564)}, {'timestamp': '2025-02-05', 'symbol': 'sz.002188', 'order_type': 'sell', 'quantity': 34790.0, 'price': 5.6848224664224665, 'high': np.float64(5.6848224664224665), 'low': np.float64(5.6848224664224665)}, {'timestamp': '2025-02-05', 'symbol': 'sz.002800', 'order_type': 'sell', 'quantity': 10110.0, 'price': 20.324471723737368, 'high': np.float64(20.324471723737368), 'low': np.float64(20.324471723737368)}, {'timestamp': '2025-02-05', 'symbol': 'sz.002205', 'order_type': 'sell', 'quantity': 14490.0, 'price': 13.706665952044604, 'high': np.float64(13.706665952044604), 'low': np.float64(13.706665952044604)}, {'timestamp': '2025-02-05', 'symbol': 'sz.002633', 'order_type': 'sell', 'quantity': 12320.0, 'price': 16.751120586245772, 'high': np.float64(16.751120586245772), 'low': np.float64(16.751120586245772)}, {'timestamp': '2025-02-05', 'symbol': 'sz.003017', 'order_type': 'sell', 'quantity': 6720.0, 'price': 30.819119962452, 'high': np.float64(30.819119962452), 'low': np.float64(30.819119962452)}, {'timestamp': '2025-02-10', 'symbol': 'sz.002188', 'order_type': 'buy', 'quantity': 34140.0, 'price': 5.969424175824175, 'high': np.float64(5.969424175824175), 'low': np.float64(5.969424175824175)}, {'timestamp': '2025-02-10', 'symbol': 'sz.002800', 'order_type': 'buy', 'quantity': 9650.0, 'price': 21.089481011162125, 'high': np.float64(21.089481011162125), 'low': np.float64(21.089481011162125)}, {'timestamp': '2025-02-10', 'symbol': 'sz.002205', 'order_type': 'buy', 'quantity': 13510.0, 'price': 14.947371635423856, 'high': np.float64(14.947371635423856), 'low': np.float64(14.947371635423856)}, {'timestamp': '2025-02-10', 'symbol': 'sz.002633', 'order_type': 'buy', 'quantity': 11840.0, 'price': 17.18453722660654, 'high': np.float64(17.18453722660654), 'low': np.float64(17.18453722660654)}, {'timestamp': '2025-02-10', 'symbol': 'sz.003017', 'order_type': 'buy', 'quantity': 6500.0, 'price': 31.03387487065101, 'high': np.float64(31.03387487065101), 'low': np.float64(31.03387487065101)}, {'timestamp': '2025-02-17', 'symbol': 'sz.002205', 'order_type': 'sell', 'quantity': 13510.0, 'price': 16.118639936324296, 'high': np.float64(16.118639936324296), 'low': np.float64(16.118639936324296)}, {'timestamp': '2025-02-17', 'symbol': 'sz.002780', 'order_type': 'buy', 'quantity': 9410.0, 'price': 21.795285913791595, 'high': np.float64(21.795285913791595), 'low': np.float64(21.795285913791595)}, {'timestamp': '2025-02-24', 'symbol': 'sz.002633', 'order_type': 'sell', 'quantity': 11840.0, 'price': 17.328745434047352, 'high': np.float64(17.328745434047352), 'low': np.float64(17.328745434047352)}, {'timestamp': '2025-02-24', 'symbol': 'sz.003017', 'order_type': 'sell', 'quantity': 6500.0, 'price': 32.65160817643562, 'high': np.float64(32.65160817643562), 'low': np.float64(32.65160817643562)}, {'timestamp': '2025-02-24', 'symbol': 'sz.002205', 'order_type': 'buy', 'quantity': 13650.0, 'price': 15.398297930570726, 'high': np.float64(15.398297930570726), 'low': np.float64(15.398297930570726)}, {'timestamp': '2025-02-24', 'symbol': 'sz.002830', 'order_type': 'buy', 'quantity': 7380.0, 'price': 28.636041487851976, 'high': np.float64(28.636041487851976), 'low': np.float64(28.636041487851976)}, {'timestamp': '2025-03-03', 'symbol': 'sz.002780', 'order_type': 'sell', 'quantity': 9410.0, 'price': 21.591147783759997, 'high': np.float64(21.591147783759997), 'low': np.float64(21.591147783759997)}, {'timestamp': '2025-03-03', 'symbol': 'sz.002205', 'order_type': 'sell', 'quantity': 13650.0, 'price': 15.23702185931172, 'high': np.float64(15.23702185931172), 'low': np.float64(15.23702185931172)}, {'timestamp': '2025-03-03', 'symbol': 'sz.002633', 'order_type': 'buy', 'quantity': 12460.0, 'price': 16.802997767756484, 'high': np.float64(16.802997767756484), 'low': np.float64(16.802997767756484)}, {'timestamp': '2025-03-03', 'symbol': 'sz.003003', 'order_type': 'buy', 'quantity': 20470.0, 'price': 10.245601300099127, 'high': np.float64(10.245601300099127), 'low': np.float64(10.245601300099127)}, {'timestamp': '2025-03-10', 'symbol': 'sz.003003', 'order_type': 'sell', 'quantity': 20470.0, 'price': 10.380287651404098, 'high': np.float64(10.380287651404098), 'low': np.float64(10.380287651404098)}, {'timestamp': '2025-03-10', 'symbol': 'sz.002205', 'order_type': 'buy', 'quantity': 12960.0, 'price': 16.383655390336095, 'high': np.float64(16.383655390336095), 'low': np.float64(16.383655390336095)}, {'timestamp': '2025-03-11', 'symbol': 'sz.002205', 'order_type': 'sell', 'quantity': 12960.0, 'price': 17.66563014693127, 'high': np.float64(17.66563014693127), 'low': np.float64(17.66563014693127)}, {'timestamp': '2025-03-17', 'symbol': 'sz.002188', 'order_type': 'sell', 'quantity': 34140.0, 'price': 6.454098901098901, 'high': np.float64(6.454098901098901), 'low': np.float64(6.454098901098901)}, {'timestamp': '2025-03-17', 'symbol': 'sz.002800', 'order_type': 'sell', 'quantity': 9650.0, 'price': 22.627244382091845, 'high': np.float64(22.627244382091845), 'low': np.float64(22.627244382091845)}, {'timestamp': '2025-03-17', 'symbol': 'sz.002830', 'order_type': 'sell', 'quantity': 7380.0, 'price': 30.119643063152093, 'high': np.float64(30.119643063152093), 'low': np.float64(30.119643063152093)}, {'timestamp': '2025-03-17', 'symbol': 'sz.002633', 'order_type': 'sell', 'quantity': 12460.0, 'price': 18.210383359639234, 'high': np.float64(18.210383359639234), 'low': np.float64(18.210383359639234)}, {'timestamp': '2025-04-14', 'symbol': 'sz.002188', 'order_type': 'buy', 'quantity': 39640.0, 'price': 5.694516483516483, 'high': np.float64(5.694516483516483), 'low': np.float64(5.694516483516483)}, {'timestamp': '2025-04-14', 'symbol': 'sz.002633', 'order_type': 'buy', 'quantity': 14210.0, 'price': 16.009395693348367, 'high': np.float64(16.009395693348367), 'low': np.float64(16.009395693348367)}, {'timestamp': '2025-04-14', 'symbol': 'sz.002830', 'order_type': 'buy', 'quantity': 8480.0, 'price': 26.943811868078683, 'high': np.float64(26.943811868078683), 'low': np.float64(26.943811868078683)}, {'timestamp': '2025-04-14', 'symbol': 'sz.003003', 'order_type': 'buy', 'quantity': 23620.0, 'price': 9.54043845758218, 'high': np.float64(9.54043845758218), 'low': np.float64(9.54043845758218)}, {'timestamp': '2025-04-14', 'symbol': 'sz.002809', 'order_type': 'buy', 'quantity': 9710.0, 'price': 21.520598256568306, 'high': np.float64(21.520598256568306), 'low': np.float64(21.520598256568306)}, {'timestamp': '2025-04-18', 'symbol': 'sz.002188', 'order_type': 'sell', 'quantity': 39640.0, 'price': 6.232442979242979, 'high': np.float64(6.232442979242979), 'low': np.float64(6.232442979242979)}, {'timestamp': '2025-04-21', 'symbol': 'sz.002633', 'order_type': 'sell', 'quantity': 14210.0, 'price': 16.59911404735062, 'high': np.float64(16.59911404735062), 'low': np.float64(16.59911404735062)}, {'timestamp': '2025-04-21', 'symbol': 'sz.002830', 'order_type': 'sell', 'quantity': 8480.0, 'price': 26.74869463893304, 'high': np.float64(26.74869463893304), 'low': np.float64(26.74869463893304)}, {'timestamp': '2025-04-21', 'symbol': 'sz.002809', 'order_type': 'sell', 'quantity': 9710.0, 'price': 27.020363679539738, 'high': np.float64(27.020363679539738), 'low': np.float64(27.020363679539738)}, {'timestamp': '2025-04-28', 'symbol': 'sz.003003', 'order_type': 'sell', 'quantity': 23620.0, 'price': 16.53615973124175, 'high': np.float64(16.53615973124175), 'low': np.float64(16.53615973124175)}], 'order_stats': {'win': 16, 'loss': 5, 'order_history': [{'symbol': 'sz.002188', 'order_return': np.float64(-1.08), 'open_time': '2025-01-20', 'close_time': '2025-02-05'}, {'symbol': 'sz.002800', 'order_return': np.float64(2.63), 'open_time': '2025-01-20', 'close_time': '2025-02-05'}, {'symbol': 'sz.002205', 'order_return': np.float64(-2.3), 'open_time': '2025-01-20', 'close_time': '2025-02-05'}, {'symbol': 'sz.002633', 'order_return': np.float64(3.35), 'open_time': '2025-01-20', 'close_time': '2025-02-05'}, {'symbol': 'sz.003017', 'order_return': np.float64(5.24), 'open_time': '2025-01-20', 'close_time': '2025-02-05'}, {'symbol': 'sz.002205', 'order_return': np.float64(7.84), 'open_time': '2025-02-10', 'close_time': '2025-02-17'}, {'symbol': 'sz.002633', 'order_return': np.float64(0.84), 'open_time': '2025-02-10', 'close_time': '2025-02-24'}, {'symbol': 'sz.003017', 'order_return': np.float64(5.21), 'open_time': '2025-02-10', 'close_time': '2025-02-24'}, {'symbol': 'sz.002780', 'order_return': np.float64(-0.94), 'open_time': '2025-02-17', 'close_time': '2025-03-03'}, {'symbol': 'sz.002205', 'order_return': np.float64(-1.05), 'open_time': '2025-02-24', 'close_time': '2025-03-03'}, {'symbol': 'sz.003003', 'order_return': np.float64(1.31), 'open_time': '2025-03-03', 'close_time': '2025-03-10'}, {'symbol': 'sz.002205', 'order_return': np.float64(7.82), 'open_time': '2025-03-10', 'close_time': '2025-03-11'}, {'symbol': 'sz.002188', 'order_return': np.float64(8.12), 'open_time': '2025-02-10', 'close_time': '2025-03-17'}, {'symbol': 'sz.002800', 'order_return': np.float64(7.29), 'open_time': '2025-02-10', 'close_time': '2025-03-17'}, {'symbol': 'sz.002830', 'order_return': np.float64(5.18), 'open_time': '2025-02-24', 'close_time': '2025-03-17'}, {'symbol': 'sz.002633', 'order_return': np.float64(8.38), 'open_time': '2025-03-03', 'close_time': '2025-03-17'}, {'symbol': 'sz.002188', 'order_return': np.float64(9.45), 'open_time': '2025-04-14', 'close_time': '2025-04-18'}, {'symbol': 'sz.002633', 'order_return': np.float64(3.68), 'open_time': '2025-04-14', 'close_time': '2025-04-21'}, {'symbol': 'sz.002830', 'order_return': np.float64(-0.72), 'open_time': '2025-04-14', 'close_time': '2025-04-21'}, {'symbol': 'sz.002809', 'order_return': np.float64(25.56), 'open_time': '2025-04-14', 'close_time': '2025-04-21'}, {'symbol': 'sz.003003', 'order_return': np.float64(73.33), 'open_time': '2025-04-14', 'close_time': '2025-04-28'}]}}

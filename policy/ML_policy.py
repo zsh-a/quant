@@ -22,6 +22,8 @@ import indictor
 import talib as ta
 import utils.utils as util
 
+from models import LeNet,TransformerModel
+
 PRICE_CHANGE_LIMIT = 0.098
 MAX_POSITION = 99999999
 
@@ -181,38 +183,13 @@ class OrderPolicy(OrderPolicy):
         self.cur_obs = obs
         self.running_in_day = True
 
-
-class LeNet(nn.Module):  # 继承于nn.Module这个父类
-    def __init__(self):  # 初始化网络结构
-        super(LeNet, self).__init__()  # 多继承需用到super函数
-        self.conv1 = nn.Conv2d(1, 16, 5)
-        self.pool1 = nn.MaxPool2d(2, 2)
-        self.conv2 = nn.Conv2d(16, 32, 1)
-        self.pool2 = nn.MaxPool2d(kernel_size=(2, 1), stride=(2, 1))
-        self.fc1 = nn.Linear(32 * 14 * 1, 120)
-        self.fc2 = nn.Linear(120, 84)
-        self.fc3 = nn.Linear(84, 1)
-        self.relu = nn.ReLU()
-
-    def forward(self, x):  # 正向传播过程
-        x = x.unsqueeze(1)
-        x = self.relu(self.conv1(x))  # input(1, 60, 6) output(16, 28, 28)
-        x = self.pool1(x)  # output(16, 52, 2)
-        x = self.relu(self.conv2(x))  # output(32, 28, 1)
-        x = self.pool2(x)  # output(32, 14, 1)
-        x = x.view(-1, 32 * 14 * 1)  # output(32*14*1)
-        x = self.relu(self.fc1(x))  # output(120)
-        x = self.relu(self.fc2(x))  # output(84)
-        x = self.fc3(x)  # output(1)
-        return x
-
-
 class Agent:
     def __init__(self, market_env: MultiMarketEnv, **args) -> None:
         self.market_env = market_env
 
         self.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-        self.model = torch.load("model_2.pth", weights_only=False,map_location=self.device)
+        model_path = args["model_path"]
+        self.model = torch.load(model_path, weights_only=False,map_location=self.device)
         print(self.model)
         self.model.eval()
 
@@ -221,18 +198,35 @@ class Agent:
 
         self.current_date = None
         self.pass_month = []
-        self.pool_size = 20
-
-        self.stock_sum = 6
-
-        self.black_industry_name = {"银行", "煤炭", "采掘", "钢铁"}
+        self.stock_sum = 4
 
         self.trad_days = pd.read_csv(
             "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
         )
-        self.etf_pool = [
-            "sh.000300"
-        ]
+        # self.etf_pool = [
+        #     # 境外
+        #     "513100",  # 纳指ETF
+        #     # '513500',  # 标普ETF
+        #     # '164824',  # 印度基金
+        #     # '513050',  # 中概互联
+        #     "513520",  # 日经ETF
+        #     "513030",  # 德国ETF
+        #     # '513080',  # 法国ETF
+        #     # 商品
+        #     "518880",  # 黄金ETF
+        #     "159980",  # 有色ETF
+        #     "159985",  # 豆粕ETF
+        #     "501018",  # 南方原油
+        #     # 债券
+        #     # "511010",  # 国债ETF
+        #     # "511090",  # 30年国债ETF
+        #     # 国内
+        #     "513130",  # 恒生科技
+        #     # '510050',  # 上证50ETF
+        #     # '512100',  # 中证1000ETF
+        # ]
+
+        self.etf_pool = self.db_client.get_index_stocks("000852")
 
     def get_next_trading_day(self):
         date = pd.to_datetime(self.current_date)
@@ -281,7 +275,7 @@ class Agent:
         for code, action in action_pos.items():
             self.create_order(code, action)
 
-    def adjust(self):
+    def get_rank(self):
         total_value = self.market_env.account.get_total_value()
 
         df = self.db_client.get_price(
@@ -290,23 +284,52 @@ class Agent:
             ["open", "high", "low", "close", "volume", "turn"],
             60,
         )
-        df.reset_index(level="code", drop=True, inplace=True)
         df = df[["open", "high", "low", "close", "volume", "turn"]]
         scaler = MinMaxScaler()
-        normed  = scaler.fit_transform(df)
-        rate = 0
-        with torch.no_grad():
-            feature = torch.tensor(normed, dtype=torch.float32).unsqueeze(0).to(self.device)
-            output = self.model(feature).squeeze().cpu().numpy()
-            logger.info(f"output : {output}")
-            if output > 0.6:
-                rate = 1
+        
+        # 将所有股票数据归一化后堆叠成batch tensor
+        features = []
+        codes = []
+        for code, group in df.groupby(level=0):
+            if len(group) < 60:
+                continue
+            codes.append(code)
+            normed = scaler.fit_transform(group)
+            features.append(normed)
+        
+        if len(features) > 0:
+            # 转换为三维张量 (样本数×时间步×特征数)
+            features_tensor = torch.tensor(np.stack(features), dtype=torch.float32).to(self.device)
+            with torch.no_grad():
+                # 批量推理
+                outputs = self.model(features_tensor).squeeze().cpu().numpy()
 
+            scores = {
+                codes[i]:outputs[i] for i in range(len(outputs))
+            }
+            rank_list = sorted([etf for etf, score in scores.items()], key=lambda x: scores[x], reverse=True)
+            return rank_list
+        else:
+            rate = 0
+        return []
 
-        targets = {
-            code: total_value * rate for code in self.etf_pool
-        }
-        self.process_order_value(targets)
+    def adjust(self, stocks):
+        target = stocks[: min(len(stocks), self.stock_sum)]
+        hold_list = list(self.market_env.account.positions[-1].keys())
+        target_value = {}
+        for stock in hold_list:
+            if stock not in target:
+                target_value[stock] = 0
+
+        total_value = self.market_env.account.get_total_value()
+        for code in target:
+            if code not in hold_list:
+                target_value[code] = total_value / len(target)
+
+        if len(target_value) > 0:
+            logger.info(f"target_value : {target_value}")
+            self.process_order_value(target_value)
+        # return target_value
 
     def action_decider(self, stocks_obs):
         # ts = stocks_obs[0].name
@@ -316,7 +339,9 @@ class Agent:
 
         if self.trad_days.loc[today, "is_last_trading_day"] == 0:
             return
-        self.adjust()
+
+        stocks = self.get_rank()
+        self.adjust(stocks)
 
     def stock_decider(self, I):
         today = self.get_current_date_str()
