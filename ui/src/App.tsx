@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart
 } from 'recharts';
+import { lttb } from './lttb';
 import './App.css';
 
 const API_BASE = "http://localhost:8000";
@@ -97,6 +98,7 @@ const App: React.FC = () => {
   const PAGE_SIZE = 10;
 
   const pollInterval = useRef<number | null>(null);
+  const lastUpdatedRef = useRef<string | null>(null);
 
   const fetchSessions = async () => {
     try {
@@ -140,7 +142,17 @@ const App: React.FC = () => {
 
   // Poll for sessions list and active session details
   useEffect(() => {
+    // Reset incremental state on session switch
+    setEquityHistory([]);
+    setTrades([]);
+    setPositions({});
+    lastUpdatedRef.current = null;
+    
     fetchSessions();
+    if (primarySessionId) {
+        fetchSessionDetails(primarySessionId);
+    }
+
     pollInterval.current = window.setInterval(() => {
         fetchSessions();
         if (primarySessionId) {
@@ -154,10 +166,22 @@ const App: React.FC = () => {
 
   const fetchSessionDetails = async (id: string) => {
     try {
-      const resp = await fetch(`${API_BASE}/session/${id}/status`);
+      let url = `${API_BASE}/session/${id}/status`;
+      if (lastUpdatedRef.current) {
+          url += `?since=${lastUpdatedRef.current}`;
+      }
+      const resp = await fetch(url);
       const data = await resp.json();
-      setEquityHistory(data.equity_history || []);
-      setTrades(data.trades || []);
+      
+      if (data.equity_history && data.equity_history.length > 0) {
+          setEquityHistory(prev => [...prev, ...data.equity_history]);
+          lastUpdatedRef.current = data.equity_history[data.equity_history.length - 1].timestamp;
+      }
+      
+      if (data.trades && data.trades.length > 0) {
+          setTrades(prev => [...prev, ...data.trades]);
+      }
+      
       setPositions(data.positions || {});
     } catch (err) {
       console.error("Fetch details error", err);
@@ -239,7 +263,13 @@ const App: React.FC = () => {
   const chartData = React.useMemo(() => {
       if (equityHistory.length === 0) return [];
       
-      const initialEquity = equityHistory[0].total_equity;
+      // LTTB Downsampling
+      let processedHistory = equityHistory;
+      if (equityHistory.length > 2000) {
+          processedHistory = lttb(equityHistory, 2000, 'total_equity');
+      }
+      
+      const initialEquity = processedHistory[0].total_equity;
       
       // Pre-process benchmarks into maps for O(1) lookup
       const bmMaps: Record<string, { map: Map<string, number>, initial: number }> = {};
@@ -253,7 +283,7 @@ const App: React.FC = () => {
           }
       });
 
-      return equityHistory.map(pt => {
+      return processedHistory.map(pt => {
           const dateStr = pt.timestamp.split(' ')[0];
           
           const point: any = {

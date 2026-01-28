@@ -107,13 +107,22 @@ class SessionDB:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if row:
+                d = dict(row)
+                d['id'] = d['session_id']
+                return d
+            return None
 
     def get_all_sessions(self):
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM sessions ORDER BY created_at DESC")
-            return [dict(row) for row in cursor.fetchall()]
+            result = []
+            for row in cursor.fetchall():
+                d = dict(row)
+                d['id'] = d['session_id']
+                result.append(d)
+            return result
 
     def get_equity_history(self, session_id, since=None):
         with sqlite3.connect(self.db_path) as conn:
@@ -128,8 +137,14 @@ class SessionDB:
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
-    def get_trades(self, session_id):
+    def get_trades(self, session_id, since=None):
         with sqlite3.connect(self.db_path) as conn:
             conn.row_factory = sqlite3.Row
-            cursor = conn.execute("SELECT * FROM trades WHERE session_id = ? ORDER BY timestamp", (session_id,))
+            query = "SELECT * FROM trades WHERE session_id = ?"
+            params = [session_id]
+            if since:
+                query += " AND timestamp > ?"
+                params.append(since)
+            query += " ORDER BY timestamp"
+            cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]

@@ -196,7 +196,7 @@ async def get_session_status(session_id: str, since: Optional[str] = Query(None,
                        # For now, acceptable compromise.
 
     equity_history = session_db.get_equity_history(session_id, since=since)
-    trades = session_db.get_trades(session_id) # Could also filter by since if needed, but trades are fewer
+    trades = session_db.get_trades(session_id, since=since)
     
     return {
         "status": status,
