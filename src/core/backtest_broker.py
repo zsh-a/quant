@@ -19,6 +19,9 @@ class BacktestBroker(Broker):
         # New: Track cost basis per position
         self.position_costs: Dict[str, float] = {} # symbol -> avg_price
         
+        # Optimization: Track last equity for PnL calc even if history is cleared
+        self._last_equity = initial_cash
+        
         # Stock name mapping
         self.stock_names: Dict[str, str] = {}
         self._load_stock_names()
@@ -186,10 +189,14 @@ class BacktestBroker(Broker):
         current_equity = float(self.get_total_equity())
         daily_pnl = 0.0
         daily_return = 0.0
-        if self.equity_history:
-            prev_equity = self.equity_history[-1]["total_equity"]
-            daily_pnl = current_equity - prev_equity
-            daily_return = daily_pnl / prev_equity if prev_equity != 0 else 0.0
+        
+        # Use _last_equity for calculation
+        prev_equity = self._last_equity
+        daily_pnl = current_equity - prev_equity
+        daily_return = daily_pnl / prev_equity if prev_equity != 0 else 0.0
+        
+        # Update _last_equity
+        self._last_equity = current_equity
         
         # Get positions info reusing the logic (simplified)
         pos_snapshot = {}

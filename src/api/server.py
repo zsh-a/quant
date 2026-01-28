@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -21,8 +21,10 @@ from src.core.data_stream import DBDataStream
 from src.strategies.jsg_strategy import JSGStrategy
 from src.strategies.rotation_strategy import RotationStrategy
 from db import DB
+from session_db import SessionDB
 
 app = FastAPI()
+session_db = SessionDB()
 
 app.add_middleware(
     CORSMiddleware,
@@ -48,8 +50,8 @@ class Session:
         self.end_date = end_date
         self.status = "starting"
         self.progress = 0.0
-        self.equity_history = []
-        self.trades = []
+        # self.equity_history = [] # Removed to save memory, use DB
+        # self.trades = [] # Removed to save memory, use DB
         self.positions = {}
         self.metrics = {}
         self.error = None
@@ -67,15 +69,20 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
     session = Session(session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date)
     SESSIONS[session_id] = session
     
+    # Persist initial session state
+    session_db.create_session(session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date)
+    
     def execute_session_task():
         try:
             db_client = DB()
             session.status = "running"
+            session_db.update_session_status(session_id, "running")
             
-            # Setup data stream
+            # Setup data stream (Chunked automatically by DBDataStream optimization)
             symbols = [req.symbol]
             stream = DBDataStream(db_client, symbols, req.start_date, req.end_date)
-            total_bars = len(stream.timestamps) if stream.timestamps else 1
+            # Use total_bars from stream if available (approximate)
+            total_bars = getattr(stream, 'total_bars', 1)
             
             # Setup broker
             if req.mode == "live":
@@ -99,14 +106,38 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                 # Update progress
                 if req.mode == "backtest" and total_bars > 0:
                     session.progress = (stream.idx / total_bars) * 100
+                    # Optimization: Don't update DB status every step for progress, maybe every 1%?
+                    # For simplicity, we just keep in-memory status updated, and DB updated less frequently or at end.
+                    # But if we want robust recovery, we should update DB occasionally.
                 else:
-                    # For live/sim, progress is less meaningful, maybe just time elapsed?
                     session.progress = 50.0 
                 
                 info = broker.get_account_info()
-                session.equity_history = info.get('equity_history', [])
-                session.trades = info.get('trades', [])
-                session.positions = info.get('detailed_positions', {})
+                
+                # Persist equity and trades
+                # We assume info['equity_history'] contains NEW items if we clear them?
+                # Actually, broker.get_account_info returns self.equity_history. 
+                # If we clear self.equity_history in broker, we get what's accumulated since last clear.
+                
+                new_equity_points = info.get('equity_history', [])
+                if new_equity_points:
+                    for pt in new_equity_points:
+                        session_db.add_equity_point(session_id, pt['timestamp'], pt['total_equity'])
+                        # Keep latest position in memory for quick access
+                        session.positions = pt.get('positions', {})
+                    
+                    # Clear broker history to save memory
+                    if isinstance(broker, BacktestBroker):
+                        broker.equity_history.clear()
+
+                new_trades = info.get('trades', [])
+                if new_trades:
+                    for trade in new_trades:
+                        session_db.add_trade(session_id, trade)
+                    
+                    # Clear broker trades to save memory
+                    if isinstance(broker, BacktestBroker):
+                        broker.trades.clear()
                 
                 # For simulation mode, we might want to slow down
                 if req.mode == "simulation":
@@ -118,9 +149,12 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
             
             session.status = "completed"
             session.progress = 100.0
+            session_db.update_session_status(session_id, "completed", 100.0)
+            
         except Exception as e:
             session.status = "failed"
             session.error = str(e)
+            session_db.update_session_status(session_id, "failed", error=str(e))
             print(f"Session failed: {e}")
 
     background_tasks.add_task(execute_session_task)
@@ -128,47 +162,71 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
 
 @app.get("/sessions")
 async def get_sessions():
-    return [
-        {
-            "id": s.session_id,
-            "strategy": s.strategy_name,
-            "symbol": s.symbol,
-            "status": s.status,
-            "mode": s.mode,
-            "progress": s.progress,
-            "start_date": s.start_date,
-            "end_date": s.end_date
-        }
-        for s in SESSIONS.values()
-    ]
+    # Return sessions from DB (persistent)
+    return session_db.get_all_sessions()
 
 @app.get("/session/{session_id}/status")
-async def get_session_status(session_id: str):
-    if session_id not in SESSIONS:
-        raise HTTPException(status_code=404, detail="Session not found")
+async def get_session_status(session_id: str, since: Optional[str] = Query(None, description="Return data since this timestamp")):
+    # Try to find in memory first for running status
+    s_mem = SESSIONS.get(session_id)
     
-    s = SESSIONS[session_id]
+    # Get basic info from DB or Memory
+    if s_mem:
+        status = s_mem.status
+        mode = s_mem.mode
+        progress = s_mem.progress
+        error = s_mem.error
+        start_date = s_mem.start_date
+        end_date = s_mem.end_date
+        positions = s_mem.positions
+    else:
+        # Fallback to DB
+        s_db = session_db.get_session(session_id)
+        if not s_db:
+            raise HTTPException(status_code=404, detail="Session not found")
+        status = s_db['status']
+        mode = s_db['mode']
+        progress = s_db['progress']
+        error = s_db['error']
+        start_date = s_db['start_date']
+        end_date = s_db['end_date']
+        positions = {} # Positions history not fully persisted in simple DB yet, only snapshots in equity?
+                       # Actually equity_history doesn't store full positions in DB in my schema (simplified).
+                       # So for finished sessions, positions might be empty unless we store final state.
+                       # For now, acceptable compromise.
+
+    equity_history = session_db.get_equity_history(session_id, since=since)
+    trades = session_db.get_trades(session_id) # Could also filter by since if needed, but trades are fewer
+    
     return {
-        "status": s.status,
-        "mode": s.mode,
-        "progress": s.progress,
-        "equity_history": s.equity_history,
-        "trades": s.trades[-20:], # Top 20 for brief status
-        "positions": s.positions,
-        "error": s.error,
-        "start_date": s.start_date,
-        "end_date": s.end_date
+        "status": status,
+        "mode": mode,
+        "progress": progress,
+        "equity_history": equity_history,
+        "trades": trades, 
+        "positions": positions,
+        "error": error,
+        "start_date": start_date,
+        "end_date": end_date
     }
 
 @app.post("/session/{session_id}/stop")
 async def stop_session(session_id: str):
-    if session_id not in SESSIONS:
-        raise HTTPException(status_code=404, detail="Session not found")
-    s = SESSIONS[session_id]
-    if s.engine:
-        s.engine.stop()
-    s.status = "stopped"
-    return {"status": "stopped"}
+    if session_id in SESSIONS:
+        s = SESSIONS[session_id]
+        if s.engine:
+            s.engine.stop()
+        s.status = "stopped"
+        session_db.update_session_status(session_id, "stopped")
+        return {"status": "stopped"}
+    
+    # If not in memory (e.g. restarted), update DB just in case
+    s_db = session_db.get_session(session_id)
+    if s_db and s_db['status'] == 'running':
+        session_db.update_session_status(session_id, "stopped")
+        return {"status": "stopped (db updated)"}
+        
+    raise HTTPException(status_code=404, detail="Session not found or not running")
 
 @app.get("/market/benchmark")
 async def get_benchmark(symbol: str, start_date: str, end_date: Optional[str] = None):
