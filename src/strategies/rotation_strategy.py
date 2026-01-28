@@ -76,7 +76,7 @@ class RotationStrategy(Strategy):
             final_list = self.get_L2(today_str)[:10]
         elif max_group == 'CYB':
             L2 = self.get_L2(today_str)
-            final_list = L2[:9] + ['sz.159915'] 
+            final_list = L2[:9] + ['159915'] 
         else:
             final_list = self.get_L2(today_str)[:10]
 
