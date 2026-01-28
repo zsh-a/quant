@@ -16,6 +16,9 @@ class BacktestBroker(Broker):
         self.equity_history: List[Dict[str, Any]] = []
         self.trades: List[Dict[str, Any]] = []
         
+        # New: Track latest known prices for every symbol as fallback
+        self.last_prices: Dict[str, float] = {} 
+        
         # New: Track cost basis per position
         self.position_costs: Dict[str, float] = {} # symbol -> avg_price
         
@@ -53,6 +56,8 @@ class BacktestBroker(Broker):
             price = 0.0
             if symbol in self.current_bars:
                 price = self.current_bars[symbol].close
+            elif symbol in self.last_prices:
+                price = self.last_prices[symbol]
             elif self.db_client and self.current_bars:
                 # Attempt fallback fetch
                 try:
@@ -60,6 +65,7 @@ class BacktestBroker(Broker):
                     df = self.db_client.get_price(symbol, str(ts.date()), ["close"], 1)
                     if not df.empty:
                         price = df.iloc[0]["close"]
+                        self.last_prices[symbol] = price
                 except Exception:
                     pass
             
@@ -93,6 +99,7 @@ class BacktestBroker(Broker):
         equity = self.cash
         for symbol, qty in self.positions.items():
             price = 0.0
+            price = 0.0
             if symbol in self.current_bars:
                 price = self.current_bars[symbol].close
             elif self.db_client and self.current_bars:
@@ -101,14 +108,23 @@ class BacktestBroker(Broker):
                     df = self.db_client.get_price(symbol, str(ts.date()), ["close"], 1)
                     if not df.empty:
                         price = df.iloc[0]["close"]
+                        self.last_prices[symbol] = price
                 except Exception:
                     pass
+            
+            if price == 0 and symbol in self.last_prices:
+                price = self.last_prices[symbol]
+                
             equity += qty * price
         return equity
 
     def step(self, bars: Dict[str, Bar]):
         self.current_bars = bars
         if not bars: return
+        
+        # Update last known prices
+        for sym, bar in bars.items():
+            self.last_prices[sym] = bar.close
         
         current_ts = next(iter(bars.values())).timestamp
         
@@ -137,11 +153,12 @@ class BacktestBroker(Broker):
                 if self.cash >= amount + fee:
                     self.cash -= (amount + fee)
                     
-                    # Update average cost
+                    # Update average cost (including commissions)
                     curr_qty = self.positions.get(order.symbol, 0)
                     curr_cost = self.position_costs.get(order.symbol, 0.0)
                     total_shares = curr_qty + order.quantity
-                    new_cost = ((curr_qty * curr_cost) + (order.quantity * execution_price)) / total_shares
+                    total_spent = (curr_qty * curr_cost) + amount + fee
+                    new_cost = total_spent / total_shares
                     self.position_costs[order.symbol] = new_cost
                     
                     self.positions[order.symbol] = total_shares
@@ -201,21 +218,35 @@ class BacktestBroker(Broker):
         # Get positions info reusing the logic (simplified)
         pos_snapshot = {}
         for k, v in self.positions.items():
-            price = float(bars[k].close) if k in bars else 0.0
-            # Fallback if price is 0 (missing bar) - try to keep last known or 0
-            if price == 0 and self.current_bars and k in self.current_bars:
-                 price = self.current_bars[k].close
+            # Robust price fetching: Current Bar -> DB (Current Day) -> Last Known Price
+            price = 0.0
+            if k in bars:
+                price = float(bars[k].close)
+            elif self.db_client:
+                 try:
+                    df = self.db_client.get_price(k, str(current_ts.date()), ["close"], 1)
+                    if not df.empty:
+                        price = float(df.iloc[0]["close"])
+                        self.last_prices[k] = price
+                 except: pass
             
-            avg_cost = self.position_costs.get(k, 0.0)
-            market_value = v * price
-            cost_value = v * avg_cost
-            unrealized_pnl = market_value - cost_value
-            pnl_pct = (unrealized_pnl / cost_value) if cost_value != 0 else 0.0
+            if price == 0 and k in self.last_prices:
+                price = float(self.last_prices[k])
+            
+            # If still 0, warn
+            if price == 0:
+                logger.warning(f"Could not find price for {k} at {current_ts}")
+            
+            avg_cost = round(float(self.position_costs.get(k, 0.0)), 2)
+            market_value = round(float(v * price), 2)
+            cost_value = round(float(v * avg_cost), 2)
+            unrealized_pnl = round(float(market_value - cost_value), 2)
+            pnl_pct = round(float(unrealized_pnl / cost_value), 4) if cost_value != 0 else 0.0
 
             pos_snapshot[k] = {
-                "qty": v,
+                "qty": float(v),
                 "name": self.stock_names.get(k, "Unknown"),
-                "price": price,
+                "price": round(float(price), 2),
                 "value": market_value,
                 "avg_cost": avg_cost,
                 "unrealized_pnl": unrealized_pnl,
@@ -224,10 +255,10 @@ class BacktestBroker(Broker):
 
         self.equity_history.append({
             "timestamp": str(current_ts),
-            "total_equity": current_equity,
-            "daily_pnl": daily_pnl,
-            "daily_return": daily_return,
-            "cash": float(self.cash),
+            "total_equity": round(current_equity, 2),
+            "daily_pnl": round(daily_pnl, 2),
+            "daily_return": round(daily_return, 4),
+            "cash": round(float(self.cash), 2),
             "positions": pos_snapshot
         })
 

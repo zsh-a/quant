@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import {
-  LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, AreaChart, Area, Legend, ComposedChart
+  Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, Legend, ComposedChart
 } from 'recharts';
 import { lttb } from './lttb';
 import './App.css';
@@ -67,18 +67,18 @@ const COLORS = {
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-  
+
   // New Session Form State
   const [strategy, setStrategy] = useState('rotation');
   const [symbol, setSymbol] = useState('sh.000300');
   const [startDate, setStartDate] = useState('2024-01-01');
   const [endDate, setEndDate] = useState<string>(''); // Optional end date
   const [mode, setMode] = useState('backtest');
-  
+
   // Session State
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
-  
+
   // Detailed Data State (for primary selected session)
   const [primarySessionId, setPrimarySessionId] = useState<string | null>(null);
   const [equityHistory, setEquityHistory] = useState<EquityPoint[]>([]);
@@ -90,6 +90,7 @@ const App: React.FC = () => {
   // Benchmark State
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
   const [benchmarksData, setBenchmarksData] = useState<Record<string, BenchmarkData[]>>({});
+  const [useLttb, setUseLttb] = useState(true);
 
   // Pagination states
   const [equityPage, setEquityPage] = useState(1);
@@ -147,17 +148,17 @@ const App: React.FC = () => {
     setTrades([]);
     setPositions({});
     lastUpdatedRef.current = null;
-    
+
     fetchSessions();
     if (primarySessionId) {
-        fetchSessionDetails(primarySessionId);
+      fetchSessionDetails(primarySessionId);
     }
 
     pollInterval.current = window.setInterval(() => {
-        fetchSessions();
-        if (primarySessionId) {
-            fetchSessionDetails(primarySessionId);
-        }
+      fetchSessions();
+      if (primarySessionId) {
+        fetchSessionDetails(primarySessionId);
+      }
     }, 1000);
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
@@ -168,20 +169,20 @@ const App: React.FC = () => {
     try {
       let url = `${API_BASE}/session/${id}/status`;
       if (lastUpdatedRef.current) {
-          url += `?since=${lastUpdatedRef.current}`;
+        url += `?since=${lastUpdatedRef.current}`;
       }
       const resp = await fetch(url);
       const data = await resp.json();
-      
+
       if (data.equity_history && data.equity_history.length > 0) {
-          setEquityHistory(prev => [...prev, ...data.equity_history]);
-          lastUpdatedRef.current = data.equity_history[data.equity_history.length - 1].timestamp;
+        setEquityHistory(prev => [...prev, ...data.equity_history]);
+        lastUpdatedRef.current = data.equity_history[data.equity_history.length - 1].timestamp;
       }
-      
+
       if (data.trades && data.trades.length > 0) {
-          setTrades(prev => [...prev, ...data.trades]);
+        setTrades(prev => [...prev, ...data.trades]);
       }
-      
+
       setPositions(data.positions || {});
     } catch (err) {
       console.error("Fetch details error", err);
@@ -191,130 +192,130 @@ const App: React.FC = () => {
   // Fetch Benchmark Data when primary session or benchmark selection changes
   useEffect(() => {
     if (!primarySessionId) {
-        setBenchmarksData({});
-        return;
+      setBenchmarksData({});
+      return;
     }
-    
+
     const session = sessions.find(s => s.id === primarySessionId);
     // FIX: Ensure session exists AND start_date is present before fetching
     if (!session || !session.start_date) return;
 
     const fetchBenchmarks = async () => {
-        const newData: Record<string, BenchmarkData[]> = {};
-        
-        await Promise.all(selectedBenchmarks.map(async (bmCode) => {
-            try {
-                let url = `${API_BASE}/market/benchmark?symbol=${bmCode}&start_date=${session.start_date}`;
-                if (session.end_date) url += `&end_date=${session.end_date}`;
-                
-                const resp = await fetch(url);
-                if (resp.ok) {
-                    const data = await resp.json();
-                    newData[bmCode] = data;
-                }
-            } catch (err) {
-                console.error(`Failed to fetch benchmark ${bmCode}`, err);
-            }
-        }));
-        
-        setBenchmarksData(newData);
+      const newData: Record<string, BenchmarkData[]> = {};
+
+      await Promise.all(selectedBenchmarks.map(async (bmCode) => {
+        try {
+          let url = `${API_BASE}/market/benchmark?symbol=${bmCode}&start_date=${session.start_date}`;
+          if (session.end_date) url += `&end_date=${session.end_date}`;
+
+          const resp = await fetch(url);
+          if (resp.ok) {
+            const data = await resp.json();
+            newData[bmCode] = data;
+          }
+        } catch (err) {
+          console.error(`Failed to fetch benchmark ${bmCode}`, err);
+        }
+      }));
+
+      setBenchmarksData(newData);
     };
 
     if (selectedBenchmarks.length > 0) {
-        fetchBenchmarks();
+      fetchBenchmarks();
     } else {
-        setBenchmarksData({});
+      setBenchmarksData({});
     }
   }, [primarySessionId, selectedBenchmarks, sessions]);
 
   const toggleSessionSelection = (id: string) => {
-      if (selectedSessionIds.includes(id)) {
-          setSelectedSessionIds(selectedSessionIds.filter(s => s !== id));
-          if (primarySessionId === id) setPrimarySessionId(null);
-      } else {
-          setSelectedSessionIds([...selectedSessionIds, id]);
-          setPrimarySessionId(id); // Make newly selected primary
-      }
+    if (selectedSessionIds.includes(id)) {
+      setSelectedSessionIds(selectedSessionIds.filter(s => s !== id));
+      if (primarySessionId === id) setPrimarySessionId(null);
+    } else {
+      setSelectedSessionIds([...selectedSessionIds, id]);
+      setPrimarySessionId(id); // Make newly selected primary
+    }
   };
 
   const toggleBenchmark = (code: string) => {
-      if (selectedBenchmarks.includes(code)) {
-          setSelectedBenchmarks(prev => prev.filter(c => c !== code));
-      } else {
-          setSelectedBenchmarks(prev => [...prev, code]);
-      }
+    if (selectedBenchmarks.includes(code)) {
+      setSelectedBenchmarks(prev => prev.filter(c => c !== code));
+    } else {
+      setSelectedBenchmarks(prev => [...prev, code]);
+    }
   };
 
   const handleDaySelect = (day: EquityPoint) => {
-      setSelectedDay(day);
-      setTradePage(1); 
-      setHoldingsPage(1);
+    setSelectedDay(day);
+    setTradePage(1);
+    setHoldingsPage(1);
   };
 
   const clearDaySelection = () => {
-      setSelectedDay(null);
-      setTradePage(1);
-      setHoldingsPage(1);
+    setSelectedDay(null);
+    setTradePage(1);
+    setHoldingsPage(1);
   };
 
   const activeSessions = sessions.filter(s => s.status === 'running');
 
   // Chart Data Preparation
   const chartData = React.useMemo(() => {
-      if (equityHistory.length === 0) return [];
-      
-      // LTTB Downsampling
-      let processedHistory = equityHistory;
-      if (equityHistory.length > 2000) {
-          processedHistory = lttb(equityHistory, 2000, 'total_equity');
+    if (equityHistory.length === 0) return [];
+
+    // LTTB Downsampling
+    let processedHistory = equityHistory;
+    if (useLttb && equityHistory.length > 2000) {
+      processedHistory = lttb(equityHistory, 2000, 'total_equity');
+    }
+
+    const initialEquity = processedHistory[0].total_equity;
+
+    // Pre-process benchmarks into maps for O(1) lookup
+    const bmMaps: Record<string, { map: Map<string, number>, initial: number }> = {};
+
+    Object.keys(benchmarksData).forEach(code => {
+      const data = benchmarksData[code];
+      if (data && data.length > 0) {
+        const map = new Map();
+        data.forEach(d => map.set(d.timestamp.split(' ')[0], d.value));
+        bmMaps[code] = { map, initial: data[0].value };
       }
-      
-      const initialEquity = processedHistory[0].total_equity;
-      
-      // Pre-process benchmarks into maps for O(1) lookup
-      const bmMaps: Record<string, { map: Map<string, number>, initial: number }> = {};
-      
-      Object.keys(benchmarksData).forEach(code => {
-          const data = benchmarksData[code];
-          if (data && data.length > 0) {
-              const map = new Map();
-              data.forEach(d => map.set(d.timestamp.split(' ')[0], d.value));
-              bmMaps[code] = { map, initial: data[0].value };
-          }
+    });
+
+    return processedHistory.map(pt => {
+      const dateStr = pt.timestamp.split(' ')[0];
+
+      const point: any = {
+        timestamp: pt.timestamp,
+        equityReturn: ((pt.total_equity - initialEquity) / initialEquity) * 100,
+        equityValue: pt.total_equity
+      };
+
+      // Add benchmark returns
+      Object.keys(bmMaps).forEach(code => {
+        const { map, initial } = bmMaps[code];
+        const val = map.get(dateStr);
+        if (val !== undefined && initial > 0) {
+          point[code] = ((val - initial) / initial) * 100;
+        }
       });
 
-      return processedHistory.map(pt => {
-          const dateStr = pt.timestamp.split(' ')[0];
-          
-          const point: any = {
-              timestamp: pt.timestamp,
-              equityReturn: ((pt.total_equity - initialEquity) / initialEquity) * 100,
-              equityValue: pt.total_equity
-          };
-
-          // Add benchmark returns
-          Object.keys(bmMaps).forEach(code => {
-              const { map, initial } = bmMaps[code];
-              const val = map.get(dateStr);
-              if (val !== undefined && initial > 0) {
-                  point[code] = ((val - initial) / initial) * 100;
-              }
-          });
-
-          return point;
-      });
+      return point;
+    });
   }, [equityHistory, benchmarksData]);
 
   // Derived Data for Display
-  const currentPositions = selectedDay ? selectedDay.positions : positions;
+  const currentPositions = (selectedDay ? selectedDay.positions : positions) || {};
   const positionKeys = Object.keys(currentPositions);
   const visiblePositions = positionKeys.slice((holdingsPage - 1) * PAGE_SIZE, holdingsPage * PAGE_SIZE);
 
-  const visibleTradesList = selectedDay 
+  const visibleTradesList = selectedDay
     ? trades.filter(t => t.timestamp.split(' ')[0] === selectedDay.timestamp.split(' ')[0])
     : trades;
-  
-  const sortedTrades = [...visibleTradesList].reverse(); 
+
+  const sortedTrades = [...visibleTradesList].reverse();
   const visibleTrades = sortedTrades.slice((tradePage - 1) * PAGE_SIZE, tradePage * PAGE_SIZE);
 
   return (
@@ -327,20 +328,20 @@ const App: React.FC = () => {
           <NavItem icon="📊" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => setActiveTab('dashboard')} />
           <NavItem icon="🧪" label="Lab & Sessions" active={activeTab === 'lab'} onClick={() => setActiveTab('lab')} />
         </div>
-        
+
         <div style={{ marginTop: 'auto' }}>
-            <div className="tagline">Active Sessions ({activeSessions.length})</div>
-            {activeSessions.slice(0, 5).map(s => (
-                <div key={s.id} style={{ fontSize: '0.8rem', padding: '0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '0.5rem' }}>
-                    <div style={{ display:'flex', justifyContent:'space-between'}}>
-                        <span>{s.strategy}</span>
-                        <span className={`status-badge ${s.mode === 'live' ? 'status-live' : 'status-backtest'}`}>{s.mode}</span>
-                    </div>
-                    <div style={{ height:'4px', background:'rgba(255,255,255,0.1)', marginTop:'4px', borderRadius:'2px'}}>
-                        <div style={{width: `${s.progress}%`, height:'100%', background:'var(--primary)'}}></div>
-                    </div>
-                </div>
-            ))}
+          <div className="tagline">Active Sessions ({activeSessions.length})</div>
+          {activeSessions.slice(0, 5).map(s => (
+            <div key={s.id} style={{ fontSize: '0.8rem', padding: '0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '0.5rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span>{s.strategy}</span>
+                <span className={`status-badge ${s.mode === 'live' ? 'status-live' : 'status-backtest'}`}>{s.mode}</span>
+              </div>
+              <div style={{ height: '4px', background: 'rgba(255,255,255,0.1)', marginTop: '4px', borderRadius: '2px' }}>
+                <div style={{ width: `${s.progress}%`, height: '100%', background: 'var(--primary)' }}></div>
+              </div>
+            </div>
+          ))}
         </div>
       </nav>
 
@@ -348,7 +349,7 @@ const App: React.FC = () => {
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
           <h1>{activeTab === 'lab' ? 'Strategy Lab' : 'Dashboard'}</h1>
           <div>
-            <span className="tagline">Connected: </span> 
+            <span className="tagline">Connected: </span>
             <span style={{ color: 'var(--success)', fontWeight: 700 }}>Localhost</span>
           </div>
         </header>
@@ -356,239 +357,268 @@ const App: React.FC = () => {
         {activeTab === 'dashboard' && (
           <div className="dashboard-view">
             {primarySessionId ? (
-                <>
+              <>
                 <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                    <div style={{ display:'flex', alignItems:'center', gap:'1rem'}}>
-                        <h2>Session: {sessions.find(s => s.id === primarySessionId)?.strategy} <span className="tagline" style={{fontSize:'1rem'}}>({sessions.find(s => s.id === primarySessionId)?.mode})</span></h2>
-                        <select className="glass-input" style={{ width: 'auto' }} value={primarySessionId || ''} onChange={e => setPrimarySessionId(e.target.value)}>
-                            {sessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {s.mode} ({s.id.slice(0,6)}...)</option>)}
-                        </select>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <h2>Session: {sessions.find(s => s.id === primarySessionId)?.strategy} <span className="tagline" style={{ fontSize: '1rem' }}>({sessions.find(s => s.id === primarySessionId)?.mode})</span></h2>
+                    <select className="glass-input" style={{ width: 'auto' }} value={primarySessionId || ''} onChange={e => setPrimarySessionId(e.target.value)}>
+                      {sessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {s.mode} ({s.id.slice(0, 6)}...)</option>)}
+                    </select>
+                  </div>
+
+                  {/* Benchmark Multi-Selector */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="tagline">Benchmarks:</span>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {AVAILABLE_BENCHMARKS.map(bm => (
+                        <button
+                          key={bm.code}
+                          onClick={() => toggleBenchmark(bm.code)}
+                          style={{
+                            padding: '0.3rem 0.6rem',
+                            fontSize: '0.75rem',
+                            background: selectedBenchmarks.includes(bm.code) ? COLORS[bm.code as keyof typeof COLORS] || 'var(--secondary)' : 'rgba(255,255,255,0.1)',
+                            color: 'white',
+                            border: '1px solid rgba(255,255,255,0.1)',
+                            opacity: selectedBenchmarks.includes(bm.code) ? 1 : 0.7
+                          }}
+                        >
+                          {bm.name}
+                        </button>
+                      ))}
+
+                      <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+
+                      <button
+                        onClick={() => setUseLttb(!useLttb)}
+                        className="glass"
+                        style={{
+                          padding: '0.3rem 0.6rem',
+                          fontSize: '0.75rem',
+                          background: useLttb ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                          color: 'white',
+                          border: '1px solid rgba(255,255,255,0.1)',
+                          cursor: 'pointer',
+                          borderRadius: '4px',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '4px'
+                        }}
+                      >
+                        <span style={{
+                          width: '6px',
+                          height: '6px',
+                          borderRadius: '50%',
+                          background: useLttb ? '#4ade80' : '#94a3b8',
+                          display: 'inline-block'
+                        }} />
+                        LTTB: {useLttb ? 'ON' : 'OFF'}
+                      </button>
                     </div>
-                    
-                    {/* Benchmark Multi-Selector */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                        <span className="tagline">Benchmarks:</span>
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                            {AVAILABLE_BENCHMARKS.map(bm => (
-                                <button
-                                    key={bm.code}
-                                    onClick={() => toggleBenchmark(bm.code)}
-                                    style={{
-                                        padding: '0.3rem 0.6rem',
-                                        fontSize: '0.75rem',
-                                        background: selectedBenchmarks.includes(bm.code) ? COLORS[bm.code as keyof typeof COLORS] || 'var(--secondary)' : 'rgba(255,255,255,0.1)',
-                                        color: 'white',
-                                        border: '1px solid rgba(255,255,255,0.1)',
-                                        opacity: selectedBenchmarks.includes(bm.code) ? 1 : 0.7
-                                    }}
-                                >
-                                    {bm.name}
-                                </button>
-                            ))}
-                        </div>
-                    </div>
+                  </div>
                 </div>
 
                 <div className="grid">
-                <StatCard label="Total Equity" value={equityHistory.length > 0 ? `$${equityHistory[equityHistory.length - 1].total_equity.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "--"} delta={equityHistory.length > 1 ? `${((equityHistory[equityHistory.length - 1].total_equity / equityHistory[0].total_equity - 1) * 100).toFixed(2)}% total` : undefined} />
-                <StatCard label="Current Cash" value={equityHistory.length > 0 ? `$${equityHistory[equityHistory.length - 1].cash.toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "--"} />
-                <StatCard label="Daily P&L" value={equityHistory.length > 0 ? `$${(equityHistory[equityHistory.length - 1].daily_pnl || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}` : "--"} delta={equityHistory.length > 0 ? `${((equityHistory[equityHistory.length - 1].daily_return || 0) * 100).toFixed(2)}%` : undefined} />
+                  <StatCard label="Total Equity" value={equityHistory.length > 0 ? `$${(equityHistory[equityHistory.length - 1].total_equity ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "--"} delta={equityHistory.length > 1 ? `${(((equityHistory[equityHistory.length - 1].total_equity ?? 0) / (equityHistory[0].total_equity || 1) - 1) * 100).toFixed(2)}% total` : undefined} />
+                  <StatCard label="Current Cash" value={equityHistory.length > 0 ? `$${(equityHistory[equityHistory.length - 1].cash ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "--"} />
+                  <StatCard label="Daily P&L" value={equityHistory.length > 0 ? `$${(equityHistory[equityHistory.length - 1].daily_pnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "--"} delta={equityHistory.length > 0 ? `${((equityHistory[equityHistory.length - 1].daily_return || 0) * 100).toFixed(2)}%` : undefined} />
                 </div>
 
                 <div className="glass card chart-container" style={{ marginTop: '2rem', height: '400px', padding: '2rem' }}>
-                <h3 style={{ marginBottom: '1rem' }}>Equity Curve (%)</h3>
-                <ResponsiveContainer width="100%" height="90%">
+                  <h3 style={{ marginBottom: '1rem' }}>Equity Curve (%)</h3>
+                  <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
-                    <defs>
+                      <defs>
                         <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
-                        <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                          <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                         </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                    <XAxis dataKey="timestamp" hide />
-                    <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
-                    <Tooltip
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                      <XAxis dataKey="timestamp" hide />
+                      <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
+                      <Tooltip
                         contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
                         itemStyle={{ color: 'var(--text)' }}
                         formatter={(value: any, name: string) => [
-                            `${value.toFixed(2)}%`, 
-                            name === 'equityReturn' ? 'Strategy' : AVAILABLE_BENCHMARKS.find(b => b.code === name)?.name || name
+                          `${value.toFixed(2)}%`,
+                          name === 'equityReturn' ? 'Strategy' : AVAILABLE_BENCHMARKS.find(b => b.code === name)?.name || name
                         ]}
                         labelFormatter={(label) => label.split(' ')[0]}
-                    />
-                    <Legend wrapperStyle={{ paddingTop: '10px' }}/>
-                    <Area type="monotone" dataKey="equityReturn" name="Strategy" stroke="var(--primary)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
-                    
-                    {/* Render active benchmarks */}
-                    {selectedBenchmarks.map(code => (
-                        <Line 
-                            key={code} 
-                            type="monotone" 
-                            dataKey={code} 
-                            name={AVAILABLE_BENCHMARKS.find(b => b.code === code)?.name} 
-                            stroke={COLORS[code as keyof typeof COLORS] || 'var(--secondary)'} 
-                            strokeWidth={2} 
-                            dot={false} 
+                      />
+                      <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                      <Area type="monotone" dataKey="equityReturn" name="Strategy" stroke="var(--primary)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
+
+                      {/* Render active benchmarks */}
+                      {selectedBenchmarks.map(code => (
+                        <Line
+                          key={code}
+                          type="monotone"
+                          dataKey={code}
+                          name={AVAILABLE_BENCHMARKS.find(b => b.code === code)?.name}
+                          stroke={COLORS[code as keyof typeof COLORS] || 'var(--secondary)'}
+                          strokeWidth={2}
+                          dot={false}
                         />
-                    ))}
+                      ))}
                     </ComposedChart>
-                </ResponsiveContainer>
+                  </ResponsiveContainer>
                 </div>
 
                 {/* Holdings & Trades Table Sections */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem' }}>
-                
-                {/* Holdings Card */}
-                <div className="glass card">
+
+                  {/* Holdings Card */}
+                  <div className="glass card">
                     <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {selectedDay ? `Holdings: ${selectedDay.timestamp.split(' ')[0]}` : 'Current Holdings'}
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                      {selectedDay ? `Holdings: ${selectedDay.timestamp.split(' ')[0]}` : 'Current Holdings'}
+                      <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         {selectedDay && <button className="tagline" style={{ marginRight: '0.5rem', padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={clearDaySelection}>Back to Live</button>}
                         <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setHoldingsPage(p => Math.max(1, p - 1))} disabled={holdingsPage === 1}>Prev</button>
                         <span className="tagline" style={{ fontSize: '0.7rem' }}>{holdingsPage} / {Math.ceil(positionKeys.length / PAGE_SIZE) || 1}</span>
                         <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setHoldingsPage(p => Math.min(Math.ceil(positionKeys.length / PAGE_SIZE), p + 1))} disabled={holdingsPage >= Math.ceil(positionKeys.length / PAGE_SIZE)}>Next</button>
-                    </div>
+                      </div>
                     </h3>
                     <div style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                    <thead>
-                        <tr>
-                        <th>Symbol</th>
-                        <th style={{ textAlign: 'right' }}>Qty</th>
-                        <th style={{ textAlign: 'right' }}>Avg Cost</th>
-                        <th style={{ textAlign: 'right' }}>Price</th>
-                        <th style={{ textAlign: 'right' }}>Value</th>
-                        <th style={{ textAlign: 'right' }}>P&L</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {visiblePositions.map((sym) => {
-                        const pos = currentPositions[sym];
-                        const qty = typeof pos === 'number' ? pos : pos.qty;
-                        const price = typeof pos === 'number' ? 0 : (pos.price || 0);
-                        const value = typeof pos === 'number' ? 0 : (pos.value || qty * price);
-                        const avgCost = pos.avg_cost || 0;
-                        const pnl = pos.unrealized_pnl || 0;
-                        const pnlPct = (pos.pnl_pct || 0) * 100;
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Symbol</th>
+                            <th style={{ textAlign: 'right' }}>Qty</th>
+                            <th style={{ textAlign: 'right' }}>Avg Cost</th>
+                            <th style={{ textAlign: 'right' }}>Price</th>
+                            <th style={{ textAlign: 'right' }}>Value</th>
+                            <th style={{ textAlign: 'right' }}>P&L</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visiblePositions.map((sym) => {
+                            const pos = currentPositions[sym];
+                            const qty = typeof pos === 'number' ? pos : pos.qty;
+                            const price = typeof pos === 'number' ? 0 : (pos.price || 0);
+                            const value = typeof pos === 'number' ? 0 : (pos.value || qty * price);
+                            const avgCost = pos.avg_cost || 0;
+                            const pnl = pos.unrealized_pnl || 0;
+                            const pnlPct = (pos.pnl_pct || 0) * 100;
 
-                        return (
-                            <tr key={sym}>
-                            <td>
-                                <div>{sym}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{pos.name}</div>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>{qty}</td>
-                            <td style={{ textAlign: 'right' }}>{avgCost > 0 ? `$${avgCost.toFixed(2)}` : '-'}</td>
-                            <td style={{ textAlign: 'right' }}>${price.toFixed(2)}</td>
-                            <td style={{ textAlign: 'right', fontWeight: 700 }}>${value.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                            <td style={{ textAlign: 'right' }}>
-                                <div style={{ color: pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                    {pnl >= 0 ? '+' : ''}{pnl.toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            return (
+                              <tr key={sym}>
+                                <td>
+                                  <div>{sym}</div>
+                                  <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{pos.name}</div>
+                                </td>
+                                <td style={{ textAlign: 'right' }}>{qty}</td>
+                                <td style={{ textAlign: 'right' }}>{avgCost > 0 ? `$${avgCost.toFixed(2)}` : '-'}</td>
+                                <td style={{ textAlign: 'right' }}>${price.toFixed(2)}</td>
+                                <td style={{ textAlign: 'right', fontWeight: 700 }}>${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                                <td style={{ textAlign: 'right' }}>
+                                  <div style={{ color: pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                    {pnl >= 0 ? '+' : ''}{(pnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                  </div>
+                                  <div style={{ fontSize: '0.7rem', color: pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
                                     {pnlPct.toFixed(2)}%
-                                </div>
-                            </td>
-                            </tr>
-                        );
-                        })}
-                        {positionKeys.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No positions</td></tr>}
-                    </tbody>
-                    </table>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                          {positionKeys.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No positions</td></tr>}
+                        </tbody>
+                      </table>
                     </div>
-                </div>
+                  </div>
 
-                {/* Trades Card */}
-                <div className="glass card">
+                  {/* Trades Card */}
+                  <div className="glass card">
                     <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {selectedDay ? `Trades: ${selectedDay.timestamp.split(' ')[0]}` : 'All Trades'}
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      {selectedDay ? `Trades: ${selectedDay.timestamp.split(' ')[0]}` : 'All Trades'}
+                      <div style={{ display: 'flex', gap: '0.5rem' }}>
                         <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setTradePage(p => Math.max(1, p - 1))} disabled={tradePage === 1}>Prev</button>
                         <span className="tagline" style={{ fontSize: '0.7rem' }}>{tradePage} / {Math.ceil(sortedTrades.length / PAGE_SIZE) || 1}</span>
                         <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setTradePage(p => Math.min(Math.ceil(sortedTrades.length / PAGE_SIZE), p + 1))} disabled={tradePage >= Math.ceil(sortedTrades.length / PAGE_SIZE)}>Next</button>
-                    </div>
+                      </div>
                     </h3>
                     <div style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                    <thead>
-                        <tr>
-                        <th>Time</th>
-                        <th>Symbol</th>
-                        <th>Type</th>
-                        <th style={{ textAlign: 'right' }}>Price</th>
-                        <th style={{ textAlign: 'right' }}>Amt</th>
-                        <th style={{ textAlign: 'right' }}>Comm</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {visibleTrades.map((t, idx) => (
-                        <tr key={idx}>
-                            <td className="tagline" style={{ fontSize: '0.7rem' }}>{t.timestamp.split(' ')[0]}</td>
-                            <td>
-                            <div style={{ fontWeight: 600 }}>{t.symbol}</div>
-                            </td>
-                            <td><span className={`status-badge ${t.type === 'buy' ? 'status-live' : 'status-danger'}`}>{t.type}</span></td>
-                            <td style={{ textAlign: 'right' }}>${t.price.toFixed(2)}</td>
-                            <td style={{ textAlign: 'right' }}>${t.amount.toLocaleString(undefined, { maximumFractionDigits: 0 })}</td>
-                            <td style={{ textAlign: 'right', color: 'var(--text-dim)' }}>
+                      <table className="data-table">
+                        <thead>
+                          <tr>
+                            <th>Time</th>
+                            <th>Symbol</th>
+                            <th>Type</th>
+                            <th style={{ textAlign: 'right' }}>Price</th>
+                            <th style={{ textAlign: 'right' }}>Amt</th>
+                            <th style={{ textAlign: 'right' }}>Comm</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {visibleTrades.map((t, idx) => (
+                            <tr key={idx}>
+                              <td className="tagline" style={{ fontSize: '0.7rem' }}>{t.timestamp.split(' ')[0]}</td>
+                              <td>
+                                <div style={{ fontWeight: 600 }}>{t.symbol}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{t.name}</div>
+                              </td>
+                              <td><span className={`status-badge ${t.type === 'buy' ? 'status-live' : 'status-danger'}`}>{t.type}</span></td>
+                              <td style={{ textAlign: 'right' }}>${t.price.toFixed(2)}</td>
+                              <td style={{ textAlign: 'right' }}>${(t.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                              <td style={{ textAlign: 'right', color: 'var(--text-dim)' }}>
                                 {t.commission ? `$${t.commission.toFixed(1)}` : '-'}
-                            </td>
-                        </tr>
-                        ))}
-                        {sortedTrades.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No trades {selectedDay ? 'on this day' : ''}</td></tr>}
-                    </tbody>
-                    </table>
+                              </td>
+                            </tr>
+                          ))}
+                          {sortedTrades.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No trades {selectedDay ? 'on this day' : ''}</td></tr>}
+                        </tbody>
+                      </table>
                     </div>
-                </div>
+                  </div>
                 </div>
 
                 {/* Daily Evolution Card */}
                 <div className="glass card" style={{ marginTop: '2rem' }}>
-                    <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        Daily History
-                        <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.max(1, p - 1))} disabled={equityPage === 1}>Prev</button>
-                        <span className="tagline" style={{ fontSize: '0.7rem' }}>{equityPage} / {Math.ceil(equityHistory.length / PAGE_SIZE) || 1}</span>
-                        <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.min(Math.ceil(equityHistory.length / PAGE_SIZE), p + 1))} disabled={equityPage >= Math.ceil(equityHistory.length / PAGE_SIZE)}>Next</button>
-                        </div>
-                    </h3>
-                    <table className="data-table">
-                        <thead>
-                        <tr>
-                            <th>Date</th>
-                            <th style={{ textAlign: 'right' }}>Equity</th>
-                            <th style={{ textAlign: 'right' }}>Daily P&L</th>
-                            <th style={{ textAlign: 'right' }}>Return</th>
-                            <th>Holdings Summary</th>
+                  <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    Daily History
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                      <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.max(1, p - 1))} disabled={equityPage === 1}>Prev</button>
+                      <span className="tagline" style={{ fontSize: '0.7rem' }}>{equityPage} / {Math.ceil(equityHistory.length / PAGE_SIZE) || 1}</span>
+                      <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.min(Math.ceil(equityHistory.length / PAGE_SIZE), p + 1))} disabled={equityPage >= Math.ceil(equityHistory.length / PAGE_SIZE)}>Next</button>
+                    </div>
+                  </h3>
+                  <table className="data-table">
+                    <thead>
+                      <tr>
+                        <th>Date</th>
+                        <th style={{ textAlign: 'right' }}>Equity</th>
+                        <th style={{ textAlign: 'right' }}>Daily P&L</th>
+                        <th style={{ textAlign: 'right' }}>Return</th>
+                        <th>Holdings Summary</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {[...equityHistory].reverse().slice((equityPage - 1) * PAGE_SIZE, equityPage * PAGE_SIZE).map((day, idx) => (
+                        <tr key={idx} style={{ cursor: 'pointer', backgroundColor: selectedDay?.timestamp === day.timestamp ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }} onClick={() => handleDaySelect(day)}>
+                          <td>{day.timestamp.split(' ')[0]}</td>
+                          <td style={{ textAlign: 'right' }}>${(day.total_equity ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                          <td style={{ textAlign: 'right', color: (day.daily_pnl || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                            {(day.daily_pnl || 0) >= 0 ? '+' : ''}{day.daily_pnl?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          </td>
+                          <td style={{ textAlign: 'right', color: (day.daily_return || 0) >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                            {(day.daily_return || 0) >= 0 ? '+' : ''}{((day.daily_return || 0) * 100).toFixed(2)}%
+                          </td>
+                          <td style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
+                            {Object.values(day.positions || {}).map(p => `${p.name} (${p.qty})`).slice(0, 3).join(', ')}{Object.keys(day.positions || {}).length > 3 ? '...' : ''}
+                          </td>
                         </tr>
-                        </thead>
-                        <tbody>
-                        {[...equityHistory].reverse().slice((equityPage - 1) * PAGE_SIZE, equityPage * PAGE_SIZE).map((day, idx) => (
-                            <tr key={idx} style={{ cursor: 'pointer', backgroundColor: selectedDay?.timestamp === day.timestamp ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }} onClick={() => handleDaySelect(day)}>
-                            <td>{day.timestamp.split(' ')[0]}</td>
-                            <td style={{ textAlign: 'right' }}>${day.total_equity.toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
-                            <td style={{ textAlign: 'right', color: (day.daily_pnl || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                {(day.daily_pnl || 0) >= 0 ? '+' : ''}{day.daily_pnl?.toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                            </td>
-                            <td style={{ textAlign: 'right', color: (day.daily_return || 0) >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
-                                {(day.daily_return || 0) >= 0 ? '+' : ''}{((day.daily_return || 0) * 100).toFixed(2)}%
-                            </td>
-                            <td style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
-                                {Object.values(day.positions).map(p => `${p.name} (${p.qty})`).slice(0, 3).join(', ')}{Object.keys(day.positions).length > 3 ? '...' : ''}
-                            </td>
-                            </tr>
-                        ))}
-                        {equityHistory.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No history yet</td></tr>}
-                        </tbody>
-                    </table>
+                      ))}
+                      {equityHistory.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No history yet</td></tr>}
+                    </tbody>
+                  </table>
                 </div>
-                </>
+              </>
             ) : (
-                <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-dim)' }}>
-                    <h2>No Session Selected</h2>
-                    <p>Go to Lab & Sessions to start or select a session.</p>
-                </div>
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-dim)' }}>
+                <h2>No Session Selected</h2>
+                <p>Go to Lab & Sessions to start or select a session.</p>
+              </div>
             )}
           </div>
         )}
@@ -635,51 +665,51 @@ const App: React.FC = () => {
 
             {/* Sessions List */}
             <div className="glass card">
-                <h3 style={{ marginBottom: '1.5rem' }}>All Sessions</h3>
-                <table className="data-table">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Strategy</th>
-                            <th>Timeframe</th>
-                            <th>Mode</th>
-                            <th>Status</th>
-                            <th>Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {sessions.map(s => (
-                            <tr key={s.id} style={{ backgroundColor: selectedSessionIds.includes(s.id) ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }}>
-                                <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{s.id.slice(0, 8)}...</td>
-                                <td>
-                                    {s.strategy}
-                                    <div className="tagline" style={{ fontSize: '0.7rem' }}>{s.symbol}</div>
-                                </td>
-                                <td style={{ fontSize: '0.8rem' }}>
-                                    {s.start_date}<br/>
-                                    {s.end_date || 'Ongoing'}
-                                </td>
-                                <td><span className={`status-badge ${s.mode === 'live' ? 'status-live' : s.mode === 'simulation' ? 'status-backtest' : ''}`}>{s.mode}</span></td>
-                                <td>
-                                    {s.status}
-                                    {s.status === 'running' && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem' }}>({s.progress.toFixed(0)}%)</span>}
-                                </td>
-                                <td>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => toggleSessionSelection(s.id)}>
-                                            {selectedSessionIds.includes(s.id) ? 'Deselect' : 'Select'}
-                                        </button>
-                                        {s.status === 'running' && (
-                                            <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(239, 68, 68, 0.2)', color: 'var(--danger)', fontSize: '0.6rem' }} onClick={() => stopSession(s.id)}>
-                                                Stop
-                                            </button>
-                                        )}
-                                    </div>
-                                </td>
-                            </tr>
-                        ))}
-                    </tbody>
-                </table>
+              <h3 style={{ marginBottom: '1.5rem' }}>All Sessions</h3>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Strategy</th>
+                    <th>Timeframe</th>
+                    <th>Mode</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {sessions.map(s => (
+                    <tr key={s.id} style={{ backgroundColor: selectedSessionIds.includes(s.id) ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }}>
+                      <td style={{ fontFamily: 'monospace', fontSize: '0.8rem' }}>{s.id.slice(0, 8)}...</td>
+                      <td>
+                        {s.strategy}
+                        <div className="tagline" style={{ fontSize: '0.7rem' }}>{s.symbol}</div>
+                      </td>
+                      <td style={{ fontSize: '0.8rem' }}>
+                        {s.start_date}<br />
+                        {s.end_date || 'Ongoing'}
+                      </td>
+                      <td><span className={`status-badge ${s.mode === 'live' ? 'status-live' : s.mode === 'simulation' ? 'status-backtest' : ''}`}>{s.mode}</span></td>
+                      <td>
+                        {s.status}
+                        {s.status === 'running' && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem' }}>({s.progress.toFixed(0)}%)</span>}
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '0.5rem' }}>
+                          <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => toggleSessionSelection(s.id)}>
+                            {selectedSessionIds.includes(s.id) ? 'Deselect' : 'Select'}
+                          </button>
+                          {s.status === 'running' && (
+                            <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(239, 68, 68, 0.2)', color: 'var(--danger)', fontSize: '0.6rem' }} onClick={() => stopSession(s.id)}>
+                              Stop
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

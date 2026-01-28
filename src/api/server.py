@@ -122,8 +122,16 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                 new_equity_points = info.get('equity_history', [])
                 if new_equity_points:
                     for pt in new_equity_points:
-                        session_db.add_equity_point(session_id, pt['timestamp'], pt['total_equity'])
-                        # Keep latest position in memory for quick access
+                        session_db.add_equity_point(
+                            session_id, 
+                            pt['timestamp'], 
+                            pt['total_equity'],
+                            cash=pt.get('cash', 0.0),
+                            daily_pnl=pt.get('daily_pnl', 0.0),
+                            daily_return=pt.get('daily_return', 0.0),
+                            positions=pt.get('positions', {})
+                        )
+                        # Keep latest positions in memory for quick access
                         session.positions = pt.get('positions', {})
                     
                     # Clear broker history to save memory
