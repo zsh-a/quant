@@ -28,11 +28,12 @@ class DataStream(ABC):
         pass
 
 class Order:
-    def __init__(self, symbol: str, type: str, quantity: float, price: Optional[float] = None):
+    def __init__(self, symbol: str, type: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"):
         self.symbol = symbol
         self.type = type  # 'buy' or 'sell'
         self.quantity = quantity
         self.price = price  # None for market order
+        self.execution_type = execution_type # 'NEXT_OPEN', 'IMMEDIATE_OPEN', 'IMMEDIATE_CLOSE'
         self.status = "PENDING"
         self.filled_quantity = 0.0
         self.avg_fill_price = 0.0
@@ -60,6 +61,10 @@ class Broker(ABC):
         """Advance the broker state based on new market data (for simulation/backtest)."""
         pass
 
+    def process_same_bar_orders(self, bars: Dict[str, Bar], timing: str):
+        """Process immediate orders (optional implementation for backtest)."""
+        pass
+
 class Strategy(ABC):
     def __init__(self):
         self.engine = None
@@ -72,8 +77,8 @@ class Strategy(ABC):
         """Handle a new bar of data."""
         pass
 
-    def buy(self, symbol: str, quantity: float, price: Optional[float] = None):
-        return self.engine.submit_order(Order(symbol, 'buy', quantity, price))
+    def buy(self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"):
+        return self.engine.submit_order(Order(symbol, 'buy', quantity, price, execution_type))
 
-    def sell(self, symbol: str, quantity: float, price: Optional[float] = None):
-        return self.engine.submit_order(Order(symbol, 'sell', quantity, price))
+    def sell(self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"):
+        return self.engine.submit_order(Order(symbol, 'sell', quantity, price, execution_type))

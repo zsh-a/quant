@@ -37,7 +37,11 @@ class TradingEngine:
             # 2. Strategy process bars
             self.strategy.on_bar(bars)
             
-            # 3. Trigger callback for progress tracking
+            # 3. Process immediate orders (generated in on_bar)
+            self.broker.process_same_bar_orders(bars, 'IMMEDIATE_OPEN')
+            self.broker.process_same_bar_orders(bars, 'IMMEDIATE_CLOSE')
+            
+            # 4. Trigger callback for progress tracking
             if self.on_step:
                 self.on_step(bars)
             

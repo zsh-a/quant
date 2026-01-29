@@ -17,7 +17,7 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")
 from src.core.engine import TradingEngine
 from src.core.backtest_broker import BacktestBroker
 from src.core.live_broker import LiveBroker
-from src.core.data_stream import DBDataStream
+from src.core.data_stream import DBDataStream, RealtimeDataStream
 from src.strategies.jsg_strategy import JSGStrategy
 from src.strategies.rotation_strategy import RotationStrategy
 from db import DB
@@ -80,9 +80,14 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
             
             # Setup data stream (Chunked automatically by DBDataStream optimization)
             symbols = [req.symbol]
-            stream = DBDataStream(db_client, symbols, req.start_date, req.end_date)
-            # Use total_bars from stream if available (approximate)
-            total_bars = getattr(stream, 'total_bars', 1)
+            
+            if req.mode == "live":
+                stream = RealtimeDataStream(symbols, interval_seconds=60)
+                total_bars = 0 # Live stream is indefinite
+            else:
+                stream = DBDataStream(db_client, symbols, req.start_date, req.end_date)
+                # Use total_bars from stream if available (approximate)
+                total_bars = getattr(stream, 'total_bars', 1)
             
             # Setup broker
             if req.mode == "live":

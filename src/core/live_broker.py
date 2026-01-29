@@ -11,7 +11,16 @@ class LiveBroker(Broker):
         self.server_url = server_url
         self.orders: Dict[str, Order] = {}
         self.stock_names: Dict[str, str] = {}
+        self.positions: Dict[str, float] = {}
         self._load_stock_names()
+        self.sync_state()
+
+    def sync_state(self):
+        """Sync local state with remote server."""
+        info = self.get_account_info()
+        self.positions = info.get("positions", {})
+        # We could also sync cash, etc. if needed
+        logger.info(f"LiveBroker synced. Positions: {self.positions}")
 
     def _load_stock_names(self):
         import os

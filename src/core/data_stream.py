@@ -1,4 +1,5 @@
 import pandas as pd
+import time
 from typing import Dict, Optional, List
 from .base import DataStream, Bar
 from datetime import datetime
@@ -186,3 +187,72 @@ class DBDataStream(DataStream):
         self.global_idx = 0
         self.idx = 0
         self._load_next_chunk()
+
+class RealtimeDataStream(DataStream):
+    def __init__(self, symbols: List[str], interval_seconds: int = 60):
+        self.symbols = symbols
+        self.interval_seconds = interval_seconds
+        self.last_fetch_time = time.time()
+        import akshare as ak
+        self.ak = ak
+
+    def next_bar(self) -> Optional[Dict[str, Bar]]:
+        # Block until interval passes
+        time_to_wait = self.interval_seconds - (time.time() - self.last_fetch_time)
+        if time_to_wait > 0:
+            time.sleep(time_to_wait)
+        
+        self.last_fetch_time = time.time()
+        current_ts = datetime.now()
+        
+        # Simple trading hours check (China A-share)
+        # 09:30 - 11:30, 13:00 - 15:00
+        # If outside, we might still return data or wait?
+        # For simplicity, we just fetch.
+        
+        bars = {}
+        try:
+            # Efficient: fetch all spot data once and filter
+            # ak.fund_etf_spot_em() is for ETFs. 
+            # We need to support both stocks and ETFs? 
+            # Assuming ETFs for now based on '510880' in examples.
+            # Or use stock_zh_a_spot_em() for stocks.
+            
+            # Using stock_zh_a_spot_em for broader coverage or fund_etf_spot_em depending on symbol
+            # This part is tricky without knowing exact symbol types.
+            # We'll try fund_etf_spot_em first as in market_env.py
+            
+            df = self.ak.fund_etf_spot_em()
+            # Columns: 代码, 名称, 最新价, ...
+            # Map to symbols
+            
+            for symbol in self.symbols:
+                # Symbol format expected: '510880' or 'sh.510880'?
+                # DBDataStream uses raw code often.
+                # Remove prefix if present
+                code = symbol.split('.')[-1]
+                
+                row = df[df['代码'] == code]
+                if not row.empty:
+                    data = row.iloc[0]
+                    bars[symbol] = Bar(
+                        symbol=symbol,
+                        timestamp=current_ts,
+                        open=float(data['开盘价']),
+                        high=float(data['最高价']),
+                        low=float(data['最低价']),
+                        close=float(data['最新价']),
+                        volume=float(data['成交量']),
+                        amount=float(data['成交额']),
+                        extra={"name": data['名称']}
+                    )
+        except Exception as e:
+            print(f"Realtime fetch error: {e}")
+            # Don't crash, just return empty or retry?
+            # Return empty dict means no new data this step
+            pass
+            
+        return bars if bars else {}
+
+    def reset(self):
+        pass

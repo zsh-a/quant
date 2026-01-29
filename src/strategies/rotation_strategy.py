@@ -22,10 +22,12 @@ SW1 = {
 }
 
 class RotationStrategy(Strategy):
-    def __init__(self, db_client, stock_sum=10):
+    def __init__(self, db_client, stock_sum=10, rebalance_dates=None, timing='OPEN'):
         super().__init__()
         self.db_client = db_client
         self.stock_sum = stock_sum
+        self.rebalance_dates = rebalance_dates
+        self.timing = timing
         
         self.JSG_group = {'银行I', '有色金属I', '钢铁I', '煤炭I'}
         self.XSZ_group = {'小市值200'}
@@ -35,19 +37,78 @@ class RotationStrategy(Strategy):
         self.trad_days = pd.read_csv(
             "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
         )
+        
+        # Calculate trigger dates for Backtest and Live
+        self.trigger_dates_backtest = set()
+        self.trigger_dates_live = set()
+        
+        if self.rebalance_dates:
+            # Filter trad_days to only trading days
+            trading_days_df = self.trad_days[self.trad_days['is_trading_day'] == 1].index
+            
+            for d_str in self.rebalance_dates:
+                try:
+                    target_date = pd.Timestamp(d_str)
+                    
+                    # Backtest: Shift D-1 for OPEN
+                    if self.timing == 'OPEN':
+                        prev_days = trading_days_df[trading_days_df < target_date]
+                        if not prev_days.empty:
+                            self.trigger_dates_backtest.add(prev_days[-1].strftime('%Y-%m-%d'))
+                        else:
+                            logger.warning(f"No previous trading day for {d_str}")
+                            
+                        # Live: Trigger on D for OPEN (at 09:30)
+                        curr_days = trading_days_df[trading_days_df <= target_date]
+                        if not curr_days.empty and curr_days[-1] == target_date: # Ensure target is trading day
+                             self.trigger_dates_live.add(target_date.strftime('%Y-%m-%d'))
+                    else: # CLOSE
+                        # Both trigger on D
+                        curr_days = trading_days_df[trading_days_df <= target_date]
+                        if not curr_days.empty:
+                            d_fmt = curr_days[-1].strftime('%Y-%m-%d')
+                            self.trigger_dates_backtest.add(d_fmt)
+                            self.trigger_dates_live.add(d_fmt)
+                            
+                except Exception as e:
+                    logger.error(f"Error parsing date {d_str}: {e}")
 
     def on_bar(self, bars: dict[str, Bar]):
         if not bars: return
+        # Get timestamp from the first bar
         ts = next(iter(bars.values())).timestamp
         today_str = str(ts.date())
 
-        if today_str not in self.trad_days.index.strftime('%Y-%m-%d'):
-            return
+        should_run = False
+        is_live = self.engine and self.engine.broker.__class__.__name__ == 'LiveBroker'
+        
+        trigger_dates = self.trigger_dates_live if is_live else self.trigger_dates_backtest
+        
+        # 1. Check Date
+        if self.rebalance_dates:
+            if today_str in trigger_dates:
+                should_run = True
+        else:
+            # Fallback to original logic (Last trading day of month)
+            if today_str in self.trad_days.index.strftime('%Y-%m-%d'):
+                if self.trad_days.loc[today_str, "is_last_trading_day"] != 0:
+                    should_run = True
 
-        if self.trad_days.loc[today_str, "is_last_trading_day"] == 0:
+        if not should_run:
             return
+            
+        # 2. Check Time (for Live Mode alignment)
+        if is_live:
+             # OPEN: Run at 09:30
+             if self.timing == 'OPEN':
+                 if ts.hour < 9 or (ts.hour == 9 and ts.minute < 30): return
+             # CLOSE: Run at 14:50
+             else:
+                 if ts.hour < 14 or (ts.hour == 14 and ts.minute < 50): return
+        
+        # For Backtest 'OPEN' timing, we are running on D-1. We don't check time (00:00).
 
-        logger.info(f"RotationStrategy: Rebalancing on {today_str}")
+        logger.info(f"RotationStrategy: Rebalancing on {today_str} (Timing: {self.timing}, Live: {is_live})")
 
         # 1. Market Breath Analysis
         df_ratio = self.get_market_breadth(today_str)
@@ -149,13 +210,23 @@ class RotationStrategy(Strategy):
         
         logger.info(f"Rebalancing: Target {target}, Holding {hold_list}")
         
+        # Determine execution type
+        is_live = self.engine and self.engine.broker.__class__.__name__ == 'LiveBroker'
+        
+        exec_type = 'NEXT_OPEN'
+        if self.timing == 'CLOSE':
+            exec_type = 'IMMEDIATE_CLOSE'
+        elif self.timing == 'OPEN' and is_live:
+             # In Live OPEN, we run at 09:30, so we want IMMEDIATE filling
+             exec_type = 'IMMEDIATE_OPEN'
+        
         # 1. Sell stocks not in target
         for stock in hold_list:
             if stock not in target:
                 qty = account['positions'][stock]
                 if qty > 0:
                     logger.info(f"Selling {stock} (qty: {qty}) because not in target")
-                    self.sell(stock, qty)
+                    self.sell(stock, qty, execution_type=exec_type)
 
         # 2. Buy/Rebalance target stocks
         total_equity = account['total_equity']
@@ -172,7 +243,7 @@ class RotationStrategy(Strategy):
                 curr_qty = account['positions'].get(code, 0)
                 if target_qty > curr_qty:
                     logger.info(f"Submitting BUY for {code}: {target_qty - curr_qty} shares")
-                    self.buy(code, target_qty - curr_qty)
+                    self.buy(code, target_qty - curr_qty, execution_type=exec_type)
                 elif target_qty < curr_qty:
                     logger.info(f"Submitting SELL for {code}: {curr_qty - target_qty} shares")
-                    self.sell(code, curr_qty - target_qty)
+                    self.sell(code, curr_qty - target_qty, execution_type=exec_type)

@@ -99,7 +99,6 @@ class BacktestBroker(Broker):
         equity = self.cash
         for symbol, qty in self.positions.items():
             price = 0.0
-            price = 0.0
             if symbol in self.current_bars:
                 price = self.current_bars[symbol].close
             elif self.db_client and self.current_bars:
@@ -118,8 +117,8 @@ class BacktestBroker(Broker):
             equity += qty * price
         return equity
 
-    def step(self, bars: Dict[str, Bar]):
-        self.current_bars = bars
+    def process_same_bar_orders(self, bars: Dict[str, Bar], timing: str):
+        """Process orders that should be filled immediately (SAME_BAR) at OPEN or CLOSE"""
         if not bars: return
         
         # Update last known prices
@@ -130,6 +129,102 @@ class BacktestBroker(Broker):
         
         for order_id in list(self.orders.keys()):
             order = self.orders[order_id]
+            
+            # Filter by timing (e.g., 'IMMEDIATE_OPEN' or 'IMMEDIATE_CLOSE')
+            if order.execution_type != timing:
+                continue
+                
+            bar = bars.get(order.symbol)
+            execution_price = None
+            
+            if bar:
+                if timing == 'IMMEDIATE_OPEN':
+                    execution_price = bar.open
+                elif timing == 'IMMEDIATE_CLOSE':
+                    execution_price = bar.close
+            elif self.db_client:
+                # Fallback DB fetch if bar missing
+                try:
+                    field = "open" if timing == 'IMMEDIATE_OPEN' else "close"
+                    df = self.db_client.get_price(order.symbol, str(current_ts.date()), [field], 1)
+                    if not df.empty:
+                        execution_price = df.iloc[0][field]
+                except Exception as e:
+                    logger.error(f"Failed to fetch price for {order.symbol}: {e}")
+            
+            if execution_price is None:
+                continue
+            
+            self._execute_order(order, execution_price, current_ts)
+
+    def _execute_order(self, order, execution_price, current_ts):
+        amount = execution_price * order.quantity
+        fee = amount * self.commission
+        
+        if order.type == 'buy':
+            if self.cash >= amount + fee:
+                self.cash -= (amount + fee)
+                curr_qty = self.positions.get(order.symbol, 0)
+                curr_cost = self.position_costs.get(order.symbol, 0.0)
+                total_shares = curr_qty + order.quantity
+                
+                # Update average cost (including commissions) - merged from dev branch logic
+                total_spent = (curr_qty * curr_cost) + amount + fee
+                new_cost = total_spent / total_shares
+                
+                self.position_costs[order.symbol] = new_cost
+                self.positions[order.symbol] = total_shares
+                order.status = "FILLED"
+                order.avg_fill_price = execution_price
+                order.filled_quantity = order.quantity
+            else:
+                order.status = "REJECTED"
+                logger.warning(f"Order REJECTED (Insufficient cash): {order.symbol}")
+        elif order.type == 'sell':
+            curr_qty = self.positions.get(order.symbol, 0)
+            if curr_qty >= order.quantity:
+                self.cash += (amount - fee)
+                new_qty = curr_qty - order.quantity
+                if new_qty > 0:
+                    self.positions[order.symbol] = new_qty
+                else:
+                    self.positions.pop(order.symbol, None)
+                    self.position_costs.pop(order.symbol, None)
+                order.status = "FILLED"
+                order.avg_fill_price = execution_price
+                order.filled_quantity = order.quantity
+            else:
+                order.status = "REJECTED"
+                logger.warning(f"Order REJECTED (Insufficient qty): {order.symbol}")
+        
+        if order.status == "FILLED":
+            logger.info(f"ORDER FILLED ({order.execution_type}): {order.type} {order.quantity} {order.symbol} at {execution_price} on {current_ts}")
+            self.trades.append({
+                "timestamp": str(current_ts),
+                "symbol": order.symbol,
+                "name": self.stock_names.get(order.symbol, "Unknown"),
+                "type": order.type,
+                "price": float(execution_price),
+                "quantity": float(order.quantity),
+                "amount": float(amount),
+                "commission": float(fee)
+            })
+        
+        if order.status in ["FILLED", "REJECTED"]:
+            self.history.append(self.orders.pop(order.id))
+
+    def step(self, bars: Dict[str, Bar]):
+        self.current_bars = bars
+        if not bars: return
+        
+        current_ts = next(iter(bars.values())).timestamp
+        
+        # Process NEXT_OPEN orders (Standard Backtest behavior)
+        for order_id in list(self.orders.keys()):
+            order = self.orders[order_id]
+            if order.execution_type != "NEXT_OPEN":
+                continue
+                
             bar = bars.get(order.symbol)
             execution_price = None
             
@@ -146,61 +241,7 @@ class BacktestBroker(Broker):
             if execution_price is None:
                 continue
             
-            amount = execution_price * order.quantity
-            fee = amount * self.commission
-            
-            if order.type == 'buy':
-                if self.cash >= amount + fee:
-                    self.cash -= (amount + fee)
-                    
-                    # Update average cost (including commissions)
-                    curr_qty = self.positions.get(order.symbol, 0)
-                    curr_cost = self.position_costs.get(order.symbol, 0.0)
-                    total_shares = curr_qty + order.quantity
-                    total_spent = (curr_qty * curr_cost) + amount + fee
-                    new_cost = total_spent / total_shares
-                    self.position_costs[order.symbol] = new_cost
-                    
-                    self.positions[order.symbol] = total_shares
-                    order.status = "FILLED"
-                    order.avg_fill_price = execution_price
-                    order.filled_quantity = order.quantity
-                else:
-                    order.status = "REJECTED"
-                    logger.warning(f"Order REJECTED (Insufficient cash): {order.symbol} need {amount+fee}, have {self.cash}")
-            elif order.type == 'sell':
-                curr_qty = self.positions.get(order.symbol, 0)
-                if curr_qty >= order.quantity:
-                    self.cash += (amount - fee)
-                    new_qty = curr_qty - order.quantity
-                    if new_qty > 0:
-                        self.positions[order.symbol] = new_qty
-                    else:
-                        self.positions.pop(order.symbol, None)
-                        self.position_costs.pop(order.symbol, None)
-                        
-                    order.status = "FILLED"
-                    order.avg_fill_price = execution_price
-                    order.filled_quantity = order.quantity
-                else:
-                    order.status = "REJECTED"
-                    logger.warning(f"Order REJECTED (Insufficient quantity): {order.symbol} need {order.quantity}, have {curr_qty}")
-            
-            if order.status == "FILLED":
-                logger.info(f"ORDER FILLED: {order.type} {order.quantity} {order.symbol} at {execution_price} on {current_ts}")
-                self.trades.append({
-                    "timestamp": str(current_ts),
-                    "symbol": order.symbol,
-                    "name": self.stock_names.get(order.symbol, "Unknown"),
-                    "type": order.type,
-                    "price": float(execution_price),
-                    "quantity": float(order.quantity),
-                    "amount": float(amount),
-                    "commission": float(fee)
-                })
-            
-            if order.status in ["FILLED", "REJECTED"]:
-                self.history.append(self.orders.pop(order_id))
+            self._execute_order(order, execution_price, current_ts)
         
         # Record equity daily
         current_equity = float(self.get_total_equity())
