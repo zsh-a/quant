@@ -65,6 +65,7 @@ LIVE_SERVER_URL = "http://localhost:11122"
 
 @app.post("/session/run")
 async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
+    print(f"Running session: {req}")
     session_id = str(uuid.uuid4())
     session = Session(session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date)
     SESSIONS[session_id] = session
