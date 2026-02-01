@@ -5,6 +5,7 @@ interface SidebarProps {
     activeTab: string;
     onTabChange: (tab: string) => void;
     activeSessions: SessionSummary[];
+    onSessionSelect: (id: string) => void;
 }
 
 const NavItem: React.FC<{ icon: string, label: string, active: boolean, onClick: () => void }> = ({ icon, label, active, onClick }) => (
@@ -29,7 +30,7 @@ const NavItem: React.FC<{ icon: string, label: string, active: boolean, onClick:
     </div>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect }) => {
     return (
         <nav className="glass sidebar">
             <div className="logo" style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '2rem' }}>
@@ -43,7 +44,21 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
             <div style={{ marginTop: 'auto' }}>
                 <div className="tagline">Active Sessions ({activeSessions.length})</div>
                 {activeSessions.slice(0, 5).map(s => (
-                    <div key={s.id} style={{ fontSize: '0.8rem', padding: '0.5rem', background: 'rgba(255,255,255,0.05)', borderRadius: '4px', marginBottom: '0.5rem' }}>
+                    <div 
+                        key={s.id} 
+                        onClick={() => onSessionSelect(s.id)}
+                        style={{ 
+                            fontSize: '0.8rem', 
+                            padding: '0.5rem', 
+                            background: 'rgba(255,255,255,0.05)', 
+                            borderRadius: '4px', 
+                            marginBottom: '0.5rem',
+                            cursor: 'pointer',
+                            transition: 'background 0.2s'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                        onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
+                    >
                         <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                             <span>{s.strategy}</span>
                             <span className={`status-badge ${s.mode === 'live' ? 'status-live' : 'status-backtest'}`}>{s.mode}</span>

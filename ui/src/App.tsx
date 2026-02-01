@@ -32,17 +32,35 @@ const App: React.FC = () => {
   
   // Session State
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
+  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>(() => {
+    const saved = localStorage.getItem('selectedSessionIds');
+    return saved ? JSON.parse(saved) : [];
+  });
   
   // Multi-session Data Cache
   const [sessionDataCache, setSessionDataCache] = useState<Record<string, { equity: EquityPoint[], trades: Trade[], positions: Record<string, Position> }>>({});
 
   // Detailed Data State (for primary selected session)
-  const [primarySessionId, setPrimarySessionId] = useState<string | null>(null);
+  const [primarySessionId, setPrimarySessionId] = useState<string | null>(() => {
+    return localStorage.getItem('primarySessionId');
+  });
   const [equityHistory, setEquityHistory] = useState<EquityPoint[]>([]); 
   const [trades, setTrades] = useState<Trade[]>([]);
   const [positions, setPositions] = useState<Record<string, Position>>({});
   const [error, setError] = useState<string | null>(null);
+
+  // Persist state to localStorage
+  useEffect(() => {
+    localStorage.setItem('selectedSessionIds', JSON.stringify(selectedSessionIds));
+  }, [selectedSessionIds]);
+
+  useEffect(() => {
+    if (primarySessionId) {
+      localStorage.setItem('primarySessionId', primarySessionId);
+    } else {
+      localStorage.removeItem('primarySessionId');
+    }
+  }, [primarySessionId]);
 
   // Benchmark State
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
@@ -255,7 +273,18 @@ const App: React.FC = () => {
 
   return (
     <div className="app-container">
-      <Sidebar activeTab={activeTab} onTabChange={setActiveTab} activeSessions={activeSessions} />
+      <Sidebar 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
+        activeSessions={activeSessions} 
+        onSessionSelect={(id) => {
+          setPrimarySessionId(id);
+          if (!selectedSessionIds.includes(id)) {
+            setSelectedSessionIds(prev => [...prev, id]);
+          }
+          setActiveTab('dashboard');
+        }}
+      />
 
       <main className="main-content">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
