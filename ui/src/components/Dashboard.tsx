@@ -1,0 +1,458 @@
+import React, { useState, useMemo } from 'react';
+import {
+    Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, Legend, ComposedChart
+} from 'recharts';
+import { lttb } from '../lttb';
+import StatCard from './StatCard';
+import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
+import { calculateMetrics } from '../utils/metrics';
+
+interface DashboardProps {
+    primarySession: SessionSummary | undefined;
+    equityHistory: EquityPoint[];
+    trades: Trade[];
+    positions: Record<string, Position>;
+    comparisonData: { id: string, name: string, data: EquityPoint[] }[];
+    benchmarksData: Record<string, BenchmarkData[]>;
+    selectedBenchmarks: string[];
+    onToggleBenchmark: (code: string) => void;
+    availableBenchmarks: { code: string, name: string }[];
+    onSelectSession: (id: string) => void;
+    allSessions: SessionSummary[];
+}
+
+const COLORS = {
+    'sh.000300': '#ec4899', // Pink
+    'sh.000905': '#f59e0b', // Amber
+    'sz.399006': '#10b981', // Emerald
+};
+
+const PAGE_SIZE = 10;
+
+const Dashboard: React.FC<DashboardProps> = ({
+    primarySession,
+    equityHistory,
+    trades,
+    positions,
+    comparisonData,
+    benchmarksData,
+    selectedBenchmarks,
+    onToggleBenchmark,
+    availableBenchmarks,
+    onSelectSession,
+    allSessions
+}) => {
+    const [useLttb, setUseLttb] = useState(true);
+    const [selectedDay, setSelectedDay] = useState<EquityPoint | null>(null);
+    const [equityPage, setEquityPage] = useState(1);
+    const [tradePage, setTradePage] = useState(1);
+    const [holdingsPage, setHoldingsPage] = useState(1);
+
+    const metrics = useMemo(() => calculateMetrics(equityHistory, trades), [equityHistory, trades]);
+
+    const chartData = useMemo(() => {
+        if (!primarySession && comparisonData.length === 0) return [];
+
+        const relevantCurves: { id: string, data: EquityPoint[] }[] = [];
+
+        if (equityHistory.length > 0) {
+            relevantCurves.push({ id: 'Primary', data: equityHistory });
+        }
+
+        comparisonData.forEach(c => {
+            relevantCurves.push({ id: c.id, data: c.data });
+        });
+
+        if (relevantCurves.length === 0) return [];
+
+        const dataMap = new Map<string, any>();
+
+        relevantCurves.forEach(curve => {
+            if (curve.data.length === 0) return;
+
+            let processedData = curve.data;
+            if (useLttb && curve.data.length > 2000) {
+                processedData = lttb(curve.data, 2000, 'total_equity');
+            }
+
+            const initialEquity = processedData[0].total_equity || 1;
+
+            processedData.forEach(pt => {
+                const ts = pt.timestamp;
+                const dateStr = ts.split(' ')[0];
+
+                if (!dataMap.has(dateStr)) {
+                    dataMap.set(dateStr, { timestamp: ts });
+                }
+                const entry = dataMap.get(dateStr);
+
+                const ret = ((pt.total_equity - initialEquity) / initialEquity) * 100;
+
+                if (curve.id === 'Primary') {
+                    entry.equityReturn = ret;
+                    entry.equityValue = pt.total_equity;
+                } else {
+                    entry[`session_${curve.id}`] = ret;
+                }
+            });
+        });
+
+        // Benchmarks
+        const bmMaps: Record<string, { map: Map<string, number>, initial: number }> = {};
+        Object.keys(benchmarksData).forEach(code => {
+            const data = benchmarksData[code];
+            if (data && data.length > 0) {
+                const map = new Map();
+                data.forEach(d => map.set(d.timestamp.split(' ')[0], d.value));
+                bmMaps[code] = { map, initial: data[0].value };
+            }
+        });
+
+        dataMap.forEach((entry, dateStr) => {
+            Object.keys(bmMaps).forEach(code => {
+                const { map, initial } = bmMaps[code];
+                const val = map.get(dateStr);
+                if (val !== undefined && initial > 0) {
+                    entry[code] = ((val - initial) / initial) * 100;
+                }
+            });
+        });
+
+        return Array.from(dataMap.values()).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+
+    }, [equityHistory, comparisonData, benchmarksData, useLttb, primarySession]);
+
+    // Derived Display Data
+    const currentPositions = (selectedDay ? selectedDay.positions : positions) || {};
+    const positionKeys = Object.keys(currentPositions);
+    const visiblePositions = positionKeys.slice((holdingsPage - 1) * PAGE_SIZE, holdingsPage * PAGE_SIZE);
+
+    const visibleTradesList = selectedDay
+        ? trades.filter(t => t.timestamp.split(' ')[0] === selectedDay.timestamp.split(' ')[0])
+        : trades;
+    const sortedTrades = [...visibleTradesList].reverse();
+    const visibleTrades = sortedTrades.slice((tradePage - 1) * PAGE_SIZE, tradePage * PAGE_SIZE);
+
+    const handleDaySelect = (day: EquityPoint) => {
+        setSelectedDay(day);
+        setTradePage(1);
+        setHoldingsPage(1);
+    };
+
+    const clearDaySelection = () => {
+        setSelectedDay(null);
+        setTradePage(1);
+        setHoldingsPage(1);
+    };
+
+    if (!primarySession) {
+        return (
+            <div className="dashboard-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-dim)' }}>
+                <h2>No Session Selected</h2>
+                <p>Go to Lab & Sessions to start or select a session.</p>
+            </div>
+        );
+    }
+
+    return (
+        <div className="dashboard-view">
+            {/* Header Controls */}
+            <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                    <h2>
+                        Session: {primarySession.strategy} 
+                        <span className="tagline" style={{ fontSize: '1rem' }}> ({primarySession.mode})</span>
+                    </h2>
+                    <select className="glass-input" style={{ width: 'auto' }} value={primarySession.id} onChange={e => onSelectSession(e.target.value)}>
+                        {allSessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {s.mode} ({s.id.slice(0, 6)}...)</option>)}
+                    </select>
+                </div>
+
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <span className="tagline">Benchmarks:</span>
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                        {availableBenchmarks.map(bm => (
+                            <button
+                                key={bm.code}
+                                onClick={() => onToggleBenchmark(bm.code)}
+                                style={{
+                                    padding: '0.3rem 0.6rem',
+                                    fontSize: '0.75rem',
+                                    background: selectedBenchmarks.includes(bm.code) ? COLORS[bm.code as keyof typeof COLORS] || 'var(--secondary)' : 'rgba(255,255,255,0.1)',
+                                    color: 'white',
+                                    border: '1px solid rgba(255,255,255,0.1)',
+                                    opacity: selectedBenchmarks.includes(bm.code) ? 1 : 0.7
+                                }}
+                            >
+                                {bm.name}
+                            </button>
+                        ))}
+                        <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
+                        <button
+                            onClick={() => setUseLttb(!useLttb)}
+                            className="glass"
+                            style={{
+                                padding: '0.3rem 0.6rem',
+                                fontSize: '0.75rem',
+                                background: useLttb ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
+                                color: 'white',
+                                border: '1px solid rgba(255,255,255,0.1)',
+                                cursor: 'pointer',
+                                borderRadius: '4px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                            }}
+                        >
+                            <span style={{
+                                width: '6px',
+                                height: '6px',
+                                borderRadius: '50%',
+                                background: useLttb ? '#4ade80' : '#94a3b8',
+                                display: 'inline-block'
+                            }} />
+                            LTTB: {useLttb ? 'ON' : 'OFF'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            {/* Key Stats Grid */}
+            <div className="grid">
+                <StatCard 
+                    label="Total Equity" 
+                    value={equityHistory.length > 0 ? `$${(equityHistory[equityHistory.length - 1].total_equity ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "--"} 
+                    delta={equityHistory.length > 1 ? `${(metrics.totalReturn * 100).toFixed(2)}% total` : undefined}
+                />
+                <StatCard 
+                    label="CAGR" 
+                    value={`${(metrics.annualizedReturn * 100).toFixed(2)}%`}
+                    subtext="Annualized Return"
+                />
+                <StatCard 
+                    label="Sharpe Ratio" 
+                    value={metrics.sharpeRatio.toFixed(2)}
+                    subtext={`Vol: ${(metrics.volatility * 100).toFixed(2)}%`}
+                />
+                <StatCard 
+                    label="Max Drawdown" 
+                    value={`${(metrics.maxDrawdown * 100).toFixed(2)}%`}
+                    delta={metrics.maxDrawdown > 0.2 ? 'High Risk' : 'Acceptable'}
+                />
+                 <StatCard 
+                    label="Daily P&L" 
+                    value={equityHistory.length > 0 ? `$${(equityHistory[equityHistory.length - 1].daily_pnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "--"}
+                    delta={equityHistory.length > 0 ? `${((equityHistory[equityHistory.length - 1].daily_return || 0) * 100).toFixed(2)}%` : undefined}
+                />
+            </div>
+
+            {/* Chart */}
+            <div className="glass card chart-container" style={{ marginTop: '2rem', height: '400px', padding: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem' }}>Equity Curve (%)</h3>
+                <ResponsiveContainer width="100%" height="90%">
+                    <ComposedChart data={chartData}>
+                        <defs>
+                            <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                            </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                        <XAxis dataKey="timestamp" hide />
+                        <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
+                        <Tooltip
+                            contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                            itemStyle={{ color: 'var(--text)' }}
+                            formatter={(value: any, name: string) => [
+                                `${value.toFixed(2)}%`,
+                                name === 'equityReturn' ? 'Strategy' : availableBenchmarks.find(b => b.code === name)?.name || name
+                            ]}
+                            labelFormatter={(label) => label.split(' ')[0]}
+                        />
+                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                        <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="var(--primary)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
+                        
+                        {comparisonData.map((c, idx) => {
+                             const color = `hsl(${(idx * 137) % 360}, 70%, 50%)`;
+                             return (
+                                 <Line
+                                     key={c.id}
+                                     type="monotone"
+                                     dataKey={`session_${c.id}`}
+                                     name={`${c.name} (${c.id.slice(0,4)})`}
+                                     stroke={color}
+                                     strokeWidth={2}
+                                     dot={false}
+                                     strokeDasharray="5 5"
+                                 />
+                             );
+                        })}
+
+                        {selectedBenchmarks.map(code => (
+                            <Line
+                                key={code}
+                                type="monotone"
+                                dataKey={code}
+                                name={availableBenchmarks.find(b => b.code === code)?.name}
+                                stroke={COLORS[code as keyof typeof COLORS] || 'var(--secondary)'}
+                                strokeWidth={2}
+                                dot={false}
+                            />
+                        ))}
+                    </ComposedChart>
+                </ResponsiveContainer>
+            </div>
+
+             {/* Holdings & Trades Table Sections */}
+             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem' }}>
+
+                {/* Holdings Card */}
+                <div className="glass card">
+                <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {selectedDay ? `Holdings: ${selectedDay.timestamp.split(' ')[0]}` : 'Current Holdings'}
+                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
+                    {selectedDay && <button className="tagline" style={{ marginRight: '0.5rem', padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={clearDaySelection}>Back to Live</button>}
+                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setHoldingsPage(p => Math.max(1, p - 1))} disabled={holdingsPage === 1}>Prev</button>
+                    <span className="tagline" style={{ fontSize: '0.7rem' }}>{holdingsPage} / {Math.ceil(positionKeys.length / PAGE_SIZE) || 1}</span>
+                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setHoldingsPage(p => Math.min(Math.ceil(positionKeys.length / PAGE_SIZE), p + 1))} disabled={holdingsPage >= Math.ceil(positionKeys.length / PAGE_SIZE)}>Next</button>
+                    </div>
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table">
+                    <thead>
+                        <tr>
+                        <th>Symbol</th>
+                        <th style={{ textAlign: 'right' }}>Qty</th>
+                        <th style={{ textAlign: 'right' }}>Avg Cost</th>
+                        <th style={{ textAlign: 'right' }}>Price</th>
+                        <th style={{ textAlign: 'right' }}>Value</th>
+                        <th style={{ textAlign: 'right' }}>P&L</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {visiblePositions.map((sym) => {
+                        const pos = currentPositions[sym];
+                        const qty = typeof pos === 'number' ? pos : pos.qty;
+                        const price = typeof pos === 'number' ? 0 : (pos.price || 0);
+                        const value = typeof pos === 'number' ? 0 : (pos.value || qty * price);
+                        const avgCost = pos.avg_cost || 0;
+                        const pnl = pos.unrealized_pnl || 0;
+                        const pnlPct = (pos.pnl_pct || 0) * 100;
+
+                        return (
+                            <tr key={sym}>
+                            <td>
+                                <div>{sym}</div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{pos.name}</div>
+                            </td>
+                            <td style={{ textAlign: 'right' }}>{qty}</td>
+                            <td style={{ textAlign: 'right' }}>{avgCost > 0 ? `$${avgCost.toFixed(2)}` : '-'}</td>
+                            <td style={{ textAlign: 'right' }}>${price.toFixed(2)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700 }}>${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ textAlign: 'right' }}>
+                                <div style={{ color: pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                {pnl >= 0 ? '+' : ''}{(pnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                                {pnlPct.toFixed(2)}%
+                                </div>
+                            </td>
+                            </tr>
+                        );
+                        })}
+                        {positionKeys.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No positions</td></tr>}
+                    </tbody>
+                    </table>
+                </div>
+                </div>
+
+                {/* Trades Card */}
+                <div className="glass card">
+                <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    {selectedDay ? `Trades: ${selectedDay.timestamp.split(' ')[0]}` : 'All Trades'}
+                    <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setTradePage(p => Math.max(1, p - 1))} disabled={tradePage === 1}>Prev</button>
+                    <span className="tagline" style={{ fontSize: '0.7rem' }}>{tradePage} / {Math.ceil(sortedTrades.length / PAGE_SIZE) || 1}</span>
+                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setTradePage(p => Math.min(Math.ceil(sortedTrades.length / PAGE_SIZE), p + 1))} disabled={tradePage >= Math.ceil(sortedTrades.length / PAGE_SIZE)}>Next</button>
+                    </div>
+                </h3>
+                <div style={{ overflowX: 'auto' }}>
+                    <table className="data-table">
+                    <thead>
+                        <tr>
+                        <th>Time</th>
+                        <th>Symbol</th>
+                        <th>Type</th>
+                        <th style={{ textAlign: 'right' }}>Price</th>
+                        <th style={{ textAlign: 'right' }}>Amt</th>
+                        <th style={{ textAlign: 'right' }}>Comm</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {visibleTrades.map((t, idx) => (
+                        <tr key={idx}>
+                            <td className="tagline" style={{ fontSize: '0.7rem' }}>{t.timestamp.split(' ')[0]}</td>
+                            <td>
+                            <div style={{ fontWeight: 600 }}>{t.symbol}</div>
+                            <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{t.name}</div>
+                            </td>
+                            <td><span className={`status-badge ${t.type === 'buy' ? 'status-live' : 'status-danger'}`}>{t.type}</span></td>
+                            <td style={{ textAlign: 'right' }}>${t.price.toFixed(2)}</td>
+                            <td style={{ textAlign: 'right' }}>${(t.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ textAlign: 'right', color: 'var(--text-dim)' }}>
+                            {t.commission ? `$${t.commission.toFixed(1)}` : '-'}
+                            </td>
+                        </tr>
+                        ))}
+                        {sortedTrades.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No trades {selectedDay ? 'on this day' : ''}</td></tr>}
+                    </tbody>
+                    </table>
+                </div>
+                </div>
+            </div>
+
+            {/* Daily Evolution Card */}
+            <div className="glass card" style={{ marginTop: '2rem' }}>
+                <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                Daily History
+                <div style={{ display: 'flex', gap: '0.5rem' }}>
+                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.max(1, p - 1))} disabled={equityPage === 1}>Prev</button>
+                    <span className="tagline" style={{ fontSize: '0.7rem' }}>{equityPage} / {Math.ceil(equityHistory.length / PAGE_SIZE) || 1}</span>
+                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.min(Math.ceil(equityHistory.length / PAGE_SIZE), p + 1))} disabled={equityPage >= Math.ceil(equityHistory.length / PAGE_SIZE)}>Next</button>
+                </div>
+                </h3>
+                <table className="data-table">
+                <thead>
+                    <tr>
+                    <th>Date</th>
+                    <th style={{ textAlign: 'right' }}>Equity</th>
+                    <th style={{ textAlign: 'right' }}>Daily P&L</th>
+                    <th style={{ textAlign: 'right' }}>Return</th>
+                    <th>Holdings Summary</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {[...equityHistory].reverse().slice((equityPage - 1) * PAGE_SIZE, equityPage * PAGE_SIZE).map((day, idx) => (
+                    <tr key={idx} style={{ cursor: 'pointer', backgroundColor: selectedDay?.timestamp === day.timestamp ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }} onClick={() => handleDaySelect(day)}>
+                        <td>{day.timestamp.split(' ')[0]}</td>
+                        <td style={{ textAlign: 'right' }}>${(day.total_equity ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                        <td style={{ textAlign: 'right', color: (day.daily_pnl || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
+                        {(day.daily_pnl || 0) >= 0 ? '+' : ''}{day.daily_pnl?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </td>
+                        <td style={{ textAlign: 'right', color: (day.daily_return || 0) >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
+                        {(day.daily_return || 0) >= 0 ? '+' : ''}{((day.daily_return || 0) * 100).toFixed(2)}%
+                        </td>
+                        <td style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
+                        {Object.values(day.positions || {}).map(p => `${p.name} (${p.qty})`).slice(0, 3).join(', ')}{Object.keys(day.positions || {}).length > 3 ? '...' : ''}
+                        </td>
+                    </tr>
+                    ))}
+                    {equityHistory.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No history yet</td></tr>}
+                </tbody>
+                </table>
+            </div>
+        </div>
+    );
+};
+
+export default Dashboard;
