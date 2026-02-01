@@ -39,6 +39,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
             <div className="nav-items">
                 <NavItem icon="📊" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => onTabChange('dashboard')} />
                 <NavItem icon="🧪" label="Lab & Sessions" active={activeTab === 'lab'} onClick={() => onTabChange('lab')} />
+                <NavItem icon="⚖️" label="Analysis" active={activeTab === 'analysis'} onClick={() => onTabChange('analysis')} />
             </div>
 
             <div style={{ marginTop: 'auto' }}>

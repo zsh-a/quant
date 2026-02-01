@@ -11,6 +11,7 @@ import {
 
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
+import Comparison from './components/Comparison';
 import NewSessionForm from './components/NewSessionForm';
 import SessionList from './components/SessionList';
 
@@ -296,7 +297,7 @@ const App: React.FC = () => {
 
       <main className="main-content">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1>{activeTab === 'lab' ? 'Strategy Lab' : 'Dashboard'}</h1>
+          <h1>{activeTab === 'lab' ? 'Strategy Lab' : activeTab === 'analysis' ? 'Analysis' : 'Dashboard'}</h1>
           <div>
             <span className="tagline">Connected: </span>
             <span style={{ color: 'var(--success)', fontWeight: 700 }}>Localhost</span>
@@ -316,6 +317,16 @@ const App: React.FC = () => {
               availableBenchmarks={AVAILABLE_BENCHMARKS}
               onSelectSession={setPrimarySessionId}
               allSessions={sessions}
+           />
+        )}
+
+        {activeTab === 'analysis' && (
+           <Comparison 
+                selectedSessionIds={selectedSessionIds}
+                sessionDataCache={sessionDataCache}
+                allSessions={sessions}
+                benchmarksData={benchmarksData}
+                availableBenchmarks={AVAILABLE_BENCHMARKS}
            />
         )}
 
