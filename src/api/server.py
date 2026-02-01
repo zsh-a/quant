@@ -20,18 +20,31 @@ from src.core.live_broker import LiveBroker
 from src.core.data_stream import DBDataStream, RealtimeDataStream
 from src.strategies.jsg_strategy import JSGStrategy
 from src.strategies.rotation_strategy import RotationStrategy
+from src.utils.config import get, get_section
+from src.utils.logging_config import setup_logging, get_logger
 from db import DB
 from session_db import SessionDB
+
+# Initialize logging system
+setup_logging()
+logger = get_logger(__name__)
+
+# Load configuration
+api_config = get_section('api')
+data_stream_config = get_section('data_stream')
+broker_config = get_section('broker')
 
 app = FastAPI()
 session_db = SessionDB()
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=api_config.get('cors_origins', ['*']),
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+logger.info(f"API Server starting with config: port={api_config.get('port', 8000)}")
 
 class SessionRequest(BaseModel):
     strategy: str
@@ -93,19 +106,40 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
             symbols = [req.symbol]
             
             if req.mode == "live":
-                stream = RealtimeDataStream(symbols, interval_seconds=60)
+                # Use configuration for realtime stream
+                rt_config = data_stream_config.get('realtime', {})
+                stream = RealtimeDataStream(
+                    symbols, 
+                    interval_seconds=rt_config.get('interval_seconds', 60),
+                    data_source=rt_config.get('data_source', 'akshare'),
+                    enable_trading_hours_check=True
+                )
                 total_bars = 0 # Live stream is indefinite
             else:
-                stream = DBDataStream(db_client, symbols, req.start_date, req.end_date)
+                # Use configuration for backtest stream
+                chunk_size = data_stream_config.get('chunk_size_months', None)
+                stream = DBDataStream(
+                    db_client, 
+                    symbols, 
+                    req.start_date, 
+                    req.end_date,
+                    chunk_size_months=chunk_size
+                )
                 # Use total_bars from stream if available (approximate)
                 total_bars = getattr(stream, 'total_bars', 1)
             
             # Setup broker
             if req.mode == "live":
-                broker = LiveBroker(server_url=LIVE_SERVER_URL)
+                live_config = broker_config.get('live', {})
+                broker = LiveBroker(server_url=live_config.get('server_url', LIVE_SERVER_URL))
             else:
                 # Backtest and Simulation (Paper) use BacktestBroker
-                broker = BacktestBroker(db_client=db_client)
+                backtest_config = broker_config.get('backtest', {})
+                broker = BacktestBroker(
+                    db_client=db_client,
+                    initial_cash=backtest_config.get('initial_cash', 1000000.0),
+                    commission=backtest_config.get('commission', 0.0001)
+                )
                 
             session.broker = broker
             

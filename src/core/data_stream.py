@@ -5,7 +5,9 @@ import os
 from typing import Dict, Optional, List
 from .base import DataStream, Bar
 from datetime import datetime
-from loguru import logger
+from src.utils.logging_config import get_logger
+
+logger = get_logger(__name__)
 
 class CSVDataStream(DataStream):
     def __init__(self, csv_files: Dict[str, str], start_date: Optional[str] = None, end_date: Optional[str] = None):
@@ -230,47 +232,143 @@ class DBDataStream(DataStream):
         self._load_next_chunk()
 
 class RealtimeDataStream(DataStream):
-    def __init__(self, symbols: List[str], interval_seconds: int = 60):
+    """
+    Event-driven realtime data stream for live trading.
+    Supports multiple data sources with automatic fallback.
+    """
+    
+    def __init__(self, symbols: List[str], interval_seconds: int = 60, 
+                 data_source: str = 'akshare', enable_trading_hours_check: bool = True):
+        """
+        Initialize realtime data stream.
+        
+        Args:
+            symbols: List of symbols to track
+            interval_seconds: Update interval in seconds (default: 60 for 1-minute bars)
+            data_source: Data source to use ('akshare', 'tushare', etc.)
+            enable_trading_hours_check: Whether to check trading hours
+        """
         self.symbols = symbols
         self.interval_seconds = interval_seconds
+        self.data_source = data_source
+        self.enable_trading_hours_check = enable_trading_hours_check
+        
         self.last_fetch_time = time.time()
-        import akshare as ak
-        self.ak = ak
-
-    def next_bar(self) -> Optional[Dict[str, Bar]]:
-        # Block until interval passes
+        self.consecutive_errors = 0
+        self.max_retries = 3
+        self.retry_delay = 5  # seconds
+        
+        # Initialize data source
+        self._init_data_source()
+        
+        logger.info(f"RealtimeDataStream initialized: {len(symbols)} symbols, "
+                   f"interval={interval_seconds}s, source={data_source}")
+    
+    def _init_data_source(self):
+        """Initialize the data source client"""
+        if self.data_source == 'akshare':
+            try:
+                import akshare as ak
+                self.ak = ak
+                logger.info("AkShare data source initialized")
+            except ImportError:
+                logger.error("AkShare not installed, falling back to mock data")
+                self.data_source = 'mock'
+        elif self.data_source == 'tushare':
+            try:
+                import tushare as ts
+                self.ts = ts
+                logger.info("Tushare data source initialized")
+            except ImportError:
+                logger.error("Tushare not installed, falling back to akshare")
+                self.data_source = 'akshare'
+                self._init_data_source()
+        else:
+            logger.warning(f"Unknown data source: {self.data_source}, using mock")
+            self.data_source = 'mock'
+    
+    def _is_trading_hours(self) -> bool:
+        """
+        Check if current time is within trading hours.
+        China A-share market: 09:30-11:30, 13:00-15:00 (Mon-Fri)
+        """
+        if not self.enable_trading_hours_check:
+            return True
+        
+        now = datetime.now()
+        
+        # Check if weekend
+        if now.weekday() >= 5:  # Saturday = 5, Sunday = 6
+            return False
+        
+        # Check trading hours
+        current_time = now.time()
+        morning_start = datetime.strptime("09:30", "%H:%M").time()
+        morning_end = datetime.strptime("11:30", "%H:%M").time()
+        afternoon_start = datetime.strptime("13:00", "%H:%M").time()
+        afternoon_end = datetime.strptime("15:00", "%H:%M").time()
+        
+        is_morning = morning_start <= current_time <= morning_end
+        is_afternoon = afternoon_start <= current_time <= afternoon_end
+        
+        return is_morning or is_afternoon
+    
+    def _wait_for_next_interval(self):
+        """Wait until next data fetch interval"""
         time_to_wait = self.interval_seconds - (time.time() - self.last_fetch_time)
         if time_to_wait > 0:
+            logger.debug(f"Waiting {time_to_wait:.1f}s for next interval")
             time.sleep(time_to_wait)
-        
-        self.last_fetch_time = time.time()
+    
+    def _wait_for_trading_hours(self):
+        """Wait until market opens if outside trading hours"""
+        while not self._is_trading_hours():
+            now = datetime.now()
+            logger.info(f"Outside trading hours ({now.strftime('%Y-%m-%d %H:%M:%S')}), waiting...")
+            
+            # Calculate time until next market open
+            if now.weekday() >= 5:
+                # Weekend, wait until Monday 09:30
+                days_until_monday = (7 - now.weekday()) % 7
+                if days_until_monday == 0:
+                    days_until_monday = 1
+                next_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+                next_open = next_open + pd.Timedelta(days=days_until_monday)
+            else:
+                # Weekday, wait until next session
+                current_time = now.time()
+                morning_start = datetime.strptime("09:30", "%H:%M").time()
+                afternoon_start = datetime.strptime("13:00", "%H:%M").time()
+                
+                if current_time < morning_start:
+                    # Before morning session
+                    next_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
+                elif current_time < afternoon_start:
+                    # Lunch break
+                    next_open = now.replace(hour=13, minute=0, second=0, microsecond=0)
+                else:
+                    # After market close, wait until next day
+                    next_open = (now + pd.Timedelta(days=1)).replace(hour=9, minute=30, second=0, microsecond=0)
+            
+            wait_seconds = (next_open - now).total_seconds()
+            logger.info(f"Market opens at {next_open.strftime('%Y-%m-%d %H:%M:%S')}, "
+                       f"waiting {wait_seconds/60:.1f} minutes")
+            
+            # Sleep in chunks to allow for interruption
+            sleep_chunk = min(60, wait_seconds)  # Sleep max 1 minute at a time
+            time.sleep(sleep_chunk)
+    
+    def _fetch_akshare_data(self) -> Dict[str, Bar]:
+        """Fetch data from AkShare"""
+        bars = {}
         current_ts = datetime.now()
         
-        # Simple trading hours check (China A-share)
-        # 09:30 - 11:30, 13:00 - 15:00
-        # If outside, we might still return data or wait?
-        # For simplicity, we just fetch.
-        
-        bars = {}
         try:
-            # Efficient: fetch all spot data once and filter
-            # ak.fund_etf_spot_em() is for ETFs. 
-            # We need to support both stocks and ETFs? 
-            # Assuming ETFs for now based on '510880' in examples.
-            # Or use stock_zh_a_spot_em() for stocks.
-            
-            # Using stock_zh_a_spot_em for broader coverage or fund_etf_spot_em depending on symbol
-            # This part is tricky without knowing exact symbol types.
-            # We'll try fund_etf_spot_em first as in market_env.py
-            
+            # Fetch ETF spot data
             df = self.ak.fund_etf_spot_em()
-            # Columns: 代码, 名称, 最新价, ...
-            # Map to symbols
             
             for symbol in self.symbols:
-                # Symbol format expected: '510880' or 'sh.510880'?
-                # DBDataStream uses raw code often.
-                # Remove prefix if present
+                # Remove prefix if present (sh.510880 -> 510880)
                 code = symbol.split('.')[-1]
                 
                 row = df[df['代码'] == code]
@@ -287,13 +385,87 @@ class RealtimeDataStream(DataStream):
                         amount=float(data['成交额']),
                         extra={"name": data['名称']}
                     )
+                else:
+                    logger.warning(f"Symbol {symbol} not found in market data")
+        
         except Exception as e:
-            print(f"Realtime fetch error: {e}")
-            # Don't crash, just return empty or retry?
-            # Return empty dict means no new data this step
-            pass
+            logger.error(f"AkShare fetch error: {e}")
+            raise
+        
+        return bars
+    
+    def _fetch_mock_data(self) -> Dict[str, Bar]:
+        """Generate mock data for testing"""
+        import random
+        bars = {}
+        current_ts = datetime.now()
+        
+        for symbol in self.symbols:
+            # Generate random OHLC data
+            base_price = 100.0
+            bars[symbol] = Bar(
+                symbol=symbol,
+                timestamp=current_ts,
+                open=base_price + random.uniform(-5, 5),
+                high=base_price + random.uniform(0, 10),
+                low=base_price + random.uniform(-10, 0),
+                close=base_price + random.uniform(-5, 5),
+                volume=random.randint(1000000, 10000000),
+                amount=random.randint(100000000, 1000000000),
+                extra={"name": f"Mock {symbol}"}
+            )
+        
+        return bars
+    
+    def next_bar(self) -> Optional[Dict[str, Bar]]:
+        """
+        Get next bar of realtime data.
+        Blocks until data is available or returns None if stream should stop.
+        """
+        # Wait for next interval
+        self._wait_for_next_interval()
+        
+        # Wait for trading hours if enabled
+        if self.enable_trading_hours_check:
+            self._wait_for_trading_hours()
+        
+        self.last_fetch_time = time.time()
+        
+        # Fetch data with retry logic
+        for attempt in range(self.max_retries):
+            try:
+                if self.data_source == 'akshare':
+                    bars = self._fetch_akshare_data()
+                elif self.data_source == 'mock':
+                    bars = self._fetch_mock_data()
+                else:
+                    logger.error(f"Unsupported data source: {self.data_source}")
+                    return {}
+                
+                # Reset error counter on success
+                if self.consecutive_errors > 0:
+                    logger.info(f"Data fetch recovered after {self.consecutive_errors} errors")
+                    self.consecutive_errors = 0
+                
+                logger.debug(f"Fetched {len(bars)} symbols at {datetime.now().strftime('%H:%M:%S')}")
+                return bars
             
-        return bars if bars else {}
-
+            except Exception as e:
+                self.consecutive_errors += 1
+                logger.error(f"Data fetch failed (attempt {attempt + 1}/{self.max_retries}): {e}")
+                
+                if attempt < self.max_retries - 1:
+                    logger.info(f"Retrying in {self.retry_delay}s...")
+                    time.sleep(self.retry_delay)
+                else:
+                    logger.error(f"Max retries reached, returning empty data")
+                    return {}
+        
+        return {}
+    
     def reset(self):
-        pass
+        """Reset the stream (no-op for realtime stream)"""
+        self.last_fetch_time = time.time()
+        self.consecutive_errors = 0
+        logger.info("RealtimeDataStream reset")
+
