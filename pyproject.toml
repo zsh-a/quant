@@ -31,6 +31,10 @@ dependencies = [
     # Additional dependencies
     "requests>=2.31.0",
     "websockets>=12.0",
+    
+    # Phase 4 - Optimization & Analysis
+    "scipy>=1.11.0",
+    "scikit-learn>=1.3.0",
 ]
 
 [tool.uv]

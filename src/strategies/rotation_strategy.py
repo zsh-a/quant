@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import talib as ta
-from loguru import logger
 from src.core.base import Strategy, Bar
 
 PRICE_CHANGE_LIMIT = 0.098
@@ -22,8 +21,8 @@ SW1 = {
 }
 
 class RotationStrategy(Strategy):
-    def __init__(self, db_client, **kwargs):
-        super().__init__()
+    def __init__(self, db_client, session_id: str = None, **kwargs):
+        super().__init__(session_id=session_id)  # Pass session_id to base class
         self.db_client = db_client
         
         # Load parameters
@@ -44,6 +43,8 @@ class RotationStrategy(Strategy):
         self.trad_days = pd.read_csv(
             "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
         )
+        
+        self._log(f"RotationStrategy initialized: stock_sum={self.stock_sum}, timing={self.timing}")
         
         # Calculate trigger dates for Backtest and Live
         self.trigger_dates_backtest = set()
@@ -105,9 +106,8 @@ class RotationStrategy(Strategy):
 
     def on_bar(self, bars: dict[str, Bar]):
         if not bars: return
-        # Get timestamp from the first bar
-        ts = next(iter(bars.values())).timestamp
-        today_str = str(ts.date())
+        
+        today_str = self._current_date  # Auto-updated by engine
 
         should_run = False
         is_live = self.engine and self.engine.broker.__class__.__name__ == 'LiveBroker'
@@ -138,7 +138,7 @@ class RotationStrategy(Strategy):
         
         # For Backtest 'OPEN' timing, we are running on D-1. We don't check time (00:00).
 
-        logger.info(f"RotationStrategy: Rebalancing on {today_str} (Timing: {self.timing}, Live: {is_live})")
+        self._log(f"========== 轮动调仓日 (Timing: {self.timing}, Live: {is_live}) ==========")
 
         # 1. Market Breath Analysis
         df_ratio = self.get_market_breadth(today_str)
@@ -238,7 +238,7 @@ class RotationStrategy(Strategy):
         account = self.engine.broker.get_account_info()
         hold_list = list(account['positions'].keys())
         
-        logger.info(f"Rebalancing: Target {target}, Holding {hold_list}")
+        self._log(f"调仓: 目标={target}, 当前持仓={hold_list}")
         
         # Determine execution type
         is_live = self.engine and self.engine.broker.__class__.__name__ == 'LiveBroker'
@@ -255,7 +255,7 @@ class RotationStrategy(Strategy):
             if stock not in target:
                 qty = account['positions'][stock]
                 if qty > 0:
-                    logger.info(f"Selling {stock} (qty: {qty}) because not in target")
+                    self._log(f"清仓 {stock}: qty={qty} (不在目标中)", stock=stock)
                     self.sell(stock, qty, execution_type=exec_type)
 
         # 2. Buy/Rebalance target stocks
@@ -265,15 +265,15 @@ class RotationStrategy(Strategy):
             for code in target:
                 price_df = self.db_client.get_price(code, date_str, ["close"], 1)
                 if price_df.empty:
-                    logger.warning(f"Could not get price for {code} on {date_str}")
+                    self._log(f"跳过 {code}: 无价格数据", level="WARNING", stock=code)
                     continue
                 price = price_df.iloc[0]["close"]
                 target_qty = int(val_per_stock / price // 100 * 100)
                 
                 curr_qty = account['positions'].get(code, 0)
                 if target_qty > curr_qty:
-                    logger.info(f"Submitting BUY for {code}: {target_qty - curr_qty} shares")
+                    self._log(f"买入 {code}: {target_qty - curr_qty}股, 当前={curr_qty}, 目标={target_qty}", stock=code)
                     self.buy(code, target_qty - curr_qty, execution_type=exec_type)
                 elif target_qty < curr_qty:
-                    logger.info(f"Submitting SELL for {code}: {curr_qty - target_qty} shares")
+                    self._log(f"卖出 {code}: {curr_qty - target_qty}股, 当前={curr_qty}, 目标={target_qty}", stock=code)
                     self.sell(code, curr_qty - target_qty, execution_type=exec_type)

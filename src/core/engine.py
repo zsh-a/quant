@@ -64,7 +64,11 @@ class TradingEngine:
             # 1. Update broker with new price data (fill orders)
             self.broker.step(bars)
             
-            # 2. Strategy process bars
+            # 2. Auto-update strategy's current date for logging
+            if hasattr(self.strategy, '_update_current_date'):
+                self.strategy._update_current_date(bars)
+            
+            # 3. Strategy process bars
             self.strategy.on_bar(bars)
             
             # 3. Process immediate orders (generated in on_bar)
@@ -76,14 +80,12 @@ class TradingEngine:
                 self.on_step(bars)
             
             self.last_bars = bars
-            
-        # Final settlement: if there are pending orders and we have last known bars
-        # we can attempt to fill them at the last close for accuracy in backtest metrics
-        if self.last_bars:
-            logger.info("Final settlement: Processing remaining orders at last available close.")
-            self.broker.step(self.last_bars) # One last step to match orders from last bar
-            if self.on_step:
-                self.on_step(self.last_bars)
+
+        # Do NOT run broker.step(last_bars) again here. Orders submitted on the last bar
+        # (e.g. JSG rebalance on last trading day of month) are NEXT_OPEN and must fill
+        # at the *next* bar's open. If the stream has ended, there is no next bar, so those
+        # orders should remain unfilled; filling them at last bar's open would wrongly
+        # show execution on the last day (e.g. 2026-01-30) instead of next Monday.
 
         self.running = False
         logger.info("Trading engine stopped.")

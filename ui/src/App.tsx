@@ -17,6 +17,10 @@ import NewSessionForm from './components/NewSessionForm';
 import SessionList from './components/SessionList';
 import { RiskPanel } from './components/RiskPanel';
 import { CheckpointList } from './components/CheckpointList';
+import { PortfolioManager } from './components/PortfolioManager';
+import { OptimizerPanel } from './components/OptimizerPanel';
+import { AttributionPanel } from './components/AttributionPanel';
+import { StrategyLogViewer } from './components/StrategyLogViewer';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? "http://localhost:8000"
@@ -455,6 +459,22 @@ const App: React.FC = () => {
               />
             </div>
           </div>
+        )}
+
+        {activeTab === 'portfolio' && (
+          <PortfolioManager />
+        )}
+
+        {activeTab === 'optimizer' && (
+          <OptimizerPanel />
+        )}
+
+        {activeTab === 'attribution' && primarySessionId && (
+          <AttributionPanel sessionId={primarySessionId} />
+        )}
+
+        {activeTab === 'logs' && (
+          <StrategyLogViewer sessionId={primarySessionId} />
         )}
       </main>
     </div>

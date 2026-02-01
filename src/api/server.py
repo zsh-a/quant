@@ -34,6 +34,10 @@ from db import DB
 from session_db import SessionDB
 from src.api.tasks_router import router as tasks_router
 from src.api.monitoring_router import router as monitoring_router
+from src.api.portfolio_router import router as portfolio_router
+from src.api.optimizer_router import router as optimizer_router
+from src.api.analysis_router import router as analysis_router
+from src.api.logs_router import router as logs_router
 
 # Initialize logging system
 setup_logging()
@@ -57,6 +61,10 @@ app.add_middleware(
 # Include routers
 app.include_router(tasks_router)
 app.include_router(monitoring_router)
+app.include_router(portfolio_router)
+app.include_router(optimizer_router)
+app.include_router(analysis_router)
+app.include_router(logs_router)
 
 logger.info(f"API Server starting with config: port={api_config.get('port', 8000)}")
 
@@ -159,11 +167,11 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                 
             session.broker = broker
             
-            # Setup strategy with params
+            # Setup strategy with params - pass session_id for debug logging
             if req.strategy == "jsg":
-                strategy = JSGStrategy(db_client, **req.params)
+                strategy = JSGStrategy(db_client, session_id=session.session_id, **req.params)
             elif req.strategy == "rotation":
-                strategy = RotationStrategy(db_client, **req.params)
+                strategy = RotationStrategy(db_client, session_id=session.session_id, **req.params)
             else:
                 raise ValueError(f"Unknown strategy: {req.strategy}")
             

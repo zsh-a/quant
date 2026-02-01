@@ -14,8 +14,8 @@ from account import Account
 import global_var
 from market_env import MultiMarketEnv
 from policy.JSG_policy import OrderPolicy
-# from policy.JSG_policy import Agent
-from policy.advanced_rotation_policy import AdvancedAgent as Agent
+from policy.JSG_policy import Agent
+# from policy.advanced_rotation_policy import AdvancedAgent as Agent
 from db import DB
 
 logger.remove()  # 这行很关键，先删除logger自动产生的handler，不然会出现重复输出的问题

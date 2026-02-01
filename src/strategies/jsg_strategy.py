@@ -1,7 +1,6 @@
 import pandas as pd
 import numpy as np
 import talib as ta
-from loguru import logger
 from src.core.base import Strategy, Bar
 import utils.utils as util
 
@@ -9,8 +8,8 @@ PRICE_CHANGE_LIMIT = 0.098
 NUM_STOCKS = 6
 
 class JSGStrategy(Strategy):
-    def __init__(self, db_client, **kwargs):
-        super().__init__()
+    def __init__(self, db_client, session_id: str = None, **kwargs):
+        super().__init__(session_id=session_id)  # Pass session_id to base class
         self.db_client = db_client
         
         # Load parameters with defaults
@@ -26,6 +25,8 @@ class JSGStrategy(Strategy):
             "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
         )
         self.pass_month = []
+        
+        self._log(f"JSGStrategy initialized: max_stocks={self.max_stocks}, pool_size={self.pool_size}, stock_sum={self.stock_sum}")
 
     @classmethod
     def get_parameters(cls) -> dict:
@@ -54,12 +55,10 @@ class JSGStrategy(Strategy):
         }
 
     def on_bar(self, bars: dict[str, Bar]):
-        # Get some representative bar for timestamp
         if not bars:
             return
-        representative_bar = next(iter(bars.values()))
-        ts = representative_bar.timestamp
-        today_str = str(ts.date())
+        
+        today_str = self._current_date  # Auto-updated by engine
 
         # Check if it's the last trading day of the month (rebalance signal)
         if today_str not in self.trad_days.index.strftime('%Y-%m-%d'):
@@ -69,14 +68,15 @@ class JSGStrategy(Strategy):
         if self.trad_days.loc[today_str, "is_last_trading_day"] == 0:
             return
 
-        logger.info(f"JSGStrategy: Rebalancing on {today_str}")
+        self._log("========== 月末调仓日 ==========")
 
         # 1. Broad market check
         I = self.get_market_breadth(today_str)
-        logger.info(f"Market breadth: {I}")
+        self._log(f"市场宽度(热门行业): {I}", breadth=I)
 
         # 2. Select stocks
         cand_stocks = self.stock_decider(I, today_str)
+        self._log(f"候选股票: {cand_stocks}", candidates=len(cand_stocks))
         
         # 3. Adjust positions
         self.adjust(cand_stocks, today_str)
@@ -148,28 +148,35 @@ class JSGStrategy(Strategy):
         account = self.engine.broker.get_account_info()
         hold_list = list(account['positions'].keys())
         
-        logger.info(f"JSG Rebalancing: Target {target}, Holding {hold_list}")
+        self._log(f"调仓: 目标={target}, 当前持仓={hold_list}")
         
-        # Sell stocks not in target
+        # Sell stocks not in target (full liquidation)
         for stock in hold_list:
             if stock not in target:
                 qty = account['positions'][stock]
+                self._log(f"清仓 {stock}: qty={qty} (不在目标中)", stock=stock, action="sell_all")
                 if qty > 0:
                     self.sell(stock, qty)
 
-        # Buy target stocks
+        # Buy target stocks (or adjust position size)
         total_equity = account['total_equity']
         if target:
             val_per_stock = (total_equity * 0.95) / len(target) # 5% cash buffer
+            self._log(f"权益={total_equity:.2f}, 每股分配={val_per_stock:.2f}", equity=total_equity)
+            
             for code in target:
                 price_df = self.db_client.get_price(code, date_str, ["close"], 1)
                 if price_df.empty:
+                    self._log(f"跳过 {code}: 无价格数据", level="WARNING", stock=code)
                     continue
                 price = price_df.iloc[0]["close"]
                 target_qty = int(val_per_stock / price // 100 * 100) # 100 share lot
                 
                 curr_qty = account['positions'].get(code, 0)
                 delta = target_qty - curr_qty
+                action = "买入" if delta > 0 else "卖出" if delta < 0 else "持有"
+                self._log(f"{action} {code}: 当前={curr_qty}, 目标={target_qty}, 差额={delta}, 价格={price:.2f}",
+                         stock=code, curr_qty=curr_qty, target_qty=target_qty, delta=delta)
                 if delta > 0:
                     self.buy(code, delta)
                 elif delta < 0:
