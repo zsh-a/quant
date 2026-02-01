@@ -107,6 +107,10 @@ class Account:
         y_data = np.array(self.tot_values[1:]).astype(float).tolist()
 
         cum_returns = np.array(self.tot_values) / self.tot_values[0]
+        
+        # Calculate daily returns
+        tot_values_array = np.array(self.tot_values)
+        daily_returns = np.diff(tot_values_array) / tot_values_array[:-1]
 
         rolling_max = np.maximum.accumulate(cum_returns)
 
@@ -120,35 +124,37 @@ class Account:
         end_date = pd.to_datetime(self.dates[-1])
         years = (end_date - start_date).days / 365
         logger.info(f"run span : {start_date} - {end_date}")
-        annualized_return = (self.tot_values[-1] / self.tot_values[0]) ** (
-            1 / years
-        ) - 1
+        if years > 0:
+            annualized_return = (self.tot_values[-1] / self.tot_values[0]) ** (
+                1 / years
+            ) - 1
+        else:
+            annualized_return = 0
+
+        # Calculate Volatility (Annualized)
+        volatility = np.std(daily_returns) * np.sqrt(252)
+
+        # Calculate Sharpe Ratio
+        # Assuming risk_free_rate is 0 for simplicity in this context, or we can use the passed value if it was an annualized rate.
+        # But commonly in backtests: (Annualized Return - Risk Free) / Volatility
+        # Or more accurately using daily series: mean(daily_returns) / std(daily_returns) * sqrt(252)
+        if np.std(daily_returns) != 0:
+            sharpe_ratio = (np.mean(daily_returns) / np.std(daily_returns)) * np.sqrt(252)
+        else:
+            sharpe_ratio = 0
+            
+        # Calculate Calmar Ratio
+        if max_drawdown != 0:
+            calmar_ratio = annualized_return / abs(max_drawdown)
+        else:
+            calmar_ratio = 0
+
         return {
             "strategy_return": f"{strategy_return:.2%}",
             "annualized_return": f"{annualized_return:.2%}",
             "max_drawdown": f"{max_drawdown:.2%}",
+            "sharpe_ratio": f"{sharpe_ratio:.2f}",
+            "volatility": f"{volatility:.2%}",
+            "calmar_ratio": f"{calmar_ratio:.2f}",
             "revenue": {"x": x_data, "y": y_data},
         }
-
-        # 计算滚动最小值
-        rolling_min = np.minimum.accumulate(cum_returns)
-
-        # 计算盈利
-        gains = cum_returns / rolling_min - 1
-
-        # 计算最大盈利
-        max_gain = np.max(gains)
-
-        # print(risk_free_rate, np.mean(strategy_return))
-        # return {
-        #     "strategy_return": strategy_return,
-        #     "max_drawdown": f"{max_drawdown:.2%}",
-        #     "max_profit": f"{max_gain:.2%}",
-        #     "code_returns": {
-        #         code: ret
-        #         for code, ret in zip(global_var.SYMBOLS, np.array(self.returns))
-        #     },
-        #     "sharpe_ratio": (np.mean(strategy_return) - risk_free_rate)
-        #     / np.std(strategy_return),
-        #     "revenue": {"x": x_data, "y": y_data},
-        # }

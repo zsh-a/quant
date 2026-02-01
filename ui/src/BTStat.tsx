@@ -86,12 +86,16 @@ export default ({ isBting, btres }) => {
   )
   return (
     <>
-      <StatGroup>
+      <Heading size="md" mb={4}>Portfolio Metrics</Heading>
+      <StatGroup mb={6}>
         <Stat.Root>
           <Stat.Label>Strategy Return</Stat.Label>
           <Stat.ValueText>{btres['strategy_return']}</Stat.ValueText>
         </Stat.Root>
-
+        <Stat.Root>
+          <Stat.Label>Annualized Return</Stat.Label>
+          <Stat.ValueText>{btres['annualized_return']}</Stat.ValueText>
+        </Stat.Root>
         <Stat.Root>
           <Stat.Label>Max Drawdown</Stat.Label>
           <Stat.ValueText>{btres['max_drawdown']}</Stat.ValueText>
@@ -101,14 +105,51 @@ export default ({ isBting, btres }) => {
           <Stat.ValueText>{btres['sharpe_ratio']}</Stat.ValueText>
         </Stat.Root>
         <Stat.Root>
-          <Stat.Label>Win Ratio</Stat.Label>
-          <Stat.ValueText>{btres['order_stats']?.['win']} - {btres['order_stats']?.['loss']}</Stat.ValueText>
+          <Stat.Label>Volatility</Stat.Label>
+          <Stat.ValueText>{btres['volatility']}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Calmar Ratio</Stat.Label>
+          <Stat.ValueText>{btres['calmar_ratio']}</Stat.ValueText>
         </Stat.Root>
         <Stat.Root>
           <Stat.Label>Buy & Hold</Stat.Label>
           <Stat.ValueText>{btres['market_return']}%</Stat.ValueText>
         </Stat.Root>
       </StatGroup>
+
+      <Heading size="md" mb={4}>Trade Metrics</Heading>
+      <StatGroup mb={6}>
+        <Stat.Root>
+          <Stat.Label>Total Trades</Stat.Label>
+          <Stat.ValueText>{btres['order_stats']?.['total_trades']}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Win Rate</Stat.Label>
+          <Stat.ValueText>{btres['order_stats']?.['win_rate']}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Profit Factor</Stat.Label>
+          <Stat.ValueText>{btres['order_stats']?.['profit_factor']}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Avg Profit</Stat.Label>
+          <Stat.ValueText>{btres['order_stats']?.['avg_profit']}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Avg Loss</Stat.Label>
+          <Stat.ValueText>{btres['order_stats']?.['avg_loss']}</Stat.ValueText>
+        </Stat.Root>
+        <Stat.Root>
+          <Stat.Label>Max Win</Stat.Label>
+          <Stat.ValueText>{btres['order_stats']?.['max_win']}</Stat.ValueText>
+        </Stat.Root>
+         <Stat.Root>
+          <Stat.Label>Max Loss</Stat.Label>
+          <Stat.ValueText>{btres['order_stats']?.['max_loss']}</Stat.ValueText>
+        </Stat.Root>
+      </StatGroup>
+
       <ReactECharts option={options} style={{ width: 1920, height: 1080, minWidth: 800, minHeight: 400 }} />
       {trading_history_ui}
     </>

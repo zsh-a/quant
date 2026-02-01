@@ -237,12 +237,26 @@ class OrderManager:
 
         win = 0
         loss = 0
+        total_profit = 0
+        total_loss = 0
+        max_win = 0
+        max_loss = 0
+        returns = []
+
         order_history = []
         for order in trade_infos:
-            if order["return"] > 0:
+            ret = order["return"]
+            returns.append(ret)
+            if ret > 0:
                 win += 1
+                total_profit += ret
+                if ret > max_win:
+                    max_win = ret
             else:
                 loss += 1
+                total_loss += ret
+                if ret < max_loss:
+                    max_loss = ret
 
             order_history.append(
                 {
@@ -256,10 +270,23 @@ class OrderManager:
                     ),
                 }
             )
+        
+        total_trades = win + loss
+        win_rate = win / total_trades if total_trades > 0 else 0
+        avg_profit = total_profit / win if win > 0 else 0
+        avg_loss = total_loss / loss if loss > 0 else 0
+        profit_factor = total_profit / abs(total_loss) if total_loss != 0 else float('inf') if total_profit > 0 else 0
 
         return {
             "win": win,
             "loss": loss,
+            "total_trades": total_trades,
+            "win_rate": f"{win_rate:.2%}",
+            "avg_profit": f"{avg_profit:.2f}%",
+            "avg_loss": f"{avg_loss:.2f}%",
+            "profit_factor": f"{profit_factor:.2f}",
+            "max_win": f"{max_win:.2f}%",
+            "max_loss": f"{max_loss:.2f}%",
             "order_history": order_history,
             # "total_revenue": sum([order["order_revenue"] for order in order_returns]),
         }
