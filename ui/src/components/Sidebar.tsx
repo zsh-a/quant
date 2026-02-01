@@ -40,19 +40,20 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
                 <NavItem icon="📊" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => onTabChange('dashboard')} />
                 <NavItem icon="🧪" label="Lab & Sessions" active={activeTab === 'lab'} onClick={() => onTabChange('lab')} />
                 <NavItem icon="⚖️" label="Analysis" active={activeTab === 'analysis'} onClick={() => onTabChange('analysis')} />
+                <NavItem icon="🛡️" label="Risk Monitor" active={activeTab === 'risk'} onClick={() => onTabChange('risk')} />
             </div>
 
             <div style={{ marginTop: 'auto' }}>
                 <div className="tagline">Active Sessions ({activeSessions.length})</div>
                 {activeSessions.slice(0, 5).map(s => (
-                    <div 
-                        key={s.id} 
+                    <div
+                        key={s.id}
                         onClick={() => onSessionSelect(s.id)}
-                        style={{ 
-                            fontSize: '0.8rem', 
-                            padding: '0.5rem', 
-                            background: 'rgba(255,255,255,0.05)', 
-                            borderRadius: '4px', 
+                        style={{
+                            fontSize: '0.8rem',
+                            padding: '0.5rem',
+                            background: 'rgba(255,255,255,0.05)',
+                            borderRadius: '4px',
                             marginBottom: '0.5rem',
                             cursor: 'pointer',
                             transition: 'background 0.2s'

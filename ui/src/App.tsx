@@ -15,6 +15,8 @@ import Dashboard from './components/Dashboard';
 import Comparison from './components/Comparison';
 import NewSessionForm from './components/NewSessionForm';
 import SessionList from './components/SessionList';
+import { RiskPanel } from './components/RiskPanel';
+import { CheckpointList } from './components/CheckpointList';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? "http://localhost:8000"
@@ -399,6 +401,20 @@ const App: React.FC = () => {
               onViewSession={handleViewSession}
               onStopSession={stopSession}
             />
+          </div>
+        )}
+
+        {activeTab === 'risk' && primarySessionId && (
+          <div className="risk-tab">
+            <RiskPanel sessionId={primarySessionId} />
+            <div style={{ marginTop: '20px' }}>
+              <CheckpointList
+                sessionId={primarySessionId}
+                onRestore={() => {
+                  fetchSessionData(primarySessionId);
+                }}
+              />
+            </div>
           </div>
         )}
       </main>

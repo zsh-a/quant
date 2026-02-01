@@ -204,7 +204,21 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                 if req.mode == "simulation":
                     time.sleep(1) # Simulate 1 second per bar
 
-            engine = TradingEngine(strategy, broker, stream, on_step=on_step)
+            # Initialize risk manager if enabled
+            risk_manager = None
+            risk_config = get_section('risk_management')
+            if risk_config.get('enabled', False):
+                from src.core.risk_manager import RiskManager
+                initial_capital = backtest_config.get('initial_cash', 1000000.0) if req.mode != "live" else 1000000.0
+                risk_manager = RiskManager(initial_capital=initial_capital)
+                logger.info(f"Risk manager initialized for session {session_id}")
+                
+                # Attach risk manager to broker if it's BacktestBroker
+                if isinstance(broker, BacktestBroker):
+                    broker.risk_manager = risk_manager
+                    logger.info(f"Risk manager attached to BacktestBroker")
+
+            engine = TradingEngine(strategy, broker, stream, on_step=on_step, risk_manager=risk_manager)
             session.engine = engine
             engine.run()
             

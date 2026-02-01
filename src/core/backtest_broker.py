@@ -1,14 +1,18 @@
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from .base import Broker, Order, Bar
 from datetime import datetime
 from loguru import logger
 import uuid
 
 class BacktestBroker(Broker):
-    def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0001, db_client=None):
+    def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0001, 
+                 db_client=None, risk_manager=None):
         self.cash = initial_cash
+        self.initial_cash = initial_cash
         self.commission = commission
         self.db_client = db_client
+        self.risk_manager = risk_manager
+        
         self.positions: Dict[str, float] = {}  # symbol -> quantity
         self.orders: Dict[str, Order] = {}
         self.history: List[Order] = []
@@ -28,6 +32,12 @@ class BacktestBroker(Broker):
         # Stock name mapping
         self.stock_names: Dict[str, str] = {}
         self._load_stock_names()
+        
+        # Initialize risk manager if provided
+        if self.risk_manager:
+            self.risk_manager.current_capital = initial_cash
+            self.risk_manager.daily_start_capital = initial_cash
+            logger.info(f"BacktestBroker initialized with risk manager")
 
     def _load_stock_names(self):
         import os
@@ -168,7 +178,7 @@ class BacktestBroker(Broker):
                 curr_cost = self.position_costs.get(order.symbol, 0.0)
                 total_shares = curr_qty + order.quantity
                 
-                # Update average cost (including commissions) - merged from dev branch logic
+                # Update average cost (including commissions)
                 total_spent = (curr_qty * curr_cost) + amount + fee
                 new_cost = total_spent / total_shares
                 
@@ -177,6 +187,11 @@ class BacktestBroker(Broker):
                 order.status = "FILLED"
                 order.avg_fill_price = execution_price
                 order.filled_quantity = order.quantity
+                
+                # Update risk manager
+                if self.risk_manager:
+                    self.risk_manager.add_position(order.symbol, order.quantity, execution_price)
+                    
             else:
                 order.status = "REJECTED"
                 logger.warning(f"Order REJECTED (Insufficient cash): {order.symbol}")
@@ -185,11 +200,17 @@ class BacktestBroker(Broker):
             if curr_qty >= order.quantity:
                 self.cash += (amount - fee)
                 new_qty = curr_qty - order.quantity
+                
+                # Update risk manager before modifying positions
+                if self.risk_manager and order.symbol in self.risk_manager.positions:
+                    self.risk_manager.close_position(order.symbol, execution_price)
+                
                 if new_qty > 0:
                     self.positions[order.symbol] = new_qty
                 else:
                     self.positions.pop(order.symbol, None)
                     self.position_costs.pop(order.symbol, None)
+                    
                 order.status = "FILLED"
                 order.avg_fill_price = execution_price
                 order.filled_quantity = order.quantity
@@ -218,6 +239,45 @@ class BacktestBroker(Broker):
         if not bars: return
         
         current_ts = next(iter(bars.values())).timestamp
+        
+        # Update risk manager positions with current prices
+        if self.risk_manager:
+            for symbol in self.positions.keys():
+                if symbol in bars:
+                    current_price = bars[symbol].close
+                    self.risk_manager.update_position(symbol, current_price)
+                    
+                    # Check stop loss and take profit
+                    stop_triggered, stop_reason = self.risk_manager.check_stop_loss(symbol, current_price)
+                    if stop_triggered:
+                        logger.warning(f"Stop loss triggered for {symbol}: {stop_reason}")
+                        # Auto-create sell order
+                        qty = self.positions.get(symbol, 0)
+                        if qty > 0:
+                            sell_order = Order(
+                                symbol=symbol,
+                                type='sell',
+                                quantity=qty,
+                                execution_type='IMMEDIATE_CLOSE'
+                            )
+                            self.submit_order(sell_order)
+                    
+                    profit_triggered, profit_reason = self.risk_manager.check_take_profit(symbol, current_price)
+                    if profit_triggered:
+                        logger.info(f"Take profit triggered for {symbol}: {profit_reason}")
+                        # Auto-create sell order
+                        qty = self.positions.get(symbol, 0)
+                        if qty > 0:
+                            sell_order = Order(
+                                symbol=symbol,
+                                type='sell',
+                                quantity=qty,
+                                execution_type='IMMEDIATE_CLOSE'
+                            )
+                            self.submit_order(sell_order)
+            
+            # Update capital
+            self.risk_manager.current_capital = self.get_total_equity()
         
         # Process NEXT_OPEN orders (Standard Backtest behavior)
         for order_id in list(self.orders.keys()):
