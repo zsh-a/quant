@@ -151,7 +151,7 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
                 ))}
             </div>
 
-            <style jsx>{`
+            <style>{`
         .checkpoint-list {
           background: #1a1a1a;
           border-radius: 12px;

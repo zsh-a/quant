@@ -89,9 +89,7 @@ export const calculateMetrics = (equityHistory: EquityPoint[], trades: Trade[]):
     const stdDev = Math.sqrt(variance);
     const annualizedVol = stdDev * Math.sqrt(252);
     
-    // Assume risk-free rate is 0 for simplicity, or 2% (0.02)
-    const riskFreeRate = 0.02; 
-    // Sharpe = (Annualized Return - Risk Free) / Annualized Volatility
+// Sharpe = (Annualized Return - Risk Free) / Annualized Volatility
     // Or simplified: Mean Daily Return / Daily StdDev * sqrt(252)
     const sharpeRatio = stdDev === 0 ? 0 : (meanReturn / stdDev) * Math.sqrt(252);
 

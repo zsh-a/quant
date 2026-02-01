@@ -1,3 +1,4 @@
+import os
 import numpy as np
 import pandas as pd
 import clickhouse_connect
@@ -6,10 +7,21 @@ from loguru import logger
 # import talib as ta
 
 
+def _clickhouse_host():
+    return os.environ.get("CLICKHOUSE_HOST", "localhost")
+
+
+def _clickhouse_port():
+    return int(os.environ.get("CLICKHOUSE_PORT", "8123"))
+
+
 class DB:
     def __init__(self):
         self.client = clickhouse_connect.get_client(
-            host="localhost", username="default", password=""
+            host=_clickhouse_host(),
+            port=_clickhouse_port(),
+            username=os.environ.get("CLICKHOUSE_USER", "default"),
+            password=os.environ.get("CLICKHOUSE_PASSWORD", ""),
         )
         self._cache = {}
 

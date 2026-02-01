@@ -1,11 +1,17 @@
+import os
 import sqlite3
 import json
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 
+
+def _default_db_path() -> str:
+    return os.environ.get("SESSION_DB_PATH", "sessions.db")
+
+
 class SessionDB:
-    def __init__(self, db_path="sessions.db"):
-        self.db_path = db_path
+    def __init__(self, db_path: Optional[str] = None):
+        self.db_path = db_path if db_path is not None else _default_db_path()
         self.init_db()
 
     def init_db(self):

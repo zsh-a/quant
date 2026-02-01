@@ -42,9 +42,19 @@ export const useWebSocket = ({
     const [usePolling, setUsePolling] = useState(false);
 
     const wsRef = useRef<WebSocket | null>(null);
-    const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-    const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null);
+    const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pollingIntervalRef = useRef<ReturnType<typeof setTimeout> | null>(null);
     const lastMessageTimeRef = useRef<string>('');
+
+    // Refs for callbacks so connect() identity is stable and we don't reconnect on every render
+    const onMessageRef = useRef(onMessage);
+    const onConnectRef = useRef(onConnect);
+    const onDisconnectRef = useRef(onDisconnect);
+    const onErrorRef = useRef(onError);
+    onMessageRef.current = onMessage;
+    onConnectRef.current = onConnect;
+    onDisconnectRef.current = onDisconnect;
+    onErrorRef.current = onError;
 
     // Cleanup function
     const cleanup = useCallback(() => {
@@ -62,7 +72,7 @@ export const useWebSocket = ({
         }
     }, []);
 
-    // Connect to WebSocket
+    // Connect to WebSocket - deps only sessionId/enabled/connectionAttempts so we don't reconnect on every parent re-render
     const connect = useCallback(() => {
         if (!enabled || !sessionId) return;
 
@@ -71,62 +81,50 @@ export const useWebSocket = ({
             wsRef.current = ws;
 
             ws.onopen = () => {
-                console.log(`[WebSocket] Connected to session: ${sessionId}`);
                 setIsConnected(true);
                 setConnectionAttempts(0);
                 setUsePolling(false);
 
-                // Send subscribe message
                 ws.send(JSON.stringify({
                     type: 'subscribe',
                     session_id: sessionId
                 }));
 
-                onConnect?.();
+                onConnectRef.current?.();
             };
 
             ws.onmessage = (event) => {
                 try {
                     const message: WebSocketMessage = JSON.parse(event.data);
 
-                    // Handle ping/pong
                     if (message.type === 'ping') {
                         ws.send(JSON.stringify({ type: 'pong' }));
                         return;
                     }
 
-                    // Update last message time for polling fallback
                     lastMessageTimeRef.current = message.timestamp;
-
-                    onMessage?.(message);
+                    onMessageRef.current?.(message);
                 } catch (error) {
                     console.error('[WebSocket] Failed to parse message:', error);
                 }
             };
 
-            ws.onerror = (error) => {
-                console.error('[WebSocket] Error:', error);
-                onError?.(error);
+            ws.onerror = (err) => {
+                onErrorRef.current?.(err);
             };
 
             ws.onclose = () => {
-                console.log('[WebSocket] Disconnected');
                 setIsConnected(false);
                 wsRef.current = null;
-                onDisconnect?.();
+                onDisconnectRef.current?.();
 
-                // Attempt to reconnect
                 if (enabled && connectionAttempts < 5) {
                     const delay = Math.min(1000 * Math.pow(2, connectionAttempts), 30000);
-                    console.log(`[WebSocket] Reconnecting in ${delay}ms...`);
-
                     reconnectTimeoutRef.current = setTimeout(() => {
                         setConnectionAttempts(prev => prev + 1);
                         connect();
                     }, delay);
                 } else if (fallbackToPolling) {
-                    // Fall back to HTTP polling after max reconnect attempts
-                    console.log('[WebSocket] Max reconnect attempts reached, falling back to polling');
                     setUsePolling(true);
                 }
             };
@@ -137,29 +135,30 @@ export const useWebSocket = ({
                 setUsePolling(true);
             }
         }
-    }, [enabled, sessionId, connectionAttempts, fallbackToPolling, onConnect, onMessage, onDisconnect, onError]);
+    }, [enabled, sessionId, connectionAttempts, fallbackToPolling]);
 
-    // HTTP polling fallback
+    // HTTP polling fallback - no onMessage in deps, use ref
     useEffect(() => {
         if (!usePolling || !enabled || !sessionId) return;
 
-        console.log('[Polling] Starting HTTP polling fallback');
+        const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
+            ? 'http://localhost:8000'
+            : `${window.location.protocol}//${window.location.hostname}:8000`;
 
         const poll = async () => {
             try {
                 const url = lastMessageTimeRef.current
-                    ? `http://localhost:8000/session/${sessionId}/status?since=${encodeURIComponent(lastMessageTimeRef.current)}`
-                    : `http://localhost:8000/session/${sessionId}/status`;
+                    ? `${baseUrl}/session/${sessionId}/status?since=${encodeURIComponent(lastMessageTimeRef.current)}`
+                    : `${baseUrl}/session/${sessionId}/status`;
 
                 const response = await fetch(url);
                 const data = await response.json();
 
-                // Simulate WebSocket message format
                 if (data.equity_history && data.equity_history.length > 0) {
                     const lastEquity = data.equity_history[data.equity_history.length - 1];
                     lastMessageTimeRef.current = lastEquity.timestamp;
 
-                    onMessage?.({
+                    onMessageRef.current?.({
                         type: 'session_progress',
                         session_id: sessionId,
                         timestamp: new Date().toISOString(),
@@ -174,25 +173,22 @@ export const useWebSocket = ({
             }
         };
 
-        // Initial poll
         poll();
-
-        // Set up polling interval
         pollingIntervalRef.current = setInterval(poll, pollingInterval);
 
         return () => {
             if (pollingIntervalRef.current) {
                 clearInterval(pollingIntervalRef.current);
+                pollingIntervalRef.current = null;
             }
         };
-    }, [usePolling, enabled, sessionId, pollingInterval, onMessage]);
+    }, [usePolling, enabled, sessionId, pollingInterval]);
 
-    // Connect on mount or when sessionId changes
+    // Connect on mount or when sessionId/enabled/usePolling change only
     useEffect(() => {
         if (enabled && sessionId && !usePolling) {
             connect();
         }
-
         return cleanup;
     }, [enabled, sessionId, usePolling, connect, cleanup]);
 

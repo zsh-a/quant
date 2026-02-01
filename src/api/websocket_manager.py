@@ -33,8 +33,10 @@ class ConnectionManager:
         self.active_connections[session_id].add(websocket)
         self.connection_sessions[websocket] = session_id
         
-        logger.info(f"WebSocket connected: session={session_id}, "
-                   f"total_connections={len(self.active_connections[session_id])}")
+        count = len(self.active_connections[session_id])
+        # Log only first connection per session to avoid log flood from reconnects/duplicates
+        if count == 1:
+            logger.info(f"WebSocket connected: session={session_id}")
         
         # Start heartbeat for this connection
         asyncio.create_task(self._heartbeat(websocket))
@@ -139,9 +141,8 @@ async def handle_websocket_message(websocket: WebSocket, data: dict):
         logger.debug("Received pong from client")
     
     elif msg_type == 'subscribe':
-        # Client subscribing to specific events
         session_id = data.get('session_id')
-        logger.info(f"Client subscribed to session: {session_id}")
+        logger.debug(f"Client subscribed to session: {session_id}")
     
     elif msg_type == 'unsubscribe':
         # Client unsubscribing

@@ -28,6 +28,21 @@ const AVAILABLE_BENCHMARKS = [
   { code: 'sz.399006', name: 'ChiNext' }
 ];
 
+function mergeEquity(prev: EquityPoint[], next: EquityPoint[]): EquityPoint[] {
+  if (next.length === 0) return prev;
+  const seen = new Set(prev.map((p) => p.timestamp));
+  const added = next.filter((p) => !seen.has(p.timestamp));
+  return added.length === 0 ? prev : [...prev, ...added];
+}
+
+function mergeTrades(prev: Trade[], next: Trade[]): Trade[] {
+  if (next.length === 0) return prev;
+  const key = (t: Trade) => `${t.timestamp}-${t.symbol}-${t.type}-${t.quantity}`;
+  const seen = new Set(prev.map(key));
+  const added = next.filter((t) => !seen.has(key(t)));
+  return added.length === 0 ? prev : [...prev, ...added];
+}
+
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
 
@@ -65,6 +80,32 @@ const App: React.FC = () => {
       localStorage.removeItem('primarySessionId');
     }
   }, [primarySessionId]);
+
+  // Prune stale session refs when server session list updates (avoid residual curves for deleted/old sessions)
+  useEffect(() => {
+    const validIds = new Set(sessions.map((s) => s.id));
+    if (validIds.size === 0) return;
+
+    setSelectedSessionIds((prev) => {
+      const next = prev.filter((id) => validIds.has(id));
+      return next.length === prev.length ? prev : next;
+    });
+
+    if (primarySessionId && !validIds.has(primarySessionId)) {
+      const remainingSelected = selectedSessionIds.filter((id) => validIds.has(id));
+      setPrimarySessionId(remainingSelected.length > 0 ? remainingSelected[0] : null);
+    }
+
+    setSessionDataCache((prev) => {
+      const keys = Object.keys(prev).filter((id) => validIds.has(id));
+      if (keys.length === Object.keys(prev).length) return prev;
+      const next: Record<string, { equity: EquityPoint[]; trades: Trade[]; positions: Record<string, Position> }> = {};
+      keys.forEach((id) => {
+        next[id] = prev[id];
+      });
+      return next;
+    });
+  }, [sessions]);
 
   // Benchmark State
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
@@ -138,15 +179,13 @@ const App: React.FC = () => {
           break;
 
         case 'equity_update':
-          // Add new equity point
           const equity = message.data.equity;
-          setEquityHistory(prev => [...prev, equity]);
+          setEquityHistory((prev) => mergeEquity(prev, [equity]));
           lastUpdatedRef.current = equity.timestamp;
           break;
 
         case 'trade_executed':
-          // Add new trade
-          setTrades(prev => [...prev, message.data.trade]);
+          setTrades((prev) => mergeTrades(prev, [message.data.trade]));
           break;
 
         case 'session_completed':
@@ -189,15 +228,14 @@ const App: React.FC = () => {
       fetchSessionDetails(primarySessionId);
     }
 
-    // Only poll for sessions list, not individual session data (WebSocket handles that)
+    // Only poll for sessions list; WebSocket handles real-time session data
     pollInterval.current = window.setInterval(() => {
       fetchSessions();
 
-      // If WebSocket is not connected and not using polling fallback, fetch manually
       if (!isConnected && !usePolling && primarySessionId) {
         fetchSessionDetails(primarySessionId);
       }
-    }, 5000); // Reduced frequency since WebSocket handles real-time updates
+    }, 15000); // 15s to avoid log flood; WebSocket handles live updates
 
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
@@ -238,25 +276,26 @@ const App: React.FC = () => {
 
   const fetchSessionDetails = async (id: string) => {
     try {
-      let url = `${API_BASE}/session/${id}/status`;
-      if (lastUpdatedRef.current) {
-        url += `?since=${encodeURIComponent(lastUpdatedRef.current)}`;
-      }
+      const since = lastUpdatedRef.current;
+      const url = since
+        ? `${API_BASE}/session/${id}/status?since=${encodeURIComponent(since)}`
+        : `${API_BASE}/session/${id}/status`;
       const resp = await fetch(url);
       const data = await resp.json();
 
-      // Incremental merge: only append new data
-      if (data.equity_history && data.equity_history.length > 0) {
-        setEquityHistory(prev => [...prev, ...data.equity_history]);
-        // Update last timestamp for next incremental fetch
-        lastUpdatedRef.current = data.equity_history[data.equity_history.length - 1].timestamp;
-      }
+      const equityList = data.equity_history || [];
+      const tradeList = data.trades || [];
 
-      if (data.trades && data.trades.length > 0) {
-        setTrades(prev => [...prev, ...data.trades]);
+      if (!since) {
+        setEquityHistory(equityList);
+        setTrades(tradeList);
+      } else {
+        setEquityHistory((prev) => mergeEquity(prev, equityList));
+        setTrades((prev) => mergeTrades(prev, tradeList));
       }
-
-      // Positions are always full snapshot (not incremental)
+      if (equityList.length > 0) {
+        lastUpdatedRef.current = equityList[equityList.length - 1].timestamp;
+      }
       setPositions(data.positions || {});
     } catch (err) {
       console.error("Fetch details error", err);
@@ -411,7 +450,7 @@ const App: React.FC = () => {
               <CheckpointList
                 sessionId={primarySessionId}
                 onRestore={() => {
-                  fetchSessionData(primarySessionId);
+                  fetchSessionDataFull(primarySessionId);
                 }}
               />
             </div>

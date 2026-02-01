@@ -1,4 +1,9 @@
 from fastapi import FastAPI, BackgroundTasks, HTTPException, Query, WebSocket, WebSocketDisconnect
+
+try:
+    from websockets.exceptions import ConnectionClosed as WsConnectionClosed
+except ImportError:
+    WsConnectionClosed = None
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -23,10 +28,12 @@ from src.strategies.rotation_strategy import RotationStrategy
 from src.utils.config import get, get_section
 from src.utils.logging_config import setup_logging, get_logger
 from src.api.websocket_manager import manager as ws_manager, handle_websocket_message
-from src.api.events import event_bus, EventType
+from src.api.events import event_bus, EventType, emit_equity_update, emit_session_progress, emit_trade_executed, emit_session_completed, emit_error
 from src.api.state_persistence import persistence
 from db import DB
 from session_db import SessionDB
+from src.api.tasks_router import router as tasks_router
+from src.api.monitoring_router import router as monitoring_router
 
 # Initialize logging system
 setup_logging()
@@ -46,6 +53,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(tasks_router)
+app.include_router(monitoring_router)
 
 logger.info(f"API Server starting with config: port={api_config.get('port', 8000)}")
 
@@ -98,7 +109,9 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
     # Persist initial session state
     session_db.create_session(session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date)
     # Note: params persistence in DB is not yet implemented in session_db, but it's okay for now.
-    
+
+    loop = asyncio.get_running_loop()
+
     def execute_session_task():
         try:
             db_client = DB()
@@ -186,15 +199,22 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                         )
                         # Keep latest positions in memory for quick access
                         session.positions = pt.get('positions', {})
+                        # Broadcast to WebSocket so frontend updates in real time
+                        asyncio.run_coroutine_threadsafe(emit_equity_update(session_id, pt), loop)
                     
                     # Clear broker history to save memory
                     if isinstance(broker, BacktestBroker):
                         broker.equity_history.clear()
+                    # Broadcast progress so frontend progress bar updates
+                    asyncio.run_coroutine_threadsafe(
+                        emit_session_progress(session_id, session.progress, session.status), loop
+                    )
 
                 new_trades = info.get('trades', [])
                 if new_trades:
                     for trade in new_trades:
                         session_db.add_trade(session_id, trade)
+                        asyncio.run_coroutine_threadsafe(emit_trade_executed(session_id, trade), loop)
                     
                     # Clear broker trades to save memory
                     if isinstance(broker, BacktestBroker):
@@ -225,12 +245,20 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
             session.status = "completed"
             session.progress = 100.0
             session_db.update_session_status(session_id, "completed", 100.0)
+            # Notify WebSocket clients so frontend marks session complete
+            eq_hist = session_db.get_equity_history(session_id)
+            final_equity = eq_hist[-1]["total_equity"] if eq_hist else 0.0
+            trades_list = session_db.get_trades(session_id)
+            asyncio.run_coroutine_threadsafe(
+                emit_session_completed(session_id, final_equity, len(trades_list)), loop
+            )
             
         except Exception as e:
             session.status = "failed"
             session.error = str(e)
             session_db.update_session_status(session_id, "failed", error=str(e))
             print(f"Session failed: {e}")
+            asyncio.run_coroutine_threadsafe(emit_error(session_id, str(e)), loop)
 
     background_tasks.add_task(execute_session_task)
     return {"session_id": session_id}
@@ -239,6 +267,22 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
 async def get_sessions():
     # Return sessions from DB (persistent)
     return session_db.get_all_sessions()
+
+@app.get("/session/{session_id}/risk")
+async def get_session_risk(session_id: str):
+    """Risk metrics and alerts for a session. Returns 404 if session not found."""
+    s_mem = SESSIONS.get(session_id)
+    s_db = session_db.get_session(session_id) if not s_mem else None
+    if not s_mem and not s_db:
+        raise HTTPException(status_code=404, detail="Session not found")
+    # Risk manager state is not persisted; return safe default so RiskPanel doesn't 404
+    return {
+        "enabled": bool(s_mem and getattr(s_mem, "engine", None) and getattr(s_mem.engine, "risk_manager", None)),
+        "metrics": {},
+        "limits": {},
+        "alerts": [],
+    }
+
 
 @app.get("/session/{session_id}/status")
 async def get_session_status(session_id: str, since: Optional[str] = Query(None, description="Return data since this timestamp")):
@@ -327,14 +371,14 @@ async def get_benchmark(symbol: str, start_date: str, end_date: Optional[str] = 
 async def websocket_endpoint(websocket: WebSocket, session_id: str):
     """WebSocket endpoint for real-time session updates"""
     await ws_manager.connect(websocket, session_id)
-    
+    closed_exc = (WebSocketDisconnect,)
+    if WsConnectionClosed is not None:
+        closed_exc = (WebSocketDisconnect, WsConnectionClosed)
     try:
         while True:
-            # Receive messages from client
             data = await websocket.receive_json()
             await handle_websocket_message(websocket, data)
-            
-    except WebSocketDisconnect:
+    except closed_exc:
         ws_manager.disconnect(websocket)
         logger.info(f"WebSocket disconnected for session: {session_id}")
     except Exception as e:

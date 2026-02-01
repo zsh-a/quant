@@ -1,12 +1,6 @@
 // Largest-Triangle-Three-Buckets (LTTB) downsampling algorithm
 // Adapted for TypeScript
 
-interface Point {
-    timestamp: string;
-    value: number;
-    [key: string]: any;
-}
-
 export function lttb(data: any[], threshold: number, valueKey: string = 'value'): any[] {
     const dataLength = data.length;
     if (threshold >= dataLength || threshold === 0) {
@@ -20,7 +14,7 @@ export function lttb(data: any[], threshold: number, valueKey: string = 'value')
     const every = (dataLength - 2) / (threshold - 2);
 
     let a = 0;
-    let maxAreaPoint, maxArea, area, nextA;
+    let maxAreaPoint: any, maxArea: number, area: number;
 
     sampled[sampledIndex++] = data[a];
 
@@ -51,6 +45,7 @@ export function lttb(data: any[], threshold: number, valueKey: string = 'value')
         const pointAY = data[a][valueKey] || 0;
 
         maxArea = -1;
+        let nextA = a;
 
         for (; rangeOffs < rangeTo; rangeOffs++) {
             // Calculate triangle area over three buckets
@@ -63,7 +58,7 @@ export function lttb(data: any[], threshold: number, valueKey: string = 'value')
             }
         }
 
-        sampled[sampledIndex++] = maxAreaPoint;
+        sampled[sampledIndex++] = maxAreaPoint!;
         a = nextA; // This a is the next a (chosen b)
     }
 

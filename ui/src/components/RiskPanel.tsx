@@ -170,7 +170,7 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
                 </div>
             )}
 
-            <style jsx>{`
+            <style>{`
         .risk-panel {
           background: #1a1a1a;
           border-radius: 12px;

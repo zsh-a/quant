@@ -1,0 +1,17 @@
+# Prometheus configuration for monitoring
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+
+scrape_configs:
+  # Quant API metrics
+  - job_name: 'quant_api'
+    static_configs:
+      - targets: ['api:8000']
+    metrics_path: '/monitoring/metrics'
+    scrape_interval: 15s
+
+  # Prometheus self-monitoring
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']

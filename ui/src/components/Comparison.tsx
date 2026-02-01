@@ -54,8 +54,8 @@ const Comparison: React.FC<ComparisonProps> = ({
     selectedSessionIds,
     sessionDataCache,
     allSessions,
-    benchmarksData,
-    availableBenchmarks
+    benchmarksData: _benchmarksData,
+    availableBenchmarks: _availableBenchmarks
 }) => {
     const [useLttb, setUseLttb] = useState(true);
 

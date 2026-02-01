@@ -1,15 +1,150 @@
 services:
-  clickhouse:
-    image: bitnami/clickhouse:latest
-    container_name: clickhouse
-    restart: unless-stopped  # 推荐企业级应用使用自动重启策略[3,5](@ref)
-    volumes:
-      - ./db:/bitnami/clickhouse         # 数据持久化目录
-      - ./config/backup_disk.xml:/etc/clickhouse-server/config.d/backup_disk.xml  # 配置文件映射
-      - ./backups:/backups                # 备份目录
-    environment:
-      - ALLOW_EMPTY_PASSWORD=yes         # 允许空密码登录
+  # Redis - Message broker and cache
+  redis:
+    image: redis:7-alpine
+    container_name: quant_redis
     ports:
-      - "9000:9000"                      # ClickHouse TCP 协议端口
-      - "8123:8123"                      # HTTP API 端口
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - quant_network
 
+  # API Server
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quant_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - PYTHONUNBUFFERED=1
+      # Shared sessions DB so API and worker see same equity/trades (Strategy Comparison needs this)
+      - SESSION_DB_PATH=/app/data/sessions.db
+      # ClickHouse: use hostname "clickhouse". Add existing container: docker network connect quant_network clickhouse
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/monitoring/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    networks:
+      - quant_network
+    restart: unless-stopped
+
+  # Celery Worker - Backtest tasks
+  celery_worker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quant_celery_worker
+    command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=4 --queues=backtest,default
+    volumes:
+      - ./data:/app/data
+      - ./config:/app/config
+      - ./logs:/app/logs
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+      - PYTHONUNBUFFERED=1
+      - SESSION_DB_PATH=/app/data/sessions.db
+      - CLICKHOUSE_HOST=clickhouse
+      - CLICKHOUSE_PORT=8123
+    depends_on:
+      redis:
+        condition: service_healthy
+    networks:
+      - quant_network
+    restart: unless-stopped
+
+  # Flower - Celery monitoring
+  flower:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quant_flower
+    command: celery -A src.tasks.celery_app flower --port=5555
+    ports:
+      - "5555:5555"
+    environment:
+      - CELERY_BROKER_URL=redis://redis:6379/0
+      - CELERY_RESULT_BACKEND=redis://redis:6379/1
+    depends_on:
+      - redis
+      - celery_worker
+    networks:
+      - quant_network
+    restart: unless-stopped
+
+  # Frontend - React app with Nginx
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: quant_frontend
+    ports:
+      - "80:80"
+    depends_on:
+      - api
+    networks:
+      - quant_network
+    restart: unless-stopped
+
+  # Prometheus - Metrics collection (optional)
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: quant_prometheus
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - quant_network
+    restart: unless-stopped
+
+  # Grafana - Metrics visualization (optional)
+  grafana:
+    image: grafana/grafana:latest
+    container_name: quant_grafana
+    ports:
+      - "3000:3000"
+    volumes:
+      - grafana_data:/var/lib/grafana
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    depends_on:
+      - prometheus
+    networks:
+      - quant_network
+    restart: unless-stopped
+
+networks:
+  quant_network:
+    driver: bridge
+
+volumes:
+  redis_data:
+  prometheus_data:
+  grafana_data:

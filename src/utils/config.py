@@ -94,6 +94,7 @@ class Config:
         return {
             'database': {
                 'host': 'localhost',
+                'port': 8123,
                 'username': 'default',
                 'password': '',
                 'cache_enabled': True
