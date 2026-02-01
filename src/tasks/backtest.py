@@ -97,9 +97,9 @@ def run_backtest_task(self, session_id: str, config: dict):
         strategy_params = config.get('params', {})
         
         if strategy_name == 'jsg':
-            strategy = JSGStrategy(db_client, **strategy_params)
+            strategy = JSGStrategy(db_client, session_id=session_id, **strategy_params)
         elif strategy_name == 'rotation':
-            strategy = RotationStrategy(db_client, **strategy_params)
+            strategy = RotationStrategy(db_client, session_id=session_id, **strategy_params)
         else:
             raise ValueError(f"Unknown strategy: {strategy_name}")
         

@@ -38,6 +38,7 @@ from src.api.portfolio_router import router as portfolio_router
 from src.api.optimizer_router import router as optimizer_router
 from src.api.analysis_router import router as analysis_router
 from src.api.logs_router import router as logs_router
+from src.tasks.backtest import run_backtest_task
 
 # Initialize logging system
 setup_logging()
@@ -270,6 +271,45 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
 
     background_tasks.add_task(execute_session_task)
     return {"session_id": session_id}
+
+@app.post("/session/run_async")
+async def run_session_async(req: SessionRequest):
+    """
+    Submit a backtest session to Celery queue for async processing.
+    Returns immediately with session_id and task_id for progress tracking.
+    """
+    session_id = str(uuid.uuid4())
+    
+    # Persist initial session state
+    session_db.create_session(session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date)
+    
+    # Build config for Celery task
+    config = {
+        'symbol': req.symbol,
+        'strategy': req.strategy,
+        'start_date': req.start_date,
+        'end_date': req.end_date,
+        'params': req.params or {},
+        'initial_cash': broker_config.get('initial_cash', 1000000.0),
+        'commission': broker_config.get('commission', 0.0001),
+        'enable_risk_management': get_section('risk_management').get('enabled', False),
+        'chunk_size_months': data_stream_config.get('chunk_size_months')
+    }
+    
+    # Submit to Celery
+    task = run_backtest_task.apply_async(
+        args=[session_id, config],
+        queue='backtest'
+    )
+    
+    logger.info(f"Async backtest submitted: session={session_id}, task={task.id}")
+    
+    return {
+        "session_id": session_id,
+        "task_id": task.id,
+        "status": "submitted",
+        "message": "Backtest submitted to queue"
+    }
 
 @app.get("/sessions")
 async def get_sessions():

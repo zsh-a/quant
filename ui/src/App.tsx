@@ -141,19 +141,62 @@ const App: React.FC = () => {
   const startSession = async (payload: any) => {
     setError(null);
     try {
-      const resp = await fetch(`${API_BASE}/session/run`, {
+      // Use async mode if specified, default to sync for compatibility
+      const useAsync = payload.async === true;
+      delete payload.async;
+
+      const endpoint = useAsync ? '/session/run_async' : '/session/run';
+      const resp = await fetch(`${API_BASE}${endpoint}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
       const data = await resp.json();
+
       fetchSessions();
       setPrimarySessionId(data.session_id);
       setSelectedSessionIds(prev => [...prev, data.session_id]);
       setActiveTab('dashboard');
+
+      // If async mode, start polling for task progress
+      if (useAsync && data.task_id) {
+        pollTaskProgress(data.session_id, data.task_id);
+      }
     } catch (err) {
       setError("Failed to start session");
     }
+  };
+
+  // Poll Celery task progress
+  const pollTaskProgress = (sessionId: string, taskId: string) => {
+    const poll = async () => {
+      try {
+        const resp = await fetch(`${API_BASE}/tasks/backtest/${taskId}`);
+        const data = await resp.json();
+
+        // Update session in list with progress
+        setSessions(prev => prev.map(s =>
+          s.id === sessionId
+            ? { ...s, progress: data.progress || 0, status: data.status === 'SUCCESS' ? 'completed' : data.status === 'FAILURE' ? 'failed' : 'running' }
+            : s
+        ));
+
+        // Continue polling if not complete
+        if (data.status !== 'SUCCESS' && data.status !== 'FAILURE') {
+          setTimeout(poll, 2000);
+        } else {
+          // Refresh sessions list and data on completion
+          fetchSessions();
+          if (sessionId === primarySessionId) {
+            fetchSessionDataFull(sessionId);
+          }
+        }
+      } catch (err) {
+        console.error('Task polling error:', err);
+      }
+    };
+
+    poll();
   };
 
   const stopSession = async (id: string) => {

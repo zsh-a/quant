@@ -14,6 +14,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
     const [startDate, setStartDate] = useState('2024-01-01');
     const [endDate, setEndDate] = useState<string>('');
     const [mode, setMode] = useState('backtest');
+    const [useAsync, setUseAsync] = useState(true); // Default to async mode
 
     useEffect(() => {
         if (strategies.length > 0 && !selectedStrategy) {
@@ -33,7 +34,14 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
     }, [selectedStrategy, strategies]);
 
     const handleStart = () => {
-        const payload: any = { strategy: selectedStrategy, symbol, start_date: startDate, mode, params: paramValues };
+        const payload: any = {
+            strategy: selectedStrategy,
+            symbol,
+            start_date: startDate,
+            mode,
+            params: paramValues,
+            async: useAsync && mode === 'backtest' // Only async for backtest mode
+        };
         if (endDate) payload.end_date = endDate;
         onStart(payload);
     };
@@ -50,6 +58,22 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                         <option value="live">Live Trading</option>
                     </select>
                 </div>
+
+                {mode === 'backtest' && (
+                    <div className="input-group" style={{ flexDirection: 'row', alignItems: 'center', gap: '0.5rem' }}>
+                        <input
+                            type="checkbox"
+                            id="asyncMode"
+                            checked={useAsync}
+                            onChange={(e) => setUseAsync(e.target.checked)}
+                            style={{ width: 'auto' }}
+                        />
+                        <label htmlFor="asyncMode" className="tagline" style={{ cursor: 'pointer' }}>
+                            Run in background (Celery queue)
+                        </label>
+                    </div>
+                )}
+
                 <div className="input-group">
                     <label className="tagline">Strategy</label>
                     <select className="glass-input" value={selectedStrategy} onChange={(e) => setSelectedStrategy(e.target.value)}>

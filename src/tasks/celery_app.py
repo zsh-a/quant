@@ -50,10 +50,10 @@ app.conf.update(
         Queue('backtest', Exchange('backtest'), routing_key='backtest'),
         Queue('analysis', Exchange('analysis'), routing_key='analysis'),
     ),
+    
+    # Explicit imports for task discovery
+    imports=['src.tasks.backtest'],
 )
-
-# Auto-discover tasks
-app.autodiscover_tasks(['src.tasks'])
 
 if __name__ == '__main__':
     app.start()
