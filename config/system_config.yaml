@@ -95,7 +95,46 @@ monitoring:
     
 # Feature Flags
 features:
-  enable_websocket: false
+  enable_websocket: true  # Phase 2: WebSocket real-time updates
   enable_parameter_optimization: false
   enable_multi_strategy: false
   enable_risk_manager: false
+  enable_state_persistence: false  # Phase 2: Coming soon
+
+# WebSocket Configuration (Phase 2)
+websocket:
+  enabled: true
+  heartbeat_interval: 30  # seconds
+  max_connections: 1000
+  message_queue_size: 100
+  ping_timeout: 60  # seconds
+  reconnect_interval: 5  # seconds
+
+# State Persistence Configuration (Phase 2)
+persistence:
+  enabled: true
+  checkpoint_interval: 60  # seconds
+  checkpoint_path: "data/checkpoints"
+  use_compression: true
+  keep_checkpoints: 5  # Keep last N checkpoints per session
+  storage_backend: "sqlite"  # sqlite, clickhouse (future)
+
+# Risk Management Configuration (Phase 2)
+risk_management:
+  enabled: true
+  
+  # Position limits
+  max_position_pct: 0.10  # Max 10% per position
+  max_total_position: 0.95  # Max 95% total exposure
+  
+  # Stop loss and take profit
+  stop_loss_pct: 0.05  # 5% stop loss
+  take_profit_pct: 0.15  # 15% take profit
+  
+  # Portfolio limits
+  max_daily_loss_pct: 0.10  # Max 10% daily loss
+  max_drawdown_pct: 0.20  # Max 20% drawdown
+  
+  # Alerts
+  alert_on_limit: true
+  alert_channels: ["log", "websocket"]  # log, websocket, email (future)

@@ -8,6 +8,7 @@ import {
   BenchmarkData,
   StrategyMeta
 } from './types';
+import { useWebSocket } from './hooks/useWebSocket';
 
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -117,7 +118,61 @@ const App: React.FC = () => {
     }
   };
 
-  // Poll for sessions list and active session details
+  // WebSocket for real-time updates
+  const { isConnected, usePolling } = useWebSocket({
+    sessionId: primarySessionId || '',
+    enabled: !!primarySessionId,
+    onMessage: (message) => {
+      console.log('[WebSocket] Received:', message.type);
+
+      switch (message.type) {
+        case 'session_progress':
+          // Update progress in sessions list
+          setSessions(prev => prev.map(s =>
+            s.id === message.session_id
+              ? { ...s, progress: message.data.progress, status: message.data.status }
+              : s
+          ));
+          break;
+
+        case 'equity_update':
+          // Add new equity point
+          const equity = message.data.equity;
+          setEquityHistory(prev => [...prev, equity]);
+          lastUpdatedRef.current = equity.timestamp;
+          break;
+
+        case 'trade_executed':
+          // Add new trade
+          setTrades(prev => [...prev, message.data.trade]);
+          break;
+
+        case 'session_completed':
+          // Update session status
+          setSessions(prev => prev.map(s =>
+            s.id === message.session_id
+              ? { ...s, status: 'completed', progress: 100 }
+              : s
+          ));
+          break;
+
+        case 'error_occurred':
+          console.error('[Session Error]:', message.data.error);
+          setError(message.data.error);
+          break;
+      }
+    },
+    onConnect: () => {
+      console.log('[WebSocket] Connected');
+    },
+    onDisconnect: () => {
+      console.log('[WebSocket] Disconnected');
+    },
+    fallbackToPolling: true,
+    pollingInterval: 2000
+  });
+
+  // Initial data fetch and periodic refresh for sessions list
   useEffect(() => {
     // Reset incremental state on session switch
     setEquityHistory([]);
@@ -132,23 +187,20 @@ const App: React.FC = () => {
       fetchSessionDetails(primarySessionId);
     }
 
+    // Only poll for sessions list, not individual session data (WebSocket handles that)
     pollInterval.current = window.setInterval(() => {
       fetchSessions();
 
-      // Update all selected sessions in cache
-      selectedSessionIds.forEach(id => {
-        fetchSessionDataFull(id);
-      });
-
-      // Also update primary state variables
-      if (primarySessionId) {
+      // If WebSocket is not connected and not using polling fallback, fetch manually
+      if (!isConnected && !usePolling && primarySessionId) {
         fetchSessionDetails(primarySessionId);
       }
-    }, 1000);
+    }, 5000); // Reduced frequency since WebSocket handles real-time updates
+
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
-  }, [primarySessionId]);
+  }, [primarySessionId, isConnected, usePolling]);
 
   const fetchSessionDataFull = async (id: string) => {
     try {

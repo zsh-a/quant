@@ -1,4 +1,4 @@
-from fastapi import FastAPI, BackgroundTasks, HTTPException, Query
+from fastapi import FastAPI, BackgroundTasks, HTTPException, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
@@ -22,6 +22,9 @@ from src.strategies.jsg_strategy import JSGStrategy
 from src.strategies.rotation_strategy import RotationStrategy
 from src.utils.config import get, get_section
 from src.utils.logging_config import setup_logging, get_logger
+from src.api.websocket_manager import manager as ws_manager, handle_websocket_message
+from src.api.events import event_bus, EventType
+from src.api.state_persistence import persistence
 from db import DB
 from session_db import SessionDB
 
@@ -305,9 +308,142 @@ async def get_benchmark(symbol: str, start_date: str, end_date: Optional[str] = 
         print(f"Error fetching benchmark: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
+# WebSocket endpoint for real-time updates
+@app.websocket("/ws/{session_id}")
+async def websocket_endpoint(websocket: WebSocket, session_id: str):
+    """WebSocket endpoint for real-time session updates"""
+    await ws_manager.connect(websocket, session_id)
+    
+    try:
+        while True:
+            # Receive messages from client
+            data = await websocket.receive_json()
+            await handle_websocket_message(websocket, data)
+            
+    except WebSocketDisconnect:
+        ws_manager.disconnect(websocket)
+        logger.info(f"WebSocket disconnected for session: {session_id}")
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        ws_manager.disconnect(websocket)
+
+# Setup event listeners to broadcast to WebSocket clients
+async def broadcast_session_event(event_data: dict):
+    """Broadcast session events to WebSocket clients"""
+    session_id = event_data.get('session_id')
+    if session_id:
+        await ws_manager.broadcast_to_session(session_id, event_data)
+
+# Register event listeners
+event_bus.subscribe(EventType.SESSION_STARTED, broadcast_session_event)
+event_bus.subscribe(EventType.SESSION_PROGRESS, broadcast_session_event)
+event_bus.subscribe(EventType.SESSION_COMPLETED, broadcast_session_event)
+event_bus.subscribe(EventType.SESSION_FAILED, broadcast_session_event)
+event_bus.subscribe(EventType.TRADE_EXECUTED, broadcast_session_event)
+event_bus.subscribe(EventType.EQUITY_UPDATE, broadcast_session_event)
+event_bus.subscribe(EventType.ERROR_OCCURRED, broadcast_session_event)
+
+logger.info("WebSocket event listeners registered")
+
+# State persistence and recovery endpoints
+@app.post("/session/{session_id}/checkpoint")
+async def create_checkpoint(session_id: str):
+    """Create a checkpoint for a session"""
+    session = SESSIONS.get(session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Collect session state
+    state = {
+        'session_id': session_id,
+        'strategy': session.strategy_name,
+        'symbol': session.symbol,
+        'mode': session.mode,
+        'status': session.status,
+        'progress': session.progress,
+        'equity_history': [
+            {'timestamp': str(e['timestamp']), 'value': e['value']}
+            for e in session.equity_history
+        ],
+        'trades': session.trades,
+        'positions': session.positions,
+        'start_date': session.start_date,
+        'end_date': session.end_date,
+        'params': session.params
+    }
+    
+    metadata = {
+        'checkpoint_type': 'manual',
+        'status': session.status,
+        'progress': session.progress
+    }
+    
+    success = persistence.save_checkpoint(session_id, state, metadata)
+    
+    if success:
+        return {"message": "Checkpoint created", "session_id": session_id}
+    else:
+        raise HTTPException(status_code=500, detail="Failed to create checkpoint")
+
+@app.get("/session/{session_id}/checkpoints")
+async def list_checkpoints(session_id: str):
+    """List all checkpoints for a session"""
+    checkpoints = persistence.list_checkpoints(session_id)
+    return {"session_id": session_id, "checkpoints": checkpoints}
+
+@app.post("/session/{session_id}/restore")
+async def restore_session(session_id: str):
+    """Restore a session from the latest checkpoint"""
+    checkpoint = persistence.load_latest_checkpoint(session_id)
+    
+    if not checkpoint:
+        raise HTTPException(status_code=404, detail="No checkpoint found")
+    
+    state = checkpoint['state']
+    
+    # Restore session
+    session = Session(
+        session_id=state['session_id'],
+        strategy_name=state['strategy'],
+        symbol=state['symbol'],
+        mode=state['mode'],
+        start_date=state['start_date'],
+        end_date=state.get('end_date'),
+        params=state.get('params', {})
+    )
+    
+    session.status = state['status']
+    session.progress = state['progress']
+    session.equity_history = state['equity_history']
+    session.trades = state['trades']
+    session.positions = state['positions']
+    
+    SESSIONS[session_id] = session
+    
+    logger.info(f"Session restored: {session_id} from checkpoint {checkpoint['checkpoint_time']}")
+    
+    return {
+        "message": "Session restored",
+        "session_id": session_id,
+        "checkpoint_time": checkpoint['checkpoint_time'],
+        "status": session.status,
+        "progress": session.progress
+    }
+
+@app.get("/persistence/stats")
+async def persistence_stats():
+    """Get persistence statistics"""
+    stats = persistence.get_stats()
+    return stats
+
 @app.get("/status")
 async def status():
-    return {"status": "up", "active_sessions": len([s for s in SESSIONS.values() if s.status == "running"])}
+    ws_connections = ws_manager.get_connection_count()
+    return {
+        "status": "up",
+        "active_sessions": len([s for s in SESSIONS.values() if s.status == "running"]),
+        "websocket_connections": ws_connections
+    }
 
 if __name__ == "__main__":
     import uvicorn

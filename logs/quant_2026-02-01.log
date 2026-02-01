@@ -2143,3 +2143,1204 @@
 2026-02-01 14:04:25 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4100 sz.002890 at 25.707120775849855 on 2024-04-15 00:00:00
 2026-02-01 14:04:25 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11300 sz.003003 at 9.22440169295883 on 2024-04-15 00:00:00
 2026-02-01 14:04:25 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-04-19
+2026-02-01 14:04:26 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:04:26 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:04:26 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-04-26
+2026-02-01 14:04:28 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['非银金融']
+2026-02-01 14:04:28 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002247', 'sz.002188', 'sz.002072', 'sz.002494', 'sz.002830', 'sz.002836', 'sz.003017', 'sz.002295', 'sz.003003'], Holding []
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11200 sz.002633 at 9.077745208568208 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11200 sz.002247 at 8.96677742343092 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 17900 sz.002188 at 5.7354090354090355 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 27900 sz.002072 at 3.65 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10200 sz.002494 at 9.995268434826889 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4500 sz.002830 at 22.649525905686286 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5000 sz.002836 at 20.92483481982987 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 3900 sz.003017 at 25.84299843872814 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10700 sz.002295 at 9.57170902375576 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11500 sz.003003 at 9.040526576155665 on 2024-04-29 00:00:00
+2026-02-01 14:04:28 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-04-30
+2026-02-01 14:04:30 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['非银金融']
+2026-02-01 14:04:30 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002856', 'sz.002247', 'sz.002188', 'sz.002072', 'sz.002494', 'sz.002830', 'sz.002836', 'sz.003011', 'sz.003017'], Holding ['sz.002633', 'sz.002247', 'sz.002188', 'sz.002072', 'sz.002494', 'sz.002830', 'sz.002836', 'sz.003017', 'sz.002295', 'sz.003003']
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10700 sz.002295 at 9.983055196677496 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11500 sz.003003 at 9.489999083896736 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 500 sz.002633 at 10.082998872604286 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11800 sz.002856 at 9.161919153758973 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 800 sz.002247 at 8.96677742343092 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002188 at 6.101221001221001 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 1100 sz.002072 at 3.95 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002494 at 10.724652888179122 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002830 at 24.360538249836335 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002836 at 22.580280612537926 on 2024-05-06 00:00:00
+2026-02-01 14:04:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4800 sz.003011 at 22.090265839933018 on 2024-05-06 00:00:00
+2026-02-01 14:04:31 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-05-10
+2026-02-01 14:04:32 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['房地产']
+2026-02-01 14:04:32 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002856', 'sz.002633', 'sz.002247', 'sz.002188', 'sz.002072', 'sz.002494', 'sz.002883', 'sz.002830', 'sz.002316', 'sz.003017'], Holding ['sz.002633', 'sz.002247', 'sz.002188', 'sz.002072', 'sz.002494', 'sz.002830', 'sz.002836', 'sz.003017', 'sz.002856', 'sz.003011']
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4800 sz.002836 at 22.878260855225378 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4800 sz.003011 at 22.776934156385963 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002856 at 9.378911975821685 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 700 sz.002633 at 10.890248027057499 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002247 at 8.70874066304442 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 1000 sz.002188 at 6.375579975579975 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 1200 sz.002072 at 3.92 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 600 sz.002494 at 10.400482020022574 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 3700 sz.002883 at 29.07356151664991 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8100 sz.002316 at 13.178675401871168 on 2024-05-13 00:00:00
+2026-02-01 14:04:33 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-05-17
+2026-02-01 14:04:35 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['房地产']
+2026-02-01 14:04:35 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002856', 'sz.002247', 'sz.002072', 'sz.002494', 'sz.002316', 'sz.002883', 'sz.003017', 'sz.002295', 'sz.002830'], Holding ['sz.002633', 'sz.002247', 'sz.002188', 'sz.002072', 'sz.002494', 'sz.002830', 'sz.003017', 'sz.002856', 'sz.002883', 'sz.002316']
+2026-02-01 14:04:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 17100 sz.002188 at 6.924297924297925 on 2024-05-20 00:00:00
+2026-02-01 14:04:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002633 at 11.179639233370914 on 2024-05-20 00:00:00
+2026-02-01 14:04:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002247 at 9.289323373914048 on 2024-05-20 00:00:00
+2026-02-01 14:04:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 1300 sz.002072 at 3.91 on 2024-05-20 00:00:00
+2026-02-01 14:04:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002494 at 10.805695605218258 on 2024-05-20 00:00:00
+2026-02-01 14:04:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.002316 at 13.212039137065778 on 2024-05-20 00:00:00
+2026-02-01 14:04:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003017 at 28.275454081848586 on 2024-05-20 00:00:00
+2026-02-01 14:04:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11200 sz.002295 at 10.75828452256846 on 2024-05-20 00:00:00
+2026-02-01 14:04:35 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-05-24
+2026-02-01 14:04:37 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:04:37 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002633', 'sz.002247', 'sz.002072', 'sz.002494', 'sz.002830', 'sz.003017', 'sz.002856', 'sz.002883', 'sz.002316', 'sz.002295']
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10200 sz.002633 at 10.6313190529876 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12200 sz.002247 at 9.289323373914048 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 29300 sz.002072 at 3.69 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10700 sz.002494 at 10.157353868905162 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4400 sz.002830 at 24.57441479285509 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4000 sz.003017 at 27.007628716343383 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11700 sz.002856 at 9.403022289384209 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 3700 sz.002883 at 29.13363085862646 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8600 sz.002316 at 12.244490816422072 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11200 sz.002295 at 9.872308150121645 on 2024-05-27 00:00:00
+2026-02-01 14:04:37 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-05-31
+2026-02-01 14:04:39 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:04:39 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:04:39 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-06-07
+2026-02-01 14:04:40 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:04:40 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:04:40 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-06-14
+2026-02-01 14:04:42 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['电子']
+2026-02-01 14:04:42 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002247', 'sz.002072', 'sz.002494', 'sz.002316', 'sz.002188', 'sz.002495', 'sz.002830', 'sz.002883', 'sz.002094'], Holding []
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11900 sz.002633 at 9.108207440811727 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 13300 sz.002247 at 8.063648762078166 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 34100 sz.002072 at 3.17 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12000 sz.002494 at 8.968727352331154 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10100 sz.002316 at 10.87657767344304 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 18400 sz.002188 at 5.7746031746031745 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7700 sz.002495 at 13.88984127553328 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4800 sz.002830 at 22.240205750189496 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4100 sz.002883 at 26.310371785728638 on 2024-06-17 00:00:00
+2026-02-01 14:04:42 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 21100 sz.002094 at 5.0724779359632715 on 2024-06-17 00:00:00
+2026-02-01 14:04:43 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-06-21
+2026-02-01 14:04:44 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['电子']
+2026-02-01 14:04:44 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002247', 'sz.002072', 'sz.002494', 'sz.002856', 'sz.002188', 'sz.002316', 'sz.002495', 'sz.002094', 'sz.002830'], Holding ['sz.002633', 'sz.002247', 'sz.002072', 'sz.002494', 'sz.002316', 'sz.002188', 'sz.002495', 'sz.002830', 'sz.002883', 'sz.002094']
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4100 sz.002883 at 26.460545140670014 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002633 at 8.864509582863587 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 400 sz.002247 at 7.999139571981541 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002072 at 3.01 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002494 at 8.482471050096333 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9800 sz.002856 at 10.295103891197583 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 700 sz.002188 at 5.421855921855922 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002316 at 10.409485380718491 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002495 at 13.11278721816079 on 2024-06-24 00:00:00
+2026-02-01 14:04:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 900 sz.002094 at 4.710158083394466 on 2024-06-24 00:00:00
+2026-02-01 14:04:45 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-06-28
+2026-02-01 14:04:46 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:04:46 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002633', 'sz.002247', 'sz.002072', 'sz.002494', 'sz.002316', 'sz.002188', 'sz.002495', 'sz.002830', 'sz.002094', 'sz.002856']
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11800 sz.002633 at 8.955896279594139 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12900 sz.002247 at 8.321685522464668 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 33900 sz.002072 at 2.84 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12300 sz.002494 at 8.42844257207024 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10000 sz.002316 at 10.409485380718491 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 19100 sz.002188 at 5.591697191697192 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7900 sz.002495 at 13.501314246847034 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4800 sz.002830 at 21.47254578839794 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 22000 sz.002094 at 4.606638125517665 on 2024-07-01 00:00:00
+2026-02-01 14:04:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9800 sz.002856 at 11.428288628636194 on 2024-07-01 00:00:00
+2026-02-01 14:04:47 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-07-05
+2026-02-01 14:04:48 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:04:48 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:04:48 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-07-12
+2026-02-01 14:04:50 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:04:50 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:04:50 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-07-19
+2026-02-01 14:04:51 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:04:51 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:04:51 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-07-26
+2026-02-01 14:04:53 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:04:53 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002856', 'sz.002633', 'sz.002072', 'sz.002494', 'sz.002247', 'sz.002188', 'sz.003011', 'sz.002316', 'sz.002830', 'sz.002295'], Holding []
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12600 sz.002856 at 8.378333962976956 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10200 sz.002633 at 10.250541149943631 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 37300 sz.002072 at 2.88 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 13300 sz.002494 at 7.969200508848465 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11900 sz.002247 at 8.773249853141046 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 20000 sz.002188 at 5.252014652014651 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5900 sz.003011 at 17.718950333434694 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10300 sz.002316 at 10.242666704745439 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5200 sz.002830 at 20.397821841889776 on 2024-07-29 00:00:00
+2026-02-01 14:04:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 13100 sz.002295 at 8.087620631907424 on 2024-07-29 00:00:00
+2026-02-01 14:04:54 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-08-02
+2026-02-01 14:04:55 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['非银金融']
+2026-02-01 14:04:56 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002856', 'sz.002633', 'sz.002072', 'sz.002494', 'sz.002188', 'sz.002247', 'sz.003011', 'sz.002830', 'sz.002295', 'sz.002316'], Holding ['sz.002856', 'sz.002633', 'sz.002072', 'sz.002494', 'sz.002247', 'sz.002188', 'sz.003011', 'sz.002316', 'sz.002830', 'sz.002295']
+2026-02-01 14:04:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002856 at 8.643547412164715 on 2024-08-05 00:00:00
+2026-02-01 14:04:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 2500 sz.002072 at 3.18 on 2024-08-05 00:00:00
+2026-02-01 14:04:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002494 at 8.266357137991967 on 2024-08-05 00:00:00
+2026-02-01 14:04:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002188 at 5.343467643467643 on 2024-08-05 00:00:00
+2026-02-01 14:04:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002830 at 21.187414945446797 on 2024-08-05 00:00:00
+2026-02-01 14:04:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002295 at 8.31138879168352 on 2024-08-05 00:00:00
+2026-02-01 14:04:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 400 sz.002316 at 11.076760084610703 on 2024-08-05 00:00:00
+2026-02-01 14:04:56 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-08-09
+2026-02-01 14:04:58 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['房地产']
+2026-02-01 14:04:58 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002856', 'sz.002633', 'sz.002494', 'sz.002247', 'sz.003011', 'sz.002188', 'sz.002295', 'sz.002775', 'sz.002830', 'sz.003017'], Holding ['sz.002856', 'sz.002633', 'sz.002072', 'sz.002494', 'sz.002247', 'sz.002188', 'sz.003011', 'sz.002316', 'sz.002830', 'sz.002295']
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 34800 sz.002072 at 3.76 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9900 sz.002316 at 9.175027178517901 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002856 at 8.848485077446165 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002633 at 10.890248027057499 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002247 at 9.289323373914048 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.003011 at 18.73798009510004 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002188 at 5.487179487179487 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 600 sz.002295 at 8.151554391843451 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11400 sz.002775 at 10.494859044226809 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002830 at 21.450612646632468 on 2024-08-12 00:00:00
+2026-02-01 14:04:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4700 sz.003017 at 23.930786477518577 on 2024-08-12 00:00:00
+2026-02-01 14:04:59 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-08-16
+2026-02-01 14:05:00 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:05:00 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002856', 'sz.002633', 'sz.002494', 'sz.002247', 'sz.002188', 'sz.003011', 'sz.002830', 'sz.002295', 'sz.002775', 'sz.003017']
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12900 sz.002856 at 8.53505100113336 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10100 sz.002633 at 9.839301014656145 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 13200 sz.002494 at 8.536499528122423 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12200 sz.002247 at 9.869906084783675 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 20200 sz.002188 at 5.225885225885226 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6100 sz.003011 at 18.935702287661968 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5200 sz.002830 at 21.384813221336053 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 13900 sz.002295 at 8.055653751939412 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11400 sz.002775 at 10.165424006964084 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4700 sz.003017 at 23.581764227053814 on 2024-08-19 00:00:00
+2026-02-01 14:05:00 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-08-23
+2026-02-01 14:05:02 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:05:02 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:05:02 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-08-30
+2026-02-01 14:05:04 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['有色金属']
+2026-02-01 14:05:04 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.003011', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002883', 'sz.002853', 'sz.003003'], Holding []
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9300 sz.002633 at 11.545186020293125 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 20800 sz.002188 at 5.304273504273504 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5800 sz.003011 at 18.661933097960834 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 13500 sz.002295 at 8.103604071891432 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10900 sz.002247 at 10.06343365507355 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5000 sz.002830 at 21.713810347818146 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4500 sz.003017 at 24.021835760248514 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4200 sz.002883 at 25.861553803794056 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5600 sz.002853 at 19.442069487075806 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 13700 sz.003003 at 7.9482955126953865 on 2024-09-02 00:00:00
+2026-02-01 14:05:04 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-09-06
+2026-02-01 14:05:06 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['商贸零售']
+2026-02-01 14:05:06 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.002622', 'sz.002295', 'sz.002830', 'sz.002853', 'sz.003017', 'sz.002247', 'sz.002883', 'sz.003003'], Holding ['sz.002633', 'sz.002188', 'sz.003011', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002883', 'sz.002853', 'sz.003003']
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5800 sz.003011 at 17.97751012370799 on 2024-09-09 00:00:00
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002633 at 11.621341600901918 on 2024-09-09 00:00:00
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002188 at 5.121367521367521 on 2024-09-09 00:00:00
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12900 sz.002622 at 8.311402221335866 on 2024-09-09 00:00:00
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002295 at 7.911802792083351 on 2024-09-09 00:00:00
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002830 at 20.6171532595445 on 2024-09-09 00:00:00
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002853 at 18.452583144542373 on 2024-09-09 00:00:00
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002247 at 9.676378514493798 on 2024-09-09 00:00:00
+2026-02-01 14:05:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.003003 at 7.606767189884256 on 2024-09-09 00:00:00
+2026-02-01 14:05:07 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-09-13
+2026-02-01 14:05:08 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['房地产']
+2026-02-01 14:05:09 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.002622', 'sz.002295', 'sz.002830', 'sz.002247', 'sz.002853', 'sz.003017', 'sz.003003', 'sz.002883'], Holding ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002883', 'sz.002853', 'sz.003003', 'sz.002622']
+2026-02-01 14:05:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002633 at 11.210101465614432 on 2024-09-18 00:00:00
+2026-02-01 14:05:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 500 sz.002188 at 5.1997557997558 on 2024-09-18 00:00:00
+2026-02-01 14:05:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 400 sz.002622 at 8.25328052748037 on 2024-09-18 00:00:00
+2026-02-01 14:05:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002295 at 7.799918712195303 on 2024-09-18 00:00:00
+2026-02-01 14:05:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002247 at 9.676378514493798 on 2024-09-18 00:00:00
+2026-02-01 14:05:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002853 at 18.425840270419847 on 2024-09-18 00:00:00
+2026-02-01 14:05:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003003 at 7.513623101844858 on 2024-09-18 00:00:00
+2026-02-01 14:05:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002883 at 25.105368020057387 on 2024-09-18 00:00:00
+2026-02-01 14:05:09 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-09-20
+2026-02-01 14:05:11 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['房地产']
+2026-02-01 14:05:11 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002830', 'sz.002247', 'sz.003017', 'sz.003003', 'sz.002853', 'sz.002622', 'sz.002715'], Holding ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002883', 'sz.002853', 'sz.003003', 'sz.002622']
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4100 sz.002883 at 25.559079490299386 on 2024-09-23 00:00:00
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002633 at 11.255794813979707 on 2024-09-23 00:00:00
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002188 at 5.330402930402931 on 2024-09-23 00:00:00
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002247 at 9.676378514493798 on 2024-09-23 00:00:00
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003017 at 23.293441498409013 on 2024-09-23 00:00:00
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003003 at 7.606767189884256 on 2024-09-23 00:00:00
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002853 at 18.586297515155 on 2024-09-23 00:00:00
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 600 sz.002622 at 9.241349323023796 on 2024-09-23 00:00:00
+2026-02-01 14:05:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7400 sz.002715 at 14.385845478576435 on 2024-09-23 00:00:00
+2026-02-01 14:05:12 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-09-27
+2026-02-01 14:05:14 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['建筑材料']
+2026-02-01 14:05:14 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.002295', 'sz.003017', 'sz.003003', 'sz.002883', 'sz.002830', 'sz.002853', 'sz.002247', 'sz.002622'], Holding ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002853', 'sz.003003', 'sz.002622', 'sz.002715']
+2026-02-01 14:05:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7400 sz.002715 at 17.208671401445056 on 2024-09-30 00:00:00
+2026-02-01 14:05:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002188 at 6.48009768009768 on 2024-09-30 00:00:00
+2026-02-01 14:05:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002295 at 9.142527670851871 on 2024-09-30 00:00:00
+2026-02-01 14:05:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.003003 at 8.631352158317647 on 2024-09-30 00:00:00
+2026-02-01 14:05:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4300 sz.002883 at 28.916544370090193 on 2024-09-30 00:00:00
+2026-02-01 14:05:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.002247 at 11.805181787682436 on 2024-09-30 00:00:00
+2026-02-01 14:05:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 400 sz.002622 at 11.043121832544157 on 2024-09-30 00:00:00
+2026-02-01 14:05:14 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-09-30
+2026-02-01 14:05:16 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['传媒']
+2026-02-01 14:05:16 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.002883', 'sz.003003', 'sz.002853', 'sz.002247', 'sz.002890'], Holding ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002853', 'sz.003003', 'sz.002622', 'sz.002883']
+2026-02-01 14:05:16 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11500 sz.002622 at 12.670529260498034 on 2024-10-08 00:00:00
+2026-02-01 14:05:16 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002633 at 14.926493799323564 on 2024-10-08 00:00:00
+2026-02-01 14:05:16 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002830 at 27.416427206841092 on 2024-10-08 00:00:00
+2026-02-01 14:05:16 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.003003 at 10.090609537601566 on 2024-10-08 00:00:00
+2026-02-01 14:05:16 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002247 at 13.482420730194693 on 2024-10-08 00:00:00
+2026-02-01 14:05:16 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5000 sz.002890 at 27.98959335922223 on 2024-10-08 00:00:00
+2026-02-01 14:05:17 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-10-11
+2026-02-01 14:05:18 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:05:19 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002853', 'sz.002830', 'sz.003003', 'sz.003017', 'sz.002247', 'sz.002820', 'sz.002780'], Holding ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002853', 'sz.003003', 'sz.002883', 'sz.002890']
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4300 sz.002883 at 31.06411199590233 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5000 sz.002890 at 24.894335870536974 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 800 sz.002633 at 12.093506200676439 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 2000 sz.002188 at 5.748473748473749 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002295 at 8.870809191123756 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002853 at 20.832698941447116 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002830 at 24.301921076143945 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.003017 at 27.1023364926114 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8600 sz.002820 at 14.189454289974261 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6300 sz.002780 at 19.365345796405105 on 2024-10-14 00:00:00
+2026-02-01 14:05:19 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-10-18
+2026-02-01 14:05:21 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:05:22 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002853', 'sz.002830', 'sz.003017', 'sz.002247', 'sz.003003', 'sz.002622', 'sz.002780'], Holding ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002853', 'sz.003003', 'sz.002820', 'sz.002780']
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8600 sz.002820 at 14.334429557304777 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002633 at 12.276279594137543 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 500 sz.002188 at 5.905250305250305 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002295 at 9.222444870771906 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002853 at 21.340813549775095 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002830 at 24.87218276204624 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 500 sz.003003 at 9.159168657207575 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11600 sz.002622 at 10.985000138688662 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002780 at 19.834808724802805 on 2024-10-21 00:00:00
+2026-02-01 14:05:22 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-10-25
+2026-02-01 14:05:24 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['建筑材料']
+2026-02-01 14:05:24 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002633', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002820', 'sz.002883', 'sz.002780', 'sz.002809'], Holding ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002247', 'sz.002830', 'sz.003017', 'sz.002853', 'sz.003003', 'sz.002780', 'sz.002622']
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10600 sz.002247 at 13.54692992029132 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5900 sz.002853 at 25.031330178683568 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11600 sz.002622 at 14.065449913029926 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 900 sz.002188 at 6.244932844932845 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 1000 sz.002633 at 16.2059075535513 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.002295 at 9.685964630308101 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002830 at 26.056572417381776 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.003017 at 28.832272864480213 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 1000 sz.003003 at 9.428251578210283 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9400 sz.002820 at 14.823721084545268 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4300 sz.002883 at 32.969700170918735 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002780 at 21.673538527693793 on 2024-10-28 00:00:00
+2026-02-01 14:05:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6300 sz.002809 at 21.973917134261566 on 2024-10-28 00:00:00
+2026-02-01 14:05:25 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-11-01
+2026-02-01 14:05:26 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['综合']
+2026-02-01 14:05:27 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002629', 'sz.002188', 'sz.003017', 'sz.002830', 'sz.003003', 'sz.002205', 'sz.002780', 'sz.002295', 'sz.002820', 'sz.002809'], Holding ['sz.002633', 'sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002780', 'sz.002820', 'sz.002883', 'sz.002809']
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9400 sz.002633 at 17.195930101465613 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4300 sz.002883 at 30.549905662961397 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 14200 sz.002629 at 10.064217211627295 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 900 sz.002188 at 6.127350427350428 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.003017 at 27.60310754762606 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002830 at 26.07850555914725 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 600 sz.003003 at 9.366155519517351 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9900 sz.002205 at 14.567516151340284 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002780 at 20.34339356390031 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 800 sz.002295 at 10.517103509476454 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002809 at 22.05662949486732 on 2024-11-04 00:00:00
+2026-02-01 14:05:27 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-11-08
+2026-02-01 14:05:29 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['综合']
+2026-02-01 14:05:29 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002629', 'sz.002188', 'sz.003017', 'sz.003003', 'sz.002205', 'sz.002830', 'sz.002820', 'sz.002809', 'sz.002295', 'sz.002633'], Holding ['sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002780', 'sz.002820', 'sz.002809', 'sz.002629', 'sz.002205']
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7000 sz.002780 at 23.98173125898248 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 1300 sz.002629 at 11.816136504021674 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.002188 at 6.571550671550672 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003017 at 29.439268082679792 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.003003 at 9.759430557905924 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002205 at 15.184218780172765 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002820 at 15.802304139026253 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002809 at 23.738447493850952 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002295 at 11.396192708596827 on 2024-11-11 00:00:00
+2026-02-01 14:05:29 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8300 sz.002633 at 18.429650507328073 on 2024-11-11 00:00:00
+2026-02-01 14:05:30 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-11-15
+2026-02-01 14:05:32 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['传媒']
+2026-02-01 14:05:32 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002629', 'sz.003017', 'sz.003003', 'sz.002205', 'sz.002295', 'sz.002830', 'sz.002809', 'sz.002820', 'sz.002209'], Holding ['sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002820', 'sz.002809', 'sz.002629', 'sz.002205', 'sz.002633']
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8300 sz.002633 at 18.62765501691094 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002188 at 6.388644688644688 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 500 sz.002629 at 12.561634075253327 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003017 at 28.63499941856535 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.003003 at 9.821526616598858 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.002205 at 15.450900998046272 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002295 at 11.060540468932684 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002830 at 28.337619160990954 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002809 at 22.91132388779343 on 2024-11-18 00:00:00
+2026-02-01 14:05:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10900 sz.002209 at 14.147250897017157 on 2024-11-18 00:00:00
+2026-02-01 14:05:33 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-11-22
+2026-02-01 14:05:34 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['商贸零售']
+2026-02-01 14:05:35 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002629', 'sz.002188', 'sz.003017', 'sz.002205', 'sz.002830', 'sz.003003', 'sz.002295', 'sz.002809', 'sz.002836', 'sz.002800'], Holding ['sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002820', 'sz.002809', 'sz.002629', 'sz.002205', 'sz.002209']
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9600 sz.002820 at 17.850079790069792 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10900 sz.002209 at 14.535059309764337 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 700 sz.002629 at 11.704311868336928 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 800 sz.002188 at 6.271062271062271 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.002205 at 15.084212948470203 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002830 at 28.600816862176625 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 400 sz.003003 at 9.914670704638256 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5900 sz.002836 at 26.26083685347215 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6500 sz.002800 at 23.615608773052386 on 2024-11-25 00:00:00
+2026-02-01 14:05:35 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-11-29
+2026-02-01 14:05:37 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['纺织服饰']
+2026-02-01 14:05:37 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002629', 'sz.002188', 'sz.002205', 'sz.003017', 'sz.003003', 'sz.002295', 'sz.002809', 'sz.002828', 'sz.002830', 'sz.002890'], Holding ['sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002809', 'sz.002629', 'sz.002205', 'sz.002836', 'sz.002800']
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5900 sz.002836 at 28.446437872006967 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6500 sz.002800 at 26.143702830320528 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.002629 at 12.114335532514335 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002188 at 6.61074481074481 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002205 at 15.200886418789858 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.003017 at 31.41200254182844 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.003003 at 10.47353523287465 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9700 sz.002828 at 16.666408404922446 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002830 at 31.386325866391683 on 2024-12-02 00:00:00
+2026-02-01 14:05:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5400 sz.002890 at 30.211829504944976 on 2024-12-02 00:00:00
+2026-02-01 14:05:38 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-12-06
+2026-02-01 14:05:40 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['综合']
+2026-02-01 14:05:40 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002629', 'sz.002205', 'sz.003017', 'sz.003003', 'sz.002830', 'sz.002295', 'sz.002809', 'sz.002890', 'sz.002836'], Holding ['sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002809', 'sz.002629', 'sz.002205', 'sz.002828', 'sz.002890']
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9700 sz.002828 at 17.35936141962604 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002188 at 6.950427350427351 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 2100 sz.002629 at 14.537202639017202 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002205 at 15.584242106983025 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003017 at 32.04934752093801 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.003003 at 10.628775379606981 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002830 at 30.728331613427496 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002295 at 11.987579988005077 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002809 at 25.089416050411575 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002890 at 30.291195081577932 on 2024-12-09 00:00:00
+2026-02-01 14:05:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5900 sz.002836 at 28.3791886098982 on 2024-12-09 00:00:00
+2026-02-01 14:05:41 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-12-13
+2026-02-01 14:05:42 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['传媒']
+2026-02-01 14:05:43 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.003017', 'sz.002205', 'sz.003003', 'sz.002809', 'sz.002828', 'sz.002830', 'sz.002295', 'sz.002890'], Holding ['sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002809', 'sz.002629', 'sz.002205', 'sz.002890', 'sz.002836']
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11500 sz.002629 at 17.295543652574313 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5900 sz.002836 at 29.858672376291 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9900 sz.002633 at 18.048872604284107 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 700 sz.002188 at 7.054945054945056 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003017 at 33.03571475051233 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002205 at 16.96765611220184 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002809 at 25.475407066571755 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10300 sz.002828 at 17.341593393608 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002890 at 31.084850847907486 on 2024-12-16 00:00:00
+2026-02-01 14:05:43 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-12-20
+2026-02-01 14:05:45 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['通信']
+2026-02-01 14:05:45 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002633', 'sz.002188', 'sz.003017', 'sz.003003', 'sz.002828', 'sz.002800', 'sz.002629', 'sz.002830', 'sz.002809', 'sz.002890'], Holding ['sz.002188', 'sz.002295', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002809', 'sz.002205', 'sz.002890', 'sz.002633', 'sz.002828']
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 14100 sz.002295 at 12.147414387845144 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10600 sz.002205 at 17.317676523160817 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002633 at 17.058850056369785 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002188 at 6.8067155067155065 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.003017 at 30.956756128178753 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.003003 at 10.535631291567583 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002828 at 16.311047884561624 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7000 sz.002800 at 22.010469689072618 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10800 sz.002629 at 15.170875574564107 on 2024-12-23 00:00:00
+2026-02-01 14:05:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002830 at 30.37740134517993 on 2024-12-23 00:00:00
+2026-02-01 14:05:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002890 at 29.259442585349515 on 2024-12-23 00:00:00
+2026-02-01 14:05:46 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2024-12-27
+2026-02-01 14:05:48 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:05:48 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002188', 'sz.002830', 'sz.003017', 'sz.003003', 'sz.002809', 'sz.002890', 'sz.002633', 'sz.002828', 'sz.002800', 'sz.002629']
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 24900 sz.002188 at 6.166544566544566 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5600 sz.002830 at 27.61382548273035 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5500 sz.003017 at 29.16612023448998 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16200 sz.003003 at 9.71803318544397 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7000 sz.002809 at 22.690757592844758 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5800 sz.002890 at 27.010751247415783 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10000 sz.002633 at 16.06882750845547 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10600 sz.002828 at 15.493718687731741 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7000 sz.002800 at 21.729570349376157 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10800 sz.002629 at 13.083482375115482 on 2024-12-30 00:00:00
+2026-02-01 14:05:48 | INFO     | src.core.data_stream:_load_next_chunk:187 - Chunk 2 loaded: 2025-01-02 to 2025-12-31, 1/1 symbols, memory: 305.68MB (+0.00MB)
+2026-02-01 14:05:48 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-01-03
+2026-02-01 14:05:50 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:05:50 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:05:50 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-01-10
+2026-02-01 14:05:51 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:05:51 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:05:52 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-01-17
+2026-02-01 14:05:53 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['有色金属']
+2026-02-01 14:05:53 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002800', 'sz.002205', 'sz.002633', 'sz.003017', 'sz.002890', 'sz.002830', 'sz.002295', 'sz.002809', 'sz.003003'], Holding []
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 27700 sz.002188 at 5.7354090354090355 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8000 sz.002800 at 19.763274971500937 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11500 sz.002205 at 14.000816438359083 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9800 sz.002633 at 16.17544532130778 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5400 sz.003017 at 29.226819756309943 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6100 sz.002890 at 25.87317798234342 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5800 sz.002830 at 26.977764371531638 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 14800 sz.002295 at 10.804805429188574 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7100 sz.002809 at 22.38747893729033 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15900 sz.003003 at 10.069910851370588 on 2025-01-20 00:00:00
+2026-02-01 14:05:54 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-01-24
+2026-02-01 14:05:56 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['计算机']
+2026-02-01 14:05:56 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002205', 'sz.002800', 'sz.002633', 'sz.003017', 'sz.002828', 'sz.002830', 'sz.002809', 'sz.003003', 'sz.002144'], Holding ['sz.002188', 'sz.002800', 'sz.002205', 'sz.002633', 'sz.003017', 'sz.002890', 'sz.002830', 'sz.002295', 'sz.002809', 'sz.003003']
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6100 sz.002890 at 27.46048951500253 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 14800 sz.002295 at 11.556027108436895 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 1200 sz.002188 at 5.6831501831501825 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002205 at 13.684131304634294 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002633 at 16.449605411499437 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.003017 at 30.137312583609315 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10900 sz.002828 at 14.836301725064223 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002830 at 28.732415712769466 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003003 at 10.245849684333898 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 14300 sz.002144 at 11.42440392211484 on 2025-01-27 00:00:00
+2026-02-01 14:05:56 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-01-27
+2026-02-01 14:05:58 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:05:58 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002188', 'sz.002800', 'sz.002205', 'sz.002633', 'sz.003017', 'sz.002830', 'sz.002809', 'sz.003003', 'sz.002828', 'sz.002144']
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 28900 sz.002188 at 5.696214896214896 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8000 sz.002800 at 20.365202127993353 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11900 sz.002205 at 13.734134220485576 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9900 sz.002633 at 16.784689966178128 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5300 sz.003017 at 30.88088172590381 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5700 sz.002830 at 29.171078548078924 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7100 sz.002809 at 23.297314903953605 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16000 sz.003003 at 10.173404282525476 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10900 sz.002828 at 14.99621395922659 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 14300 sz.002144 at 11.621376403530613 on 2025-02-05 00:00:00
+2026-02-01 14:05:58 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-02-07
+2026-02-01 14:06:00 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['计算机']
+2026-02-01 14:06:00 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002800', 'sz.002205', 'sz.002633', 'sz.003017', 'sz.002828', 'sz.002809', 'sz.002830', 'sz.003003', 'sz.002890'], Holding []
+2026-02-01 14:06:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 27700 sz.002188 at 5.957509157509157 on 2025-02-10 00:00:00
+2026-02-01 14:06:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7800 sz.002800 at 21.047386238684755 on 2025-02-10 00:00:00
+2026-02-01 14:06:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10900 sz.002205 at 14.917536562299258 on 2025-02-10 00:00:00
+2026-02-01 14:06:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9600 sz.002633 at 17.15023675310034 on 2025-02-10 00:00:00
+2026-02-01 14:06:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5300 sz.003017 at 30.971931008633746 on 2025-02-10 00:00:00
+2026-02-01 14:06:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10700 sz.002828 at 15.387110531623494 on 2025-02-10 00:00:00
+2026-02-01 14:06:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7100 sz.002809 at 23.10431939587352 on 2025-02-10 00:00:00
+2026-02-01 14:06:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5600 sz.002830 at 29.193011689844397 on 2025-02-10 00:00:00
+2026-02-01 14:06:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15900 sz.003003 at 10.38039114483525 on 2025-02-10 00:00:00
+2026-02-01 14:06:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5900 sz.002890 at 27.56631028384647 on 2025-02-10 00:00:00
+2026-02-01 14:06:01 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-02-14
+2026-02-01 14:06:03 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['计算机']
+2026-02-01 14:06:03 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002800', 'sz.002633', 'sz.003017', 'sz.002780', 'sz.003003', 'sz.002809', 'sz.002828', 'sz.002830', 'sz.002890'], Holding ['sz.002188', 'sz.002800', 'sz.002205', 'sz.002633', 'sz.003017', 'sz.002828', 'sz.002809', 'sz.002830', 'sz.003003', 'sz.002890']
+2026-02-01 14:06:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10900 sz.002205 at 16.150941819964224 on 2025-02-17 00:00:00
+2026-02-01 14:06:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002188 at 5.892185592185592 on 2025-02-17 00:00:00
+2026-02-01 14:06:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002800 at 20.846743853187284 on 2025-02-17 00:00:00
+2026-02-01 14:06:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002633 at 16.556223224351747 on 2025-02-17 00:00:00
+2026-02-01 14:06:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003017 at 30.577384116804012 on 2025-02-17 00:00:00
+2026-02-01 14:06:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7600 sz.002780 at 21.751782349093407 on 2025-02-17 00:00:00
+2026-02-01 14:06:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003003 at 10.349343115488786 on 2025-02-17 00:00:00
+2026-02-01 14:06:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002828 at 15.316038427551328 on 2025-02-17 00:00:00
+2026-02-01 14:06:04 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-02-21
+2026-02-01 14:06:05 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['计算机']
+2026-02-01 14:06:06 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002800', 'sz.002780', 'sz.002205', 'sz.002830', 'sz.002633', 'sz.003003', 'sz.002809', 'sz.002890', 'sz.002295'], Holding ['sz.002188', 'sz.002800', 'sz.002633', 'sz.003017', 'sz.002828', 'sz.002809', 'sz.002830', 'sz.003003', 'sz.002890', 'sz.002780']
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5400 sz.003017 at 32.71704226095754 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10500 sz.002828 at 16.186671702435337 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002188 at 5.996703296703297 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002780 at 20.930222224397433 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10900 sz.002205 at 15.367562804960803 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002830 at 28.578883720411152 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 500 sz.002633 at 17.363472378804964 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.003003 at 10.235500341218408 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002809 at 23.214602543347855 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002890 at 28.650973164496857 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 14600 sz.002295 at 11.52406022846888 on 2025-02-24 00:00:00
+2026-02-01 14:06:06 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-02-28
+2026-02-01 14:06:08 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['食品饮料']
+2026-02-01 14:06:08 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002800', 'sz.002633', 'sz.002830', 'sz.003003', 'sz.002205', 'sz.002809', 'sz.002780', 'sz.002890', 'sz.003017'], Holding ['sz.002188', 'sz.002800', 'sz.002633', 'sz.002809', 'sz.002830', 'sz.003003', 'sz.002890', 'sz.002780', 'sz.002205', 'sz.002295']
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 14600 sz.002295 at 11.715861508276962 on 2025-03-03 00:00:00
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 400 sz.002188 at 6.101221001221001 on 2025-03-03 00:00:00
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002633 at 16.76945885005637 on 2025-03-03 00:00:00
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002830 at 28.44728486981832 on 2025-03-03 00:00:00
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.003003 at 10.22515099810292 on 2025-03-03 00:00:00
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002205 at 15.267556973258237 on 2025-03-03 00:00:00
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002809 at 22.883753100924846 on 2025-03-03 00:00:00
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002780 at 21.634416616993985 on 2025-03-03 00:00:00
+2026-02-01 14:06:08 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002890 at 27.275303169525635 on 2025-03-03 00:00:00
+2026-02-01 14:06:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5200 sz.003017 at 32.231446086397874 on 2025-03-03 00:00:00
+2026-02-01 14:06:09 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-03-07
+2026-02-01 14:06:11 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:06:11 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002800', 'sz.002633', 'sz.002830', 'sz.002205', 'sz.003017', 'sz.002780', 'sz.002809', 'sz.002828', 'sz.003003'], Holding ['sz.002188', 'sz.002800', 'sz.002633', 'sz.002809', 'sz.002830', 'sz.003003', 'sz.002890', 'sz.002780', 'sz.002205', 'sz.003017']
+2026-02-01 14:06:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6100 sz.002890 at 28.227690089121097 on 2025-03-10 00:00:00
+2026-02-01 14:06:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002188 at 6.218803418803419 on 2025-03-10 00:00:00
+2026-02-01 14:06:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002633 at 16.95223224351748 on 2025-03-10 00:00:00
+2026-02-01 14:06:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003017 at 32.33767024958281 on 2025-03-10 00:00:00
+2026-02-01 14:06:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002809 at 23.38002726455936 on 2025-03-10 00:00:00
+2026-02-01 14:06:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10700 sz.002828 at 15.778007104020396 on 2025-03-10 00:00:00
+2026-02-01 14:06:11 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.003003 at 10.40108983106623 on 2025-03-10 00:00:00
+2026-02-01 14:06:12 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-03-14
+2026-02-01 14:06:13 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:06:13 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002188', 'sz.002800', 'sz.002633', 'sz.002809', 'sz.002830', 'sz.003003', 'sz.002780', 'sz.002205', 'sz.003017', 'sz.002828']
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 27600 sz.002188 at 6.467032967032967 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7900 sz.002800 at 22.672589561214274 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10000 sz.002633 at 18.24687711386697 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7200 sz.002809 at 23.986584575668207 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5800 sz.002830 at 30.180003069290674 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16200 sz.003003 at 10.794364869454803 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7700 sz.002780 at 23.68831692873392 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10700 sz.002205 at 16.76764444879671 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5300 sz.003017 at 33.24816307688218 on 2025-03-17 00:00:00
+2026-02-01 14:06:13 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10700 sz.002828 at 16.328815910579664 on 2025-03-17 00:00:00
+2026-02-01 14:06:14 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-03-21
+2026-02-01 14:06:15 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:06:15 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:06:15 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-03-28
+2026-02-01 14:06:17 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:17 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:06:17 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-04-03
+2026-02-01 14:06:19 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:19 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:06:19 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-04-11
+2026-02-01 14:06:21 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['农林牧渔']
+2026-02-01 14:06:21 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002633', 'sz.002830', 'sz.003003', 'sz.002809', 'sz.002205', 'sz.002780', 'sz.002828', 'sz.003017', 'sz.002295'], Holding []
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 31600 sz.002188 at 5.6831501831501825 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11300 sz.002633 at 15.977440811724918 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6700 sz.002830 at 26.890031804469743 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 18800 sz.003003 at 9.521395666249681 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8300 sz.002809 at 21.477642970627052 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12200 sz.002205 at 14.667521983042848 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8800 sz.002780 at 20.891100313697628 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12300 sz.002828 at 14.658621464883813 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5900 sz.003017 at 30.547034355894034 on 2025-04-14 00:00:00
+2026-02-01 14:06:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 16300 sz.002295 at 11.284308628708779 on 2025-04-14 00:00:00
+2026-02-01 14:06:22 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-04-18
+2026-02-01 14:06:23 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:23 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002188', 'sz.002633', 'sz.002830', 'sz.003003', 'sz.002809', 'sz.002205', 'sz.002780', 'sz.002828', 'sz.003017', 'sz.002295']
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 31600 sz.002188 at 5.892185592185592 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11300 sz.002633 at 16.632378804960542 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6700 sz.002830 at 26.802299237407855 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 18800 sz.003003 at 12.067334072659923 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8300 sz.002809 at 27.074512704949637 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12200 sz.002205 at 14.834198369213789 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8800 sz.002780 at 23.316658777085742 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12300 sz.002828 at 14.409869100631239 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5900 sz.003017 at 30.455985073164097 on 2025-04-21 00:00:00
+2026-02-01 14:06:23 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16300 sz.002295 at 11.396192708596827 on 2025-04-21 00:00:00
+2026-02-01 14:06:24 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-04-25
+2026-02-01 14:06:25 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:25 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:06:25 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-04-30
+2026-02-01 14:06:27 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['汽车']
+2026-02-01 14:06:27 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002591', 'sz.002188', 'sz.002883', 'sz.002828', 'sz.003011', 'sz.002494', 'sz.002830', 'sz.002486', 'sz.002718', 'sz.002696'], Holding []
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10400 sz.002591 at 18.606125582819438 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 30100 sz.002188 at 6.31025641025641 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6100 sz.002883 at 31.366586309396997 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 13000 sz.002828 at 14.694157516919894 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7600 sz.003011 at 24.867368064519937 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15700 sz.002494 at 12.129393316857495 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6500 sz.002830 at 29.21494483160987 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 20800 sz.002486 at 9.443344947461224 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5100 sz.002718 at 37.81158549292921 on 2025-05-06 00:00:00
+2026-02-01 14:06:27 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10000 sz.002696 at 19.356698762930087 on 2025-05-06 00:00:00
+2026-02-01 14:06:28 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-05-09
+2026-02-01 14:06:30 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['家用电器']
+2026-02-01 14:06:30 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002591', 'sz.002883', 'sz.002828', 'sz.002494', 'sz.003011', 'sz.002800', 'sz.002696', 'sz.002830', 'sz.002718'], Holding ['sz.002591', 'sz.002188', 'sz.002883', 'sz.002828', 'sz.003011', 'sz.002494', 'sz.002830', 'sz.002486', 'sz.002718', 'sz.002696']
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 20800 sz.002486 at 9.988960433314539 on 2025-05-12 00:00:00
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002188 at 6.663003663003662 on 2025-05-12 00:00:00
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002591 at 19.680222217954263 on 2025-05-12 00:00:00
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002828 at 15.422646583659574 on 2025-05-12 00:00:00
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.003011 at 26.46435500444323 on 2025-05-12 00:00:00
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8000 sz.002800 at 24.518499507791013 on 2025-05-12 00:00:00
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002696 at 20.010395906893955 on 2025-05-12 00:00:00
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002830 at 31.495991575219048 on 2025-05-12 00:00:00
+2026-02-01 14:06:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002718 at 39.542587976153435 on 2025-05-12 00:00:00
+2026-02-01 14:06:31 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-05-16
+2026-02-01 14:06:32 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:32 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002591', 'sz.002188', 'sz.002883', 'sz.002828', 'sz.003011', 'sz.002494', 'sz.002830', 'sz.002718', 'sz.002696', 'sz.002800']
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10300 sz.002591 at 19.368387710979636 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 29900 sz.002188 at 6.623809523809524 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6100 sz.002883 at 32.66722585742407 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12900 sz.002828 at 15.68916697393019 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7500 sz.003011 at 27.148777978696078 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 15700 sz.002494 at 12.750720814157544 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6300 sz.002830 at 30.00453793516689 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5000 sz.002718 at 39.40735340715155 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9900 sz.002696 at 20.845675590847787 on 2025-05-19 00:00:00
+2026-02-01 14:06:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8000 sz.002800 at 24.558627984890506 on 2025-05-19 00:00:00
+2026-02-01 14:06:33 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-05-23
+2026-02-01 14:06:34 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:34 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:06:34 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-05-30
+2026-02-01 14:06:36 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['医药生物']
+2026-02-01 14:06:36 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002591', 'sz.002188', 'sz.002883', 'sz.002494', 'sz.002828', 'sz.003011', 'sz.002830', 'sz.002718', 'sz.002800', 'sz.002780'], Holding []
+2026-02-01 14:06:36 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10300 sz.002591 at 19.12584976111048 on 2025-06-03 00:00:00
+2026-02-01 14:06:36 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 29700 sz.002188 at 6.702197802197802 on 2025-06-03 00:00:00
+2026-02-01 14:06:36 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6000 sz.002883 at 32.515988700676736 on 2025-06-03 00:00:00
+2026-02-01 14:06:36 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15700 sz.002494 at 12.615649619092316 on 2025-06-03 00:00:00
+2026-02-01 14:06:36 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12600 sz.002828 at 15.8668472341106 on 2025-06-03 00:00:00
+2026-02-01 14:06:36 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7200 sz.003011 at 27.135659218364847 on 2025-06-03 00:00:00
+2026-02-01 14:06:36 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6500 sz.002830 at 30.201936211056147 on 2025-06-03 00:00:00
+2026-02-01 14:06:36 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5000 sz.002718 at 40.245807734963286 on 2025-06-03 00:00:00
+2026-02-01 14:06:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7700 sz.002800 at 26.28415250016876 on 2025-06-03 00:00:00
+2026-02-01 14:06:37 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8000 sz.002780 at 24.64680374087922 on 2025-06-03 00:00:00
+2026-02-01 14:06:37 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-06-06
+2026-02-01 14:06:39 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:39 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002591', 'sz.002188', 'sz.002883', 'sz.002494', 'sz.002828', 'sz.003011', 'sz.002830', 'sz.002718', 'sz.002800', 'sz.002780']
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10300 sz.002591 at 19.92276016782342 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 29700 sz.002188 at 6.950427350427351 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6000 sz.002883 at 33.846875680053266 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 15700 sz.002494 at 13.128920160340185 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12600 sz.002828 at 16.506496170760073 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7200 sz.003011 at 28.063902977259882 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6500 sz.002830 at 33.052061142378456 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5000 sz.002718 at 41.24654354557729 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7700 sz.002800 at 26.986400849409907 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8000 sz.002780 at 25.448802910225293 on 2025-06-09 00:00:00
+2026-02-01 14:06:39 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-06-13
+2026-02-01 14:06:41 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['石油石化']
+2026-02-01 14:06:41 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002883', 'sz.002188', 'sz.002591', 'sz.002494', 'sz.003011', 'sz.002718', 'sz.002830', 'sz.002780', 'sz.002633', 'sz.002800'], Holding []
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6300 sz.002883 at 32.60673099472513 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 30800 sz.002188 at 6.7675213675213675 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10600 sz.002591 at 19.54162910374332 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 16500 sz.002494 at 12.642663858105362 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7600 sz.003011 at 27.44507380466319 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5200 sz.002718 at 40.16466699356214 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6300 sz.002830 at 32.80656980371123 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8400 sz.002780 at 24.64680374087922 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10200 sz.002633 at 20.105073280721534 on 2025-06-16 00:00:00
+2026-02-01 14:06:41 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7900 sz.002800 at 26.344345215818002 on 2025-06-16 00:00:00
+2026-02-01 14:06:42 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-06-20
+2026-02-01 14:06:43 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:43 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002883', 'sz.002188', 'sz.002591', 'sz.002494', 'sz.003011', 'sz.002718', 'sz.002830', 'sz.002780', 'sz.002633', 'sz.002800']
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6300 sz.002883 at 31.366295468710945 on 2025-06-23 00:00:00
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 30800 sz.002188 at 6.467032967032967 on 2025-06-23 00:00:00
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10600 sz.002591 at 18.71007041847765 on 2025-06-23 00:00:00
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16500 sz.002494 at 11.91327940475313 on 2025-06-23 00:00:00
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7600 sz.003011 at 25.836117955911796 on 2025-06-23 00:00:00
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5200 sz.002718 at 38.89346204494436 on 2025-06-23 00:00:00
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6300 sz.002830 at 30.976543460919174 on 2025-06-23 00:00:00
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8400 sz.002780 at 23.473146419884976 on 2025-06-23 00:00:00
+2026-02-01 14:06:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10200 sz.002633 at 19.343517474633597 on 2025-06-23 00:00:00
+2026-02-01 14:06:44 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7900 sz.002800 at 31.82188233989897 on 2025-06-23 00:00:00
+2026-02-01 14:06:44 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-06-27
+2026-02-01 14:06:45 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['非银金融']
+2026-02-01 14:06:46 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002883', 'sz.002591', 'sz.002188', 'sz.003011', 'sz.002494', 'sz.002830', 'sz.003003', 'sz.002718', 'sz.002760', 'sz.002633'], Holding []
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6000 sz.002883 at 34.033188223538545 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9700 sz.002591 at 21.06615336006372 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 28200 sz.002188 at 7.263980463980464 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7200 sz.003011 at 28.311434646298558 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15100 sz.002494 at 13.453091028496733 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6100 sz.002830 at 33.5653612141372 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 16900 sz.003003 at 12.174427275333244 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 4800 sz.002718 at 42.057950959588645 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10500 sz.002760 at 19.462285630601144 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9800 sz.002633 at 20.92755355129651 on 2025-06-30 00:00:00
+2026-02-01 14:06:46 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-07-04
+2026-02-01 14:06:48 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:06:48 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002883', 'sz.002591', 'sz.002188', 'sz.003011', 'sz.002494', 'sz.002830', 'sz.003003', 'sz.002718', 'sz.002760', 'sz.002633']
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6000 sz.002883 at 33.8210490271318 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9700 sz.002591 at 20.650374017430885 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 28200 sz.002188 at 7.211721611721611 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7200 sz.003011 at 28.86838090163558 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 15100 sz.002494 at 13.696219179614143 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6100 sz.002830 at 33.476091636440025 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16900 sz.003003 at 13.342414680313356 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 4800 sz.002718 at 41.62520033878259 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10500 sz.002760 at 19.564988984852338 on 2025-07-07 00:00:00
+2026-02-01 14:06:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9800 sz.002633 at 21.506335963923338 on 2025-07-07 00:00:00
+2026-02-01 14:06:49 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-07-11
+2026-02-01 14:06:50 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['房地产']
+2026-02-01 14:06:50 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002883', 'sz.002591', 'sz.002188', 'sz.003011', 'sz.002494', 'sz.002800', 'sz.002760', 'sz.002144', 'sz.002828', 'sz.002780'], Holding []
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5900 sz.002883 at 34.51807781532538 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9700 sz.002591 at 20.96220852440551 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 27300 sz.002188 at 7.499145299145299 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7000 sz.003011 at 29.317032051768177 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 14700 sz.002494 at 14.047404286783735 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7500 sz.002800 at 27.284411736629174 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10400 sz.002760 at 19.790936364204963 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15000 sz.002144 at 13.745655787325985 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11000 sz.002828 at 18.586566277987973 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7900 sz.002780 at 26.113875392122033 on 2025-07-14 00:00:00
+2026-02-01 14:06:51 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-07-18
+2026-02-01 14:06:53 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['医药生物']
+2026-02-01 14:06:53 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002883', 'sz.002591', 'sz.002188', 'sz.002494', 'sz.003011', 'sz.002830', 'sz.002828', 'sz.002800', 'sz.003023', 'sz.002780'], Holding ['sz.002883', 'sz.002591', 'sz.002188', 'sz.003011', 'sz.002494', 'sz.002800', 'sz.002760', 'sz.002144', 'sz.002828', 'sz.002780']
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10400 sz.002760 at 19.944991395581752 on 2025-07-21 00:00:00
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 15000 sz.002144 at 13.920240746521488 on 2025-07-21 00:00:00
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002591 at 20.96220852440551 on 2025-07-21 00:00:00
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002188 at 7.577533577533577 on 2025-07-21 00:00:00
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002494 at 13.858304613692415 on 2025-07-21 00:00:00
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6000 sz.002830 at 34.257200441290294 on 2025-07-21 00:00:00
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002828 at 18.26518472851268 on 2025-07-21 00:00:00
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7200 sz.003023 at 29.100094580314572 on 2025-07-21 00:00:00
+2026-02-01 14:06:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002780 at 26.15299730282184 on 2025-07-21 00:00:00
+2026-02-01 14:06:54 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-07-25
+2026-02-01 14:06:56 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:06:56 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002883', 'sz.002591', 'sz.002188', 'sz.003011', 'sz.002494', 'sz.002800', 'sz.002828', 'sz.002780', 'sz.002830', 'sz.003023']
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5900 sz.002883 at 41.2762265008544 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9800 sz.002591 at 22.10560171664581 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 27500 sz.002188 at 7.577533577533577 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7000 sz.003011 at 30.786751336685313 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 14900 sz.002494 at 13.993375808757643 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7500 sz.002800 at 28.329945568836038 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11200 sz.002828 at 18.318748320091892 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7800 sz.002780 at 28.030849016412642 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6000 sz.002830 at 35.41770495135355 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7200 sz.003023 at 39.099685904236395 on 2025-07-28 00:00:00
+2026-02-01 14:06:56 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-08-01
+2026-02-01 14:06:58 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['医药生物']
+2026-02-01 14:06:58 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002591', 'sz.002494', 'sz.002883', 'sz.002828', 'sz.002800', 'sz.002830', 'sz.002144', 'sz.002360', 'sz.002780'], Holding []
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 29500 sz.002188 at 7.525274725274725 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10100 sz.002591 at 21.897712045329396 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15900 sz.002494 at 13.966361569744597 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5700 sz.002883 at 37.57894336347978 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12300 sz.002828 at 17.818821465352546 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7900 sz.002800 at 27.766965813032343 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6200 sz.002830 at 35.797100656566535 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15700 sz.002144 at 14.164659689395192 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5700 sz.002360 at 37.95171863619426 on 2025-08-04 00:00:00
+2026-02-01 14:06:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8200 sz.002780 at 26.876752650768296 on 2025-08-04 00:00:00
+2026-02-01 14:06:59 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-08-08
+2026-02-01 14:07:00 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:07:01 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002591', 'sz.002883', 'sz.002494', 'sz.002828', 'sz.002360', 'sz.002780', 'sz.003003', 'sz.003011', 'sz.002144'], Holding ['sz.002188', 'sz.002591', 'sz.002494', 'sz.002883', 'sz.002828', 'sz.002800', 'sz.002830', 'sz.002144', 'sz.002360', 'sz.002780']
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7900 sz.002800 at 34.16080732537433 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6200 sz.002830 at 41.04168834627547 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002188 at 7.8649572649572645 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002591 at 22.625325894936857 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002883 at 38.27597215167336 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002494 at 14.479632110992465 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002360 at 39.17596762445859 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002780 at 27.620068954064653 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 17500 sz.003003 at 13.300325044097857 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6900 sz.003011 at 33.72618990651959 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002144 at 14.769887547939605 on 2025-08-11 00:00:00
+2026-02-01 14:07:01 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-08-15
+2026-02-01 14:07:03 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['电子']
+2026-02-01 14:07:03 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002591', 'sz.002494', 'sz.002883', 'sz.002780', 'sz.002360', 'sz.002828', 'sz.003011', 'sz.002144', 'sz.003003'], Holding ['sz.002188', 'sz.002591', 'sz.002494', 'sz.002883', 'sz.002828', 'sz.002144', 'sz.002360', 'sz.002780', 'sz.003003', 'sz.003011']
+2026-02-01 14:07:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 1000 sz.002188 at 7.512210012210012 on 2025-08-18 00:00:00
+2026-02-01 14:07:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002591 at 21.967008602434866 on 2025-08-18 00:00:00
+2026-02-01 14:07:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.002494 at 13.939347330731552 on 2025-08-18 00:00:00
+2026-02-01 14:07:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002780 at 26.60289927586964 on 2025-08-18 00:00:00
+2026-02-01 14:07:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.002828 at 18.961511419042484 on 2025-08-18 00:00:00
+2026-02-01 14:07:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003011 at 32.79794614762456 on 2025-08-18 00:00:00
+2026-02-01 14:07:03 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002144 at 14.327605651310996 on 2025-08-18 00:00:00
+2026-02-01 14:07:04 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-08-22
+2026-02-01 14:07:06 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['综合']
+2026-02-01 14:07:06 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002591', 'sz.002883', 'sz.002494', 'sz.002828', 'sz.003011', 'sz.002360', 'sz.002144', 'sz.003003', 'sz.002780'], Holding ['sz.002188', 'sz.002591', 'sz.002494', 'sz.002883', 'sz.002828', 'sz.002144', 'sz.002360', 'sz.002780', 'sz.003003', 'sz.003011']
+2026-02-01 14:07:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 600 sz.002188 at 7.773504273504273 on 2025-08-25 00:00:00
+2026-02-01 14:07:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002591 at 22.625325894936857 on 2025-08-25 00:00:00
+2026-02-01 14:07:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002883 at 37.881999358346555 on 2025-08-25 00:00:00
+2026-02-01 14:07:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002494 at 14.182475481848963 on 2025-08-25 00:00:00
+2026-02-01 14:07:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002828 at 19.247183907464972 on 2025-08-25 00:00:00
+2026-02-01 14:07:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003011 at 33.03000708734832 on 2025-08-25 00:00:00
+2026-02-01 14:07:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003003 at 13.352937089367229 on 2025-08-25 00:00:00
+2026-02-01 14:07:06 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002780 at 27.913483284313216 on 2025-08-25 00:00:00
+2026-02-01 14:07:07 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-08-29
+2026-02-01 14:07:08 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['电子']
+2026-02-01 14:07:09 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002828', 'sz.002836', 'sz.003011', 'sz.002780', 'sz.002144', 'sz.003003', 'sz.002748', 'sz.002486', 'sz.002696'], Holding ['sz.002188', 'sz.002591', 'sz.002494', 'sz.002883', 'sz.002828', 'sz.002144', 'sz.002360', 'sz.002780', 'sz.003003', 'sz.003011']
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10400 sz.002591 at 20.13064983913984 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16500 sz.002494 at 12.91280624823582 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6200 sz.002883 at 35.03327300659889 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 5900 sz.002360 at 36.87149894066691 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 1500 sz.002188 at 6.98962148962149 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002828 at 18.22947566745987 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6900 sz.002836 at 31.879082398773825 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.003011 at 32.31835353886213 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002780 at 26.876752650768296 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 500 sz.002144 at 14.292688659471894 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 600 sz.003003 at 12.974130363427735 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11200 sz.002748 at 19.819509206128767 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 19800 sz.002486 at 11.373984358942185 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9600 sz.002696 at 23.060982578725337 on 2025-09-01 00:00:00
+2026-02-01 14:07:09 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-09-05
+2026-02-01 14:07:11 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['有色金属']
+2026-02-01 14:07:11 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.003011', 'sz.002828', 'sz.002836', 'sz.002696', 'sz.003003', 'sz.002760', 'sz.002780', 'sz.002748', 'sz.002316'], Holding ['sz.002188', 'sz.002828', 'sz.002144', 'sz.002780', 'sz.003003', 'sz.003011', 'sz.002836', 'sz.002748', 'sz.002486', 'sz.002696']
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 15500 sz.002144 at 15.421671395602818 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 19800 sz.002486 at 11.79368857882935 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.002188 at 7.211721611721611 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.003011 at 31.823290200784772 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.002828 at 18.87223876641046 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002696 at 23.060982578725337 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.003003 at 13.058309635858734 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10800 sz.002760 at 21.136350304895593 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002780 at 27.65919086476446 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11900 sz.002316 at 18.950601590538792 on 2025-09-08 00:00:00
+2026-02-01 14:07:12 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-09-12
+2026-02-01 14:07:14 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['房地产']
+2026-02-01 14:07:14 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.003011', 'sz.002828', 'sz.002836', 'sz.002316', 'sz.002780', 'sz.002760', 'sz.003003', 'sz.002696', 'sz.003008'], Holding ['sz.002188', 'sz.002828', 'sz.002780', 'sz.003003', 'sz.003011', 'sz.002836', 'sz.002748', 'sz.002696', 'sz.002760', 'sz.002316']
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11200 sz.002748 at 21.916011270463002 on 2025-09-15 00:00:00
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 1200 sz.002188 at 7.682051282051282 on 2025-09-15 00:00:00
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003011 at 31.869702388729525 on 2025-09-15 00:00:00
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002828 at 19.050784071674514 on 2025-09-15 00:00:00
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002836 at 32.81162327067728 on 2025-09-15 00:00:00
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002316 at 18.81714664976035 on 2025-09-15 00:00:00
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002780 at 27.580947043364844 on 2025-09-15 00:00:00
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002696 at 23.71467972268921 on 2025-09-15 00:00:00
+2026-02-01 14:07:14 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7000 sz.003008 at 32.86722361417735 on 2025-09-15 00:00:00
+2026-02-01 14:07:15 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-09-19
+2026-02-01 14:07:17 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:07:17 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002188', 'sz.002828', 'sz.002780', 'sz.003003', 'sz.003011', 'sz.002836', 'sz.002696', 'sz.002760', 'sz.002316', 'sz.003008']
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 30300 sz.002188 at 7.342368742368743 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12200 sz.002828 at 18.372311911671108 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8300 sz.002780 at 27.3657765345159 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 17300 sz.003003 at 12.87942868194286 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7200 sz.003011 at 32.98359489940356 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7000 sz.002836 at 31.879082398773825 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9700 sz.002696 at 22.62518448274943 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10800 sz.002760 at 20.930943596393206 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12300 sz.002316 at 17.816234593922033 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7000 sz.003008 at 32.40388394521896 on 2025-09-22 00:00:00
+2026-02-01 14:07:17 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-09-26
+2026-02-01 14:07:19 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['电子']
+2026-02-01 14:07:19 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002828', 'sz.002316', 'sz.003011', 'sz.002780', 'sz.003003', 'sz.002836', 'sz.002696', 'sz.002760', 'sz.002748'], Holding []
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 31200 sz.002188 at 7.263980463980464 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12500 sz.002828 at 17.94380317903738 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 12800 sz.002316 at 17.616052182754373 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7000 sz.003011 at 31.900517941118746 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8700 sz.002780 at 25.957387749322802 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 17900 sz.003003 at 12.679502909919238 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7000 sz.002836 at 31.879082398773825 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10000 sz.002696 at 22.47991845075746 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11000 sz.002760 at 20.489319173113078 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11300 sz.002748 at 19.992416592877984 on 2025-09-29 00:00:00
+2026-02-01 14:07:19 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-09-30
+2026-02-01 14:07:21 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['有色金属']
+2026-02-01 14:07:21 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002316', 'sz.002828', 'sz.002780', 'sz.003011', 'sz.003003', 'sz.002696', 'sz.002743', 'sz.002760', 'sz.002144'], Holding ['sz.002188', 'sz.002828', 'sz.002316', 'sz.003011', 'sz.002780', 'sz.003003', 'sz.002836', 'sz.002696', 'sz.002760', 'sz.002748']
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7000 sz.002836 at 33.7096255917695 on 2025-10-09 00:00:00
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11300 sz.002748 at 21.310835416840746 on 2025-10-09 00:00:00
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 400 sz.002188 at 7.512210012210012 on 2025-10-09 00:00:00
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002316 at 17.582688447559757 on 2025-10-09 00:00:00
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002780 at 26.60289927586964 on 2025-10-09 00:00:00
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003011 at 32.38742885011662 on 2025-10-09 00:00:00
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.003003 at 12.805771818565736 on 2025-10-09 00:00:00
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002696 at 22.66150099074742 on 2025-10-09 00:00:00
+2026-02-01 14:07:21 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 21300 sz.002743 at 10.767671186104385 on 2025-10-09 00:00:00
+2026-02-01 14:07:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002760 at 20.900132590117853 on 2025-10-09 00:00:00
+2026-02-01 14:07:22 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15800 sz.002144 at 14.711692561541104 on 2025-10-09 00:00:00
+2026-02-01 14:07:22 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-10-10
+2026-02-01 14:07:24 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:07:24 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002188', 'sz.002828', 'sz.002316', 'sz.003011', 'sz.002780', 'sz.003003', 'sz.002696', 'sz.002760', 'sz.002743', 'sz.002144']
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 30800 sz.002188 at 7.394627594627595 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 12500 sz.002828 at 18.40802097272392 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 13100 sz.002316 at 17.182323625224434 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7100 sz.003011 at 31.460727442669057 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8800 sz.002780 at 25.66397341907424 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 18100 sz.003003 at 12.626890864649862 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10200 sz.002696 at 22.22570289477151 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11100 sz.002760 at 20.1298574332339 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 21300 sz.002743 at 11.221729609614812 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 15800 sz.002144 at 14.606941586023803 on 2025-10-13 00:00:00
+2026-02-01 14:07:24 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-10-17
+2026-02-01 14:07:26 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:07:26 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:07:26 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-10-24
+2026-02-01 14:07:27 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:07:27 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding []
+2026-02-01 14:07:27 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-10-31
+2026-02-01 14:07:29 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['综合']
+2026-02-01 14:07:29 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002494', 'sz.003003', 'sz.002828', 'sz.002780', 'sz.003011', 'sz.003008', 'sz.002144', 'sz.002830', 'sz.002760'], Holding []
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 28800 sz.002188 at 8.126251526251526 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15800 sz.002494 at 14.479632110992465 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 17000 sz.003003 at 13.647564542875728 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11300 sz.002828 at 20.264892147470075 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8000 sz.002780 at 28.36338525736101 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6400 sz.003011 at 35.87433923068204 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6800 sz.003008 at 33.9284209205014 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 14900 sz.002144 at 15.39839340104342 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 5700 sz.002830 at 40.439118696819556 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10100 sz.002760 at 22.72825229578909 on 2025-11-03 00:00:00
+2026-02-01 14:07:30 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-11-07
+2026-02-01 14:07:32 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['石油石化']
+2026-02-01 14:07:32 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002494', 'sz.003003', 'sz.002828', 'sz.002144', 'sz.002780', 'sz.002830', 'sz.003011', 'sz.002696', 'sz.002853'], Holding ['sz.002188', 'sz.002494', 'sz.003003', 'sz.002828', 'sz.002780', 'sz.003011', 'sz.003008', 'sz.002144', 'sz.002830', 'sz.002760']
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6800 sz.003008 at 35.363279250179 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10100 sz.002760 at 23.888800198827578 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 800 sz.002188 at 8.413675213675214 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.002494 at 15.236030803357743 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 300 sz.003003 at 14.057938495976847 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002828 at 21.0147824295791 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002144 at 15.596256354798323 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002780 at 29.517481623005356 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002830 at 40.30521433027379 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.003011 at 37.068056297902636 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 9200 sz.002696 at 25.639454646582816 on 2025-11-10 00:00:00
+2026-02-01 14:07:32 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6600 sz.002853 at 35.80870845006122 on 2025-11-10 00:00:00
+2026-02-01 14:07:33 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-11-14
+2026-02-01 14:07:35 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['石油石化']
+2026-02-01 14:07:35 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002494', 'sz.003003', 'sz.002830', 'sz.002858', 'sz.003008', 'sz.002144', 'sz.002828', 'sz.002760', 'sz.002696'], Holding ['sz.002188', 'sz.002494', 'sz.003003', 'sz.002828', 'sz.002780', 'sz.003011', 'sz.002144', 'sz.002830', 'sz.002696', 'sz.002853']
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7900 sz.002780 at 34.97498816562861 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6300 sz.003011 at 40.931929962853495 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6600 sz.002853 at 36.102880065408996 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 800 sz.002188 at 8.831746031746032 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002494 at 15.776315583618656 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.003003 at 14.594581357724467 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002830 at 41.57730581245851 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8200 sz.002858 at 30.382634745996047 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7000 sz.003008 at 35.85651180100567 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002144 at 16.434264158936738 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002828 at 21.889654425372964 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10500 sz.002760 at 23.806637515426623 on 2025-11-17 00:00:00
+2026-02-01 14:07:35 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002696 at 27.092114966502525 on 2025-11-17 00:00:00
+2026-02-01 14:07:36 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-11-21
+2026-02-01 14:07:38 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['银行']
+2026-02-01 14:07:38 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002188', 'sz.002494', 'sz.003003', 'sz.002828', 'sz.002144', 'sz.002830', 'sz.002696', 'sz.002858', 'sz.003008', 'sz.002760']
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 28800 sz.002188 at 7.825763125763126 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 15900 sz.002494 at 14.803802979149014 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 17200 sz.003003 at 13.047787226804859 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11300 sz.002828 at 20.193474025364456 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 15300 sz.002144 at 15.38675440376372 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6000 sz.002830 at 38.98848805924048 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9500 sz.002696 at 25.966303218564754 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8200 sz.002858 at 28.008362626772513 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7000 sz.003008 at 33.48002769247715 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10500 sz.002760 at 22.28662787250896 on 2025-11-24 00:00:00
+2026-02-01 14:07:38 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-11-28
+2026-02-01 14:07:40 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['通信']
+2026-02-01 14:07:40 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002494', 'sz.003003', 'sz.002144', 'sz.002858', 'sz.003008', 'sz.002802', 'sz.003011', 'sz.002743', 'sz.002817'], Holding []
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 28300 sz.002188 at 8.23076923076923 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 15200 sz.002494 at 15.209016564344697 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 16700 sz.003003 at 14.047416086922972 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 14900 sz.002144 at 15.607895352078023 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7900 sz.002858 at 29.35646628768757 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6600 sz.003008 at 34.66302342807872 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 8300 sz.002802 at 27.93448127358833 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 6300 sz.003011 at 36.84816104867779 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 19300 sz.002743 at 12.000115478489827 on 2025-12-01 00:00:00
+2026-02-01 14:07:40 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7800 sz.002817 at 29.77135283694231 on 2025-12-01 00:00:00
+2026-02-01 14:07:41 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-12-05
+2026-02-01 14:07:42 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:07:43 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002494', 'sz.002144', 'sz.003011', 'sz.002828', 'sz.002802', 'sz.003008', 'sz.002780', 'sz.002858', 'sz.002743'], Holding ['sz.002188', 'sz.002494', 'sz.003003', 'sz.002144', 'sz.002858', 'sz.003008', 'sz.002802', 'sz.003011', 'sz.002743', 'sz.002817']
+2026-02-01 14:07:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16700 sz.003003 at 14.605103766778342 on 2025-12-08 00:00:00
+2026-02-01 14:07:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7800 sz.002817 at 30.028002430364225 on 2025-12-08 00:00:00
+2026-02-01 14:07:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002188 at 8.113186813186813 on 2025-12-08 00:00:00
+2026-02-01 14:07:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002494 at 14.992902652240332 on 2025-12-08 00:00:00
+2026-02-01 14:07:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10900 sz.002828 at 21.06834602115832 on 2025-12-08 00:00:00
+2026-02-01 14:07:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7700 sz.002780 at 30.06518837280267 on 2025-12-08 00:00:00
+2026-02-01 14:07:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002858 at 29.79912719127162 on 2025-12-08 00:00:00
+2026-02-01 14:07:43 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002743 at 12.043359137871773 on 2025-12-08 00:00:00
+2026-02-01 14:07:43 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-12-12
+2026-02-01 14:07:45 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:07:45 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002494', 'sz.002828', 'sz.002144', 'sz.003011', 'sz.002319', 'sz.002802', 'sz.003008', 'sz.002817', 'sz.002999'], Holding ['sz.002188', 'sz.002494', 'sz.002144', 'sz.002858', 'sz.003008', 'sz.002802', 'sz.003011', 'sz.002743', 'sz.002828', 'sz.002780']
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7700 sz.002858 at 29.45707103850213 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 19200 sz.002743 at 11.329838758069675 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7700 sz.002780 at 28.558994810860053 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 1500 sz.002188 at 7.120268620268621 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002494 at 13.39906255047064 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002828 at 19.122202193780137 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002144 at 14.281049662192194 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003011 at 33.37695747162843 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10000 sz.002319 at 20.92217102022751 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002802 at 25.79382679055918 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 7800 sz.002817 at 27.608163406671874 on 2025-12-15 00:00:00
+2026-02-01 14:07:45 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 21900 sz.002999 at 9.879591023649235 on 2025-12-15 00:00:00
+2026-02-01 14:07:46 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-12-19
+2026-02-01 14:07:47 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['商贸零售']
+2026-02-01 14:07:48 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002494', 'sz.002828', 'sz.002144', 'sz.003011', 'sz.003008', 'sz.002802', 'sz.003003', 'sz.002743', 'sz.002319', 'sz.002817'], Holding ['sz.002188', 'sz.002494', 'sz.002144', 'sz.003008', 'sz.002802', 'sz.003011', 'sz.002828', 'sz.002319', 'sz.002817', 'sz.002999']
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 30100 sz.002188 at 10.73919413919414 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 21900 sz.002999 at 10.393995456733576 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002494 at 14.398589393953328 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 600 sz.002828 at 19.56856545694027 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.002144 at 14.921194512575708 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.003011 at 34.66491535994538 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.003008 at 33.245744523233405 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002802 at 26.959529726862183 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 16700 sz.003003 at 13.879057542060973 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 20000 sz.002743 at 11.654166203434263 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002817 at 29.14806096720337 on 2025-12-22 00:00:00
+2026-02-01 14:07:48 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-12-26
+2026-02-01 14:07:50 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['有色金属']
+2026-02-01 14:07:50 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002494', 'sz.002188', 'sz.002828', 'sz.003011', 'sz.002144', 'sz.002802', 'sz.003008', 'sz.002817', 'sz.002760', 'sz.002743'], Holding ['sz.002494', 'sz.002144', 'sz.003008', 'sz.002802', 'sz.003011', 'sz.002828', 'sz.002319', 'sz.002817', 'sz.003003', 'sz.002743']
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10000 sz.002319 at 24.655342712072024 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16700 sz.003003 at 14.573536539616716 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002494 at 14.50664635000551 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 28700 sz.002188 at 8.23076923076923 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002828 at 19.693547170625106 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.003011 at 34.28795207555993 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002144 at 14.89791651801631 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002802 at 26.47205395349911 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003008 at 33.245744523233405 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 400 sz.002817 at 28.524769097464432 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10700 sz.002760 at 22.471493910161108 on 2025-12-29 00:00:00
+2026-02-01 14:07:50 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002743 at 11.69740986281621 on 2025-12-29 00:00:00
+2026-02-01 14:07:51 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2025-12-31
+2026-02-01 14:07:52 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:07:53 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002494', 'sz.002828', 'sz.003008', 'sz.002144', 'sz.003011', 'sz.002802', 'sz.002817', 'sz.003003', 'sz.002760'], Holding ['sz.002494', 'sz.002144', 'sz.003008', 'sz.002802', 'sz.003011', 'sz.002828', 'sz.002817', 'sz.002743', 'sz.002188', 'sz.002760']
+2026-02-01 14:07:53 | INFO     | src.core.data_stream:_load_next_chunk:187 - Chunk 3 loaded: 2026-01-05 to 2026-01-30, 1/1 symbols, memory: 453.88MB (+0.00MB)
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 20200 sz.002743 at 11.827140840962045 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 800 sz.002188 at 7.9433455433455435 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002494 at 14.560674828031601 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002828 at 19.63998357904589 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.003008 at 32.763266598179676 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.003011 at 34.50784732478478 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002802 at 26.49324855234098 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 16800 sz.003003 at 13.942191996384224 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002760 at 22.081221164006575 on 2026-01-05 00:00:00
+2026-02-01 14:07:53 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2026-01-09
+2026-02-01 14:07:55 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['国防军工']
+2026-02-01 14:07:55 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002494', 'sz.002188', 'sz.002715', 'sz.003011', 'sz.002144', 'sz.003008', 'sz.002802', 'sz.002817', 'sz.002828', 'sz.002999'], Holding ['sz.002494', 'sz.002144', 'sz.003008', 'sz.002802', 'sz.003011', 'sz.002828', 'sz.002817', 'sz.002188', 'sz.002760', 'sz.003003']
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 10500 sz.002760 at 22.77960397291469 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16800 sz.003003 at 14.205252222731096 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002494 at 14.857831457175104 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 600 sz.002188 at 8.374481074481075 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 10000 sz.002715 at 23.936129515845703 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.003011 at 35.0575854478469 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002144 at 15.002667493533611 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002817 at 28.711883086757254 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 700 sz.002828 at 20.63983728852459 on 2026-01-12 00:00:00
+2026-02-01 14:07:55 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 23200 sz.002999 at 10.409124998883113 on 2026-01-12 00:00:00
+2026-02-01 14:07:56 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2026-01-16
+2026-02-01 14:07:57 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['计算机']
+2026-02-01 14:07:58 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002188', 'sz.002494', 'sz.002715', 'sz.003011', 'sz.003003', 'sz.002802', 'sz.002828', 'sz.002817', 'sz.002760', 'sz.002144'], Holding ['sz.002494', 'sz.002144', 'sz.003008', 'sz.002802', 'sz.003011', 'sz.002828', 'sz.002817', 'sz.002188', 'sz.002715', 'sz.002999']
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 7200 sz.003008 at 34.54240394681529 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 23200 sz.002999 at 10.363736372434495 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 500 sz.002188 at 8.23076923076923 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002494 at 14.749774501122921 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002715 at 24.57120054532487 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 17700 sz.003003 at 13.710698997198977 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002802 at 26.832362133810946 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 200 sz.002828 at 20.586273696945373 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002817 at 28.417402234585385 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 11000 sz.002760 at 22.081221164006575 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002144 at 15.293642425526118 on 2026-01-19 00:00:00
+2026-02-01 14:07:58 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2026-01-23
+2026-02-01 14:08:00 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['有色金属']
+2026-02-01 14:08:00 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target ['sz.002494', 'sz.002188', 'sz.002144', 'sz.002715', 'sz.003003', 'sz.002802', 'sz.002817', 'sz.003011', 'sz.002828', 'sz.002247'], Holding ['sz.002494', 'sz.002144', 'sz.002802', 'sz.003011', 'sz.002828', 'sz.002817', 'sz.002188', 'sz.002715', 'sz.003003', 'sz.002760']
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11000 sz.002760 at 24.60772367858593 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002494 at 15.425130476449063 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 400 sz.002188 at 8.805616605616606 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 300 sz.002144 at 15.991982262308131 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.002715 at 26.53689658895086 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002802 at 28.44315164579328 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 100 sz.002817 at 30.147477241095118 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 100 sz.003011 at 37.00522908383839 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 200 sz.002828 at 22.282454096953884 on 2026-01-26 00:00:00
+2026-02-01 14:08:00 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): buy 13600 sz.002247 at 19.094720268601098 on 2026-01-26 00:00:00
+2026-02-01 14:08:01 | INFO     | src.strategies.jsg_strategy:on_bar:72 - JSGStrategy: Rebalancing on 2026-01-30
+2026-02-01 14:08:02 | INFO     | src.strategies.jsg_strategy:on_bar:76 - Market breadth: ['煤炭']
+2026-02-01 14:08:02 | INFO     | src.strategies.jsg_strategy:adjust:151 - JSG Rebalancing: Target [], Holding ['sz.002494', 'sz.002144', 'sz.002802', 'sz.003011', 'sz.002828', 'sz.002817', 'sz.002188', 'sz.002715', 'sz.003003', 'sz.002247']
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16700 sz.002494 at 14.803802979149014 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 16100 sz.002144 at 17.458495919550362 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9100 sz.002802 at 28.040454267797696 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 6800 sz.003011 at 35.717271195521434 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 11600 sz.002828 at 24.996342736967495 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 8600 sz.002817 at 29.411275110665446 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 29000 sz.002188 at 8.635775335775337 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 9700 sz.002715 at 25.508686350746498 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 17700 sz.003003 at 14.057938495976847 on 2026-01-30 00:00:00
+2026-02-01 14:08:02 | INFO     | src.core.backtest_broker:_execute_order:201 - ORDER FILLED (NEXT_OPEN): sell 13600 sz.002247 at 18.256100797344967 on 2026-01-30 00:00:00
+2026-02-01 14:43:42 | INFO     | src.utils.logging_config:setup_logging:59 - Logging system initialized: level=INFO, console=True, file=True
+2026-02-01 14:43:42 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:43:42 | WARNING  | src.core.risk_manager:check_position_limit:81 - Position limit exceeded: AAPL - Position size 20.0% exceeds limit 10.0%
+2026-02-01 14:43:42 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=900 @ 100
+2026-02-01 14:43:42 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=900 @ 100
+2026-02-01 14:43:42 | INFO     | src.core.risk_manager:add_position:181 - Position added: MSFT qty=900 @ 100
+2026-02-01 14:44:02 | INFO     | src.utils.logging_config:setup_logging:59 - Logging system initialized: level=INFO, console=True, file=True
+2026-02-01 14:44:02 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:02 | WARNING  | src.core.risk_manager:check_position_limit:81 - Position limit exceeded: AAPL - Position size 20.0% exceeds limit 10.0%
+2026-02-01 14:44:02 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=900 @ 100
+2026-02-01 14:44:02 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=900 @ 100
+2026-02-01 14:44:02 | INFO     | src.core.risk_manager:add_position:181 - Position added: MSFT qty=900 @ 100
+2026-02-01 14:44:18 | INFO     | src.utils.logging_config:setup_logging:59 - Logging system initialized: level=INFO, console=True, file=True
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:18 | WARNING  | src.core.risk_manager:check_position_limit:81 - Position limit exceeded: AAPL - Position size 20.0% exceeds limit 10.0%
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=3000 @ 100
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=3000 @ 100
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:add_position:181 - Position added: MSFT qty=3000 @ 100
+2026-02-01 14:44:18 | WARNING  | src.core.risk_manager:check_position_limit:95 - Total exposure limit exceeded: Total exposure 100.0% would exceed limit 95.0%
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:18 | WARNING  | src.core.risk_manager:check_stop_loss:113 - Stop loss: AAPL - Stop loss triggered: 6.0% loss (limit: 5.0%)
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:check_take_profit:132 - Take profit: AAPL - Take profit triggered: 20.0% profit (target: 15.0%)
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:18 | INFO     | src.core.risk_manager:close_position:216 - Position closed: AAPL pnl=-10000.00 (-10.00%)
+2026-02-01 14:44:36 | INFO     | src.utils.logging_config:setup_logging:59 - Logging system initialized: level=INFO, console=True, file=True
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:36 | WARNING  | src.core.risk_manager:check_position_limit:81 - Position limit exceeded: AAPL - Position size 20.0% exceeds limit 10.0%
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=3000 @ 100
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=3000 @ 100
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:add_position:181 - Position added: MSFT qty=3000 @ 100
+2026-02-01 14:44:36 | WARNING  | src.core.risk_manager:check_position_limit:95 - Total exposure limit exceeded: Total exposure 100.0% would exceed limit 95.0%
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:36 | WARNING  | src.core.risk_manager:check_stop_loss:113 - Stop loss: AAPL - Stop loss triggered: 6.0% loss (limit: 5.0%)
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:check_take_profit:132 - Take profit: AAPL - Take profit triggered: 20.0% profit (target: 15.0%)
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:36 | INFO     | src.core.risk_manager:close_position:216 - Position closed: AAPL pnl=-10000.00 (-10.00%)
+2026-02-01 14:44:56 | INFO     | src.utils.logging_config:setup_logging:59 - Logging system initialized: level=INFO, console=True, file=True
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:56 | WARNING  | src.core.risk_manager:check_position_limit:81 - Position limit exceeded: AAPL - Position size 20.0% exceeds limit 10.0%
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=3000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=3000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: MSFT qty=3000 @ 100
+2026-02-01 14:44:56 | WARNING  | src.core.risk_manager:check_position_limit:95 - Total exposure limit exceeded: Total exposure 100.0% would exceed limit 95.0%
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:56 | WARNING  | src.core.risk_manager:check_stop_loss:113 - Stop loss: AAPL - Stop loss triggered: 6.0% loss (limit: 5.0%)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:check_take_profit:132 - Take profit: AAPL - Take profit triggered: 20.0% profit (target: 15.0%)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=11000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=5000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:close_position:216 - Position closed: AAPL pnl=-100000.00 (-20.00%)
+2026-02-01 14:44:56 | ERROR    | src.core.risk_manager:check_daily_loss_limit:148 - Daily loss limit: Daily loss limit exceeded: 10.0% (limit: 10.0%)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:close_position:216 - Position closed: AAPL pnl=10000.00 (10.00%)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=2000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:close_position:216 - Position closed: GOOGL pnl=-20000.00 (-10.00%)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=500 @ 150
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=300 @ 200
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: MSFT qty=400 @ 250
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:56 | WARNING  | src.core.risk_manager:check_stop_loss:113 - Stop loss: AAPL - Stop loss triggered: 6.0% loss (limit: 5.0%)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=1000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:check_take_profit:132 - Take profit: GOOGL - Take profit triggered: 20.0% profit (target: 15.0%)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:__init__:66 - Risk manager initialized: enabled=True, initial_capital=1000000, limits=RiskLimits(max_position_pct=0.1, max_total_position=0.95, stop_loss_pct=0.05, take_profit_pct=0.15, max_daily_loss_pct=0.1, max_drawdown_pct=0.2)
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: AAPL qty=1000 @ 100
+2026-02-01 14:44:56 | INFO     | src.core.risk_manager:add_position:181 - Position added: GOOGL qty=500 @ 200
+2026-02-01 14:50:39 | INFO     | src.utils.logging_config:setup_logging:59 - Logging system initialized: level=INFO, console=True, file=True
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:disconnect:188 - MockBroker disconnected
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000002 @ $160.00, commission=$0.80
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000002 sell 50 AAPL
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=10000, commission=0.0001
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:50:39 | WARNING  | src.core.broker_interface:_execute_order:241 - Order rejected: insufficient cash (need $15001.50, have $10000.00)
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:50:39 | WARNING  | src.core.broker_interface:_execute_order:274 - Order rejected: insufficient quantity (need 200, have 100)
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000002 sell 200 AAPL
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000002 @ $200.00, commission=$1.00
+2026-02-01 14:50:39 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000002 buy 50 GOOGL
+2026-02-01 14:54:01 | INFO     | src.utils.logging_config:setup_logging:59 - Logging system initialized: level=INFO, console=True, file=True
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:disconnect:188 - MockBroker disconnected
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000002 @ $160.00, commission=$0.80
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000002 sell 50 AAPL
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=10000, commission=0.0001
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:54:01 | WARNING  | src.core.broker_interface:_execute_order:241 - Order rejected: insufficient cash (need $15001.50, have $10000.00)
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:54:01 | WARNING  | src.core.broker_interface:_execute_order:274 - Order rejected: insufficient quantity (need 200, have 100)
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000002 sell 200 AAPL
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:__init__:177 - MockBroker initialized: cash=1000000, commission=0.0001
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:connect:182 - MockBroker connected
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000001 @ $150.00, commission=$1.50
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000001 buy 100 AAPL
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:_execute_order:291 - Order filled: ORD000002 @ $200.00, commission=$1.00
+2026-02-01 14:54:01 | INFO     | src.core.broker_interface:submit_order:216 - Order submitted: ORD000002 buy 50 GOOGL
