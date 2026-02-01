@@ -54,10 +54,10 @@ def update_etf_kline():
 
 
 if __name__ == "__main__":
-    # update_fincial()
-    # update_kline_daily()
+    update_fincial()
+    update_kline_daily()
     #update_industry_weekly()
     #update_etf_kline()
-    # update_share_info()
+    update_share_info()
     # update_index_stocks_weekly()
-    update_etf_kline()
+    # update_etf_kline()

@@ -90,26 +90,32 @@ class AdvancedAgent:
         # Combined amount for market sentiment logic
         df_sh = self.db_client.get_price(['sh.000001'], yesterday, ['amount'], ma_window + slope_window)
         df_sz = self.db_client.get_price(['sz.399001'], yesterday, ['amount'], ma_window + slope_window)
+        logger.info(f"df_sh: {df_sh}")
+        logger.info(f"df_sz: {df_sz}")
         
         if df_sh.empty or df_sz.empty:
             return None
             
         total_money = df_sh['amount'].values + df_sz['amount'].values
+        logger.info(f"total_money: {total_money}")
         ma_total = pd.Series(total_money).rolling(ma_window).mean().dropna()
         if len(ma_total) < slope_window + 1:
             return None
-            
+
+        logger.info(f"ma_total: {ma_total}")
         change_total = (ma_total.iloc[-1] - ma_total.iloc[-slope_window - 1]) / ma_total.iloc[-slope_window - 1]
         
         # Bank Index return check
-        price_df = self.db_client.get_price(['sz.399986'], yesterday, ['close'], ma_window)
+        price_df = self.db_client.get_price(['sz.399431'], yesterday, ['close'], ma_window)
         if price_df.empty:
             return None
             
         close_prices = price_df['close']
         bank_return = close_prices.iloc[-1] / close_prices.iloc[0]
-        
-        return '存量' if change_total <= 0.1 or bank_return <= 0.9 else None
+
+        logger.info(f"bank_return: {bank_return}")
+        logger.info(f"change_total: {change_total}")
+        return '存量' if change_total <= 0.15 or bank_return <= 0.9 else None
 
     def get_market_breadth(self, end_date):
         # Group 1: All SW Level 1 Industries
@@ -302,7 +308,7 @@ class AdvancedAgent:
             final_list = self.get_L2(today_str)[:10]
         elif max_group == 'CYB':
             L2 = self.get_L2(today_str)
-            final_list = L2[:9] + ['sz.159915'] 
+            final_list = L2[:9] + ['159949'] 
         else:
             final_list = self.get_L2(today_str)[:10]
 
