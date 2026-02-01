@@ -9,12 +9,16 @@ PRICE_CHANGE_LIMIT = 0.098
 NUM_STOCKS = 6
 
 class JSGStrategy(Strategy):
-    def __init__(self, db_client, max_stocks=NUM_STOCKS, pool_size=20):
+    def __init__(self, db_client, **kwargs):
         super().__init__()
         self.db_client = db_client
-        self.max_stocks = max_stocks
-        self.pool_size = pool_size
-        self.stock_sum = 10 # From Agent class
+        
+        # Load parameters with defaults
+        params = self.get_parameters()
+        self.max_stocks = kwargs.get('max_stocks', params['max_stocks']['default'])
+        self.pool_size = kwargs.get('pool_size', params['pool_size']['default'])
+        self.stock_sum = kwargs.get('stock_sum', params['stock_sum']['default'])
+        
         self.black_industry_name = {"银行", "煤炭", "采掘", "钢铁"}
         
         # Initialize internal state from original Agent
@@ -22,6 +26,32 @@ class JSGStrategy(Strategy):
             "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
         )
         self.pass_month = []
+
+    @classmethod
+    def get_parameters(cls) -> dict:
+        return {
+            "max_stocks": {
+                "type": "int",
+                "default": NUM_STOCKS,
+                "description": "Maximum number of stocks to consider from index",
+                "min": 1,
+                "max": 100
+            },
+            "pool_size": {
+                "type": "int",
+                "default": 20,
+                "description": "Size of the candidate pool after financial filtering",
+                "min": 5,
+                "max": 100
+            },
+            "stock_sum": {
+                "type": "int",
+                "default": 10,
+                "description": "Maximum number of stocks to hold in portfolio",
+                "min": 1,
+                "max": 20
+            }
+        }
 
     def on_bar(self, bars: dict[str, Bar]):
         # Get some representative bar for timestamp

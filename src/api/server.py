@@ -39,15 +39,17 @@ class SessionRequest(BaseModel):
     start_date: str
     end_date: Optional[str] = None
     mode: str = "backtest" # backtest, simulation, live
+    params: Optional[Dict[str, Any]] = {}
 
 class Session:
-    def __init__(self, session_id: str, strategy_name: str, symbol: str, mode: str, start_date: str, end_date: Optional[str]):
+    def __init__(self, session_id: str, strategy_name: str, symbol: str, mode: str, start_date: str, end_date: Optional[str], params: Dict[str, Any] = {}):
         self.session_id = session_id
         self.strategy_name = strategy_name
         self.symbol = symbol
         self.mode = mode
         self.start_date = start_date
         self.end_date = end_date
+        self.params = params
         self.status = "starting"
         self.progress = 0.0
         # self.equity_history = [] # Removed to save memory, use DB
@@ -63,15 +65,23 @@ SESSIONS: Dict[str, Session] = {}
 # Mock live server URL - in real scenario this might be config
 LIVE_SERVER_URL = "http://localhost:11122" 
 
+@app.get("/strategies")
+async def get_strategies():
+    return [
+        {"name": "jsg", "label": "JSG Quantitative", "params": JSGStrategy.get_parameters()},
+        {"name": "rotation", "label": "Advanced Rotation", "params": RotationStrategy.get_parameters()}
+    ]
+
 @app.post("/session/run")
 async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
     print(f"Running session: {req}")
     session_id = str(uuid.uuid4())
-    session = Session(session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date)
+    session = Session(session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date, req.params)
     SESSIONS[session_id] = session
     
     # Persist initial session state
     session_db.create_session(session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date)
+    # Note: params persistence in DB is not yet implemented in session_db, but it's okay for now.
     
     def execute_session_task():
         try:
@@ -99,11 +109,11 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                 
             session.broker = broker
             
-            # Setup strategy
+            # Setup strategy with params
             if req.strategy == "jsg":
-                strategy = JSGStrategy(db_client)
+                strategy = JSGStrategy(db_client, **req.params)
             elif req.strategy == "rotation":
-                strategy = RotationStrategy(db_client)
+                strategy = RotationStrategy(db_client, **req.params)
             else:
                 raise ValueError(f"Unknown strategy: {req.strategy}")
             

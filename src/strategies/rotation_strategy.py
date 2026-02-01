@@ -22,13 +22,20 @@ SW1 = {
 }
 
 class RotationStrategy(Strategy):
-    def __init__(self, db_client, stock_sum=10, rebalance_dates=None, timing='OPEN'):
+    def __init__(self, db_client, **kwargs):
         super().__init__()
         self.db_client = db_client
-        self.stock_sum = stock_sum
-        self.rebalance_dates = rebalance_dates
-        self.timing = timing
         
+        # Load parameters
+        params = self.get_parameters()
+        self.stock_sum = kwargs.get('stock_sum', params['stock_sum']['default'])
+        self.timing = kwargs.get('timing', params['timing']['default'])
+        
+        rebalance_dates_str = kwargs.get('rebalance_dates', None)
+        self.rebalance_dates = None
+        if rebalance_dates_str:
+            self.rebalance_dates = [d.strip() for d in rebalance_dates_str.split(',') if d.strip()]
+
         self.JSG_group = {'银行I', '有色金属I', '钢铁I', '煤炭I'}
         self.XSZ_group = {'小市值200'}
         self.CYB_group = {'创业板50'}
@@ -72,6 +79,29 @@ class RotationStrategy(Strategy):
                             
                 except Exception as e:
                     logger.error(f"Error parsing date {d_str}: {e}")
+
+    @classmethod
+    def get_parameters(cls) -> dict:
+        return {
+            "stock_sum": {
+                "type": "int",
+                "default": 10,
+                "description": "Number of stocks to hold",
+                "min": 1,
+                "max": 20
+            },
+            "timing": {
+                "type": "str",
+                "default": "OPEN",
+                "description": "Rebalance execution timing (OPEN/CLOSE)",
+                "options": ["OPEN", "CLOSE"]
+            },
+            "rebalance_dates": {
+                "type": "str",
+                "default": "",
+                "description": "Specific rebalance dates (comma separated, YYYY-MM-DD)",
+            }
+        }
 
     def on_bar(self, bars: dict[str, Bar]):
         if not bars: return

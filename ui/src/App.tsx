@@ -55,6 +55,21 @@ interface BenchmarkData {
   value: number;
 }
 
+interface StrategyParam {
+  type: string;
+  default: any;
+  description: string;
+  min?: number;
+  max?: number;
+  options?: string[];
+}
+
+interface StrategyMeta {
+  name: string;
+  label: string;
+  params: Record<string, StrategyParam>;
+}
+
 const AVAILABLE_BENCHMARKS = [
   { code: 'sh.000300', name: 'HS300' },
   { code: 'sh.000905', name: 'ZZ500' },
@@ -71,7 +86,10 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
 
   // New Session Form State
-  const [strategy, setStrategy] = useState('rotation');
+  const [strategies, setStrategies] = useState<StrategyMeta[]>([]);
+  const [selectedStrategy, setSelectedStrategy] = useState<string>('');
+  const [paramValues, setParamValues] = useState<Record<string, any>>({});
+  
   const [symbol, setSymbol] = useState('sh.000300');
   const [startDate, setStartDate] = useState('2024-01-01');
   const [endDate, setEndDate] = useState<string>(''); // Optional end date
@@ -80,10 +98,13 @@ const App: React.FC = () => {
   // Session State
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>([]);
+  
+  // Multi-session Data Cache
+  const [sessionDataCache, setSessionDataCache] = useState<Record<string, { equity: EquityPoint[], trades: Trade[], positions: Record<string, Position> }>>({});
 
   // Detailed Data State (for primary selected session)
   const [primarySessionId, setPrimarySessionId] = useState<string | null>(null);
-  const [equityHistory, setEquityHistory] = useState<EquityPoint[]>([]);
+  const [equityHistory, setEquityHistory] = useState<EquityPoint[]>([]); // Keep for backward compatibility/direct access
   const [trades, setTrades] = useState<Trade[]>([]);
   const [positions, setPositions] = useState<Record<string, Position>>({});
   const [selectedDay, setSelectedDay] = useState<EquityPoint | null>(null);
@@ -103,6 +124,19 @@ const App: React.FC = () => {
   const pollInterval = useRef<number | null>(null);
   const lastUpdatedRef = useRef<string | null>(null);
 
+  const fetchStrategies = async () => {
+      try {
+          const resp = await fetch(`${API_BASE}/strategies`);
+          const data = await resp.json();
+          setStrategies(data);
+          if (data.length > 0) {
+              setSelectedStrategy(data[0].name);
+          }
+      } catch (err) {
+          console.error("Failed to fetch strategies", err);
+      }
+  };
+
   const fetchSessions = async () => {
     try {
       const resp = await fetch(`${API_BASE}/sessions`);
@@ -112,11 +146,23 @@ const App: React.FC = () => {
       console.error("Failed to fetch sessions", err);
     }
   };
+  
+  // Initialize params when strategy changes
+  useEffect(() => {
+      const strat = strategies.find(s => s.name === selectedStrategy);
+      if (strat) {
+          const defaults: Record<string, any> = {};
+          Object.entries(strat.params).forEach(([key, conf]) => {
+              defaults[key] = conf.default;
+          });
+          setParamValues(defaults);
+      }
+  }, [selectedStrategy, strategies]);
 
   const startSession = async () => {
     setError(null);
     try {
-      const payload: any = { strategy, symbol, start_date: startDate, mode };
+      const payload: any = { strategy: selectedStrategy, symbol, start_date: startDate, mode, params: paramValues };
       if (endDate) payload.end_date = endDate;
 
       const resp = await fetch(`${API_BASE}/session/run`, {
@@ -150,22 +196,78 @@ const App: React.FC = () => {
     setTrades([]);
     setPositions({});
     lastUpdatedRef.current = null;
-
+    
+    // Also clear cache for simplicity when primary changes? No, we want to keep it for comparison.
+    // But we should ensure primary is loaded into main state
+    
+    fetchStrategies();
     fetchSessions();
+    
     if (primarySessionId) {
       fetchSessionDetails(primarySessionId);
     }
 
     pollInterval.current = window.setInterval(() => {
       fetchSessions();
+      
+      // Update all selected sessions in cache
+      selectedSessionIds.forEach(id => {
+          fetchSessionDataFull(id);
+      });
+      
+      // Also update primary state variables
       if (primarySessionId) {
-        fetchSessionDetails(primarySessionId);
+          // We can just rely on the cache update above and then sync to state?
+          // Or keep existing incremental logic for primary for efficiency?
+          // Let's keep existing logic for primary to ensure responsiveness
+          fetchSessionDetails(primarySessionId);
       }
     }, 1000);
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
-  }, [primarySessionId]);
+  }, [primarySessionId]); // Note: Adding selectedSessionIds to dependency might cause loop if not careful
+
+  // Effect to sync primary session data from cache if we want? 
+  // Actually, let's just stick to the plan:
+  // 1. fetchSessionDetails updates 'equityHistory' state (for Primary)
+  // 2. We add a new function fetchSessionDataFull to update 'sessionDataCache' (for Comparison)
+  
+  const fetchSessionDataFull = async (id: string) => {
+      try {
+          // For comparison, we just need equity history mainly.
+          // We can use the same endpoint.
+          // To save bandwidth, maybe we only fetch if status is running or if we don't have it?
+          // But for now, simple approach.
+          const session = sessions.find(s => s.id === id);
+          if (session && session.status === 'completed' && sessionDataCache[id]) {
+              return; // Already have full data for completed session
+          }
+          
+          const resp = await fetch(`${API_BASE}/session/${id}/status`);
+          const data = await resp.json();
+          
+          setSessionDataCache(prev => ({
+              ...prev,
+              [id]: {
+                  equity: data.equity_history || [],
+                  trades: data.trades || [],
+                  positions: data.positions || {}
+              }
+          }));
+      } catch (err) {
+          console.error("Error fetching full session data", err);
+      }
+  };
+
+  // Watch selectedSessionIds to fetch missing data
+  useEffect(() => {
+      selectedSessionIds.forEach(id => {
+          if (!sessionDataCache[id]) {
+              fetchSessionDataFull(id);
+          }
+      });
+  }, [selectedSessionIds]);
 
   const fetchSessionDetails = async (id: string) => {
     try {
@@ -264,19 +366,67 @@ const App: React.FC = () => {
 
   // Chart Data Preparation
   const chartData = React.useMemo(() => {
-    if (equityHistory.length === 0) return [];
-
-    // LTTB Downsampling
-    let processedHistory = equityHistory;
-    if (useLttb && equityHistory.length > 2000) {
-      processedHistory = lttb(equityHistory, 2000, 'total_equity');
+    // We use the primary session's equity history as the base for the X-axis (timestamps)
+    // if it exists, otherwise we might need a merged timeline.
+    // For simplicity, we assume all sessions cover roughly same period or we just use the primary.
+    // Better: Collect ALL timestamps from all selected sessions and sort them.
+    
+    if (selectedSessionIds.length === 0) return [];
+    
+    // Collect all relevant equity curves
+    const relevantCurves: {id: string, data: EquityPoint[]}[] = [];
+    
+    // Add Primary
+    if (equityHistory.length > 0) {
+        relevantCurves.push({ id: 'Primary', data: equityHistory });
     }
+    
+    // Add others from cache
+    selectedSessionIds.forEach(id => {
+        if (id !== primarySessionId && sessionDataCache[id]?.equity) {
+            relevantCurves.push({ id: id, data: sessionDataCache[id].equity });
+        }
+    });
+    
+    if (relevantCurves.length === 0) return [];
+    
+    // Create a map of timestamp -> data point
+    const dataMap = new Map<string, any>();
+    
+    relevantCurves.forEach(curve => {
+        if (curve.data.length === 0) return;
+        
+        let processedData = curve.data;
+        if (useLttb && curve.data.length > 2000) {
+             processedData = lttb(curve.data, 2000, 'total_equity');
+        }
+        
+        const initialEquity = processedData[0].total_equity || 1;
+        
+        processedData.forEach(pt => {
+            const ts = pt.timestamp;
+            const dateStr = ts.split(' ')[0]; // Use date as key to align
+            
+            if (!dataMap.has(dateStr)) {
+                dataMap.set(dateStr, { timestamp: ts });
+            }
+            const entry = dataMap.get(dateStr);
+            
+            // Calculate return %
+            const ret = ((pt.total_equity - initialEquity) / initialEquity) * 100;
+            
+            if (curve.id === 'Primary') {
+                entry.equityReturn = ret;
+                entry.equityValue = pt.total_equity;
+            } else {
+                entry[`session_${curve.id}`] = ret;
+            }
+        });
+    });
 
-    const initialEquity = processedHistory[0].total_equity;
-
+    // Add benchmarks
     // Pre-process benchmarks into maps for O(1) lookup
     const bmMaps: Record<string, { map: Map<string, number>, initial: number }> = {};
-
     Object.keys(benchmarksData).forEach(code => {
       const data = benchmarksData[code];
       if (data && data.length > 0) {
@@ -285,28 +435,22 @@ const App: React.FC = () => {
         bmMaps[code] = { map, initial: data[0].value };
       }
     });
-
-    return processedHistory.map(pt => {
-      const dateStr = pt.timestamp.split(' ')[0];
-
-      const point: any = {
-        timestamp: pt.timestamp,
-        equityReturn: ((pt.total_equity - initialEquity) / initialEquity) * 100,
-        equityValue: pt.total_equity
-      };
-
-      // Add benchmark returns
-      Object.keys(bmMaps).forEach(code => {
-        const { map, initial } = bmMaps[code];
-        const val = map.get(dateStr);
-        if (val !== undefined && initial > 0) {
-          point[code] = ((val - initial) / initial) * 100;
-        }
-      });
-
-      return point;
+    
+    // Merge benchmarks into dataMap
+    dataMap.forEach((entry, dateStr) => {
+        Object.keys(bmMaps).forEach(code => {
+            const { map, initial } = bmMaps[code];
+            const val = map.get(dateStr);
+            if (val !== undefined && initial > 0) {
+              entry[code] = ((val - initial) / initial) * 100;
+            }
+        });
     });
-  }, [equityHistory, benchmarksData]);
+    
+    // Convert map to sorted array
+    return Array.from(dataMap.values()).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
+    
+  }, [equityHistory, sessionDataCache, selectedSessionIds, primarySessionId, benchmarksData, useLttb]);
 
   // Derived Data for Display
   const currentPositions = (selectedDay ? selectedDay.positions : positions) || {};
@@ -449,7 +593,25 @@ const App: React.FC = () => {
                         labelFormatter={(label) => label.split(' ')[0]}
                       />
                       <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                      <Area type="monotone" dataKey="equityReturn" name="Strategy" stroke="var(--primary)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
+                      <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="var(--primary)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
+
+                      {/* Render other selected sessions */}
+                      {selectedSessionIds.filter(id => id !== primarySessionId).map((id, idx) => {
+                          const s = sessions.find(sess => sess.id === id);
+                          const color = `hsl(${(idx * 137) % 360}, 70%, 50%)`; // Generate random distinct color
+                          return (
+                              <Line
+                                  key={id}
+                                  type="monotone"
+                                  dataKey={`session_${id}`}
+                                  name={s ? `${s.strategy} (${id.slice(0,4)})` : id.slice(0,6)}
+                                  stroke={color}
+                                  strokeWidth={2}
+                                  dot={false}
+                                  strokeDasharray="5 5"
+                              />
+                          );
+                      })}
 
                       {/* Render active benchmarks */}
                       {selectedBenchmarks.map(code => (
@@ -641,11 +803,46 @@ const App: React.FC = () => {
                 </div>
                 <div className="input-group">
                   <label className="tagline">Strategy</label>
-                  <select className="glass-input" value={strategy} onChange={(e) => setStrategy(e.target.value)}>
-                    <option value="rotation">Advanced Rotation</option>
-                    <option value="jsg">JSG Quantitative</option>
+                  <select className="glass-input" value={selectedStrategy} onChange={(e) => setSelectedStrategy(e.target.value)}>
+                    {strategies.map(s => (
+                        <option key={s.name} value={s.name}>{s.label}</option>
+                    ))}
                   </select>
                 </div>
+                
+                {/* Dynamic Parameters */}
+                {selectedStrategy && strategies.find(s => s.name === selectedStrategy)?.params && (
+                    <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
+                        <div className="tagline" style={{ marginBottom: '1rem', color: 'var(--primary)' }}>Configuration</div>
+                        {Object.entries(strategies.find(s => s.name === selectedStrategy)!.params).map(([key, conf]) => (
+                            <div key={key} className="input-group" style={{ marginBottom: '1rem' }}>
+                                <label className="tagline" title={conf.description}>{key} <span style={{ opacity: 0.5 }}>- {conf.description}</span></label>
+                                {conf.options ? (
+                                    <select 
+                                        className="glass-input" 
+                                        value={paramValues[key] || conf.default} 
+                                        onChange={(e) => setParamValues(prev => ({ ...prev, [key]: e.target.value }))}
+                                    >
+                                        {conf.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                    </select>
+                                ) : (
+                                    <input 
+                                        type={conf.type === 'int' || conf.type === 'float' ? 'number' : 'text'}
+                                        value={paramValues[key] !== undefined ? paramValues[key] : ''}
+                                        onChange={(e) => {
+                                            let val: any = e.target.value;
+                                            if (conf.type === 'int') val = parseInt(val);
+                                            else if (conf.type === 'float') val = parseFloat(val);
+                                            setParamValues(prev => ({ ...prev, [key]: val }));
+                                        }}
+                                        className="glass-input"
+                                    />
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                )}
+                
                 <div className="input-group">
                   <label className="tagline">Symbol</label>
                   <input type="text" value={symbol} onChange={(e) => setSymbol(e.target.value)} className="glass-input" />

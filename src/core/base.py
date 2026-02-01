@@ -77,6 +77,24 @@ class Strategy(ABC):
         """Handle a new bar of data."""
         pass
 
+    @classmethod
+    def get_parameters(cls) -> Dict[str, Dict[str, Any]]:
+        """
+        Return the parameter schema for this strategy.
+        Format:
+        {
+            "param_name": {
+                "type": "int" | "float" | "str" | "bool" | "list",
+                "default": value,
+                "description": "User friendly description",
+                "min": optional_min,
+                "max": optional_max,
+                "options": optional_list_of_values (for dropdowns)
+            }
+        }
+        """
+        return {}
+
     def buy(self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"):
         return self.engine.submit_order(Order(symbol, 'buy', quantity, price, execution_type))
 
