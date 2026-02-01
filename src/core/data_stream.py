@@ -1,8 +1,11 @@
 import pandas as pd
 import time
+import psutil
+import os
 from typing import Dict, Optional, List
 from .base import DataStream, Bar
 from datetime import datetime
+from loguru import logger
 
 class CSVDataStream(DataStream):
     def __init__(self, csv_files: Dict[str, str], start_date: Optional[str] = None, end_date: Optional[str] = None):
@@ -57,11 +60,32 @@ class CSVDataStream(DataStream):
         self.idx = 0
 
 class DBDataStream(DataStream):
-    def __init__(self, db_client, symbols: List[str], start_date: str, end_date: Optional[str] = None):
+    def __init__(self, db_client, symbols: List[str], start_date: str, end_date: Optional[str] = None, 
+                 chunk_size_months: int = None):
         self.db_client = db_client
         self.symbols = symbols
         self.start_date = pd.to_datetime(start_date)
         self.end_date = pd.to_datetime(end_date) if end_date else pd.Timestamp.now()
+        
+        # Dynamic chunk size based on symbol count
+        # More symbols = smaller chunks to avoid memory overflow
+        if chunk_size_months is None:
+            if len(symbols) > 1000:
+                chunk_size_months = 1  # 1 month for large portfolios
+            elif len(symbols) > 100:
+                chunk_size_months = 3  # 3 months for medium portfolios
+            else:
+                chunk_size_months = 12  # 1 year for small portfolios
+        
+        self.chunk_size_months = chunk_size_months
+        
+        # Memory monitoring
+        self.process = psutil.Process(os.getpid())
+        self.initial_memory_mb = self.process.memory_info().rss / 1024 / 1024
+        
+        logger.info(f"Initializing DBDataStream: {len(symbols)} symbols, "
+                   f"chunk_size={chunk_size_months} months, "
+                   f"initial_memory={self.initial_memory_mb:.2f}MB")
         
         # Load master timeline (using the first symbol as reference or a market index)
         # This is lightweight compared to loading all columns for all stocks
@@ -78,7 +102,8 @@ class DBDataStream(DataStream):
                 self.timestamps = pd.to_datetime(ref_df['datetime']).sort_values().unique().tolist()
             else:
                 self.timestamps = pd.to_datetime(ref_df.index).sort_values().unique().tolist()
-        except Exception:
+        except Exception as e:
+            logger.warning(f"Failed to load timeline from {ref_symbol}: {e}, using fallback")
             # Fallback if reference symbol fails
             self.timestamps = pd.date_range(start=self.start_date, end=self.end_date, freq='B').tolist()
 
@@ -86,22 +111,24 @@ class DBDataStream(DataStream):
         self.global_idx = 0
         
         # Chunking
-        self.chunk_size_years = 1
         self.current_chunk_data: Dict[str, pd.DataFrame] = {}
         self.current_chunk_start_idx = 0
         self.current_chunk_end_idx = 0
+        self.chunks_loaded = 0
+        
+        logger.info(f"Timeline loaded: {self.total_bars} trading days from {self.start_date.date()} to {self.end_date.date()}")
         
         self._load_next_chunk()
 
     def _load_next_chunk(self):
         if self.global_idx >= self.total_bars:
             self.current_chunk_data = {}
+            logger.info(f"Reached end of data stream. Total chunks loaded: {self.chunks_loaded}")
             return
 
         chunk_start_ts = self.timestamps[self.global_idx]
-        # Determine chunk end date
-        next_year = chunk_start_ts.year + self.chunk_size_years
-        chunk_end_date_limit = chunk_start_ts.replace(year=next_year)
+        # Determine chunk end date using months instead of years
+        chunk_end_date_limit = chunk_start_ts + pd.DateOffset(months=self.chunk_size_months)
         
         # Find the index in self.timestamps that corresponds to this limit
         # We want to load enough data to cover [chunk_start_ts, chunk_end_date_limit)
@@ -122,8 +149,12 @@ class DBDataStream(DataStream):
         start_str = chunk_start_ts.strftime("%Y-%m-%d")
         end_str = chunk_end_ts.strftime("%Y-%m-%d")
         
+        # Memory tracking before loading
+        mem_before = self.process.memory_info().rss / 1024 / 1024
+        
         # Load data for all symbols in this range
         self.current_chunk_data = {}
+        symbols_loaded = 0
         for symbol in self.symbols:
             df = self.db_client.get_kline(symbol, start_str, end_str)
             if df.empty:
@@ -144,6 +175,16 @@ class DBDataStream(DataStream):
             
             # Index by timestamp for faster lookup in next_bar
             self.current_chunk_data[symbol] = df.set_index('timestamp').sort_index()
+            symbols_loaded += 1
+        
+        # Memory tracking after loading
+        mem_after = self.process.memory_info().rss / 1024 / 1024
+        mem_delta = mem_after - mem_before
+        self.chunks_loaded += 1
+        
+        logger.info(f"Chunk {self.chunks_loaded} loaded: {start_str} to {end_str}, "
+                   f"{symbols_loaded}/{len(self.symbols)} symbols, "
+                   f"memory: {mem_after:.2f}MB (+{mem_delta:.2f}MB)")
 
     def next_bar(self) -> Optional[Dict[str, Bar]]:
         if self.global_idx >= self.total_bars:

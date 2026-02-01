@@ -1,0 +1,101 @@
+# Quantitative Trading Platform Configuration
+
+# Database Configuration
+database:
+  host: "localhost"
+  username: "default"
+  password: ""
+  cache_enabled: true
+  
+# Data Stream Configuration
+data_stream:
+  # Chunk size in months for DBDataStream
+  # null = auto (based on symbol count)
+  # 1 = 1 month chunks (for 1000+ symbols)
+  # 3 = 3 month chunks (for 100-1000 symbols)
+  # 12 = 12 month chunks (for <100 symbols)
+  chunk_size_months: null
+  
+  # Enable memory monitoring and logging
+  enable_memory_monitoring: true
+  
+  # Realtime data stream settings
+  realtime:
+    interval_seconds: 60
+    data_source: "akshare"  # akshare, tushare, etc.
+    enable_websocket: false  # Future: WebSocket support
+
+# Broker Configuration
+broker:
+  backtest:
+    initial_cash: 1000000.0
+    commission: 0.0001  # 0.01%
+    slippage: 0.0
+    
+  live:
+    server_url: "http://localhost:11122"
+    timeout_seconds: 30
+    retry_attempts: 3
+
+# API Server Configuration
+api:
+  host: "0.0.0.0"
+  port: 8000
+  cors_origins: ["*"]
+  
+  # Session management
+  session:
+    persist_to_db: true
+    clear_memory_on_persist: true
+    update_db_interval_bars: 10  # Update DB every N bars
+    
+  # Performance
+  enable_incremental_updates: true
+  max_response_size_mb: 10
+
+# Logging Configuration
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  format: "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+  rotation: "100 MB"
+  retention: "30 days"
+  
+  # Log to file
+  file:
+    enabled: true
+    path: "logs/quant_{time:YYYY-MM-DD}.log"
+  
+  # Log to console
+  console:
+    enabled: true
+    colorize: true
+
+# Task Queue Configuration (Future: Celery)
+task_queue:
+  enabled: false
+  broker_url: "redis://localhost:6379/0"
+  result_backend: "redis://localhost:6379/1"
+  worker_concurrency: 4
+
+# Performance Monitoring
+monitoring:
+  enabled: true
+  
+  # Metrics to track
+  metrics:
+    - memory_usage
+    - api_response_time
+    - backtest_throughput
+    - database_query_time
+  
+  # Alert thresholds
+  alerts:
+    memory_usage_mb: 8000  # Alert if memory > 8GB
+    api_response_time_ms: 1000  # Alert if response > 1s
+    
+# Feature Flags
+features:
+  enable_websocket: false
+  enable_parameter_optimization: false
+  enable_multi_strategy: false
+  enable_risk_manager: false

@@ -30,14 +30,14 @@ const App: React.FC = () => {
 
   // New Session Form State
   const [strategies, setStrategies] = useState<StrategyMeta[]>([]);
-  
+
   // Session State
   const [sessions, setSessions] = useState<SessionSummary[]>([]);
   const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>(() => {
     const saved = localStorage.getItem('selectedSessionIds');
     return saved ? JSON.parse(saved) : [];
   });
-  
+
   // Multi-session Data Cache
   const [sessionDataCache, setSessionDataCache] = useState<Record<string, { equity: EquityPoint[], trades: Trade[], positions: Record<string, Position> }>>({});
 
@@ -45,7 +45,7 @@ const App: React.FC = () => {
   const [primarySessionId, setPrimarySessionId] = useState<string | null>(() => {
     return localStorage.getItem('primarySessionId');
   });
-  const [equityHistory, setEquityHistory] = useState<EquityPoint[]>([]); 
+  const [equityHistory, setEquityHistory] = useState<EquityPoint[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [positions, setPositions] = useState<Record<string, Position>>({});
   const [error, setError] = useState<string | null>(null);
@@ -71,13 +71,13 @@ const App: React.FC = () => {
   const lastUpdatedRef = useRef<string | null>(null);
 
   const fetchStrategies = async () => {
-      try {
-          const resp = await fetch(`${API_BASE}/strategies`);
-          const data = await resp.json();
-          setStrategies(data);
-      } catch (err) {
-          console.error("Failed to fetch strategies", err);
-      }
+    try {
+      const resp = await fetch(`${API_BASE}/strategies`);
+      const data = await resp.json();
+      setStrategies(data);
+    } catch (err) {
+      console.error("Failed to fetch strategies", err);
+    }
   };
 
   const fetchSessions = async () => {
@@ -89,7 +89,7 @@ const App: React.FC = () => {
       console.error("Failed to fetch sessions", err);
     }
   };
-  
+
   const startSession = async (payload: any) => {
     setError(null);
     try {
@@ -124,75 +124,77 @@ const App: React.FC = () => {
     setTrades([]);
     setPositions({});
     lastUpdatedRef.current = null;
-    
+
     fetchStrategies();
     fetchSessions();
-    
+
     if (primarySessionId) {
       fetchSessionDetails(primarySessionId);
     }
 
     pollInterval.current = window.setInterval(() => {
       fetchSessions();
-      
+
       // Update all selected sessions in cache
       selectedSessionIds.forEach(id => {
-          fetchSessionDataFull(id);
+        fetchSessionDataFull(id);
       });
-      
+
       // Also update primary state variables
       if (primarySessionId) {
-          fetchSessionDetails(primarySessionId);
+        fetchSessionDetails(primarySessionId);
       }
     }, 1000);
     return () => {
       if (pollInterval.current) clearInterval(pollInterval.current);
     };
-  }, [primarySessionId]); 
+  }, [primarySessionId]);
 
   const fetchSessionDataFull = async (id: string) => {
-      try {
-          const session = sessions.find(s => s.id === id);
-          if (session && session.status === 'completed' && sessionDataCache[id]) {
-              return; // Already have full data for completed session
-          }
-          
-          const resp = await fetch(`${API_BASE}/session/${id}/status`);
-          const data = await resp.json();
-          
-          setSessionDataCache(prev => ({
-              ...prev,
-              [id]: {
-                  equity: data.equity_history || [],
-                  trades: data.trades || [],
-                  positions: data.positions || {}
-              }
-          }));
-      } catch (err) {
-          console.error("Error fetching full session data", err);
+    try {
+      const session = sessions.find(s => s.id === id);
+      if (session && session.status === 'completed' && sessionDataCache[id]) {
+        return; // Already have full data for completed session
       }
+
+      const resp = await fetch(`${API_BASE}/session/${id}/status`);
+      const data = await resp.json();
+
+      setSessionDataCache(prev => ({
+        ...prev,
+        [id]: {
+          equity: data.equity_history || [],
+          trades: data.trades || [],
+          positions: data.positions || {}
+        }
+      }));
+    } catch (err) {
+      console.error("Error fetching full session data", err);
+    }
   };
 
   // Watch selectedSessionIds to fetch missing data
   useEffect(() => {
-      selectedSessionIds.forEach(id => {
-          if (!sessionDataCache[id]) {
-              fetchSessionDataFull(id);
-          }
-      });
+    selectedSessionIds.forEach(id => {
+      if (!sessionDataCache[id]) {
+        fetchSessionDataFull(id);
+      }
+    });
   }, [selectedSessionIds]);
 
   const fetchSessionDetails = async (id: string) => {
     try {
       let url = `${API_BASE}/session/${id}/status`;
       if (lastUpdatedRef.current) {
-        url += `?since=${lastUpdatedRef.current}`;
+        url += `?since=${encodeURIComponent(lastUpdatedRef.current)}`;
       }
       const resp = await fetch(url);
       const data = await resp.json();
 
+      // Incremental merge: only append new data
       if (data.equity_history && data.equity_history.length > 0) {
         setEquityHistory(prev => [...prev, ...data.equity_history]);
+        // Update last timestamp for next incremental fetch
         lastUpdatedRef.current = data.equity_history[data.equity_history.length - 1].timestamp;
       }
 
@@ -200,6 +202,7 @@ const App: React.FC = () => {
         setTrades(prev => [...prev, ...data.trades]);
       }
 
+      // Positions are always full snapshot (not incremental)
       setPositions(data.positions || {});
     } catch (err) {
       console.error("Fetch details error", err);
@@ -263,29 +266,29 @@ const App: React.FC = () => {
   };
 
   const handleViewSession = (id: string) => {
-      setPrimarySessionId(id);
-      if (!selectedSessionIds.includes(id)) {
-          setSelectedSessionIds(prev => [...prev, id]);
-      }
-      setActiveTab('dashboard');
+    setPrimarySessionId(id);
+    if (!selectedSessionIds.includes(id)) {
+      setSelectedSessionIds(prev => [...prev, id]);
+    }
+    setActiveTab('dashboard');
   };
 
   const activeSessions = sessions.filter(s => s.status === 'running');
   const primarySession = sessions.find(s => s.id === primarySessionId);
   const comparisonData = selectedSessionIds
-        .filter(id => id !== primarySessionId && sessionDataCache[id])
-        .map(id => ({
-            id,
-            name: sessions.find(s => s.id === id)?.strategy || id,
-            data: sessionDataCache[id].equity
-        }));
+    .filter(id => id !== primarySessionId && sessionDataCache[id])
+    .map(id => ({
+      id,
+      name: sessions.find(s => s.id === id)?.strategy || id,
+      data: sessionDataCache[id].equity
+    }));
 
   return (
     <div className="app-container">
-      <Sidebar 
-        activeTab={activeTab} 
-        onTabChange={setActiveTab} 
-        activeSessions={activeSessions} 
+      <Sidebar
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
+        activeSessions={activeSessions}
         onSessionSelect={(id) => {
           setPrimarySessionId(id);
           if (!selectedSessionIds.includes(id)) {
@@ -305,44 +308,44 @@ const App: React.FC = () => {
         </header>
 
         {activeTab === 'dashboard' && (
-           <Dashboard 
-              primarySession={primarySession}
-              equityHistory={equityHistory}
-              trades={trades}
-              positions={positions}
-              comparisonData={comparisonData}
-              benchmarksData={benchmarksData}
-              selectedBenchmarks={selectedBenchmarks}
-              onToggleBenchmark={toggleBenchmark}
-              availableBenchmarks={AVAILABLE_BENCHMARKS}
-              onSelectSession={setPrimarySessionId}
-              allSessions={sessions}
-           />
+          <Dashboard
+            primarySession={primarySession}
+            equityHistory={equityHistory}
+            trades={trades}
+            positions={positions}
+            comparisonData={comparisonData}
+            benchmarksData={benchmarksData}
+            selectedBenchmarks={selectedBenchmarks}
+            onToggleBenchmark={toggleBenchmark}
+            availableBenchmarks={AVAILABLE_BENCHMARKS}
+            onSelectSession={setPrimarySessionId}
+            allSessions={sessions}
+          />
         )}
 
         {activeTab === 'analysis' && (
-           <Comparison 
-                selectedSessionIds={selectedSessionIds}
-                sessionDataCache={sessionDataCache}
-                allSessions={sessions}
-                benchmarksData={benchmarksData}
-                availableBenchmarks={AVAILABLE_BENCHMARKS}
-           />
+          <Comparison
+            selectedSessionIds={selectedSessionIds}
+            sessionDataCache={sessionDataCache}
+            allSessions={sessions}
+            benchmarksData={benchmarksData}
+            availableBenchmarks={AVAILABLE_BENCHMARKS}
+          />
         )}
 
         {activeTab === 'lab' && (
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-            <NewSessionForm 
-                strategies={strategies} 
-                onStart={startSession}
-                error={error}
+            <NewSessionForm
+              strategies={strategies}
+              onStart={startSession}
+              error={error}
             />
-            <SessionList 
-                sessions={sessions} 
-                selectedSessionIds={selectedSessionIds} 
-                onToggleSelection={toggleSessionSelection}
-                onViewSession={handleViewSession}
-                onStopSession={stopSession}
+            <SessionList
+              sessions={sessions}
+              selectedSessionIds={selectedSessionIds}
+              onToggleSelection={toggleSessionSelection}
+              onViewSession={handleViewSession}
+              onStopSession={stopSession}
             />
           </div>
         )}
