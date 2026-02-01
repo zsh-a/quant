@@ -261,6 +261,14 @@ const App: React.FC = () => {
     }
   };
 
+  const handleViewSession = (id: string) => {
+      setPrimarySessionId(id);
+      if (!selectedSessionIds.includes(id)) {
+          setSelectedSessionIds(prev => [...prev, id]);
+      }
+      setActiveTab('dashboard');
+  };
+
   const activeSessions = sessions.filter(s => s.status === 'running');
   const primarySession = sessions.find(s => s.id === primarySessionId);
   const comparisonData = selectedSessionIds
@@ -322,6 +330,7 @@ const App: React.FC = () => {
                 sessions={sessions} 
                 selectedSessionIds={selectedSessionIds} 
                 onToggleSelection={toggleSessionSelection}
+                onViewSession={handleViewSession}
                 onStopSession={stopSession}
             />
           </div>
