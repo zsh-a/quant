@@ -1,7 +1,6 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import {
-  SessionSummary,
   Trade,
   Position,
   EquityPoint,
@@ -9,6 +8,14 @@ import {
   StrategyMeta
 } from './types';
 import { useWebSocket } from './hooks/useWebSocket';
+import {
+  useSessions,
+  useSelectedSessions,
+  usePrimarySession,
+  useSessionDataCache,
+  useSessionActions,
+  useSessionStore
+} from './store';
 
 import Sidebar from './components/Sidebar';
 import Dashboard from './components/Dashboard';
@@ -49,69 +56,18 @@ function mergeTrades(prev: Trade[], next: Trade[]): Trade[] {
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
-
-  // New Session Form State
   const [strategies, setStrategies] = useState<StrategyMeta[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // Session State
-  const [sessions, setSessions] = useState<SessionSummary[]>([]);
-  const [selectedSessionIds, setSelectedSessionIds] = useState<string[]>(() => {
-    const saved = localStorage.getItem('selectedSessionIds');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const sessions = useSessions()
+  const selectedSessionIds = useSelectedSessions()
+  const primarySessionId = usePrimarySession()
+  const sessionDataCache = useSessionDataCache()
+  const { selectSession, toggleSession, updateSession, setSessions: setStoreSessions, addSessionData } = useSessionActions()
 
-  // Multi-session Data Cache
-  const [sessionDataCache, setSessionDataCache] = useState<Record<string, { equity: EquityPoint[], trades: Trade[], positions: Record<string, Position> }>>({});
-
-  // Detailed Data State (for primary selected session)
-  const [primarySessionId, setPrimarySessionId] = useState<string | null>(() => {
-    return localStorage.getItem('primarySessionId');
-  });
   const [equityHistory, setEquityHistory] = useState<EquityPoint[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
   const [positions, setPositions] = useState<Record<string, Position>>({});
-  const [error, setError] = useState<string | null>(null);
-
-  // Persist state to localStorage
-  useEffect(() => {
-    localStorage.setItem('selectedSessionIds', JSON.stringify(selectedSessionIds));
-  }, [selectedSessionIds]);
-
-  useEffect(() => {
-    if (primarySessionId) {
-      localStorage.setItem('primarySessionId', primarySessionId);
-    } else {
-      localStorage.removeItem('primarySessionId');
-    }
-  }, [primarySessionId]);
-
-  // Prune stale session refs when server session list updates (avoid residual curves for deleted/old sessions)
-  useEffect(() => {
-    const validIds = new Set(sessions.map((s) => s.id));
-    if (validIds.size === 0) return;
-
-    setSelectedSessionIds((prev) => {
-      const next = prev.filter((id) => validIds.has(id));
-      return next.length === prev.length ? prev : next;
-    });
-
-    if (primarySessionId && !validIds.has(primarySessionId)) {
-      const remainingSelected = selectedSessionIds.filter((id) => validIds.has(id));
-      setPrimarySessionId(remainingSelected.length > 0 ? remainingSelected[0] : null);
-    }
-
-    setSessionDataCache((prev) => {
-      const keys = Object.keys(prev).filter((id) => validIds.has(id));
-      if (keys.length === Object.keys(prev).length) return prev;
-      const next: Record<string, { equity: EquityPoint[]; trades: Trade[]; positions: Record<string, Position> }> = {};
-      keys.forEach((id) => {
-        next[id] = prev[id];
-      });
-      return next;
-    });
-  }, [sessions]);
-
-  // Benchmark State
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
   const [benchmarksData, setBenchmarksData] = useState<Record<string, BenchmarkData[]>>({});
 
@@ -132,7 +88,7 @@ const App: React.FC = () => {
     try {
       const resp = await fetch(`${API_BASE}/sessions`);
       const data = await resp.json();
-      setSessions(data);
+      setStoreSessions(data);
     } catch (err) {
       console.error("Failed to fetch sessions", err);
     }
@@ -141,7 +97,6 @@ const App: React.FC = () => {
   const startSession = async (payload: any) => {
     setError(null);
     try {
-      // Use async mode if specified, default to sync for compatibility
       const useAsync = payload.async === true;
       delete payload.async;
 
@@ -154,11 +109,9 @@ const App: React.FC = () => {
       const data = await resp.json();
 
       fetchSessions();
-      setPrimarySessionId(data.session_id);
-      setSelectedSessionIds(prev => [...prev, data.session_id]);
+      selectSession(data.session_id);
       setActiveTab('dashboard');
 
-      // If async mode, start polling for task progress
       if (useAsync && data.task_id) {
         pollTaskProgress(data.session_id, data.task_id);
       }
@@ -167,25 +120,20 @@ const App: React.FC = () => {
     }
   };
 
-  // Poll Celery task progress
   const pollTaskProgress = (sessionId: string, taskId: string) => {
     const poll = async () => {
       try {
         const resp = await fetch(`${API_BASE}/tasks/backtest/${taskId}`);
         const data = await resp.json();
 
-        // Update session in list with progress
-        setSessions(prev => prev.map(s =>
-          s.id === sessionId
-            ? { ...s, progress: data.progress || 0, status: data.status === 'SUCCESS' ? 'completed' : data.status === 'FAILURE' ? 'failed' : 'running' }
-            : s
-        ));
+        updateSession(sessionId, {
+          progress: data.progress || 0,
+          status: data.status === 'SUCCESS' ? 'completed' : data.status === 'FAILURE' ? 'failed' : 'running'
+        });
 
-        // Continue polling if not complete
         if (data.status !== 'SUCCESS' && data.status !== 'FAILURE') {
           setTimeout(poll, 2000);
         } else {
-          // Refresh sessions list and data on completion
           fetchSessions();
           if (sessionId === primarySessionId) {
             fetchSessionDataFull(sessionId);
@@ -195,7 +143,6 @@ const App: React.FC = () => {
         console.error('Task polling error:', err);
       }
     };
-
     poll();
   };
 
@@ -208,118 +155,25 @@ const App: React.FC = () => {
     }
   };
 
-  // WebSocket for real-time updates
-  const { isConnected, usePolling } = useWebSocket({
-    sessionId: primarySessionId || '',
-    enabled: !!primarySessionId,
-    onMessage: (message) => {
-      console.log('[WebSocket] Received:', message.type);
-
-      switch (message.type) {
-        case 'session_progress':
-          // Update progress in sessions list
-          setSessions(prev => prev.map(s =>
-            s.id === message.session_id
-              ? { ...s, progress: message.data.progress, status: message.data.status }
-              : s
-          ));
-          break;
-
-        case 'equity_update':
-          const equity = message.data.equity;
-          setEquityHistory((prev) => mergeEquity(prev, [equity]));
-          lastUpdatedRef.current = equity.timestamp;
-          break;
-
-        case 'trade_executed':
-          setTrades((prev) => mergeTrades(prev, [message.data.trade]));
-          break;
-
-        case 'session_completed':
-          // Update session status
-          setSessions(prev => prev.map(s =>
-            s.id === message.session_id
-              ? { ...s, status: 'completed', progress: 100 }
-              : s
-          ));
-          break;
-
-        case 'error_occurred':
-          console.error('[Session Error]:', message.data.error);
-          setError(message.data.error);
-          break;
-      }
-    },
-    onConnect: () => {
-      console.log('[WebSocket] Connected');
-    },
-    onDisconnect: () => {
-      console.log('[WebSocket] Disconnected');
-    },
-    fallbackToPolling: true,
-    pollingInterval: 2000
-  });
-
-  // Initial data fetch and periodic refresh for sessions list
-  useEffect(() => {
-    // Reset incremental state on session switch
-    setEquityHistory([]);
-    setTrades([]);
-    setPositions({});
-    lastUpdatedRef.current = null;
-
-    fetchStrategies();
-    fetchSessions();
-
-    if (primarySessionId) {
-      fetchSessionDetails(primarySessionId);
-    }
-
-    // Only poll for sessions list; WebSocket handles real-time session data
-    pollInterval.current = window.setInterval(() => {
-      fetchSessions();
-
-      if (!isConnected && !usePolling && primarySessionId) {
-        fetchSessionDetails(primarySessionId);
-      }
-    }, 15000); // 15s to avoid log flood; WebSocket handles live updates
-
-    return () => {
-      if (pollInterval.current) clearInterval(pollInterval.current);
-    };
-  }, [primarySessionId, isConnected, usePolling]);
-
   const fetchSessionDataFull = async (id: string) => {
     try {
       const session = sessions.find(s => s.id === id);
       if (session && session.status === 'completed' && sessionDataCache[id]) {
-        return; // Already have full data for completed session
+        return;
       }
 
       const resp = await fetch(`${API_BASE}/session/${id}/status`);
       const data = await resp.json();
 
-      setSessionDataCache(prev => ({
-        ...prev,
-        [id]: {
-          equity: data.equity_history || [],
-          trades: data.trades || [],
-          positions: data.positions || {}
-        }
-      }));
+      addSessionData(id, {
+        equity: data.equity_history || [],
+        trades: data.trades || [],
+        positions: data.positions || {}
+      });
     } catch (err) {
       console.error("Error fetching full session data", err);
     }
   };
-
-  // Watch selectedSessionIds to fetch missing data
-  useEffect(() => {
-    selectedSessionIds.forEach(id => {
-      if (!sessionDataCache[id]) {
-        fetchSessionDataFull(id);
-      }
-    });
-  }, [selectedSessionIds]);
 
   const fetchSessionDetails = async (id: string) => {
     try {
@@ -349,8 +203,7 @@ const App: React.FC = () => {
     }
   };
 
-  // Fetch Benchmark Data
-  useEffect(() => {
+  const fetchBenchmarks = useCallback(async () => {
     if (!primarySessionId) {
       setBenchmarksData({});
       return;
@@ -359,43 +212,106 @@ const App: React.FC = () => {
     const session = sessions.find(s => s.id === primarySessionId);
     if (!session || !session.start_date) return;
 
-    const fetchBenchmarks = async () => {
-      const newData: Record<string, BenchmarkData[]> = {};
+    const newData: Record<string, BenchmarkData[]> = {};
 
-      await Promise.all(selectedBenchmarks.map(async (bmCode) => {
-        try {
-          let url = `${API_BASE}/market/benchmark?symbol=${bmCode}&start_date=${session.start_date}`;
-          if (session.end_date) url += `&end_date=${session.end_date}`;
+    await Promise.all(selectedBenchmarks.map(async (bmCode) => {
+      try {
+        let url = `${API_BASE}/market/benchmark?symbol=${bmCode}&start_date=${session.start_date}`;
+        if (session.end_date) url += `&end_date=${session.end_date}`;
 
-          const resp = await fetch(url);
-          if (resp.ok) {
-            const data = await resp.json();
-            newData[bmCode] = data;
-          }
-        } catch (err) {
-          console.error(`Failed to fetch benchmark ${bmCode}`, err);
+        const resp = await fetch(url);
+        if (resp.ok) {
+          const data = await resp.json();
+          newData[bmCode] = data;
         }
-      }));
+      } catch (err) {
+        console.error(`Failed to fetch benchmark ${bmCode}`, err);
+      }
+    }));
 
-      setBenchmarksData(newData);
-    };
+    setBenchmarksData(newData);
+  }, [primarySessionId, selectedBenchmarks, sessions]);
 
+  useEffect(() => {
     if (selectedBenchmarks.length > 0) {
       fetchBenchmarks();
     } else {
       setBenchmarksData({});
     }
-  }, [primarySessionId, selectedBenchmarks, sessions]);
+  }, [selectedBenchmarks, fetchBenchmarks]);
 
-  const toggleSessionSelection = (id: string) => {
-    if (selectedSessionIds.includes(id)) {
-      setSelectedSessionIds(selectedSessionIds.filter(s => s !== id));
-      if (primarySessionId === id) setPrimarySessionId(null);
-    } else {
-      setSelectedSessionIds([...selectedSessionIds, id]);
-      setPrimarySessionId(id); // Make newly selected primary
+  const { isConnected, usePolling } = useWebSocket({
+    sessionId: primarySessionId || '',
+    enabled: !!primarySessionId,
+    onMessage: (message) => {
+      console.log('[WebSocket] Received:', message.type);
+
+      switch (message.type) {
+        case 'session_progress':
+          updateSession(message.session_id, {
+            progress: message.data.progress,
+            status: message.data.status
+          });
+          break;
+
+        case 'equity_update':
+          const equity = message.data.equity;
+          setEquityHistory((prev) => mergeEquity(prev, [equity]));
+          lastUpdatedRef.current = equity.timestamp;
+          break;
+
+        case 'trade_executed':
+          setTrades((prev) => mergeTrades(prev, [message.data.trade]));
+          break;
+
+        case 'session_completed':
+          updateSession(message.session_id, { status: 'completed', progress: 100 });
+          break;
+
+        case 'error_occurred':
+          console.error('[Session Error]:', message.data.error);
+          setError(message.data.error);
+          break;
+      }
+    },
+    onConnect: () => console.log('[WebSocket] Connected'),
+    onDisconnect: () => console.log('[WebSocket] Disconnected'),
+    fallbackToPolling: true,
+    pollingInterval: 2000
+  });
+
+  useEffect(() => {
+    setEquityHistory([]);
+    setTrades([]);
+    setPositions({});
+    lastUpdatedRef.current = null;
+
+    fetchStrategies();
+    fetchSessions();
+
+    if (primarySessionId) {
+      fetchSessionDetails(primarySessionId);
     }
-  };
+
+    pollInterval.current = window.setInterval(() => {
+      fetchSessions();
+      if (!isConnected && !usePolling && primarySessionId) {
+        fetchSessionDetails(primarySessionId);
+      }
+    }, 15000);
+
+    return () => {
+      if (pollInterval.current) clearInterval(pollInterval.current);
+    };
+  }, [primarySessionId, isConnected, usePolling]);
+
+  useEffect(() => {
+    selectedSessionIds.forEach(id => {
+      if (!sessionDataCache[id]) {
+        fetchSessionDataFull(id);
+      }
+    });
+  }, [selectedSessionIds]);
 
   const toggleBenchmark = (code: string) => {
     if (selectedBenchmarks.includes(code)) {
@@ -406,10 +322,7 @@ const App: React.FC = () => {
   };
 
   const handleViewSession = (id: string) => {
-    setPrimarySessionId(id);
-    if (!selectedSessionIds.includes(id)) {
-      setSelectedSessionIds(prev => [...prev, id]);
-    }
+    selectSession(id);
     setActiveTab('dashboard');
   };
 
@@ -420,8 +333,17 @@ const App: React.FC = () => {
     .map(id => ({
       id,
       name: sessions.find(s => s.id === id)?.strategy || id,
-      data: sessionDataCache[id].equity
+      data: sessionDataCache[id]?.equity || []
     }));
+
+  // Ensure store hydration on mount
+  useEffect(() => {
+    try {
+      useSessionStore.persist.rehydrate()
+    } catch (e) {
+      console.warn('Store rehydration failed:', e)
+    }
+  }, [])
 
   return (
     <div className="app-container">
@@ -429,13 +351,7 @@ const App: React.FC = () => {
         activeTab={activeTab}
         onTabChange={setActiveTab}
         activeSessions={activeSessions}
-        onSessionSelect={(id) => {
-          setPrimarySessionId(id);
-          if (!selectedSessionIds.includes(id)) {
-            setSelectedSessionIds(prev => [...prev, id]);
-          }
-          setActiveTab('dashboard');
-        }}
+        onSessionSelect={selectSession}
       />
 
       <main className="main-content">
@@ -458,7 +374,7 @@ const App: React.FC = () => {
             selectedBenchmarks={selectedBenchmarks}
             onToggleBenchmark={toggleBenchmark}
             availableBenchmarks={AVAILABLE_BENCHMARKS}
-            onSelectSession={setPrimarySessionId}
+            onSelectSession={selectSession}
             allSessions={sessions}
           />
         )}
@@ -483,7 +399,7 @@ const App: React.FC = () => {
             <SessionList
               sessions={sessions}
               selectedSessionIds={selectedSessionIds}
-              onToggleSelection={toggleSessionSelection}
+              onToggleSelection={toggleSession}
               onViewSession={handleViewSession}
               onStopSession={stopSession}
             />
@@ -496,9 +412,7 @@ const App: React.FC = () => {
             <div style={{ marginTop: '20px' }}>
               <CheckpointList
                 sessionId={primarySessionId}
-                onRestore={() => {
-                  fetchSessionDataFull(primarySessionId);
-                }}
+                onRestore={() => fetchSessionDataFull(primarySessionId)}
               />
             </div>
           </div>

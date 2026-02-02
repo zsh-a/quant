@@ -17,14 +17,14 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
     const [useAsync, setUseAsync] = useState(true); // Default to async mode
 
     useEffect(() => {
-        if (strategies.length > 0 && !selectedStrategy) {
+        if (strategies && strategies.length > 0 && !selectedStrategy) {
             setSelectedStrategy(strategies[0].name);
         }
     }, [strategies]);
 
     useEffect(() => {
         const strat = strategies.find(s => s.name === selectedStrategy);
-        if (strat) {
+        if (strat && strat.params) {
             const defaults: Record<string, any> = {};
             Object.entries(strat.params).forEach(([key, conf]) => {
                 defaults[key] = conf.default;

@@ -48,6 +48,7 @@ case $MODE in
         # Build images
         print_info "Building Docker images..."
         docker-compose build
+        docker image prune -f
         
         # Start services
         print_info "Starting services..."
@@ -80,6 +81,7 @@ case $MODE in
         # Build images with no cache
         print_info "Building Docker images (no cache)..."
         docker-compose build --no-cache
+        docker image prune -f
         
         # Start services in detached mode
         print_info "Starting services..."

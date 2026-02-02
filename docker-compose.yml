@@ -1,3 +1,9 @@
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # Redis - Message broker and cache
   redis:
@@ -15,6 +21,7 @@ services:
       retries: 3
     networks:
       - quant_network
+    logging: *default-logging
 
   # API Server
   api:
@@ -48,6 +55,7 @@ services:
     networks:
       - quant_network
     restart: unless-stopped
+    logging: *default-logging
 
   # Celery Worker - Backtest tasks
   celery_worker:
@@ -73,6 +81,7 @@ services:
     networks:
       - quant_network
     restart: unless-stopped
+    logging: *default-logging
 
   # Flower - Celery monitoring
   flower:
@@ -92,6 +101,7 @@ services:
     networks:
       - quant_network
     restart: unless-stopped
+    logging: *default-logging
 
   # Frontend - React app with Nginx
   frontend:
@@ -106,6 +116,7 @@ services:
     networks:
       - quant_network
     restart: unless-stopped
+    logging: *default-logging
 
   # Prometheus - Metrics collection (optional)
   prometheus:
@@ -122,6 +133,7 @@ services:
     networks:
       - quant_network
     restart: unless-stopped
+    logging: *default-logging
 
   # Grafana - Metrics visualization (optional)
   grafana:
@@ -139,6 +151,7 @@ services:
     networks:
       - quant_network
     restart: unless-stopped
+    logging: *default-logging
 
 networks:
   quant_network:
