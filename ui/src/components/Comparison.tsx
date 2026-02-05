@@ -4,7 +4,7 @@ import {
 } from 'recharts';
 import { lttb } from '../lttb';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
-import { calculateMetrics, BacktestMetrics } from '../utils/metrics';
+import { calculateMetrics, PerformanceMetrics } from '../utils/metrics';
 
 interface ComparisonProps {
     selectedSessionIds: string[];
@@ -24,29 +24,35 @@ const COLORS = [
     '#ef4444', // Red
 ];
 
-const METRIC_LABELS: Record<keyof BacktestMetrics, string> = {
+// Subset of metrics to display in comparison table
+type DisplayableMetricKey = 'totalReturn' | 'annualizedReturn' | 'maxDrawdown' | 'sharpeRatio' | 
+    'sortinoRatio' | 'volatility' | 'winRate' | 'profitFactor' | 'totalTrades' | 'avgWin' | 'avgLoss';
+
+const METRIC_LABELS: Record<DisplayableMetricKey, string> = {
     totalReturn: 'Total Return',
     annualizedReturn: 'CAGR (Annualized)',
     maxDrawdown: 'Max Drawdown',
     sharpeRatio: 'Sharpe Ratio',
+    sortinoRatio: 'Sortino Ratio',
     volatility: 'Volatility (Ann.)',
     winRate: 'Win Days %',
     profitFactor: 'Profit Factor',
     totalTrades: 'Total Trades',
-    avgProfit: 'Avg Profit',
+    avgWin: 'Avg Win',
     avgLoss: 'Avg Loss'
 };
 
-const FORMATTERS: Record<keyof BacktestMetrics, (val: number) => string> = {
+const FORMATTERS: Record<DisplayableMetricKey, (val: number) => string> = {
     totalReturn: (v) => `${(v * 100).toFixed(2)}%`,
     annualizedReturn: (v) => `${(v * 100).toFixed(2)}%`,
     maxDrawdown: (v) => `${(v * 100).toFixed(2)}%`,
     sharpeRatio: (v) => v.toFixed(2),
+    sortinoRatio: (v) => v.toFixed(2),
     volatility: (v) => `${(v * 100).toFixed(2)}%`,
     winRate: (v) => `${(v * 100).toFixed(2)}%`,
     profitFactor: (v) => v.toFixed(2),
     totalTrades: (v) => v.toString(),
-    avgProfit: (v) => `$${v.toFixed(2)}`,
+    avgWin: (v) => `$${v.toFixed(2)}`,
     avgLoss: (v) => `$${v.toFixed(2)}`
 };
 
@@ -75,7 +81,7 @@ const Comparison: React.FC<ComparisonProps> = ({
                 metrics,
                 equity: data.equity
             };
-        }).filter(item => item !== null) as { id: string, name: string, mode: string, metrics: BacktestMetrics, equity: EquityPoint[] }[];
+        }).filter(item => item !== null) as { id: string, name: string, mode: string, metrics: PerformanceMetrics, equity: EquityPoint[] }[];
     }, [selectedSessionIds, sessionDataCache, allSessions]);
 
     // Prepare Chart Data
@@ -146,23 +152,24 @@ const Comparison: React.FC<ComparisonProps> = ({
                         </tr>
                     </thead>
                     <tbody>
-                        {(Object.keys(METRIC_LABELS) as Array<keyof BacktestMetrics>).map(key => (
+                        {(Object.keys(METRIC_LABELS) as Array<DisplayableMetricKey>).map(key => (
                             <tr key={key}>
                                 <td style={{ color: 'var(--text-dim)' }}>{METRIC_LABELS[key]}</td>
                                 {sessionMetrics.map(s => {
                                     const val = s.metrics[key];
+                                    const numVal = typeof val === 'number' ? val : 0;
                                     let color = 'inherit';
                                     if (key === 'totalReturn' || key === 'annualizedReturn' || key === 'sharpeRatio' || key === 'profitFactor') {
-                                        color = val > 0 ? 'var(--success)' : (val < 0 ? 'var(--danger)' : 'inherit');
-                                        if (key === 'sharpeRatio' && val < 1) color = 'var(--text-dim)'; // Neutral if low sharpe
+                                        color = numVal > 0 ? 'var(--success)' : (numVal < 0 ? 'var(--danger)' : 'inherit');
+                                        if (key === 'sharpeRatio' && numVal < 1) color = 'var(--text-dim)'; // Neutral if low sharpe
                                     }
                                     if (key === 'maxDrawdown') {
-                                        color = val > 0.2 ? 'var(--danger)' : 'inherit';
+                                        color = numVal > 0.2 ? 'var(--danger)' : 'inherit';
                                     }
 
                                     return (
                                         <td key={s.id} style={{ fontWeight: 600, color }}>
-                                            {FORMATTERS[key](val)}
+                                            {FORMATTERS[key](numVal)}
                                         </td>
                                     );
                                 })}

@@ -31,6 +31,7 @@ from src.core.backtest_broker import BacktestBroker
 from src.core.live_broker import LiveBroker
 from src.core.data_stream import DBDataStream, RealtimeDataStream
 from src.strategies.registry import StrategyRegistry
+from src.utils.cache import get_cache, get_backtest_cache
 from src.config.settings import (
     get_data_stream_config,
     get_broker_config,
@@ -49,6 +50,7 @@ from src.api.events import (
     emit_error,
 )
 from src.api.state_persistence import persistence
+from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
 from db import DB
 from session_db import SessionDB
 from src.api.tasks_router import router as tasks_router
@@ -436,6 +438,27 @@ async def get_session_status(
     }
 
 
+@app.get("/session/{session_id}/metrics")
+async def get_session_metrics(session_id: str):
+    """
+    Calculate and return performance metrics for a session.
+    Uses unified metrics calculation for consistency with frontend.
+    """
+    # Get equity history and trades
+    equity_history = session_db.get_equity_history(session_id)
+    trades = session_db.get_trades(session_id)
+
+    if not equity_history:
+        raise HTTPException(
+            status_code=404, detail="No equity history found for session"
+        )
+
+    # Calculate metrics using unified service
+    metrics = calc_perf_metrics(equity_history, trades)
+
+    return {"session_id": session_id, "metrics": metrics.to_dict()}
+
+
 @app.post("/session/{session_id}/stop")
 async def stop_session(session_id: str):
     if session_id in SESSIONS:
@@ -607,6 +630,22 @@ async def persistence_stats():
     """Get persistence statistics"""
     stats = persistence.get_stats()
     return stats
+
+
+@app.get("/cache/stats")
+async def cache_stats():
+    """Get cache statistics"""
+    cache = get_cache()
+    backtest_cache = get_backtest_cache()
+    return {"redis": cache.get_stats(), "backtest_cache": backtest_cache.get_stats()}
+
+
+@app.post("/cache/clear")
+async def cache_clear(pattern: str = "*"):
+    """Clear cache by pattern"""
+    cache = get_cache()
+    deleted = cache.clear_pattern(pattern)
+    return {"deleted": deleted, "pattern": pattern}
 
 
 @app.get("/status")

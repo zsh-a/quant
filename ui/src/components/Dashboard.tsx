@@ -4,6 +4,7 @@ import {
 } from 'recharts';
 import { lttb } from '../lttb';
 import StatCard from './StatCard';
+import { VirtualizedTradeList } from './VirtualizedTradeList';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
 import { calculateMetrics } from '../utils/metrics';
 
@@ -45,7 +46,6 @@ const Dashboard: React.FC<DashboardProps> = ({
     const [useLttb, setUseLttb] = useState(true);
     const [selectedDay, setSelectedDay] = useState<EquityPoint | null>(null);
     const [equityPage, setEquityPage] = useState(1);
-    const [tradePage, setTradePage] = useState(1);
     const [holdingsPage, setHoldingsPage] = useState(1);
 
     const metrics = useMemo(() => calculateMetrics(equityHistory, trades), [equityHistory, trades]);
@@ -127,21 +127,24 @@ const Dashboard: React.FC<DashboardProps> = ({
     const positionKeys = Object.keys(currentPositions);
     const visiblePositions = positionKeys.slice((holdingsPage - 1) * PAGE_SIZE, holdingsPage * PAGE_SIZE);
 
-    const visibleTradesList = selectedDay
-        ? trades.filter(t => t.timestamp.split(' ')[0] === selectedDay.timestamp.split(' ')[0])
-        : trades;
-    const sortedTrades = [...visibleTradesList].reverse();
-    const visibleTrades = sortedTrades.slice((tradePage - 1) * PAGE_SIZE, tradePage * PAGE_SIZE);
+    // Virtualized trades - no pagination needed
+    const filteredTrades = useMemo(() => {
+        const list = selectedDay
+            ? trades.filter(t => t.timestamp.split(' ')[0] === selectedDay.timestamp.split(' ')[0])
+            : trades;
+        return [...list].reverse();
+    }, [trades, selectedDay]);
+
+    // Alias for backward compatibility in JSX
+    const sortedTrades = filteredTrades;
 
     const handleDaySelect = (day: EquityPoint) => {
         setSelectedDay(day);
-        setTradePage(1);
         setHoldingsPage(1);
     };
 
     const clearDaySelection = () => {
         setSelectedDay(null);
-        setTradePage(1);
         setHoldingsPage(1);
     };
 
@@ -366,48 +369,19 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
                 </div>
 
-                {/* Trades Card */}
-                <div className="glass card">
-                <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                {/* Trades Card - Virtualized */}
+                <div className="glass card" style={{ display: 'flex', flexDirection: 'column' }}>
+                <h3 style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     {selectedDay ? `Trades: ${selectedDay.timestamp.split(' ')[0]}` : 'All Trades'}
-                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setTradePage(p => Math.max(1, p - 1))} disabled={tradePage === 1}>Prev</button>
-                    <span className="tagline" style={{ fontSize: '0.7rem' }}>{tradePage} / {Math.ceil(sortedTrades.length / PAGE_SIZE) || 1}</span>
-                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setTradePage(p => Math.min(Math.ceil(sortedTrades.length / PAGE_SIZE), p + 1))} disabled={tradePage >= Math.ceil(sortedTrades.length / PAGE_SIZE)}>Next</button>
-                    </div>
+                    <span className="tagline" style={{ fontSize: '0.7rem' }}>
+                        {sortedTrades.length} trades
+                    </span>
                 </h3>
-                <div style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                    <thead>
-                        <tr>
-                        <th>Time</th>
-                        <th>Symbol</th>
-                        <th>Type</th>
-                        <th style={{ textAlign: 'right' }}>Price</th>
-                        <th style={{ textAlign: 'right' }}>Amt</th>
-                        <th style={{ textAlign: 'right' }}>Comm</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {visibleTrades.map((t, idx) => (
-                        <tr key={idx}>
-                            <td className="tagline" style={{ fontSize: '0.7rem' }}>{t.timestamp.split(' ')[0]}</td>
-                            <td>
-                            <div style={{ fontWeight: 600 }}>{t.symbol}</div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{t.name}</div>
-                            </td>
-                            <td><span className={`status-badge ${t.type === 'buy' ? 'status-live' : 'status-danger'}`}>{t.type}</span></td>
-                            <td style={{ textAlign: 'right' }}>${t.price.toFixed(2)}</td>
-                            <td style={{ textAlign: 'right' }}>${(t.amount ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td style={{ textAlign: 'right', color: 'var(--text-dim)' }}>
-                            {t.commission ? `$${t.commission.toFixed(1)}` : '-'}
-                            </td>
-                        </tr>
-                        ))}
-                        {sortedTrades.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No trades {selectedDay ? 'on this day' : ''}</td></tr>}
-                    </tbody>
-                    </table>
-                </div>
+                <VirtualizedTradeList 
+                    trades={sortedTrades} 
+                    height={350}
+                    showDate={!selectedDay}
+                />
                 </div>
             </div>
 

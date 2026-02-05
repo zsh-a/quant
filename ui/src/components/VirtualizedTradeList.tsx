@@ -1,189 +1,201 @@
-import React from 'react';
-import { FixedSizeList as List } from 'react-window';
+import React, { memo, useCallback, useMemo } from 'react';
+import { FixedSizeList as List, areEqual } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
-
-interface Trade {
-    timestamp: string;
-    symbol: string;
-    side: 'buy' | 'sell';
-    quantity: number;
-    price: number;
-    commission: number;
-    pnl?: number;
-}
+import { Trade } from '../types';
 
 interface VirtualizedTradeListProps {
     trades: Trade[];
     onTradeClick?: (trade: Trade) => void;
+    height?: number;
+    showDate?: boolean;
 }
 
-const TradeRow: React.FC<{
+interface RowData {
+    trades: Trade[];
+    onTradeClick?: (trade: Trade) => void;
+    showDate: boolean;
+}
+
+// Memoized row component to prevent unnecessary re-renders
+const TradeRow = memo<{
     index: number;
     style: React.CSSProperties;
-    data: {
-        trades: Trade[];
-        onTradeClick?: (trade: Trade) => void;
-    };
-}> = ({ index, style, data }) => {
+    data: RowData;
+}>(({ index, style, data }) => {
     const trade = data.trades[index];
-    const isProfitable = (trade.pnl || 0) > 0;
+    const isBuy = trade.type === 'buy';
+
+    const handleClick = useCallback(() => {
+        data.onTradeClick?.(trade);
+    }, [data, trade]);
+
+    const displayDate = data.showDate 
+        ? trade.timestamp.split(' ')[0] 
+        : trade.timestamp.split(' ')[1] || trade.timestamp;
 
     return (
         <div
-            style={style}
-            className={`trade-row ${trade.side}`}
-            onClick={() => data.onTradeClick?.(trade)}
+            style={{
+                ...style,
+                display: 'grid',
+                gridTemplateColumns: data.showDate 
+                    ? '100px 1fr 70px 90px 100px 80px' 
+                    : '80px 1fr 70px 90px 100px 80px',
+                gap: '8px',
+                padding: '0 16px',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+                cursor: data.onTradeClick ? 'pointer' : 'default',
+                alignItems: 'center',
+                fontSize: '13px',
+            }}
+            onClick={handleClick}
+            onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'rgba(255,255,255,0.03)';
+            }}
+            onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'transparent';
+            }}
         >
-            <div className="trade-time">
-                {new Date(trade.timestamp).toLocaleString()}
+            <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>
+                {displayDate}
             </div>
-            <div className="trade-symbol">{trade.symbol}</div>
-            <div className={`trade-side ${trade.side}`}>
-                {trade.side.toUpperCase()}
+            <div>
+                <div style={{ fontWeight: 600, color: 'var(--text)' }}>{trade.symbol}</div>
+                <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{trade.name}</div>
             </div>
-            <div className="trade-quantity">{trade.quantity}</div>
-            <div className="trade-price">${trade.price.toFixed(2)}</div>
-            <div className="trade-commission">${trade.commission.toFixed(2)}</div>
-            {trade.pnl !== undefined && (
-                <div className={`trade-pnl ${isProfitable ? 'profit' : 'loss'}`}>
-                    {isProfitable ? '+' : ''}${trade.pnl.toFixed(2)}
-                </div>
-            )}
+            <div>
+                <span style={{
+                    fontSize: '10px',
+                    fontWeight: 600,
+                    padding: '3px 8px',
+                    borderRadius: '4px',
+                    textTransform: 'uppercase',
+                    background: isBuy ? 'rgba(46, 204, 113, 0.15)' : 'rgba(231, 76, 60, 0.15)',
+                    color: isBuy ? '#2ecc71' : '#e74c3c',
+                }}>
+                    {trade.type}
+                </span>
+            </div>
+            <div style={{ textAlign: 'right', color: 'var(--text)' }}>
+                ${trade.price.toFixed(2)}
+            </div>
+            <div style={{ textAlign: 'right', color: 'var(--text)', fontWeight: 500 }}>
+                ${(trade.amount ?? 0).toLocaleString(undefined, { 
+                    minimumFractionDigits: 0, 
+                    maximumFractionDigits: 0 
+                })}
+            </div>
+            <div style={{ textAlign: 'right', color: 'var(--text-dim)', fontSize: '12px' }}>
+                {trade.commission ? `$${trade.commission.toFixed(1)}` : '-'}
+            </div>
         </div>
     );
-};
+}, areEqual);
 
-export const VirtualizedTradeList: React.FC<VirtualizedTradeListProps> = ({
+TradeRow.displayName = 'TradeRow';
+
+// Header component
+const TradeHeader: React.FC<{ showDate: boolean }> = memo(({ showDate }) => (
+    <div style={{
+        display: 'grid',
+        gridTemplateColumns: showDate 
+            ? '100px 1fr 70px 90px 100px 80px' 
+            : '80px 1fr 70px 90px 100px 80px',
+        gap: '8px',
+        padding: '12px 16px',
+        background: 'rgba(255,255,255,0.03)',
+        borderBottom: '1px solid rgba(255,255,255,0.1)',
+        fontSize: '11px',
+        fontWeight: 600,
+        color: 'var(--text-dim)',
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+    }}>
+        <div>{showDate ? 'Date' : 'Time'}</div>
+        <div>Symbol</div>
+        <div>Type</div>
+        <div style={{ textAlign: 'right' }}>Price</div>
+        <div style={{ textAlign: 'right' }}>Amount</div>
+        <div style={{ textAlign: 'right' }}>Comm</div>
+    </div>
+));
+
+TradeHeader.displayName = 'TradeHeader';
+
+export const VirtualizedTradeList: React.FC<VirtualizedTradeListProps> = memo(({
     trades,
-    onTradeClick
+    onTradeClick,
+    height,
+    showDate = true
 }) => {
+    // Memoize item data to prevent re-renders
+    const itemData = useMemo<RowData>(() => ({
+        trades,
+        onTradeClick,
+        showDate
+    }), [trades, onTradeClick, showDate]);
+
     if (trades.length === 0) {
         return (
-            <div className="empty-trades">
-                <p>No trades yet</p>
+            <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: height || 200,
+                color: 'var(--text-dim)',
+                fontSize: '14px',
+            }}>
+                No trades
             </div>
         );
     }
 
-    return (
-        <div className="virtualized-trade-list">
-            <div className="trade-header">
-                <div>Time</div>
-                <div>Symbol</div>
-                <div>Side</div>
-                <div>Quantity</div>
-                <div>Price</div>
-                <div>Commission</div>
-                <div>P&L</div>
+    const ITEM_HEIGHT = 52;
+    const HEADER_HEIGHT = 44;
+
+    // If height is provided, use fixed height mode
+    if (height) {
+        return (
+            <div style={{ height: height, display: 'flex', flexDirection: 'column' }}>
+                <TradeHeader showDate={showDate} />
+                <List
+                    height={height - HEADER_HEIGHT}
+                    itemCount={trades.length}
+                    itemSize={ITEM_HEIGHT}
+                    width="100%"
+                    itemData={itemData}
+                    overscanCount={5}
+                >
+                    {TradeRow}
+                </List>
             </div>
+        );
+    }
 
-            <AutoSizer>
-                {({ height, width }: { height: number; width: number }) => (
-                    <List
-                        height={height || 400}
-                        itemCount={trades.length}
-                        itemSize={50}
-                        width={width || 800}
-                        itemData={{ trades, onTradeClick }}
-                    >
-                        {TradeRow}
-                    </List>
-                )}
-            </AutoSizer>
-
-            <style>{`
-        .virtualized-trade-list {
-          height: 100%;
-          display: flex;
-          flex-direction: column;
-          background: #1a1a1a;
-          border-radius: 8px;
-          overflow: hidden;
-        }
-
-        .trade-header {
-          display: grid;
-          grid-template-columns: 180px 100px 80px 100px 100px 100px 120px;
-          gap: 12px;
-          padding: 12px 16px;
-          background: #2a2a2a;
-          border-bottom: 1px solid #333;
-          font-size: 12px;
-          font-weight: 600;
-          color: #888;
-        }
-
-        .trade-row {
-          display: grid;
-          grid-template-columns: 180px 100px 80px 100px 100px 100px 120px;
-          gap: 12px;
-          padding: 12px 16px;
-          border-bottom: 1px solid #222;
-          cursor: pointer;
-          transition: background 0.2s;
-          align-items: center;
-        }
-
-        .trade-row:hover {
-          background: #252525;
-        }
-
-        .trade-time {
-          font-size: 12px;
-          color: #888;
-        }
-
-        .trade-symbol {
-          font-weight: 600;
-          color: #fff;
-        }
-
-        .trade-side {
-          font-size: 11px;
-          font-weight: 600;
-          padding: 4px 8px;
-          border-radius: 4px;
-          text-align: center;
-        }
-
-        .trade-side.buy {
-          background: rgba(46, 204, 113, 0.2);
-          color: #2ecc71;
-        }
-
-        .trade-side.sell {
-          background: rgba(231, 76, 60, 0.2);
-          color: #e74c3c;
-        }
-
-        .trade-quantity,
-        .trade-price,
-        .trade-commission {
-          font-size: 13px;
-          color: #ccc;
-        }
-
-        .trade-pnl {
-          font-weight: 600;
-          font-size: 14px;
-        }
-
-        .trade-pnl.profit {
-          color: #2ecc71;
-        }
-
-        .trade-pnl.loss {
-          color: #e74c3c;
-        }
-
-        .empty-trades {
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          height: 200px;
-          color: #666;
-        }
-      `}</style>
+    // Auto-sizing mode
+    return (
+        <div style={{ height: '100%', minHeight: 200, display: 'flex', flexDirection: 'column' }}>
+            <TradeHeader showDate={showDate} />
+            <div style={{ flex: 1 }}>
+                <AutoSizer>
+                    {({ height: autoHeight, width }: { height: number; width: number }) => (
+                        <List
+                            height={autoHeight || 300}
+                            itemCount={trades.length}
+                            itemSize={ITEM_HEIGHT}
+                            width={width || '100%'}
+                            itemData={itemData}
+                            overscanCount={5}
+                        >
+                            {TradeRow}
+                        </List>
+                    )}
+                </AutoSizer>
+            </div>
         </div>
     );
-};
+});
+
+VirtualizedTradeList.displayName = 'VirtualizedTradeList';
+
+export default VirtualizedTradeList;

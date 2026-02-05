@@ -113,8 +113,8 @@ export const useSessionStore = create<SessionStore>()(
   )
 )
 
-export const useSessionActions = () => useSessionStore.getState().actions
-export const useSessions = (): SessionSummary[] => useSessionStore.getState().sessions || []
-export const useSelectedSessions = (): string[] => useSessionStore.getState().selectedSessionIds || []
-export const usePrimarySession = (): string | null => useSessionStore.getState().primarySessionId
-export const useSessionDataCache = (): Record<string, SessionData> => useSessionStore.getState().sessionDataCache || {}
+export const useSessionActions = () => useSessionStore(state => state.actions)
+export const useSessions = (): SessionSummary[] => useSessionStore(state => state.sessions || [])
+export const useSelectedSessions = (): string[] => useSessionStore(state => state.selectedSessionIds || [])
+export const usePrimarySession = (): string | null => useSessionStore(state => state.primarySessionId)
+export const useSessionDataCache = (): Record<string, SessionData> => useSessionStore(state => state.sessionDataCache || {})

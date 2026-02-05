@@ -43,7 +43,3 @@ dependencies = [
 [tool.uv]
 # UV configuration for faster dependency resolution
 index-url = "https://pypi.org/simple"
-
-[tool.uv.pip]
-# Use pre-built wheels when available
-prefer-binary = true
