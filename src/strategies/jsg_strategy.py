@@ -32,6 +32,9 @@ class JSGStrategy(Strategy):
             "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
         )
         self.pass_month = []
+        
+        # Track stocks that hit limit-up yesterday
+        self.prev_limit_up_stocks = set()
 
         self._log(
             f"JSGStrategy initialized: max_stocks={self.max_stocks}, pool_size={self.pool_size}, stock_sum={self.stock_sum}"
@@ -63,13 +66,50 @@ class JSGStrategy(Strategy):
             },
         }
 
+    def _is_limit_up(self, symbol: str, bar: Bar) -> bool:
+        """Check if a stock is at limit-up price."""
+        preclose = bar.extra.get('preclose', 0)
+        if preclose <= 0:
+            return False
+            
+        limit_pct = 0.10
+        if bar.extra.get('isst') == 1:
+            limit_pct = 0.05
+        elif symbol.startswith('sh.68') or symbol.startswith('sz.30'):
+            limit_pct = 0.20
+            
+        up_limit = round(preclose * (1 + limit_pct) + 0.0001, 2)
+        return bar.close >= up_limit
+
     def on_bar(self, bars: dict[str, Bar]):
         if not bars:
             return
 
         today_str = self._current_date  # Auto-updated by engine
+        
+        # 1. Daily check for "limit-up break" sell rule
+        account = self.engine.broker.get_account_info()
+        hold_list = list(account["positions"].keys())
+        
+        current_limit_up_stocks = set()
+        
+        for symbol in bars:
+            bar = bars[symbol]
+            if self._is_limit_up(symbol, bar):
+                current_limit_up_stocks.add(symbol)
+        
+        # Sell if it was limit-up yesterday but not today
+        for stock in hold_list:
+            if stock in self.prev_limit_up_stocks and stock not in current_limit_up_stocks:
+                qty = account["positions"][stock]
+                if qty > 0:
+                    self._log(f"涨停打开: {stock} 昨日涨停, 今日未涨停, 收盘卖出", stock=stock)
+                    self.sell(stock, qty, execution_type="IMMEDIATE_CLOSE")
+        
+        # Update state for tomorrow
+        self.prev_limit_up_stocks = current_limit_up_stocks
 
-        # Check if it's the last trading day of the month (rebalance signal)
+        # 2. Monthly Rebalance Check
         if today_str not in self.trad_days.index.strftime("%Y-%m-%d"):
             return
 
@@ -77,7 +117,7 @@ class JSGStrategy(Strategy):
         if self.trad_days.loc[today_str, "is_last_trading_day"] == 0:
             return
 
-        self._log("========== 月末调仓日 ==========")
+        self._log("========== 调仓日 ==========")
 
         # 1. Broad market check
         I = self.get_market_breadth(today_str)

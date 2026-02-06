@@ -183,6 +183,41 @@ class BacktestBroker(Broker):
             return price * (1 - self.slippage)
 
     def _execute_order(self, order, execution_price, current_ts):
+        # Calculate limits based on preclose if available
+        is_st = False
+        bar = self.current_bars.get(order.symbol)
+        preclose = 0.0
+        
+        if bar and hasattr(bar, 'extra') and 'preclose' in bar.extra:
+            preclose = bar.extra['preclose']
+        elif bar and hasattr(bar, 'preclose'): # Some implementations might have it directly
+            preclose = bar.preclose
+            
+        if bar and hasattr(bar, 'extra') and 'isst' in bar.extra:
+            is_st = bar.extra['isst'] == 1
+
+        # Determine limit percentage
+        limit_pct = 0.10
+        if is_st:
+            limit_pct = 0.05
+        elif order.symbol.startswith('sh.68') or order.symbol.startswith('sz.30'):
+            limit_pct = 0.20
+            
+        # Simplified limit check logic (China A-share rounding rule is complex, 
+        # using a tolerance check against pctChg or price delta is often safer)
+        if preclose > 0:
+            up_limit = round(preclose * (1 + limit_pct) + 0.0001, 2)
+            down_limit = round(preclose * (1 - limit_pct) + 0.0001, 2)
+            
+            if order.type == 'buy' and execution_price >= up_limit:
+                logger.warning(f"Order REJECTED (Limit Up): {order.symbol} at {execution_price}")
+                order.status = "REJECTED"
+                return
+            if order.type == 'sell' and execution_price <= down_limit:
+                logger.warning(f"Order REJECTED (Limit Down): {order.symbol} at {execution_price}")
+                order.status = "REJECTED"
+                return
+
         amount = execution_price * order.quantity
         fee = amount * self.commission
         
