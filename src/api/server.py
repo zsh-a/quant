@@ -59,6 +59,7 @@ from src.api.portfolio_router import router as portfolio_router
 from src.api.optimizer_router import router as optimizer_router
 from src.api.analysis_router import router as analysis_router
 from src.api.logs_router import router as logs_router
+from src.api.market_router import router as market_router
 from src.tasks.backtest import run_backtest_task
 
 setup_logging()
@@ -88,6 +89,7 @@ app.include_router(portfolio_router)
 app.include_router(optimizer_router)
 app.include_router(analysis_router)
 app.include_router(logs_router)
+app.include_router(market_router)
 
 logger.info(f"API Server starting with config: port={api_config.port}")
 

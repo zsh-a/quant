@@ -25,7 +25,7 @@ class JSGStrategy(Strategy):
         self.pool_size = kwargs.get("pool_size", params["pool_size"]["default"])
         self.stock_sum = kwargs.get("stock_sum", params["stock_sum"]["default"])
 
-        self.black_industry_name = {"银行", "煤炭", "采掘", "钢铁"}
+        self.black_industry_name = {"银行", "煤炭", "有色金属", "钢铁"}
 
         # Initialize internal state from original Agent
         self.trad_days = pd.read_csv(

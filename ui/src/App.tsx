@@ -28,6 +28,7 @@ import { PortfolioManager } from './components/PortfolioManager';
 import { OptimizerPanel } from './components/OptimizerPanel';
 import { AttributionPanel } from './components/AttributionPanel';
 import { StrategyLogViewer } from './components/StrategyLogViewer';
+import { IndustryHeatmap } from './components/IndustryHeatmap';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? "http://localhost:8000"
@@ -377,6 +378,10 @@ const App: React.FC = () => {
             onSelectSession={selectSession}
             allSessions={sessions}
           />
+        )}
+
+        {activeTab === 'heatmap' && (
+          <IndustryHeatmap />
         )}
 
         {activeTab === 'analysis' && (
