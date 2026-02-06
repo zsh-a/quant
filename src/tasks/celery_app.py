@@ -42,6 +42,7 @@ app.conf.update(
     task_routes={
         'src.tasks.backtest.*': {'queue': 'backtest'},
         'src.tasks.analysis.*': {'queue': 'analysis'},
+        'src.tasks.data_tasks.*': {'queue': 'default'},
     },
     
     # Queues
@@ -52,7 +53,7 @@ app.conf.update(
     ),
     
     # Explicit imports for task discovery
-    imports=['src.tasks.backtest'],
+    imports=['src.tasks.backtest', 'src.tasks.data_tasks'],
 )
 
 if __name__ == '__main__':

@@ -2,12 +2,13 @@ from mootdx.affair import Affair
 from datetime import datetime
 import pandas as pd
 import clickhouse_connect
-from config_manager import cm
-from loguru import logger
 import os
 import hashlib
+import json
+from loguru import logger
 from db import DB
-
+# Use config_manager for now to keep compatibility with existing config files
+from config_manager import cm
 
 def convert_to_date(num):
     try:
@@ -16,9 +17,9 @@ def convert_to_date(num):
     except ValueError:
         return "无效日期"
 
-
 class TDXProcess:
     table_name = "stock_data.finicial_report"
+    state_file = "data/tdx_sync_state.json"
 
     def __init__(self):
         self.client = clickhouse_connect.get_client(
@@ -26,38 +27,65 @@ class TDXProcess:
             username=cm.get("db.username"),
             password=cm.get("db.password"),
         )
-        self.fin_path = cm.get("fin_data.path")
+        self.fin_path = cm.get("fin_data.path", "fin_data")
+        os.makedirs(self.fin_path, exist_ok=True)
+        os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
+        self.state = self._load_state()
 
-    def __del__(self):
-        db = DB()
-        db.opt_table(TDXProcess.table_name)
+    def _load_state(self):
+        if os.path.exists(self.state_file):
+            try:
+                with open(self.state_file, "r") as f:
+                    return json.load(f)
+            except Exception as e:
+                logger.error(f"Failed to load state file: {e}")
+        return {"file_hashes": {}}
+
+    def _save_state(self):
+        try:
+            with open(self.state_file, "w") as f:
+                json.dump(self.state, f, indent=4)
+        except Exception as e:
+            logger.error(f"Failed to save state file: {e}")
 
     def fetch_tdx(self):
-        local_hash = {}
-
-        if os.path.exists(self.fin_path):
-            files = os.listdir(self.fin_path)
-            for file in files:
-                file_path = os.path.join(self.fin_path, file)
-
-                with open(file_path, "rb") as f:
-                    local_md5 = hashlib.md5(f.read()).hexdigest()
-                    local_hash[file] = local_md5
+        """
+        Fetch updated financial data files from TDX.
+        Uses cached hashes to avoid re-hashing all local files.
+        """
+        local_hash = self.state.get("file_hashes", {})
+        
+        # Verify if local files still match cached hashes (optional, but good for first run or after manual changes)
+        # To optimize, we only check files that exist in local_hash
+        existing_files = set(os.listdir(self.fin_path))
+        keys_to_remove = [f for f in local_hash if f not in existing_files]
+        for f in keys_to_remove:
+            del local_hash[f]
 
         updated_files = []
-        files = Affair.files()
-        for item in files:
+        remote_files = Affair.files()
+        
+        for item in remote_files:
             filename = item["filename"]
-            md5 = item["hash"]
+            remote_md5 = item["hash"]
+            
+            # Check if we already have this file with the same hash
+            if filename in local_hash and local_hash[filename] == remote_md5:
+                continue
+                
             try:
-                if filename not in local_hash or local_hash[filename] != md5:
-                    logger.info(f"update fin date from tdx : {filename}")
-                    Affair.fetch(downdir=self.fin_path, filename=filename)
-                    updated_files.append(filename)
+                logger.info(f"Updating financial data from TDX: {filename}")
+                Affair.fetch(downdir=self.fin_path, filename=filename)
+                
+                # Update hash after successful fetch
+                local_hash[filename] = remote_md5
+                updated_files.append(filename)
             except Exception as e:
-                logger.error(f"update fin date from tdx : {filename} error : {e}")
+                logger.error(f"Failed to fetch {filename} from TDX: {e}")
                 continue
 
+        self.state["file_hashes"] = local_hash
+        self._save_state()
         return updated_files
 
     def _process_df(self, df, filename=None, date=None):
@@ -75,8 +103,8 @@ class TDXProcess:
             "净利润增长率(%)": "inc_net_profit_year_on_year",
             "总股本": "total_shares",
             "已上市流通A股": "circulating_a",
-            "每股净资产": "nav_per_share", # 用于计算PB
-            "每股收益": "eps", # 用于计算PE
+            "每股净资产": "nav_per_share", 
+            "每股收益": "eps", 
         }
 
         new_df = pd.DataFrame(index=df.index)
@@ -92,7 +120,7 @@ class TDXProcess:
             if tdx_col in df.columns:
                 val = df[tdx_col]
             elif internal_col == "total_operating_revenue" and "营业总收入(万元)" in df.columns:
-                val = df["营业总收入(万元)"] * 10000 # 转换为元
+                val = df["营业总收入(万元)"] * 10000 
             elif internal_col == "total_operating_revenue" and "营业收入" in df.columns:
                 val = df["营业收入"]
             else:
@@ -107,9 +135,9 @@ class TDXProcess:
         # 获取代码前缀
         def format_code(code):
             code_str = str(code).zfill(6)
-            if code_str.startswith("6"):
+            if code_str.startswith("6") or code_str.startswith("68"):
                 return "sh." + code_str
-            elif code_str.startswith("0") or code_str.startswith("3"):
+            elif code_str.startswith("0") or code_str.startswith("3") or code_str.startswith("00"):
                 return "sz." + code_str
             return None
 
@@ -117,41 +145,59 @@ class TDXProcess:
         
         # 清理数据：必须有 code 和有效的日期
         new_df = new_df.dropna(subset=["code", "report_date", "publish_date"])
-
-        # 计算增量利润 (adjusted_profit_diff)
-        # 注意：这里需要根据季度逻辑，但为了简化，我们先填入 adjusted_profit
-        # 后续 update 方法会根据上一季度数据重写这个值
         new_df["adjusted_profit_diff"] = 0.0
-        
-        # 市值相关字段 (需要结合股价，但目前仅从报表中拿财务数据)
-        # 实际市值计算可能需要同步行情数据，这里先保留字段为0或从报表拿(如果报备里有的话，通常没有)
         new_df["market_cap"] = 0.0
         new_df["circulating_market_cap"] = 0.0
         new_df["pe_ratio"] = 0.0
-        new_df["pb_ratio"] = 0.0 # 稍后可以在 SQL 中或此处通过 (股价 / 每股净资产) 处理
+        new_df["pb_ratio"] = 0.0 
 
         return new_df
 
-    def update_fincial_db(self, start_year=2024):
+    def update_fincial_db(self, start_year=None):
+        """
+        Incremental update: only process files downloaded by fetch_tdx.
+        """
+        if start_year is None:
+            # Try to detect start_year from DB
+            try:
+                res = self.client.query(f"SELECT min(toYear(report_date)) FROM {self.table_name}")
+                if res.result_rows and res.result_rows[0][0]:
+                    start_year = str(res.result_rows[0][0])
+                else:
+                    start_year = "2024"
+            except Exception:
+                start_year = "2024"
+
         files = self.fetch_tdx()
+        if not files:
+            logger.info("No new financial data files to process.")
+            # Still run update to ensure derived fields are correct if needed
+            self.update(start_year)
+            return
+
         for filename in files:
             logger.info(f"Processing {filename}...")
-            df = Affair.parse(downdir=self.fin_path, filename=filename)
-            processed_df = self._process_df(df, filename=filename)
-            
-            if not processed_df.empty:
-                # 批量插入
-                cols = [
-                    "report_date", "code", "publish_date", "net_profit", "adjusted_profit",
-                    "total_operating_revenue", "subtotal_operate_cash_inflow", "roe", "roa",
-                    "inc_net_profit_year_on_year", "total_shares", "circulating_a",
-                    "market_cap", "circulating_market_cap", "pe_ratio", "pb_ratio", "adjusted_profit_diff"
-                ]
-                self.client.insert_df(self.table_name, processed_df[cols])
-        
+            try:
+                df = Affair.parse(downdir=self.fin_path, filename=filename)
+                processed_df = self._process_df(df, filename=filename)
+                
+                if not processed_df.empty:
+                    cols = [
+                        "report_date", "code", "publish_date", "net_profit", "adjusted_profit",
+                        "total_operating_revenue", "subtotal_operate_cash_inflow", "roe", "roa",
+                        "inc_net_profit_year_on_year", "total_shares", "circulating_a",
+                        "market_cap", "circulating_market_cap", "pe_ratio", "pb_ratio", "adjusted_profit_diff"
+                    ]
+                    self.client.insert_df(self.table_name, processed_df[cols])
+            except Exception as e:
+                logger.error(f"Error processing {filename}: {e}")
+
         self.update(start_year)
 
     def init_fincial_db(self, start_year="2024"):
+        """
+        Full initialization from a specific year.
+        """
         dates_def = ["0331", "0630", "0930", "1231"]
         now_year = datetime.now().year
         years = [str(year) for year in range(int(start_year), now_year + 1)]
@@ -159,6 +205,11 @@ class TDXProcess:
 
         for date in dates:
             filename = f"gpcw{date}.zip"
+            if not os.path.exists(os.path.join(self.fin_path, filename)):
+                # If file doesn't exist locally, we can't parse it. 
+                # Normally fetch_tdx should have been called first if we want remote files.
+                continue
+                
             try:
                 logger.info(f"Parsing {filename}...")
                 df = Affair.parse(downdir=self.fin_path, filename=filename)
@@ -181,8 +232,7 @@ class TDXProcess:
 
     def update(self, start_year):
         """
-        优化后的 update 方法：使用单次 SQL INSERT ... SELECT 计算所有派生指标（增量利润、市值、PE/PB）。
-        使用 FINAL 确保读取最新行，防止多步更新时的 eclipsing 效应。
+        Compute derived financial indicators.
         """
         logger.info(f"Computing derived financial indicators starting from {start_year}")
         
@@ -217,44 +267,13 @@ class TDXProcess:
             END
         LEFT JOIN stock_data.stock_daily AS daily ON curr.code = daily.code AND curr.publish_date = daily.date
         """
-        self.client.command(sql)
-        self.client.command(f"OPTIMIZE TABLE {self.table_name} FINAL")
-        logger.info("Financial indicators update completed.")
-            # except Exception as e:
-            #     logger.error(f"update adjusted_profit_diff error {e}")
-            #     continue
-
+        try:
+            self.client.command(sql)
+            self.client.command(f"OPTIMIZE TABLE {self.table_name} FINAL")
+            logger.info("Financial indicators update completed.")
+        except Exception as e:
+            logger.error(f"Failed to update derived fields: {e}")
 
 if __name__ == "__main__":
-    # CREATE TABLE stock_data.finicial_report
-    # (
-    #     `report_date` Date,
-    #     `code` String,
-    #     `publish_date` Date,
-    #     `net_profit` Float64,
-    #     `adjusted_profit` Float64,
-    #     `roa` Float64,
-    #     `total_shares` Float64,
-    #     `circulating_a` Float64,
-    #     `adjusted_profit_diff` Float64,
-
-    # ) ENGINE = ReplacingMergeTree()
-    # ORDER BY (report_date, code)
-    # code = "sz.002193"
-
-    # df = Affair.parse(downdir="fin_data", filename="gpcw20210630.zip")
-    # df.to_csv("test.csv")
-
-    # from mootdx.quotes import Quotes
-
-    # client = Quotes.factory(market="std")
-    # client.finance(symbol="600300").to_csv("tmp.csv")
-
     proc = TDXProcess()
-    # proc.init_fincial_db(start_year="2010")
-    # proc.update_fincial_db(start_year=2010)
-    proc.update(start_year="2010")
-    # proc.update_fincial_db()
-    # proc.update_fincial_db()
-
-    
+    proc.update_fincial_db()

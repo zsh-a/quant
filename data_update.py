@@ -1,6 +1,6 @@
 import preprocess.bao.pre_process as bao
 import preprocess.ak_utils as ak
-import tdx_utils as tdx
+from src.utils.tdx_utils import TDXProcess
 import pandas as pd
 import time
 INDEX_LIST = [
@@ -29,9 +29,9 @@ def update_industry_weekly():
 
 
 def update_fincial():
-    proc = tdx.TDXProcess()
-    proc.fetch_tdx()
-    proc.init_fincial_db(start_year="2024")
+    proc = TDXProcess()
+    # update_fincial_db now handles incremental fetch and processing
+    proc.update_fincial_db()
 
 
 def update_share_info():
