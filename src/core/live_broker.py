@@ -49,7 +49,9 @@ class LiveBroker(Broker):
             url = f"{self.server_url}{endpoint}"
             logger.info(f"LiveBroker submitting: {url} {params}")
             
-            resp = requests.get(url, params=params)
+            # 增加超时控制
+            resp = requests.get(url, params=params, timeout=10)
+            resp.raise_for_status()
             data = resp.json()
             
             if data.get("status") == -1:
@@ -57,13 +59,14 @@ class LiveBroker(Broker):
                 logger.error(f"Order rejected: {data}")
             else:
                 order.status = "FILLED"
-                # Assume filled at ordered price or current market price?
-                # Without real-time callback, we just mark it filled.
-                # In real life, we would query 'deal' endpoint.
-                pass
+                # 记录成交时间
+                order.updated_at = datetime.now()
                 
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Network error during order submission: {e}")
+            order.status = "ERROR"
         except Exception as e:
-            logger.error(f"Failed to submit order: {e}")
+            logger.error(f"Unexpected error during order submission: {e}")
             order.status = "ERROR"
             
         return order.id
@@ -74,16 +77,18 @@ class LiveBroker(Broker):
 
     def get_account_info(self) -> Dict[str, Any]:
         try:
-            # Fetch balance
-            bal_resp = requests.get(f"{self.server_url}/balance")
+            # Fetch balance with timeout
+            bal_resp = requests.get(f"{self.server_url}/balance", timeout=5)
+            bal_resp.raise_for_status()
             bal_data = bal_resp.json()
             
             cash = 0.0
             if isinstance(bal_data, dict):
                  cash = float(bal_data.get("zj", 0) if isinstance(bal_data, dict) else 0)
 
-            # Fetch positions
-            pos_resp = requests.get(f"{self.server_url}/position")
+            # Fetch positions with timeout
+            pos_resp = requests.get(f"{self.server_url}/position", timeout=5)
+            pos_resp.raise_for_status()
             pos_data = pos_resp.json()
             
             positions = {}

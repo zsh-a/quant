@@ -5,11 +5,12 @@ from loguru import logger
 import uuid
 
 class BacktestBroker(Broker):
-    def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0001, 
-                 db_client=None, risk_manager=None):
+    def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0003, 
+                 slippage: float = 0.001, db_client=None, risk_manager=None):
         self.cash = initial_cash
         self.initial_cash = initial_cash
         self.commission = commission
+        self.slippage = slippage  # 新增滑点参数
         self.db_client = db_client
         self.risk_manager = risk_manager
         
@@ -50,6 +51,20 @@ class BacktestBroker(Broker):
                 logger.error(f"Failed to load stock names: {e}")
 
     def submit_order(self, order: Order) -> str:
+        # 统一风险检查入口
+        if self.risk_manager and self.risk_manager.enabled:
+            price = 0.0
+            if order.symbol in self.current_bars:
+                price = self.current_bars[order.symbol].close
+            elif order.symbol in self.last_prices:
+                price = self.last_prices[order.symbol]
+            
+            if order.type == 'buy' and price > 0:
+                allowed, reason = self.risk_manager.check_position_limit(order.symbol, order.quantity, price)
+                if not allowed:
+                    logger.warning(f"Order REJECTED by RiskManager: {reason}")
+                    return "REJECTED_BY_RISK"
+
         order.id = str(uuid.uuid4())
         order.status = "SUBMITTED"
         self.orders[order.id] = order
@@ -145,27 +160,27 @@ class BacktestBroker(Broker):
                 continue
                 
             bar = bars.get(order.symbol)
-            execution_price = None
+            raw_price = None
             
             if bar:
                 if timing == 'IMMEDIATE_OPEN':
-                    execution_price = bar.open
+                    raw_price = bar.open
                 elif timing == 'IMMEDIATE_CLOSE':
-                    execution_price = bar.close
-            elif self.db_client:
-                # Fallback DB fetch if bar missing
-                try:
-                    field = "open" if timing == 'IMMEDIATE_OPEN' else "close"
-                    df = self.db_client.get_price(order.symbol, str(current_ts.date()), [field], 1)
-                    if not df.empty:
-                        execution_price = df.iloc[0][field]
-                except Exception as e:
-                    logger.error(f"Failed to fetch price for {order.symbol}: {e}")
+                    raw_price = bar.close
             
-            if execution_price is None:
+            if raw_price is None:
                 continue
             
+            # 应用滑点模型
+            execution_price = self._apply_slippage(order, raw_price)
             self._execute_order(order, execution_price, current_ts)
+
+    def _apply_slippage(self, order, price):
+        """应用滑点：买入价更高，卖出价更低"""
+        if order.type == 'buy':
+            return price * (1 + self.slippage)
+        else:
+            return price * (1 - self.slippage)
 
     def _execute_order(self, order, execution_price, current_ts):
         amount = execution_price * order.quantity
@@ -286,21 +301,22 @@ class BacktestBroker(Broker):
                 continue
                 
             bar = bars.get(order.symbol)
-            execution_price = None
+            raw_price = None
             
             if bar:
-                execution_price = bar.open
+                raw_price = bar.open
             elif self.db_client:
                 try:
                     df = self.db_client.get_price(order.symbol, str(current_ts.date()), ["open"], 1)
                     if not df.empty:
-                        execution_price = df.iloc[0]["open"]
+                        raw_price = df.iloc[0]["open"]
                 except Exception as e:
                     logger.error(f"Failed to fetch price for {order.symbol}: {e}")
             
-            if execution_price is None:
+            if raw_price is None:
                 continue
             
+            execution_price = self._apply_slippage(order, raw_price)
             self._execute_order(order, execution_price, current_ts)
         
         # Record equity daily
