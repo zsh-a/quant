@@ -15,22 +15,26 @@ NUM_STOCKS = 6
     description="JSG量化策略 - 基于月末调仓的行业轮动策略",
 )
 class JSGStrategy(Strategy):
+    _trad_days_cache = None
+
     def __init__(self, db_client, session_id: str = None, **kwargs):
         super().__init__(session_id=session_id)  # Pass session_id to base class
         self.db_client = db_client
 
-        # Load parameters with defaults
+        # Load parameters with defaults and handle type conversion
         params = self.get_parameters()
-        self.max_stocks = kwargs.get("max_stocks", params["max_stocks"]["default"])
-        self.pool_size = kwargs.get("pool_size", params["pool_size"]["default"])
-        self.stock_sum = kwargs.get("stock_sum", params["stock_sum"]["default"])
+        self.max_stocks = int(kwargs.get("max_stocks", params["max_stocks"]["default"]))
+        self.pool_size = int(kwargs.get("pool_size", params["pool_size"]["default"]))
+        self.stock_sum = int(kwargs.get("stock_sum", params["stock_sum"]["default"]))
 
         self.black_industry_name = {"银行", "煤炭", "有色金属", "钢铁"}
 
-        # Initialize internal state from original Agent
-        self.trad_days = pd.read_csv(
-            "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
-        )
+        # Initialize internal state from original Agent (Lazy load)
+        if JSGStrategy._trad_days_cache is None:
+            JSGStrategy._trad_days_cache = pd.read_csv(
+                "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
+            )
+        self.trad_days = JSGStrategy._trad_days_cache
         self.pass_month = []
         
         # Track stocks that hit limit-up yesterday

@@ -34,17 +34,37 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
     }, [selectedStrategy, strategies]);
 
     const handleStart = () => {
+        // Prepare final params by merging defaults with current values
+        const finalParams: Record<string, any> = {};
+        const strat = strategies.find(s => s.name === selectedStrategy);
+        
+        if (strat && strat.params) {
+            Object.entries(strat.params).forEach(([key, conf]) => {
+                const userVal = paramValues[key];
+                if (userVal === undefined || userVal === '') {
+                    finalParams[key] = conf.default;
+                } else {
+                    // Final safety cast
+                    if (conf.type === 'int') finalParams[key] = parseInt(userVal) || 0;
+                    else if (conf.type === 'float') finalParams[key] = parseFloat(userVal) || 0;
+                    else finalParams[key] = userVal;
+                }
+            });
+        }
+
         const payload: any = {
             strategy: selectedStrategy,
             symbol,
             start_date: startDate,
             mode,
-            params: paramValues,
+            params: finalParams,
             async: useAsync && mode === 'backtest' // Only async for backtest mode
         };
         if (endDate) payload.end_date = endDate;
         onStart(payload);
     };
+
+    const currentStrategy = strategies.find(s => s.name === selectedStrategy);
 
     return (
         <div className="glass card">
@@ -77,6 +97,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                 <div className="input-group">
                     <label className="tagline">Strategy</label>
                     <select className="glass-input" value={selectedStrategy} onChange={(e) => setSelectedStrategy(e.target.value)}>
+                        <option value="" disabled>Select a strategy...</option>
                         {strategies.map(s => (
                             <option key={s.name} value={s.name}>{s.label}</option>
                         ))}
@@ -84,35 +105,71 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                 </div>
 
                 {/* Dynamic Parameters */}
-                {selectedStrategy && strategies.find(s => s.name === selectedStrategy)?.params && (
+                {selectedStrategy && (
                     <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-                        <div className="tagline" style={{ marginBottom: '1rem', color: 'var(--primary)' }}>Configuration</div>
-                        {Object.entries(strategies.find(s => s.name === selectedStrategy)!.params).map(([key, conf]) => (
-                            <div key={key} className="input-group" style={{ marginBottom: '1rem' }}>
-                                <label className="tagline" title={conf.description}>{key} <span style={{ opacity: 0.5 }}>- {conf.description}</span></label>
-                                {conf.options ? (
-                                    <select
-                                        className="glass-input"
-                                        value={paramValues[key] || conf.default}
-                                        onChange={(e) => setParamValues(prev => ({ ...prev, [key]: e.target.value }))}
-                                    >
-                                        {conf.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
-                                    </select>
-                                ) : (
-                                    <input
-                                        type={conf.type === 'int' || conf.type === 'float' ? 'number' : 'text'}
-                                        value={paramValues[key] !== undefined ? paramValues[key] : ''}
-                                        onChange={(e) => {
-                                            let val: any = e.target.value;
-                                            if (conf.type === 'int') val = parseInt(val);
-                                            else if (conf.type === 'float') val = parseFloat(val);
-                                            setParamValues(prev => ({ ...prev, [key]: val }));
-                                        }}
-                                        className="glass-input"
-                                    />
-                                )}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                            <div className="tagline" style={{ color: 'var(--primary)' }}>
+                                Configuration {currentStrategy?.params ? `(${Object.keys(currentStrategy.params).length} fields)` : ''}
                             </div>
-                        ))}
+                            {currentStrategy?.params && (
+                                <button 
+                                    className="btn-ghost" 
+                                    style={{ padding: '2px 8px', fontSize: '0.7rem' }}
+                                    onClick={() => {
+                                        const defaults: Record<string, any> = {};
+                                        Object.entries(currentStrategy.params).forEach(([k, v]) => defaults[k] = v.default);
+                                        setParamValues(defaults);
+                                    }}
+                                >
+                                    Reset Defaults
+                                </button>
+                            )}
+                        </div>
+                        
+                        {!currentStrategy ? (
+                            <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>Loading strategy metadata...</div>
+                        ) : !currentStrategy.params || Object.keys(currentStrategy.params).length === 0 ? (
+                            <div style={{ fontSize: '0.8rem', opacity: 0.5 }}>No configurable parameters for this strategy.</div>
+                        ) : (
+                            Object.entries(currentStrategy.params).map(([key, conf]) => (
+                                <div key={key} className="input-group" style={{ marginBottom: '1rem' }}>
+                                    <label className="tagline" title={conf.description}>
+                                        {key} <span style={{ opacity: 0.5 }}>- {conf.description}</span>
+                                    </label>
+                                    {conf.options ? (
+                                        <select
+                                            className="glass-input"
+                                            value={paramValues[key] !== undefined ? paramValues[key] : conf.default}
+                                            onChange={(e) => setParamValues(prev => ({ ...prev, [key]: e.target.value }))}
+                                        >
+                                            {conf.options.map(opt => <option key={opt} value={opt}>{opt}</option>)}
+                                        </select>
+                                    ) : (
+                                        <input
+                                            type="text" 
+                                            placeholder={`Default: ${conf.default}`}
+                                            value={paramValues[key] !== undefined ? paramValues[key] : ''}
+                                            onChange={(e) => {
+                                                // Allow any string during typing
+                                                const val = e.target.value;
+                                                setParamValues(prev => ({ ...prev, [key]: val }));
+                                            }}
+                                            onBlur={(e) => {
+                                                // Apply basic parsing on blur if empty or invalid
+                                                const raw = e.target.value;
+                                                if (raw === '') return;
+                                                
+                                                let parsed: any = raw;
+                                                if (conf.type === 'int') parsed = parseInt(raw) || 0;
+                                                else if (conf.type === 'float') parsed = parseFloat(raw) || 0;
+                                                setParamValues(prev => ({ ...prev, [key]: parsed }));
+                                            }}
+                                            className="glass-input"
+                                        />
+                                    )}
+                                </div>
+                            ))
+                        )}
                     </div>
                 )}
 

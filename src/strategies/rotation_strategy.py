@@ -57,13 +57,15 @@ SW1 = {
     description="高级轮动策略 - 基于行业动量的轮动策略",
 )
 class RotationStrategy(Strategy):
+    _trad_days_cache = None
+
     def __init__(self, db_client, session_id: str = None, **kwargs):
         super().__init__(session_id=session_id)
         self.db_client = db_client
 
         params = self.get_parameters()
-        self.stock_sum = kwargs.get("stock_sum", params["stock_sum"]["default"])
-        self.timing = kwargs.get("timing", params["timing"]["default"])
+        self.stock_sum = int(kwargs.get("stock_sum", params["stock_sum"]["default"]))
+        self.timing = str(kwargs.get("timing", params["timing"]["default"]))
 
         rebalance_dates_str = kwargs.get("rebalance_dates", None)
         self.rebalance_dates = None
@@ -77,9 +79,11 @@ class RotationStrategy(Strategy):
         self.CYB_group = {"创业板50"}
         self.black_industry_name = {"银行I", "煤炭I", "采掘I", "钢铁I"}
 
-        self.trad_days = pd.read_csv(
-            "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
-        )
+        if RotationStrategy._trad_days_cache is None:
+            RotationStrategy._trad_days_cache = pd.read_csv(
+                "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
+            )
+        self.trad_days = RotationStrategy._trad_days_cache
 
         self._log(
             f"RotationStrategy initialized: stock_sum={self.stock_sum}, timing={self.timing}"

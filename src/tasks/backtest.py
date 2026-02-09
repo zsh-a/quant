@@ -7,8 +7,7 @@ from src.tasks.celery_app import app
 from src.core.engine import TradingEngine
 from src.core.backtest_broker import BacktestBroker
 from src.core.data_stream import DBDataStream
-from src.strategies.jsg_strategy import JSGStrategy
-from src.strategies.rotation_strategy import RotationStrategy
+from src.strategies.registry import StrategyRegistry
 from src.core.risk_manager import RiskManager
 from db import DB
 from session_db import SessionDB
@@ -93,23 +92,24 @@ def run_backtest_task(self, session_id: str, config: dict):
             logger.info("Risk manager enabled")
         
         # Setup strategy
-        strategy_name = config['strategy']
-        strategy_params = config.get('params', {})
-        
-        if strategy_name == 'jsg':
-            strategy = JSGStrategy(db_client, session_id=session_id, **strategy_params)
-        elif strategy_name == 'rotation':
-            strategy = RotationStrategy(db_client, session_id=session_id, **strategy_params)
-        else:
+        strategy_name = config["strategy"]
+        strategy_params = config.get("params", {})
+
+        strategy = StrategyRegistry.create_strategy(
+            strategy_name, db_client, session_id=session_id, **strategy_params
+        )
+
+        if strategy is None:
             raise ValueError(f"Unknown strategy: {strategy_name}")
         
         logger.info(f"Strategy initialized: {strategy_name}")
         
         # Progress callback
         last_update_time = time.time()
+        last_db_write = time.time()
         
         def on_step(bars):
-            nonlocal last_update_time
+            nonlocal last_update_time, last_db_write
             
             # Update progress (throttle to every 2 seconds)
             current_time = time.time()
@@ -124,28 +124,21 @@ def run_backtest_task(self, session_id: str, config: dict):
                     session_db.update_session_status(session_id, "running", progress)
                 last_update_time = current_time
             
-            # Persist equity and trades
-            info = broker.get_account_info()
-            
-            new_equity_points = info.get('equity_history', [])
-            if new_equity_points:
-                for pt in new_equity_points:
-                    session_db.add_equity_point(
-                        session_id,
-                        pt['timestamp'],
-                        pt['total_equity'],
-                        cash=pt.get('cash', 0.0),
-                        daily_pnl=pt.get('daily_pnl', 0.0),
-                        daily_return=pt.get('daily_return', 0.0),
-                        positions=pt.get('positions', {})
-                    )
-                broker.equity_history.clear()
-            
-            new_trades = info.get('trades', [])
-            if new_trades:
-                for trade in new_trades:
-                    session_db.add_trade(session_id, trade)
-                broker.trades.clear()
+            # Persist equity and trades (throttle to every 2 seconds)
+            if current_time - last_db_write >= 2.0:
+                info = broker.get_account_info()
+                
+                new_equity_points = info.get('equity_history', [])
+                if new_equity_points:
+                    session_db.add_equity_points(session_id, new_equity_points)
+                    broker.equity_history.clear()
+                
+                new_trades = info.get('trades', [])
+                if new_trades:
+                    session_db.add_trades(session_id, new_trades)
+                    broker.trades.clear()
+                
+                last_db_write = current_time
         
         # Create and run engine
         self.update_progress(session_id, 5, "Starting backtest engine...")

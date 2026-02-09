@@ -22,6 +22,13 @@ from datetime import datetime
 import asyncio
 import time
 import pandas as pd
+import anyio
+
+# Patch requests timeout globally to prevent 20s stalls
+import requests
+from functools import partial
+requests.get = partial(requests.get, timeout=5)
+requests.post = partial(requests.get, timeout=5)
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -137,10 +144,12 @@ SESSIONS: Dict[str, Session] = {}
 # Mock live server URL - in real scenario this might be config
 LIVE_SERVER_URL = "http://localhost:11122"
 
+# Register strategies once at startup
+StrategyRegistry.register_all()
+
 
 @app.get("/strategies")
 async def get_strategies():
-    StrategyRegistry.register_all()
     return StrategyRegistry.list_strategies()
 
 
@@ -217,65 +226,58 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
             if strategy is None:
                 raise ValueError(f"Unknown strategy: {req.strategy}")
 
+
+# ... inside execute_session_task ...
             # Progress callback
+            last_db_write = time.time()
+
             def on_step(bars):
+                nonlocal last_db_write
+                
                 # Update progress
                 if req.mode == "backtest" and total_bars > 0:
                     session.progress = (stream.idx / total_bars) * 100
-                    # Optimization: Don't update DB status every step for progress, maybe every 1%?
-                    # For simplicity, we just keep in-memory status updated, and DB updated less frequently or at end.
-                    # But if we want robust recovery, we should update DB occasionally.
                 else:
                     session.progress = 50.0
 
-                info = broker.get_account_info()
+                # Throttle DB writes to every 2 seconds
+                current_time = time.time()
+                if current_time - last_db_write >= 2.0 or session.progress >= 100:
+                    info = broker.get_account_info()
 
-                # Persist equity and trades
-                # We assume info['equity_history'] contains NEW items if we clear them?
-                # Actually, broker.get_account_info returns self.equity_history.
-                # If we clear self.equity_history in broker, we get what's accumulated since last clear.
+                    new_equity_points = info.get("equity_history", [])
+                    if new_equity_points:
+                        session_db.add_equity_points(session_id, new_equity_points)
+                        for pt in new_equity_points:
+                            # Keep latest positions in memory for quick access
+                            session.positions = pt.get("positions", {})
+                            # Broadcast to WebSocket
+                            asyncio.run_coroutine_threadsafe(
+                                emit_equity_update(session_id, pt), loop
+                            )
 
-                new_equity_points = info.get("equity_history", [])
-                if new_equity_points:
-                    for pt in new_equity_points:
-                        session_db.add_equity_point(
-                            session_id,
-                            pt["timestamp"],
-                            pt["total_equity"],
-                            cash=pt.get("cash", 0.0),
-                            daily_pnl=pt.get("daily_pnl", 0.0),
-                            daily_return=pt.get("daily_return", 0.0),
-                            positions=pt.get("positions", {}),
-                        )
-                        # Keep latest positions in memory for quick access
-                        session.positions = pt.get("positions", {})
-                        # Broadcast to WebSocket so frontend updates in real time
+                        if isinstance(broker, BacktestBroker):
+                            broker.equity_history.clear()
+                        
                         asyncio.run_coroutine_threadsafe(
-                            emit_equity_update(session_id, pt), loop
+                            emit_session_progress(
+                                session_id, session.progress, session.status
+                            ),
+                            loop,
                         )
 
-                    # Clear broker history to save memory
-                    if isinstance(broker, BacktestBroker):
-                        broker.equity_history.clear()
-                    # Broadcast progress so frontend progress bar updates
-                    asyncio.run_coroutine_threadsafe(
-                        emit_session_progress(
-                            session_id, session.progress, session.status
-                        ),
-                        loop,
-                    )
+                    new_trades = info.get("trades", [])
+                    if new_trades:
+                        session_db.add_trades(session_id, new_trades)
+                        for trade in new_trades:
+                            asyncio.run_coroutine_threadsafe(
+                                emit_trade_executed(session_id, trade), loop
+                            )
 
-                new_trades = info.get("trades", [])
-                if new_trades:
-                    for trade in new_trades:
-                        session_db.add_trade(session_id, trade)
-                        asyncio.run_coroutine_threadsafe(
-                            emit_trade_executed(session_id, trade), loop
-                        )
-
-                    # Clear broker trades to save memory
-                    if isinstance(broker, BacktestBroker):
-                        broker.trades.clear()
+                        if isinstance(broker, BacktestBroker):
+                            broker.trades.clear()
+                    
+                    last_db_write = current_time
 
                 # For simulation mode, we might want to slow down
                 if req.mode == "simulation":
@@ -368,14 +370,14 @@ async def run_session_async(req: SessionRequest):
 @app.get("/sessions")
 async def get_sessions():
     # Return sessions from DB (persistent)
-    return session_db.get_all_sessions()
+    return await anyio.to_thread.run_sync(session_db.get_all_sessions)
 
 
 @app.get("/session/{session_id}/risk")
 async def get_session_risk(session_id: str):
     """Risk metrics and alerts for a session. Returns 404 if session not found."""
     s_mem = SESSIONS.get(session_id)
-    s_db = session_db.get_session(session_id) if not s_mem else None
+    s_db = await anyio.to_thread.run_sync(session_db.get_session, session_id) if not s_mem else None
     if not s_mem and not s_db:
         raise HTTPException(status_code=404, detail="Session not found")
     # Risk manager state is not persisted; return safe default so RiskPanel doesn't 404
@@ -410,7 +412,7 @@ async def get_session_status(
         positions = s_mem.positions
     else:
         # Fallback to DB
-        s_db = session_db.get_session(session_id)
+        s_db = await anyio.to_thread.run_sync(session_db.get_session, session_id)
         if not s_db:
             raise HTTPException(status_code=404, detail="Session not found")
         status = s_db["status"]
@@ -424,8 +426,10 @@ async def get_session_status(
         # So for finished sessions, positions might be empty unless we store final state.
         # For now, acceptable compromise.
 
-    equity_history = session_db.get_equity_history(session_id, since=since)
-    trades = session_db.get_trades(session_id, since=since)
+    equity_history = await anyio.to_thread.run_sync(
+        session_db.get_equity_history, session_id, since
+    )
+    trades = await anyio.to_thread.run_sync(session_db.get_trades, session_id, since)
 
     return {
         "status": status,
@@ -447,8 +451,10 @@ async def get_session_metrics(session_id: str):
     Uses unified metrics calculation for consistency with frontend.
     """
     # Get equity history and trades
-    equity_history = session_db.get_equity_history(session_id)
-    trades = session_db.get_trades(session_id)
+    equity_history = await anyio.to_thread.run_sync(
+        session_db.get_equity_history, session_id
+    )
+    trades = await anyio.to_thread.run_sync(session_db.get_trades, session_id)
 
     if not equity_history:
         raise HTTPException(

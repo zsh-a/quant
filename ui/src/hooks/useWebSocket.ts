@@ -152,6 +152,11 @@ export const useWebSocket = ({
                     : `${baseUrl}/session/${sessionId}/status`;
 
                 const response = await fetch(url);
+                if (response.status === 404) {
+                    console.warn(`[Polling] Session ${sessionId} not found, stopping polling`);
+                    setUsePolling(false);
+                    return;
+                }
                 const data = await response.json();
 
                 if (data.equity_history && data.equity_history.length > 0) {

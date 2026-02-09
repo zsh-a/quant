@@ -41,7 +41,21 @@ export const useSessionStore = create<SessionStore>()(
       ...initialState,
       
       actions: {
-        setSessions: (sessions) => set({ sessions }),
+        setSessions: (sessions) => {
+          const sessionIds = new Set(sessions.map(s => s.id))
+          const { selectedSessionIds, primarySessionId } = get()
+
+          const validSelected = selectedSessionIds.filter(id => sessionIds.has(id))
+          const validPrimary = (primarySessionId && sessionIds.has(primarySessionId))
+            ? primarySessionId
+            : (validSelected.length > 0 ? validSelected[0] : null)
+
+          set({
+            sessions,
+            selectedSessionIds: validSelected,
+            primarySessionId: validPrimary
+          })
+        },
         
         selectSession: (id) => {
           const { selectedSessionIds } = get()

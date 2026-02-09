@@ -305,6 +305,15 @@ def run_backtest(
     """
 
     def strategy_factory(name, params):
+        # Some strategies require db_client as first argument
+        import inspect
+        sig = inspect.signature(strategy_class.__init__)
+        
+        if 'db_client' in sig.parameters:
+            from db import DB
+            db_client = DB()
+            return strategy_class(db_client, **params)
+        
         return strategy_class(**params)
 
     def broker_factory(mode, capital):

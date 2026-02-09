@@ -64,7 +64,7 @@ const App: React.FC = () => {
   const selectedSessionIds = useSelectedSessions()
   const primarySessionId = usePrimarySession()
   const sessionDataCache = useSessionDataCache()
-  const { selectSession, toggleSession, updateSession, setSessions: setStoreSessions, addSessionData } = useSessionActions()
+  const { selectSession, toggleSession, updateSession, setSessions: setStoreSessions, addSessionData, removeSession } = useSessionActions()
 
   const [equityHistory, setEquityHistory] = useState<EquityPoint[]>([]);
   const [trades, setTrades] = useState<Trade[]>([]);
@@ -164,6 +164,11 @@ const App: React.FC = () => {
       }
 
       const resp = await fetch(`${API_BASE}/session/${id}/status`);
+      if (resp.status === 404) {
+        console.warn(`Session ${id} not found, removing from store`);
+        removeSession(id);
+        return;
+      }
       const data = await resp.json();
 
       addSessionData(id, {
@@ -183,6 +188,13 @@ const App: React.FC = () => {
         ? `${API_BASE}/session/${id}/status?since=${encodeURIComponent(since)}`
         : `${API_BASE}/session/${id}/status`;
       const resp = await fetch(url);
+      
+      if (resp.status === 404) {
+        console.warn(`Session ${id} not found, removing from store`);
+        removeSession(id);
+        return;
+      }
+      
       const data = await resp.json();
 
       const equityList = data.equity_history || [];
@@ -282,27 +294,47 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    setEquityHistory([]);
-    setTrades([]);
-    setPositions({});
-    lastUpdatedRef.current = null;
+    // 1. One-time parallel initialization
+    const initData = async () => {
+      console.log('[App] Initializing data...');
+      try {
+        await Promise.all([
+          fetchStrategies(),
+          fetchSessions()
+        ]);
+      } catch (err) {
+        console.error('Initial data fetch failed', err);
+      }
+    };
+    
+    initData();
 
-    fetchStrategies();
-    fetchSessions();
+    // 2. Separate interval for background list updates
+    const listInterval = window.setInterval(fetchSessions, 15000);
+    
+    return () => clearInterval(listInterval);
+  }, []); // Run only once on mount
 
+  useEffect(() => {
+    // 3. Reactive effect for specific session details
     if (primarySessionId) {
+      setEquityHistory([]);
+      setTrades([]);
+      setPositions({});
+      lastUpdatedRef.current = null;
       fetchSessionDetails(primarySessionId);
     }
 
-    pollInterval.current = window.setInterval(() => {
-      fetchSessions();
-      if (!isConnected && !usePolling && primarySessionId) {
+    // Interval for dynamic session updates when NOT using WebSocket/Polling
+    let detailInterval: number | null = null;
+    if (!isConnected && !usePolling && primarySessionId) {
+      detailInterval = window.setInterval(() => {
         fetchSessionDetails(primarySessionId);
-      }
-    }, 15000);
+      }, 5000);
+    }
 
     return () => {
-      if (pollInterval.current) clearInterval(pollInterval.current);
+      if (detailInterval) clearInterval(detailInterval);
     };
   }, [primarySessionId, isConnected, usePolling]);
 

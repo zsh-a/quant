@@ -59,7 +59,7 @@ class StrategyRegistry:
                 "name": name,
                 "label": cls._labels.get(name, name),
                 "description": cls._descriptions.get(name, ""),
-                "parameters": cls.get_parameters(name),
+                "params": cls.get_parameters(name),
             }
             for name in cls._strategies
         ]
@@ -72,6 +72,10 @@ class StrategyRegistry:
 
         # Import forces decorator execution
         _ = jsg_strategy, rotation_strategy
+
+
+# Auto-register all strategies on module import
+StrategyRegistry.register_all()
 
 
 # Convenience function
