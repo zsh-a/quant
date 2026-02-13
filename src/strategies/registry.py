@@ -69,9 +69,10 @@ class StrategyRegistry:
         """Import all strategy modules to trigger registration"""
         from src.strategies import jsg_strategy
         from src.strategies import rotation_strategy
+        from src.strategies import multi_factor_strategy
 
         # Import forces decorator execution
-        _ = jsg_strategy, rotation_strategy
+        _ = jsg_strategy, rotation_strategy, multi_factor_strategy
 
 
 # Auto-register all strategies on module import
