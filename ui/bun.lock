@@ -10,6 +10,7 @@
         "@emotion/react": "^11.14.0",
         "@emotion/styled": "^11.14.0",
         "@melloware/react-logviewer": "^6.3.5",
+        "dinero.js": "^1.9.1",
         "echarts-for-react": "^3.0.2",
         "framer-motion": "^12.6.3",
         "klinecharts": "10.0.0-alpha5",
@@ -548,6 +549,8 @@
     "decimal.js-light": ["decimal.js-light@2.5.1", "https://registry.npmmirror.com/decimal.js-light/-/decimal.js-light-2.5.1.tgz", {}, "sha512-qIMFpTMZmny+MMIitAB6D7iVPEorVw6YQRWkvarTkT4tBeSLLiHzcwj6q0MmYSFCiVpiqPJTJEYIrpcPzVEIvg=="],
 
     "deep-is": ["deep-is@0.1.4", "https://registry.npmmirror.com/deep-is/-/deep-is-0.1.4.tgz", {}, "sha512-oIPzksmTg4/MriiaYGO+okXDT7ztn/w3Eptv/+gSIdMdKsJo0u4CfYNFJPy+4SKMuCqGw2wxnA+URMg3t8a/bQ=="],
+
+    "dinero.js": ["dinero.js@1.9.1", "https://registry.npmmirror.com/dinero.js/-/dinero.js-1.9.1.tgz", {}, "sha512-1HXiF2vv3ZeRQ23yr+9lFxj/PbZqutuYWJnE0qfCB9xYBPnuaJ8lXtli1cJM0TvUXW1JTOaePldmqN5JVNxKSA=="],
 
     "dom-helpers": ["dom-helpers@5.2.1", "https://registry.npmmirror.com/dom-helpers/-/dom-helpers-5.2.1.tgz", { "dependencies": { "@babel/runtime": "7.27.0", "csstype": "3.1.3" } }, "sha512-nRCa7CK3VTrM2NmGkIy4cbK7IZlgBE/PYMn55rrXefr5xXDP0LdtfPnblFDoVdcAfslJ7or6iqAUnx0CCGIWQA=="],
 

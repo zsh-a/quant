@@ -7,6 +7,7 @@ import StatCard from './StatCard';
 import { VirtualizedTradeList } from './VirtualizedTradeList';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
 import { calculateMetrics } from '../utils/metrics';
+import { formatMoney, formatSignedMoney, formatSigned, formatPercent, colorFromSign, colorFromValue } from '../utils/format';
 
 interface DashboardProps {
     primarySession: SessionSummary | undefined;
@@ -161,16 +162,27 @@ const Dashboard: React.FC<DashboardProps> = ({
         <div className="dashboard-view">
             {/* Header Controls */}
             <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                    <h2>
-                        Session: {primarySession.strategy} 
-                        <span className="tagline" style={{ fontSize: '1rem' }}> ({primarySession.mode})</span>
-                    </h2>
-                    <select className="glass-input" style={{ width: 'auto' }} value={primarySession.id} onChange={e => onSelectSession(e.target.value)}>
-                        {allSessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {s.mode} ({s.id.slice(0, 6)}...)</option>)}
-                    </select>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                        <h2>
+                            Session: {primarySession.strategy || 'Unknown'}
+                            <span className="tagline" style={{ fontSize: '1rem' }}> ({primarySession.mode})</span>
+                        </h2>
+                        <select className="glass-input" style={{ width: 'auto' }} value={primarySession.id} onChange={e => onSelectSession(e.target.value)}>
+                            {allSessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {s.mode} ({s.id.slice(0, 6)}...)</option>)}
+                        </select>
+                    </div>
+                    {(primarySession.params && Object.keys(primarySession.params).length > 0) && (
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', alignItems: 'center' }}>
+                            <span className="tagline">策略参数:</span>
+                            {Object.entries(primarySession.params).map(([k, v]) => (
+                                <span key={k} style={{ background: 'rgba(255,255,255,0.08)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
+                                    {k}: <strong style={{ color: 'var(--text)' }}>{String(v)}</strong>
+                                </span>
+                            ))}
+                        </div>
+                    )}
                 </div>
-
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <span className="tagline">Benchmarks:</span>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
@@ -224,28 +236,28 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="grid">
                 <StatCard 
                     label="Total Equity" 
-                    value={equityHistory.length > 0 ? `$${(equityHistory[equityHistory.length - 1].total_equity ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "--"} 
-                    delta={equityHistory.length > 1 ? `${(metrics.totalReturn * 100).toFixed(2)}% total` : undefined}
+                    value={equityHistory.length > 0 ? formatMoney(equityHistory[equityHistory.length - 1].total_equity) : "--"} 
+                    delta={equityHistory.length > 1 ? `${formatPercent(metrics.totalReturn, 2)} total` : undefined}
                 />
                 <StatCard 
                     label="CAGR" 
-                    value={`${(metrics.annualizedReturn * 100).toFixed(2)}%`}
+                    value={formatPercent(metrics.annualizedReturn, 2)}
                     subtext="Annualized Return"
                 />
                 <StatCard 
                     label="Sharpe Ratio" 
                     value={metrics.sharpeRatio.toFixed(2)}
-                    subtext={`Vol: ${(metrics.volatility * 100).toFixed(2)}%`}
+                    subtext={`Vol: ${formatPercent(metrics.volatility, 2)}`}
                 />
                 <StatCard 
                     label="Max Drawdown" 
-                    value={`${(metrics.maxDrawdown * 100).toFixed(2)}%`}
+                    value={formatPercent(metrics.maxDrawdown, 2)}
                     delta={metrics.maxDrawdown > 0.2 ? 'High Risk' : 'Acceptable'}
                 />
                  <StatCard 
                     label="Daily P&L" 
-                    value={equityHistory.length > 0 ? `$${(equityHistory[equityHistory.length - 1].daily_pnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : "--"}
-                    delta={equityHistory.length > 0 ? `${((equityHistory[equityHistory.length - 1].daily_return || 0) * 100).toFixed(2)}%` : undefined}
+                    value={equityHistory.length > 0 ? formatSignedMoney(equityHistory[equityHistory.length - 1].daily_pnl) : "--"}
+                    delta={equityHistory.length > 0 ? formatSigned((equityHistory[equityHistory.length - 1].daily_return ?? 0) * 100, { asPercent: true }) : undefined}
                 />
             </div>
 
@@ -349,15 +361,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{pos.name}</div>
                             </td>
                             <td style={{ textAlign: 'right' }}>{qty}</td>
-                            <td style={{ textAlign: 'right' }}>{avgCost > 0 ? `$${avgCost.toFixed(2)}` : '-'}</td>
-                            <td style={{ textAlign: 'right' }}>${price.toFixed(2)}</td>
-                            <td style={{ textAlign: 'right', fontWeight: 700 }}>${(value ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td style={{ textAlign: 'right' }}>{avgCost > 0 ? formatMoney(avgCost) : '-'}</td>
+                            <td style={{ textAlign: 'right' }}>{formatMoney(price)}</td>
+                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatMoney(value)}</td>
                             <td style={{ textAlign: 'right' }}>
-                                <div style={{ color: pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                {pnl >= 0 ? '+' : ''}{(pnl ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                <div style={{ color: colorFromValue(pnl) }}>
+                                {formatSignedMoney(pnl)}
                                 </div>
-                                <div style={{ fontSize: '0.7rem', color: pnl >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                                {pnlPct.toFixed(2)}%
+                                <div style={{ fontSize: '0.7rem', color: colorFromValue(pnlPct) }}>
+                                {formatSigned(pnlPct, { asPercent: true })}
                                 </div>
                             </td>
                             </tr>
@@ -409,12 +421,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                     {[...equityHistory].reverse().slice((equityPage - 1) * PAGE_SIZE, equityPage * PAGE_SIZE).map((day, idx) => (
                     <tr key={idx} style={{ cursor: 'pointer', backgroundColor: selectedDay?.timestamp === day.timestamp ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }} onClick={() => handleDaySelect(day)}>
                         <td>{day.timestamp.split(' ')[0]}</td>
-                        <td style={{ textAlign: 'right' }}>${(day.total_equity ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                        <td style={{ textAlign: 'right', color: (day.daily_pnl || 0) >= 0 ? 'var(--success)' : 'var(--danger)' }}>
-                        {(day.daily_pnl || 0) >= 0 ? '+' : ''}{day.daily_pnl?.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        <td style={{ textAlign: 'right' }}>{formatMoney(day.total_equity)}</td>
+                        <td style={{ textAlign: 'right', color: colorFromValue(day.daily_pnl) }}>
+                        {formatSignedMoney(day.daily_pnl)}
                         </td>
-                        <td style={{ textAlign: 'right', color: (day.daily_return || 0) >= 0 ? 'var(--success)' : 'var(--danger)', fontWeight: 600 }}>
-                        {(day.daily_return || 0) >= 0 ? '+' : ''}{((day.daily_return || 0) * 100).toFixed(2)}%
+                        <td style={{ textAlign: 'right', color: colorFromValue((day.daily_return ?? 0) * 100), fontWeight: 600 }}>
+                        {formatSigned((day.daily_return ?? 0) * 100, { asPercent: true })}
                         </td>
                         <td style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
                         {Object.values(day.positions || {}).map(p => `${p.name} (${p.qty})`).slice(0, 3).join(', ')}{Object.keys(day.positions || {}).length > 3 ? '...' : ''}

@@ -5,6 +5,7 @@ import {
 import { lttb } from '../lttb';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
 import { calculateMetrics, PerformanceMetrics } from '../utils/metrics';
+import { formatMoney, formatPercent } from '../utils/format';
 
 interface ComparisonProps {
     selectedSessionIds: string[];
@@ -43,17 +44,17 @@ const METRIC_LABELS: Record<DisplayableMetricKey, string> = {
 };
 
 const FORMATTERS: Record<DisplayableMetricKey, (val: number) => string> = {
-    totalReturn: (v) => `${(v * 100).toFixed(2)}%`,
-    annualizedReturn: (v) => `${(v * 100).toFixed(2)}%`,
-    maxDrawdown: (v) => `${(v * 100).toFixed(2)}%`,
+    totalReturn: (v) => formatPercent(v, 2),
+    annualizedReturn: (v) => formatPercent(v, 2),
+    maxDrawdown: (v) => formatPercent(v, 2),
     sharpeRatio: (v) => v.toFixed(2),
     sortinoRatio: (v) => v.toFixed(2),
-    volatility: (v) => `${(v * 100).toFixed(2)}%`,
-    winRate: (v) => `${(v * 100).toFixed(2)}%`,
+    volatility: (v) => formatPercent(v, 2),
+    winRate: (v) => formatPercent(v, 2),
     profitFactor: (v) => v.toFixed(2),
     totalTrades: (v) => v.toString(),
-    avgWin: (v) => `$${v.toFixed(2)}`,
-    avgLoss: (v) => `$${v.toFixed(2)}`
+    avgWin: (v) => formatMoney(v),
+    avgLoss: (v) => formatMoney(v)
 };
 
 const Comparison: React.FC<ComparisonProps> = ({

@@ -92,7 +92,7 @@ class TDXProcess:
         if len(df) == 0:
             return pd.DataFrame()
 
-        # 核心映射逻辑
+        # 核心映射逻辑（roe/roa 原始为累计值，在 update() 中会重算为单季度 roe/roa）
         mapping = {
             "五、净利润": "net_profit",
             "扣除非经常性损益后的净利润": "adjusted_profit",
@@ -168,6 +168,7 @@ class TDXProcess:
             except Exception:
                 start_year = "2024"
 
+        self._ensure_nav_per_share_column()
         files = self.fetch_tdx()
         if not files:
             logger.info("No new financial data files to process.")
@@ -185,7 +186,7 @@ class TDXProcess:
                     cols = [
                         "report_date", "code", "publish_date", "net_profit", "adjusted_profit",
                         "total_operating_revenue", "subtotal_operate_cash_inflow", "roe", "roa",
-                        "inc_net_profit_year_on_year", "total_shares", "circulating_a",
+                        "inc_net_profit_year_on_year", "total_shares", "circulating_a", "nav_per_share",
                         "market_cap", "circulating_market_cap", "pe_ratio", "pb_ratio", "adjusted_profit_diff"
                     ]
                     self.client.insert_df(self.table_name, processed_df[cols])
@@ -198,6 +199,7 @@ class TDXProcess:
         """
         Full initialization from a specific year.
         """
+        self._ensure_nav_per_share_column()
         dates_def = ["0331", "0630", "0930", "1231"]
         now_year = datetime.now().year
         years = [str(year) for year in range(int(start_year), now_year + 1)]
@@ -219,7 +221,7 @@ class TDXProcess:
                     cols = [
                         "report_date", "code", "publish_date", "net_profit", "adjusted_profit",
                         "total_operating_revenue", "subtotal_operate_cash_inflow", "roe", "roa",
-                        "inc_net_profit_year_on_year", "total_shares", "circulating_a",
+                        "inc_net_profit_year_on_year", "total_shares", "circulating_a", "nav_per_share",
                         "market_cap", "circulating_market_cap", "pe_ratio", "pb_ratio", "adjusted_profit_diff"
                     ]
                     self.client.insert_df(self.table_name, processed_df[cols])
@@ -230,21 +232,43 @@ class TDXProcess:
         self.client.command(f"OPTIMIZE TABLE {self.table_name} FINAL")
         self.update(start_year)
 
+    def _ensure_nav_per_share_column(self):
+        """确保表中有 nav_per_share 列（用于单季度 ROE/ROA 计算）"""
+        try:
+            self.client.command("ALTER TABLE stock_data.finicial_report ADD COLUMN IF NOT EXISTS nav_per_share Float64 DEFAULT 0 AFTER circulating_a")
+        except Exception as e:
+            logger.warning(f"Could not ensure nav_per_share column: {e}")
+
     def update(self, start_year):
         """
-        Compute derived financial indicators.
+        Compute derived financial indicators. ROE/ROA 为单季度值。
         """
+        self._ensure_nav_per_share_column()
         logger.info(f"Computing derived financial indicators starting from {start_year}")
         
         sql = f"""
         INSERT INTO {self.table_name}
-        (report_date, code, publish_date, net_profit, adjusted_profit, total_operating_revenue, subtotal_operate_cash_inflow, roe, roa, inc_net_profit_year_on_year, total_shares, circulating_a, market_cap, circulating_market_cap, pe_ratio, pb_ratio, adjusted_profit_diff)
+        (report_date, code, publish_date, net_profit, adjusted_profit, total_operating_revenue, subtotal_operate_cash_inflow, roe, roa, inc_net_profit_year_on_year, total_shares, circulating_a, nav_per_share, market_cap, circulating_market_cap, pe_ratio, pb_ratio, adjusted_profit_diff)
         SELECT
-            curr.report_date, curr.code, curr.publish_date, curr.net_profit, curr.adjusted_profit, curr.total_operating_revenue, curr.subtotal_operate_cash_inflow, curr.roe, curr.roa, curr.inc_net_profit_year_on_year, curr.total_shares, curr.circulating_a,
+            curr.report_date, curr.code, curr.publish_date, curr.net_profit, curr.adjusted_profit, curr.total_operating_revenue, curr.subtotal_operate_cash_inflow,
+            -- 单季度 ROE = 单季度净利润 / 期末净资产 * 100（单季度净利润 = 本期累计 - 上期累计）
+            CASE 
+                WHEN coalesce(curr.nav_per_share, 0) * curr.total_shares > 0 THEN
+                    (curr.net_profit - coalesce(prev.net_profit, 0)) / (curr.nav_per_share * curr.total_shares) * 100
+                ELSE curr.roe
+            END AS roe,
+            -- 单季度 ROA = 单季度净利润 / 期末总资产 * 100（总资产由 净资产*roe/roa 近似，roe/roa 为原始累计值）
+            CASE 
+                WHEN curr.roa != 0 AND curr.roe != 0 AND coalesce(curr.nav_per_share, 0) * curr.total_shares > 0 THEN
+                    (curr.net_profit - coalesce(prev.net_profit, 0)) / (curr.nav_per_share * curr.total_shares * curr.roe / curr.roa) * 100
+                ELSE curr.roa
+            END AS roa,
+            curr.inc_net_profit_year_on_year, curr.total_shares, curr.circulating_a, coalesce(curr.nav_per_share, 0) AS nav_per_share,
             coalesce(daily.close * curr.total_shares, 0) AS market_cap,
             coalesce(daily.close * curr.circulating_a, 0) AS circulating_market_cap,
             CASE WHEN curr.net_profit > 0 THEN (coalesce(daily.close, 0) * curr.total_shares) / curr.net_profit ELSE 0 END AS pe_ratio,
             CASE 
+                WHEN coalesce(curr.nav_per_share, 0) > 0 THEN coalesce(daily.close, 0) / curr.nav_per_share
                 WHEN curr.roe != 0 AND (curr.net_profit / (curr.roe/100)) > 0 
                 THEN (coalesce(daily.close, 0) * curr.total_shares) / (curr.net_profit / (curr.roe/100)) 
                 ELSE 0 
@@ -255,11 +279,12 @@ class TDXProcess:
             END AS adjusted_profit_diff
         FROM (SELECT * FROM {self.table_name} FINAL WHERE report_date >= '{start_year}-01-01') AS curr
         LEFT JOIN (
-            SELECT code, report_date, adjusted_profit FROM {self.table_name} FINAL 
-            WHERE formatDateTime(report_date, '%m-%d') IN ('03-31', '06-30', '09-30')
+            SELECT code, report_date, adjusted_profit, net_profit FROM {self.table_name} FINAL 
+            WHERE formatDateTime(report_date, '%m-%d') IN ('03-31', '06-30', '09-30', '12-31')
         ) AS prev 
             ON curr.code = prev.code 
             AND prev.report_date = CASE
+                WHEN formatDateTime(curr.report_date, '%m-%d') = '03-31' THEN toDate(concat(toString(toYear(curr.report_date) - 1), '-12-31'))
                 WHEN formatDateTime(curr.report_date, '%m-%d') = '06-30' THEN toDate(concat(toString(toYear(curr.report_date)), '-03-31'))
                 WHEN formatDateTime(curr.report_date, '%m-%d') = '09-30' THEN toDate(concat(toString(toYear(curr.report_date)), '-06-30'))
                 WHEN formatDateTime(curr.report_date, '%m-%d') = '12-31' THEN toDate(concat(toString(toYear(curr.report_date)), '-09-30'))

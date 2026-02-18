@@ -136,7 +136,7 @@ class DB:
                 {fields_str},
                 tradestatus,
                 ROW_NUMBER() OVER(PARTITION BY code ORDER BY date DESC) AS rn
-            FROM stock_data.stock_daily
+            FROM stock_data.stock_daily FINAL
             WHERE code IN ({stocks_str})
             AND date <= '{end_date}'
             """

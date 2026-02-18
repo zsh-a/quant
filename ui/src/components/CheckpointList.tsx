@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatMoney } from '../utils/format';
 
 interface Checkpoint {
     id: string;
@@ -130,7 +131,7 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
                                 )}
                                 {checkpoint.metadata.equity !== undefined && (
                                     <span className="detail-item">
-                                        Equity: ${checkpoint.metadata.equity.toLocaleString()}
+                                        Equity: {formatMoney(checkpoint.metadata.equity)}
                                     </span>
                                 )}
                                 {checkpoint.metadata.positions !== undefined && (

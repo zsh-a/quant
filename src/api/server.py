@@ -170,9 +170,8 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
 
     # Persist initial session state
     session_db.create_session(
-        session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date
+        session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date, req.params
     )
-    # Note: params persistence in DB is not yet implemented in session_db, but it's okay for now.
 
     loop = asyncio.get_running_loop()
 
@@ -338,7 +337,7 @@ async def run_session_async(req: SessionRequest):
 
     # Persist initial session state
     session_db.create_session(
-        session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date
+        session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date, req.params
     )
 
     # Build config for Celery task

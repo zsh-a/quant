@@ -1,4 +1,5 @@
 import React from 'react';
+import { formatMoney } from '../utils/format';
 
 interface RiskMetric {
     label: string;
@@ -145,11 +146,11 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
             <div className="capital-info">
                 <div className="capital-item">
                     <span className="label">Current Capital:</span>
-                    <span className="value">${(metrics.current_capital || 0).toLocaleString()}</span>
+                    <span className="value">{formatMoney(metrics.current_capital)}</span>
                 </div>
                 <div className="capital-item">
                     <span className="label">Peak Capital:</span>
-                    <span className="value">${(metrics.peak_capital || 0).toLocaleString()}</span>
+                    <span className="value">{formatMoney(metrics.peak_capital)}</span>
                 </div>
             </div>
 

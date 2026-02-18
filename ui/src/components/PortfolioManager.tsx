@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatMoney } from '../utils/format';
 
 interface Strategy {
     name: string;
@@ -261,7 +262,7 @@ export const PortfolioManager: React.FC = () => {
                                 </div>
                                 <div className="result-item">
                                     <span className="label">最终权益</span>
-                                    <span className="value">¥{backtestResult.final_equity.toLocaleString()}</span>
+                                    <span className="value">{formatMoney(backtestResult.final_equity, { symbol: '¥' })}</span>
                                 </div>
                             </div>
 
@@ -280,7 +281,7 @@ export const PortfolioManager: React.FC = () => {
                                         <tr key={name}>
                                             <td>{name}</td>
                                             <td>{(data.weight * 100).toFixed(0)}%</td>
-                                            <td>¥{data.final_equity.toLocaleString()}</td>
+                                            <td>{formatMoney(data.final_equity, { symbol: '¥' })}</td>
                                             <td>{data.trades}</td>
                                         </tr>
                                     ))}

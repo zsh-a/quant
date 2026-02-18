@@ -2,6 +2,7 @@ import React, { memo, useCallback, useMemo } from 'react';
 import { FixedSizeList as List, areEqual } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { Trade } from '../types';
+import { formatMoney } from '../utils/format';
 
 interface VirtualizedTradeListProps {
     trades: Trade[];
@@ -77,16 +78,13 @@ const TradeRow = memo<{
                 </span>
             </div>
             <div style={{ textAlign: 'right', color: 'var(--text)' }}>
-                ${trade.price.toFixed(2)}
+                {formatMoney(trade.price)}
             </div>
             <div style={{ textAlign: 'right', color: 'var(--text)', fontWeight: 500 }}>
-                ${(trade.amount ?? 0).toLocaleString(undefined, { 
-                    minimumFractionDigits: 0, 
-                    maximumFractionDigits: 0 
-                })}
+                {formatMoney(trade.amount, { decimals: 0 })}
             </div>
             <div style={{ textAlign: 'right', color: 'var(--text-dim)', fontSize: '12px' }}>
-                {trade.commission ? `$${trade.commission.toFixed(1)}` : '-'}
+                {trade.commission ? formatMoney(trade.commission, { decimals: 1 }) : '-'}
             </div>
         </div>
     );

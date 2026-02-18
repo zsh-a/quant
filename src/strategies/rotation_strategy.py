@@ -100,25 +100,11 @@ class RotationStrategy(Strategy):
             for d_str in self.rebalance_dates:
                 try:
                     target_date = pd.Timestamp(d_str)
-
-                    if self.timing == "OPEN":
-                        prev_days = trading_days_df[trading_days_df < target_date]
-                        if not prev_days.empty:
-                            self.trigger_dates_backtest.add(
-                                prev_days[-1].strftime("%Y-%m-%d")
-                            )
-
-                        curr_days = trading_days_df[trading_days_df <= target_date]
-                        if not curr_days.empty and curr_days[-1] == target_date:
-                            self.trigger_dates_live.add(
-                                target_date.strftime("%Y-%m-%d")
-                            )
-                    else:
-                        curr_days = trading_days_df[trading_days_df <= target_date]
-                        if not curr_days.empty:
-                            d_fmt = curr_days[-1].strftime("%Y-%m-%d")
-                            self.trigger_dates_backtest.add(d_fmt)
-                            self.trigger_dates_live.add(d_fmt)
+                    curr_days = trading_days_df[trading_days_df <= target_date]
+                    if not curr_days.empty:
+                        d_fmt = curr_days[-1].strftime("%Y-%m-%d")
+                        self.trigger_dates_backtest.add(d_fmt)
+                        self.trigger_dates_live.add(d_fmt)
 
                 except Exception as e:
                     self._log(f"Error parsing date {d_str}: {e}")
@@ -250,7 +236,7 @@ class RotationStrategy(Strategy):
 
     def judge_market_env(self, date_str):
         df_sh = self.db_client.get_price(["sh.000001"], date_str, ["amount"], 25)
-        df_sz = self.db_client.get_price(["sz.399001"], date_str, ["amount"], 25)
+        df_sz = self.db_client.get_price(["sz.399010"], date_str, ["amount"], 25)
         if df_sh.empty or df_sz.empty:
             return None
 

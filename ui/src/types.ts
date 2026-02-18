@@ -37,6 +37,7 @@ export interface SessionSummary {
     progress: number;
     start_date: string;
     end_date?: string;
+    params?: Record<string, unknown>;
 }
 
 export interface BenchmarkData {

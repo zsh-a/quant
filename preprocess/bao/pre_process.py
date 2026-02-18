@@ -21,23 +21,33 @@ def _fetch_stock_batch(batch_tasks):
     bs.login()
     all_results = []
     meta_updates = []
+    batch_total = len(batch_tasks)
     
     try:
-        for code, last_update_date, last_adjfactor in batch_tasks:
+        for idx, (code, last_update_date, last_adjfactor) in enumerate(batch_tasks):
+            start_str = last_update_date.strftime("%Y-%m-%d") if hasattr(last_update_date, 'strftime') else str(last_update_date)
             try:
                 rs = bs.query_history_k_data_plus(
                     code,
                     "date,code,open,high,low,close,preclose,volume,amount,adjustflag,turn,tradestatus,pctChg,peTTM,pbMRQ,isST",
-                    start_date=last_update_date.strftime("%Y-%m-%d") if hasattr(last_update_date, 'strftime') else str(last_update_date),
+                    start_date=start_str,
                     frequency="d",
                     adjustflag="3",
                 )
 
+                if rs.error_code != "0":
+                    logger.error(
+                        f"Baostock API error for {code} (start_date={start_str}): "
+                        f"error_code={rs.error_code}, error_msg={rs.error_msg}"
+                    )
+                    continue
+
                 data_list = []
-                while (rs.error_code == "0") & rs.next():
+                while rs.next():
                     data_list.append(rs.get_row_data())
                 
                 if not data_list:
+                    logger.warning(f"No data returned for {code} (start_date={start_str}), may be up-to-date or no trading data")
                     continue
 
                 df = pd.DataFrame(data_list, columns=rs.fields)
@@ -76,11 +86,19 @@ def _fetch_stock_batch(batch_tasks):
                         'error_update_count': 0
                     })
             except Exception as e:
-                logger.error(f"Error processing {code} in batch: {e}")
+                logger.exception(f"Error processing {code} (start_date={start_str}) in batch: {e}")
                 continue
+
+            if (idx + 1) % 200 == 0 or idx + 1 == batch_total:
+                pct = 100 * (idx + 1) / batch_total
+                logger.info(f"Batch progress: {idx + 1}/{batch_total} ({pct:.1f}%), fetched {len(meta_updates)} with new data")
                 
     finally:
-        bs.logout()
+        try:
+            bs.logout()
+        except Exception as e:
+            # logout 失败时不要影响已获取的数据返回，多进程下 logout 常失败
+            logger.warning(f"Batch logout failed (data preserved): {e}")
         
     return all_results, meta_updates
 
@@ -160,7 +178,7 @@ class BaoStockProcessor:
             column_names=["code", "last_update_date", "last_adjfactor", "error_update_count", "name"]
         )
 
-    def update_daily_data(self, max_workers=10):
+    def update_daily_data(self, max_workers=1):
         logger.info("Starting daily K-line update with batch processing...")
         query = """
             SELECT code, last_update_date, last_adjfactor
@@ -179,15 +197,20 @@ class BaoStockProcessor:
         # 分片逻辑：将所有任务平均分配给 worker
         batch_size = math.ceil(total_tasks / max_workers)
         chunks = [tasks[i : i + batch_size] for i in range(0, total_tasks, batch_size)]
+        total_batches = len(chunks)
         
         all_new_kline = []
         all_meta_updates = []
+        completed_batches = 0
+        
+        logger.info(f"Split into {total_batches} batches, ~{batch_size} stocks each")
         
         # 并行执行分片任务
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(_fetch_stock_batch, chunk) for chunk in chunks]
+            futures = {executor.submit(_fetch_stock_batch, chunk): i for i, chunk in enumerate(chunks)}
             
             for future in as_completed(futures):
+                batch_idx = futures[future]
                 try:
                     batch_kline, batch_meta = future.result()
                     if batch_kline:
@@ -195,9 +218,11 @@ class BaoStockProcessor:
                     if batch_meta:
                         all_meta_updates.extend(batch_meta)
                     
-                    logger.info(f"Batch completed. Current total fetched: {len(all_meta_updates)}")
+                    completed_batches += 1
+                    logger.info(f"Batch {completed_batches}/{total_batches} done, +{len(batch_meta)} new, total fetched: {len(all_meta_updates)}")
                 except Exception as e:
-                    logger.error(f"Batch execution error: {e}")
+                    completed_batches += 1
+                    logger.error(f"Batch {completed_batches}/{total_batches} failed: {e}")
         
         # 批量写入
         if all_new_kline:
@@ -212,6 +237,7 @@ class BaoStockProcessor:
             
             self.update_meta_batch(all_meta_updates)
             logger.info(f"Updated meta for {len(all_meta_updates)} stocks")
+            self.client.command("OPTIMIZE TABLE stock_data.stock_daily_meta FINAL")
         else:
             logger.info("No new data found in any batch.")
 

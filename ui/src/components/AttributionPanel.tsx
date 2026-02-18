@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { formatMoney } from '../utils/format';
 
 interface AttributionData {
     session_id: string;
@@ -135,7 +136,7 @@ const BarItem: React.FC<{ label: string; value: number }> = ({ label, value }) =
                 }} />
             </div>
             <span style={{ width: 60, fontSize: 11, textAlign: 'right', color: positive ? '#28a745' : '#dc3545' }}>
-                ¥{value.toLocaleString()}
+                {formatMoney(value, { symbol: '¥' })}
             </span>
         </div>
     );

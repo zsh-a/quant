@@ -15,6 +15,7 @@
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.0",
     "@melloware/react-logviewer": "^6.3.5",
+    "dinero.js": "^1.9.1",
     "echarts-for-react": "^3.0.2",
     "framer-motion": "^12.6.3",
     "klinecharts": "10.0.0-alpha5",

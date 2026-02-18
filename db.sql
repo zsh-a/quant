@@ -65,6 +65,7 @@ CREATE TABLE stock_data.finicial_report
     `inc_net_profit_year_on_year` Float64,
     `total_shares` Float64,
     `circulating_a` Float64,
+    `nav_per_share` Float64,
     `market_cap` Float64,
     `circulating_market_cap` Float64,
     `pe_ratio` Float64,
@@ -97,6 +98,9 @@ CREATE TABLE stock_data.etf_daily
     `turn` Float64,
 ) ENGINE = ReplacingMergeTree() 
 ORDER BY (code, date)
+
+-- 若表已存在，添加 nav_per_share 列（用于单季度 ROE/ROA 计算）:
+-- ALTER TABLE stock_data.finicial_report ADD COLUMN IF NOT EXISTS nav_per_share Float64 DEFAULT 0 AFTER circulating_a;
 
 -- OPTIMIZE TABLE stock_data.finicial_report FINAL;
 

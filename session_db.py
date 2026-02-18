@@ -72,6 +72,7 @@ class SessionDB:
             self._add_column_if_not_exists(cursor, "trades", "name", "TEXT")
             self._add_column_if_not_exists(cursor, "trades", "type", "TEXT")
             self._add_column_if_not_exists(cursor, "trades", "amount", "REAL")
+            self._add_column_if_not_exists(cursor, "sessions", "params", "TEXT")
             
             # Indexes for performance
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC)")
@@ -91,12 +92,13 @@ class SessionDB:
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
-    def create_session(self, session_id, strategy_name, symbol, mode, start_date, end_date):
+    def create_session(self, session_id, strategy_name, symbol, mode, start_date, end_date, params=None):
+        params_json = json.dumps(params or {})
         with self._get_conn() as conn:
             conn.execute("""
-                INSERT INTO sessions (session_id, strategy_name, symbol, mode, start_date, end_date, status, progress)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (session_id, strategy_name, symbol, mode, start_date, end_date, "starting", 0.0))
+                INSERT INTO sessions (session_id, strategy_name, symbol, mode, start_date, end_date, status, progress, params)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (session_id, strategy_name, symbol, mode, start_date, end_date, "starting", 0.0, params_json))
 
     def update_session_status(self, session_id, status, progress=None, error=None):
         with self._get_conn() as conn:
@@ -156,6 +158,14 @@ class SessionDB:
             if row:
                 d = dict(row)
                 d['id'] = d['session_id']
+                d['strategy'] = d.get('strategy_name', '')
+                if d.get('params'):
+                    try:
+                        d['params'] = json.loads(d['params'])
+                    except (TypeError, ValueError):
+                        d['params'] = {}
+                else:
+                    d['params'] = {}
                 return d
             return None
 
@@ -167,6 +177,14 @@ class SessionDB:
             for row in cursor.fetchall():
                 d = dict(row)
                 d['id'] = d['session_id']
+                d['strategy'] = d.get('strategy_name', '')
+                if d.get('params'):
+                    try:
+                        d['params'] = json.loads(d['params'])
+                    except (TypeError, ValueError):
+                        d['params'] = {}
+                else:
+                    d['params'] = {}
                 result.append(d)
             return result
 

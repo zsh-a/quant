@@ -72,7 +72,6 @@ const App: React.FC = () => {
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
   const [benchmarksData, setBenchmarksData] = useState<Record<string, BenchmarkData[]>>({});
 
-  const pollInterval = useRef<number | null>(null);
   const lastUpdatedRef = useRef<string | null>(null);
 
   const fetchStrategies = async () => {
