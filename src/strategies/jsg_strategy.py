@@ -12,7 +12,7 @@ NUM_STOCKS = 6
 @StrategyRegistry.register(
     name="jsg",
     label="JSG Quantitative",
-    description="JSG量化策略 - 基于月末调仓的行业轮动策略",
+    description="JSG量化策略 - 基于行业轮动策略",
 )
 class JSGStrategy(Strategy):
     _trad_days_cache = None
@@ -26,6 +26,9 @@ class JSGStrategy(Strategy):
         self.max_stocks = int(kwargs.get("max_stocks", params["max_stocks"]["default"]))
         self.pool_size = int(kwargs.get("pool_size", params["pool_size"]["default"]))
         self.stock_sum = int(kwargs.get("stock_sum", params["stock_sum"]["default"]))
+        self.stop_loss_pct = float(kwargs.get("stop_loss_pct", params["stop_loss_pct"]["default"]))
+        self.trailing_stop_pct = float(kwargs.get("trailing_stop_pct", params["trailing_stop_pct"]["default"]))
+        self.max_drawdown_pct = float(kwargs.get("max_drawdown_pct", params["max_drawdown_pct"]["default"]))
 
         self.black_industry_name = {"银行", "煤炭", "有色金属", "钢铁"}
 
@@ -40,8 +43,14 @@ class JSGStrategy(Strategy):
         # Track stocks that hit limit-up yesterday
         self.prev_limit_up_stocks = set()
 
+        # Risk control state
+        self._peak_equity = 0.0  # 组合净值峰值
+        self._trailing_highs = {}  # symbol -> 持仓期间最高价
+        self._drawdown_triggered = False  # 回撤熔断标志
+
         self._log(
-            f"JSGStrategy initialized: max_stocks={self.max_stocks}, pool_size={self.pool_size}, stock_sum={self.stock_sum}"
+            f"JSGStrategy initialized: max_stocks={self.max_stocks}, pool_size={self.pool_size}, stock_sum={self.stock_sum}, "
+            f"stop_loss={self.stop_loss_pct:.0%}, trailing_stop={self.trailing_stop_pct:.0%}, max_dd={self.max_drawdown_pct:.0%}"
         )
 
     @classmethod
@@ -68,6 +77,27 @@ class JSGStrategy(Strategy):
                 "min": 1,
                 "max": 20,
             },
+            "stop_loss_pct": {
+                "type": "float",
+                "default": 0.08,
+                "description": "个股止损比例 (0=禁用, 0.08=跌8%止损)",
+                "min": 0.0,
+                "max": 0.30,
+            },
+            "trailing_stop_pct": {
+                "type": "float",
+                "default": 0.0,
+                "description": "个股移动止盈比例 (0=禁用, 0.10=从最高点回落10%卖出)",
+                "min": 0.0,
+                "max": 0.30,
+            },
+            "max_drawdown_pct": {
+                "type": "float",
+                "default": 0.15,
+                "description": "组合最大回撤熔断 (0=禁用, 0.15=回撤15%清仓)",
+                "min": 0.0,
+                "max": 0.50,
+            },
         }
 
     def _is_limit_up(self, symbol: str, bar: Bar) -> bool:
@@ -85,23 +115,97 @@ class JSGStrategy(Strategy):
         up_limit = round(preclose * (1 + limit_pct) + 0.0001, 2)
         return bar.close >= up_limit
 
+    def _check_risk_controls(self, bars: dict[str, Bar]) -> bool:
+        """每日风控检查。返回 True 表示触发了组合熔断，应跳过买入。"""
+        account = self.engine.broker.get_account_info()
+        total_equity = account["total_equity"]
+        detailed = account.get("detailed_positions", {})
+
+        # --- 组合回撤熔断 ---
+        if self._peak_equity <= 0:
+            self._peak_equity = total_equity
+        if total_equity > self._peak_equity:
+            self._peak_equity = total_equity
+
+        if self.max_drawdown_pct > 0 and self._peak_equity > 0:
+            drawdown = (self._peak_equity - total_equity) / self._peak_equity
+            if drawdown >= self.max_drawdown_pct:
+                if not self._drawdown_triggered:
+                    self._drawdown_triggered = True
+                    self._log(
+                        f"⚠ 组合回撤熔断: 回撤={drawdown:.2%} >= 阈值={self.max_drawdown_pct:.0%}, "
+                        f"峰值={self._peak_equity:.0f}, 当前={total_equity:.0f}, 全部清仓",
+                        level="WARNING",
+                    )
+                    # 清仓所有持仓
+                    for symbol, qty in list(account["positions"].items()):
+                        if qty > 0:
+                            self.sell(symbol, qty, execution_type="IMMEDIATE_CLOSE")
+                    self._trailing_highs.clear()
+                return True
+
+        # 回撤恢复：在调仓日重置熔断标志 (由 on_bar 中调仓逻辑处理)
+
+        # --- 个股止损 & 移动止盈 ---
+        for symbol, info in detailed.items():
+            qty = account["positions"].get(symbol, 0)
+            if qty <= 0:
+                continue
+
+            current_price = info.get("price", 0)
+            if current_price <= 0:
+                continue
+
+            # 更新移动止盈最高价
+            if symbol not in self._trailing_highs:
+                self._trailing_highs[symbol] = current_price
+            elif current_price > self._trailing_highs[symbol]:
+                self._trailing_highs[symbol] = current_price
+
+            # 个股固定止损：基于成本价
+            if self.stop_loss_pct > 0:
+                pnl_pct = info.get("pnl_pct", 0)
+                if pnl_pct <= -self.stop_loss_pct:
+                    self._log(
+                        f"✂ 止损卖出: {symbol} 亏损={pnl_pct:.2%} <= -{self.stop_loss_pct:.0%}, 收盘清仓",
+                        level="WARNING",
+                    )
+                    self.sell(symbol, qty, execution_type="IMMEDIATE_CLOSE")
+                    self._trailing_highs.pop(symbol, None)
+                    continue
+
+            # 个股移动止盈：从最高价回落超过阈值
+            if self.trailing_stop_pct > 0:
+                peak = self._trailing_highs.get(symbol, current_price)
+                drop_from_peak = (peak - current_price) / peak if peak > 0 else 0
+                if drop_from_peak >= self.trailing_stop_pct:
+                    self._log(
+                        f"✂ 移动止盈: {symbol} 从高点={peak:.2f}回落={drop_from_peak:.2%} >= {self.trailing_stop_pct:.0%}, 收盘清仓",
+                        level="WARNING",
+                    )
+                    self.sell(symbol, qty, execution_type="IMMEDIATE_CLOSE")
+                    self._trailing_highs.pop(symbol, None)
+                    continue
+
+        return False
+
     def on_bar(self, bars: dict[str, Bar]):
         if not bars:
             return
 
         today_str = self._current_date  # Auto-updated by engine
-        
+
         # 1. Daily check for "limit-up break" sell rule
         account = self.engine.broker.get_account_info()
         hold_list = list(account["positions"].keys())
-        
+
         current_limit_up_stocks = set()
-        
+
         for symbol in bars:
             bar = bars[symbol]
             if self._is_limit_up(symbol, bar):
                 current_limit_up_stocks.add(symbol)
-        
+
         # Sell if it was limit-up yesterday but not today
         for stock in hold_list:
             if stock in self.prev_limit_up_stocks and stock not in current_limit_up_stocks:
@@ -109,16 +213,30 @@ class JSGStrategy(Strategy):
                 if qty > 0:
                     self._log(f"涨停打开: {stock} 昨日涨停, 今日未涨停, 收盘卖出", stock=stock)
                     self.sell(stock, qty, execution_type="IMMEDIATE_CLOSE")
-        
+
         # Update state for tomorrow
         self.prev_limit_up_stocks = current_limit_up_stocks
 
-        # 2. Monthly Rebalance Check
+        # 2. Daily risk control checks (stop-loss, trailing stop, drawdown)
+        drawdown_triggered = self._check_risk_controls(bars)
+
+        # 3. Rebalance Check
         if today_str not in self.trad_days.index.strftime("%Y-%m-%d"):
             return
 
         # Original logic check
         if self.trad_days.loc[today_str, "is_last_trading_day"] == 0:
+            return
+
+        # 调仓日重置回撤熔断标志，允许重新建仓
+        if self._drawdown_triggered:
+            self._log("调仓日: 重置回撤熔断标志")
+            self._drawdown_triggered = False
+            self._peak_equity = self.engine.broker.get_account_info()["total_equity"]
+
+        # 如果当日已触发熔断清仓，跳过买入
+        if drawdown_triggered:
+            self._log("调仓日: 回撤熔断中, 跳过建仓", level="WARNING")
             return
 
         self._log("========== 调仓日 ==========")
@@ -228,6 +346,7 @@ class JSGStrategy(Strategy):
                 )
                 if qty > 0:
                     self.sell(stock, qty)
+                    self._trailing_highs.pop(stock, None)
 
         # Buy target stocks (or adjust position size)
         total_equity = account["total_equity"]
