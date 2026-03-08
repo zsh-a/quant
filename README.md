@@ -10,7 +10,35 @@ python health_check.py
 
 预期输出：`7/7 checks passed (100%)` ✅
 
-### 2. 启动后端API
+### 2. 本地快速调试（推荐）
+
+```bash
+./dev_local.sh up
+```
+
+这会自动：
+- 优先复用本机 `redis://127.0.0.1:6379`，没有则自动启动本地 Redis 或 `docker compose` 里的 `redis`
+- 本地启动 API（热重载）、Celery worker（包含 `backtest/default/automation` 队列）和前端 Vite
+- 日志写入 `.dev/local/logs/`
+
+常用命令：
+
+```bash
+./dev_local.sh status
+./dev_local.sh logs api
+./dev_local.sh logs worker
+./dev_local.sh down
+```
+
+也可以使用：
+
+```bash
+make dev_local
+make dev_local_status
+make dev_local_down
+```
+
+### 3. 手动启动后端API
 
 ```bash
 uvicorn src.api.server:app --reload
@@ -18,7 +46,7 @@ uvicorn src.api.server:app --reload
 
 访问 http://localhost:8000/docs 查看API文档
 
-### 3. 启动前端（新终端）
+### 4. 启动前端（新终端）
 
 ```bash
 cd ui && npm run dev

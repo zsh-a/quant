@@ -35,6 +35,7 @@ dependencies = [
     # Configuration
     "pydantic-settings>=2.0.0",
     "openai>=2.17.0",
+    "pytest>=9.0.2",
 ]
 
 [tool.uv]

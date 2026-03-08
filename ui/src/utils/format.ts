@@ -81,3 +81,15 @@ export function formatPercent(value: number | undefined | null, decimals = 2): s
   if (!Number.isFinite(n)) return '0.' + '0'.repeat(decimals) + '%';
   return (n * 100).toFixed(decimals) + '%';
 }
+
+
+/** Format trade/quote price for UI: round noise while keeping useful precision. */
+export function formatPrice(value: number | string | undefined | null, decimals = 2): string {
+  const raw = value ?? 0;
+  const n = typeof raw === 'string' ? Number(raw) : Number(value ?? 0);
+  if (!Number.isFinite(n)) return (0).toFixed(decimals);
+  return n.toLocaleString('en-US', {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+}

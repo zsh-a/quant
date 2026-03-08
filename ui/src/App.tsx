@@ -80,6 +80,7 @@ const App: React.FC = () => {
 
   const primarySession = sessions.find((session) => session.id === primarySessionId);
   const selectedSessionSource = primarySession?.source || 'manual';
+  const primarySessionRunId = primarySession?.run_id || null;
   const lastUpdatedRef = useRef<string | null>(null);
 
   const fetchStrategies = async () => {
@@ -335,7 +336,7 @@ const App: React.FC = () => {
     return () => {
       if (detailInterval) clearInterval(detailInterval);
     };
-  }, [primarySessionId, isConnected, usePolling, selectedSessionSource]);
+  }, [primarySessionId, primarySessionRunId, isConnected, usePolling, selectedSessionSource]);
 
   useEffect(() => {
     selectedSessionIds.forEach((id) => {

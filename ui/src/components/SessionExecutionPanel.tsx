@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { SessionSummary, SimulationRun, SimulationStep, Trade } from '../types';
+import { formatPrice } from '../utils/format';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:8000'
@@ -95,7 +96,7 @@ const SessionExecutionPanel: React.FC<SessionExecutionPanelProps> = ({ session, 
                   <strong>{trade.type.toUpperCase()} {trade.symbol}</strong>
                   <span className="tagline">{trade.timestamp}</span>
                 </div>
-                <div className="tagline">{trade.quantity} @ {trade.price} · amount {trade.amount}</div>
+                <div className="tagline">{trade.quantity} @ {formatPrice(trade.price, 2)} · amount {trade.amount}</div>
               </div>
             ))}
             {recentTrades.length === 0 && <div className="tagline">暂无成交记录。</div>}
@@ -141,12 +142,12 @@ const SessionExecutionPanel: React.FC<SessionExecutionPanelProps> = ({ session, 
               )}
               {step.payload?.close_prices && (
                 <div className="tagline" style={{ marginTop: '0.35rem' }}>
-                  行情：{Object.entries(step.payload.close_prices).map(([code, price]) => `${code}=${price}`).join('，')}
+                  行情：{Object.entries(step.payload.close_prices).map(([code, price]) => `${code}=${formatPrice(Number(price), 2)}`).join('，')}
                 </div>
               )}
               {step.payload?.new_trades?.length > 0 && (
                 <div className="tagline" style={{ marginTop: '0.35rem' }}>
-                  成交：{step.payload.new_trades.map((trade: any) => `${trade.type} ${trade.symbol} @ ${trade.price}`).join('；')}
+                  成交：{step.payload.new_trades.map((trade: any) => `${trade.type} ${trade.symbol} @ ${formatPrice(trade.price, 2)}`).join('；')}
                 </div>
               )}
               {step.payload?.error && <div style={{ marginTop: '0.35rem', color: 'var(--danger)' }}>{step.payload.error}</div>}

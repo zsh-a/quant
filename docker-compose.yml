@@ -63,7 +63,7 @@ services:
       context: .
       dockerfile: Dockerfile
     container_name: quant_celery_worker
-    command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=4 --queues=backtest,default
+    command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=4 --queues=backtest,default,automation
     volumes:
       - ./data:/app/data
       - ./config:/app/config

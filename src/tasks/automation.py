@@ -77,6 +77,7 @@ def run_simulation_job_task(
     job_id: str,
     update_run_id: Optional[str] = None,
     trigger_source: str = "manual",
+    force_full_replay: bool = False,
 ):
     session_db = SessionDB()
     service = AutomationService(session_db)
@@ -85,7 +86,11 @@ def run_simulation_job_task(
         return {"status": "error", "error": f"job {job_id} not found"}
 
     latest_market_date = get_reference_latest_date()
-    window = service.get_run_window(job, latest_market_date=latest_market_date)
+    window = service.get_run_window(
+        job,
+        latest_market_date=latest_market_date,
+        force_full_replay=force_full_replay,
+    )
     if not window:
         session_db.update_simulation_job(
             job_id,
@@ -98,9 +103,13 @@ def run_simulation_job_task(
             "job_id": job_id,
             "reason": "no new market data",
             "latest_market_date": latest_market_date,
+            "force_full_replay": force_full_replay,
         }
 
-    session_id = str(uuid.uuid4())
+    existing_session_id = job.get("latest_session_id")
+    existing_session = session_db.get_session(existing_session_id) if existing_session_id else None
+    session_id = existing_session_id if existing_session else str(uuid.uuid4())
+
     run = session_db.create_simulation_run(
         job_id=job_id,
         session_id=session_id,
@@ -111,19 +120,42 @@ def run_simulation_job_task(
     )
     run_id = run["run_id"]
 
-    session_db.create_session(
-        session_id=session_id,
-        strategy_name=job["strategy_name"],
-        symbol=job["symbol"],
-        mode="simulation",
-        start_date=window["start_date"],
-        end_date=window["end_date"],
-        params=job.get("params") or {},
-        source="automation",
-        job_id=job_id,
-        run_id=run_id,
-        last_processed_at=job.get("last_processed_at"),
-    )
+    if existing_session:
+        if force_full_replay:
+            from src.utils.session_logger import clear_session_logs
+
+            clear_session_logs(session_id)
+            session_db.clear_session_runtime_data(session_id, clear_logs=False)
+        session_db.update_session(
+            session_id,
+            strategy_name=job["strategy_name"],
+            symbol=job["symbol"],
+            mode="simulation",
+            start_date=job["start_date"],
+            end_date=window["end_date"],
+            status="starting",
+            progress=0.0,
+            error=None,
+            params=job.get("params") or {},
+            source="automation",
+            job_id=job_id,
+            run_id=run_id,
+            last_processed_at=None if force_full_replay else job.get("last_processed_at"),
+        )
+    else:
+        session_db.create_session(
+            session_id=session_id,
+            strategy_name=job["strategy_name"],
+            symbol=job["symbol"],
+            mode="simulation",
+            start_date=job["start_date"],
+            end_date=window["end_date"],
+            params=job.get("params") or {},
+            source="automation",
+            job_id=job_id,
+            run_id=run_id,
+            last_processed_at=None if force_full_replay else job.get("last_processed_at"),
+        )
 
     db_client = DB()
     stream = None
@@ -138,7 +170,7 @@ def run_simulation_job_task(
             chunk_size_months=data_stream_config.chunk_size_months,
         )
         total_bars = getattr(stream, "total_bars", 0)
-        snapshot = job.get("snapshot") or {}
+        snapshot = {} if force_full_replay else (job.get("snapshot") or {})
         initial_cash = snapshot.get("initial_cash", broker_config.backtest.initial_cash)
 
         broker = BacktestBroker(
@@ -172,6 +204,7 @@ def run_simulation_job_task(
                 "start_date": window["start_date"],
                 "end_date": window["end_date"],
                 "trigger_source": trigger_source,
+                "force_full_replay": force_full_replay,
             },
         )
 
@@ -181,7 +214,7 @@ def run_simulation_job_task(
             current_ts = next(iter(bars.values())).timestamp if bars else None
             progress = round((stream.idx / total_bars) * 100, 2) if total_bars else 100.0
             info = broker.get_account_info()
-            new_equity_points = info.get("equity_history", [])
+            new_equity_points = list(info.get("equity_history", []))
             latest_equity = (
                 new_equity_points[-1]
                 if new_equity_points
@@ -198,7 +231,7 @@ def run_simulation_job_task(
                 session_db.add_equity_points(session_id, new_equity_points)
                 broker.equity_history.clear()
 
-            new_trades = info.get("trades", [])
+            new_trades = list(info.get("trades", []))
             if new_trades:
                 session_db.add_trades(session_id, new_trades)
                 broker.trades.clear()
@@ -258,6 +291,7 @@ def run_simulation_job_task(
             "bars_processed": step_index,
             "metrics": metrics,
             "last_processed_at": window["end_date"],
+            "force_full_replay": force_full_replay,
         }
 
         session_db.add_simulation_run_step(
@@ -293,7 +327,14 @@ def run_simulation_job_task(
             snapshot=snapshot,
             error=None,
         )
-        return {"status": "completed", "job_id": job_id, "run_id": run_id, "session_id": session_id, **summary}
+        return {
+            "status": "completed",
+            "job_id": job_id,
+            "run_id": run_id,
+            "session_id": session_id,
+            "force_full_replay": force_full_replay,
+            **summary,
+        }
     except Exception as exc:
         logger.exception("Simulation job failed")
         session_db.add_simulation_run_step(
@@ -320,7 +361,13 @@ def run_simulation_job_task(
             latest_run_id=run_id,
             last_update_at=datetime.now().isoformat(),
         )
-        return {"status": "failed", "job_id": job_id, "run_id": run_id, "error": str(exc)}
+        return {
+            "status": "failed",
+            "job_id": job_id,
+            "run_id": run_id,
+            "error": str(exc),
+            "force_full_replay": force_full_replay,
+        }
 
 
 @app.task(name="src.tasks.automation.run_automation_cycle")

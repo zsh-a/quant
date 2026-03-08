@@ -71,6 +71,7 @@ export interface SimulationJob {
     symbol: string;
     mode: string;
     start_date: string;
+    end_date?: string;
     params: Record<string, unknown>;
     enabled: boolean;
     status: string;

@@ -246,7 +246,7 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                 if current_time - last_db_write >= 2.0 or session.progress >= 100:
                     info = broker.get_account_info()
 
-                    new_equity_points = info.get("equity_history", [])
+                    new_equity_points = list(info.get("equity_history", []))
                     if new_equity_points:
                         session_db.add_equity_points(session_id, new_equity_points)
                         for pt in new_equity_points:
@@ -267,7 +267,7 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                             loop,
                         )
 
-                    new_trades = info.get("trades", [])
+                    new_trades = list(info.get("trades", []))
                     if new_trades:
                         session_db.add_trades(session_id, new_trades)
                         for trade in new_trades:

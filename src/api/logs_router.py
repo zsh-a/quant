@@ -2,15 +2,15 @@
 Logs API Router - API endpoints for session debug logs.
 """
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
 from typing import Optional
-from loguru import logger
 
 from src.utils.session_logger import (
-    get_session_logger,
     get_all_logs,
-    list_session_loggers
+    get_session_logs as fetch_session_logs,
+    clear_session_logs as purge_session_logs,
+    list_session_loggers,
 )
 
 router = APIRouter(prefix="/logs", tags=["logs"])
@@ -46,12 +46,16 @@ async def get_session_logs(
         limit: Maximum number of entries to return (default 500)
         format: Response format - 'text' for log viewer, 'json' for structured data
     """
-    collector = get_session_logger(session_id) if session_id else None
-    
     if format == "json":
-        if not collector:
+        logs = fetch_session_logs(
+            session_id,
+            level=level,
+            source=source,
+            since=since,
+            limit=limit,
+        )
+        if not logs:
             return {"logs": [], "count": 0}
-        logs = collector.get_logs(level=level, source=source, since=since, limit=limit)
         return {
             "session_id": session_id,
             "logs": logs,
@@ -66,9 +70,7 @@ async def get_session_logs(
 @router.delete("/{session_id}")
 async def clear_session_logs(session_id: str):
     """Clear logs for a session"""
-    collector = get_session_logger(session_id)
-    if collector:
-        collector.clear()
+    purge_session_logs(session_id)
     return {"message": f"Logs cleared for session {session_id}"}
 
 

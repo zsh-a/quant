@@ -76,6 +76,7 @@ class SessionDB:
                     symbol TEXT NOT NULL,
                     mode TEXT NOT NULL DEFAULT 'simulation',
                     start_date TEXT NOT NULL,
+                    end_date TEXT,
                     params TEXT,
                     enabled INTEGER NOT NULL DEFAULT 1,
                     status TEXT NOT NULL DEFAULT 'idle',
@@ -148,6 +149,22 @@ class SessionDB:
                 """
             )
 
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS session_logs (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    session_id TEXT NOT NULL,
+                    timestamp TEXT NOT NULL,
+                    level TEXT NOT NULL,
+                    source TEXT NOT NULL,
+                    message TEXT NOT NULL,
+                    extra TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(session_id) REFERENCES sessions(session_id)
+                )
+                """
+            )
+
             self._add_column_if_not_exists(cursor, "equity_history", "cash", "REAL DEFAULT 0.0")
             self._add_column_if_not_exists(cursor, "equity_history", "daily_pnl", "REAL DEFAULT 0.0")
             self._add_column_if_not_exists(cursor, "equity_history", "daily_return", "REAL DEFAULT 0.0")
@@ -156,6 +173,7 @@ class SessionDB:
             self._add_column_if_not_exists(cursor, "trades", "name", "TEXT")
             self._add_column_if_not_exists(cursor, "trades", "type", "TEXT")
             self._add_column_if_not_exists(cursor, "trades", "amount", "REAL")
+            self._add_column_if_not_exists(cursor, "simulation_jobs", "end_date", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "params", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "source", "TEXT DEFAULT 'manual'")
             self._add_column_if_not_exists(cursor, "sessions", "job_id", "TEXT")
@@ -170,6 +188,7 @@ class SessionDB:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_job ON simulation_runs(job_id, created_at DESC)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_steps_run ON simulation_run_steps(run_id, step_index DESC)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_data_update_runs_created ON data_update_runs(created_at DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_logs_session_time ON session_logs(session_id, timestamp DESC)")
             conn.commit()
 
     def _add_column_if_not_exists(self, cursor, table, column, type_def):
@@ -251,6 +270,30 @@ class SessionDB:
                 params.append(last_processed_at)
             params.append(session_id)
             conn.execute(f"UPDATE sessions SET {', '.join(updates)} WHERE session_id = ?", params)
+
+    def update_session(self, session_id: str, **fields):
+        if not fields:
+            return self.get_session(session_id)
+
+        db_fields = {}
+        for key, value in fields.items():
+            if key == "params":
+                db_fields[key] = self._json_dumps(value)
+            else:
+                db_fields[key] = value
+
+        assignments = ", ".join(f"{key} = ?" for key in db_fields)
+        values = list(db_fields.values()) + [session_id]
+        with self._get_conn() as conn:
+            conn.execute(f"UPDATE sessions SET {assignments} WHERE session_id = ?", values)
+        return self.get_session(session_id)
+
+    def clear_session_runtime_data(self, session_id: str, clear_logs: bool = True):
+        with self._get_conn() as conn:
+            conn.execute("DELETE FROM equity_history WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM trades WHERE session_id = ?", (session_id,))
+            if clear_logs:
+                conn.execute("DELETE FROM session_logs WHERE session_id = ?", (session_id,))
 
     def add_equity_points(self, session_id, points: List[Dict]):
         if not points:
@@ -374,12 +417,111 @@ class SessionDB:
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
 
+    def add_session_logs(self, session_id: str, logs: List[Dict[str, Any]]):
+        if not logs:
+            return
+
+        data = [
+            (
+                session_id,
+                str(item.get("timestamp") or datetime.now().isoformat()),
+                item.get("level", "INFO"),
+                item.get("source", "system"),
+                item.get("message", ""),
+                self._json_dumps(item.get("extra") or {}),
+            )
+            for item in logs
+        ]
+
+        with self._get_conn() as conn:
+            conn.executemany(
+                """
+                INSERT INTO session_logs (session_id, timestamp, level, source, message, extra)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                data,
+            )
+
+    def add_session_log(
+        self,
+        session_id: str,
+        timestamp: str,
+        level: str,
+        source: str,
+        message: str,
+        extra: Optional[Dict[str, Any]] = None,
+    ):
+        self.add_session_logs(
+            session_id,
+            [
+                {
+                    "timestamp": timestamp,
+                    "level": level,
+                    "source": source,
+                    "message": message,
+                    "extra": extra or {},
+                }
+            ],
+        )
+
+    def get_session_logs(
+        self,
+        session_id: str,
+        level: Optional[str] = None,
+        source: Optional[str] = None,
+        since: Optional[str] = None,
+        limit: int = 500,
+    ) -> List[Dict[str, Any]]:
+        query = "SELECT timestamp, level, source, message, extra FROM session_logs WHERE session_id = ?"
+        params: List[Any] = [session_id]
+
+        if level:
+            query += " AND level = ?"
+            params.append(level.upper())
+        if source:
+            query += " AND source = ?"
+            params.append(source)
+        if since:
+            query += " AND timestamp >= ?"
+            params.append(since)
+
+        query += " ORDER BY timestamp DESC LIMIT ?"
+        params.append(limit)
+
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, params).fetchall()
+
+        result = []
+        for row in reversed(rows):
+            item = dict(row)
+            item["extra"] = self._json_loads(item.get("extra"), {})
+            result.append(item)
+        return result
+
+    def clear_session_logs(self, session_id: str):
+        with self._get_conn() as conn:
+            conn.execute("DELETE FROM session_logs WHERE session_id = ?", (session_id,))
+
+    def list_sessions_with_logs(self) -> List[str]:
+        with self._get_conn() as conn:
+            rows = conn.execute(
+                """
+                SELECT session_id
+                FROM session_logs
+                GROUP BY session_id
+                ORDER BY MAX(timestamp) DESC
+                """
+            ).fetchall()
+        return [row[0] for row in rows]
+
     def create_simulation_job(
         self,
         name: str,
         strategy_name: str,
         symbol: str,
         start_date: str,
+        end_date: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
         enabled: bool = True,
         schedule: str = "daily",
@@ -389,9 +531,9 @@ class SessionDB:
             conn.execute(
                 """
                 INSERT INTO simulation_jobs (
-                    job_id, name, strategy_name, symbol, start_date, params,
+                    job_id, name, strategy_name, symbol, start_date, end_date, params,
                     enabled, schedule, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job_id,
@@ -399,6 +541,7 @@ class SessionDB:
                     strategy_name,
                     symbol,
                     start_date,
+                    end_date,
                     self._json_dumps(params or {}),
                     1 if enabled else 0,
                     schedule,

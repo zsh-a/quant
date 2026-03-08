@@ -20,6 +20,7 @@ class SimulationJobRequest(BaseModel):
     strategy: str
     symbol: str
     start_date: str
+    end_date: Optional[str] = None
     params: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
     schedule: str = "daily"
@@ -32,6 +33,7 @@ async def create_simulation_job(req: SimulationJobRequest):
         strategy=req.strategy,
         symbol=req.symbol,
         start_date=req.start_date,
+        end_date=req.end_date,
         params=req.params,
         enabled=req.enabled,
         schedule=req.schedule,
@@ -41,6 +43,25 @@ async def create_simulation_job(req: SimulationJobRequest):
 @router.get("/simulation-jobs")
 async def list_simulation_jobs(enabled_only: bool = False):
     return automation_service.list_jobs(enabled_only=enabled_only)
+
+
+@router.post("/simulation-jobs/run-enabled")
+async def run_enabled_simulation_jobs(force: bool = Query(False)):
+    jobs = automation_service.list_jobs(enabled_only=True)
+    tasks = []
+    for job in jobs:
+        task = run_simulation_job_task.apply_async(
+            args=[job["job_id"], None, "manual_batch", force],
+            queue="automation",
+        )
+        tasks.append(
+            {
+                "job_id": job["job_id"],
+                "name": job["name"],
+                "task_id": task.id,
+            }
+        )
+    return {"status": "submitted", "count": len(tasks), "tasks": tasks, "force_full_replay": force}
 
 
 @router.get("/simulation-jobs/{job_id}")
@@ -68,12 +89,16 @@ async def disable_simulation_job(job_id: str):
 
 
 @router.post("/simulation-jobs/{job_id}/run")
-async def run_simulation_job(job_id: str):
+async def run_simulation_job(job_id: str, force: bool = Query(False)):
     job = automation_service.get_job(job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Simulation job not found")
-    task = run_simulation_job_task.apply_async(args=[job_id, None, "manual"], queue="automation")
-    return {"job_id": job_id, "task_id": task.id, "status": "submitted"}
+    trigger_source = "manual_force" if force else "manual"
+    task = run_simulation_job_task.apply_async(
+        args=[job_id, None, trigger_source, force],
+        queue="automation",
+    )
+    return {"job_id": job_id, "task_id": task.id, "status": "submitted", "force_full_replay": force}
 
 
 @router.get("/simulation-jobs/{job_id}/runs")
