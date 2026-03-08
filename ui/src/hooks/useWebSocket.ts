@@ -158,18 +158,52 @@ export const useWebSocket = ({
                     return;
                 }
                 const data = await response.json();
+                const equityHistory = data.equity_history || [];
+                const trades = data.trades || [];
 
-                if (data.equity_history && data.equity_history.length > 0) {
-                    const lastEquity = data.equity_history[data.equity_history.length - 1];
-                    lastMessageTimeRef.current = lastEquity.timestamp;
+                const latestEquityTs = equityHistory.length > 0
+                    ? equityHistory[equityHistory.length - 1].timestamp
+                    : '';
+                const latestTradeTs = trades.length > 0
+                    ? trades[trades.length - 1].timestamp
+                    : '';
+                const latestTimestamp = [latestEquityTs, latestTradeTs]
+                    .filter(Boolean)
+                    .sort()
+                    .slice(-1)[0];
 
+                if (latestTimestamp) {
+                    lastMessageTimeRef.current = latestTimestamp;
+                }
+
+                onMessageRef.current?.({
+                    type: 'session_progress',
+                    session_id: sessionId,
+                    timestamp: new Date().toISOString(),
+                    data: {
+                        progress: data.progress || 0,
+                        status: data.status || 'unknown'
+                    }
+                });
+
+                if (equityHistory.length > 0) {
                     onMessageRef.current?.({
-                        type: 'session_progress',
+                        type: 'equity_batch',
                         session_id: sessionId,
-                        timestamp: new Date().toISOString(),
+                        timestamp: latestEquityTs || new Date().toISOString(),
                         data: {
-                            progress: data.progress || 0,
-                            status: data.status || 'unknown'
+                            updates: equityHistory,
+                        }
+                    });
+                }
+
+                if (trades.length > 0) {
+                    onMessageRef.current?.({
+                        type: 'trades_batch',
+                        session_id: sessionId,
+                        timestamp: latestTradeTs || new Date().toISOString(),
+                        data: {
+                            trades,
                         }
                     });
                 }

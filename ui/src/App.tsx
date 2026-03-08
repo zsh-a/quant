@@ -79,7 +79,6 @@ const App: React.FC = () => {
   const [benchmarksData, setBenchmarksData] = useState<Record<string, BenchmarkData[]>>({});
 
   const primarySession = sessions.find((session) => session.id === primarySessionId);
-  const selectedSessionSource = primarySession?.source || 'manual';
   const primarySessionRunId = primarySession?.run_id || null;
   const lastUpdatedRef = useRef<string | null>(null);
   const sessionDetailInFlightRef = useRef(false);
@@ -147,6 +146,12 @@ const App: React.FC = () => {
       const data = await resp.json();
       const equityList = data.equity_history || [];
       const tradeList = data.trades || [];
+
+      updateSession(id, {
+        status: data.status,
+        progress: data.progress,
+        end_date: data.end_date,
+      });
 
       if (!since) {
         setEquityHistory(equityList);
@@ -285,11 +290,29 @@ const App: React.FC = () => {
           lastUpdatedRef.current = equity.timestamp;
           break;
         }
+        case 'equity_batch': {
+          const updates = Array.isArray(message.data?.updates) ? message.data.updates : [];
+          if (updates.length > 0) {
+            setEquityHistory((prev) => mergeEquity(prev, updates));
+            lastUpdatedRef.current = updates[updates.length - 1].timestamp;
+          }
+          break;
+        }
         case 'trade_executed':
           setTrades((prev) => mergeTrades(prev, [message.data.trade]));
           break;
+        case 'trades_batch': {
+          const batchTrades = Array.isArray(message.data?.trades) ? message.data.trades : [];
+          if (batchTrades.length > 0) {
+            setTrades((prev) => mergeTrades(prev, batchTrades));
+          }
+          break;
+        }
         case 'session_completed':
           updateSession(message.session_id, { status: 'completed', progress: 100 });
+          if (message.session_id === primarySessionId) {
+            fetchSessionDetails(message.session_id);
+          }
           break;
         case 'error_occurred':
           setError(message.data.error);
@@ -336,18 +359,17 @@ const App: React.FC = () => {
     let detailInterval: number | null = null;
     if (
       activeTab === 'session' &&
-      primarySessionId &&
-      ((!isConnected && !usePolling) || selectedSessionSource === 'automation')
+      primarySessionId
     ) {
       detailInterval = window.setInterval(() => {
         fetchSessionDetails(primarySessionId);
-      }, selectedSessionSource === 'automation' ? 5000 : 7000);
+      }, primarySession?.status === 'running' ? 2500 : 8000);
     }
 
     return () => {
       if (detailInterval) clearInterval(detailInterval);
     };
-  }, [activeTab, primarySessionId, primarySessionRunId, isConnected, usePolling, selectedSessionSource]);
+  }, [activeTab, primarySessionId, primarySessionRunId, primarySession?.status]);
 
   useEffect(() => {
     selectedSessionIds.forEach((id) => {
