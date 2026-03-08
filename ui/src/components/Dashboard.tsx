@@ -239,7 +239,17 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Chart */}
-            <div className="glass card chart-container" style={{ marginTop: '2rem', height: '400px', padding: '2rem' }}>
+            <div
+                className="glass card chart-container"
+                style={{
+                    marginTop: '2rem',
+                    minHeight: '520px',
+                    padding: '2rem',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    gap: '1rem',
+                }}
+            >
                 <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
                     <div>
                         <h3 style={{ marginBottom: '0.35rem' }}>收益曲线 (%)</h3>
@@ -299,58 +309,60 @@ const Dashboard: React.FC<DashboardProps> = ({
                         ) : null}
                     </div>
                 </div>
-                <ResponsiveContainer width="100%" height="90%">
-                    <ComposedChart data={chartData}>
-                        <defs>
-                            <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.38} />
-                                <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
-                            </linearGradient>
-                        </defs>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
-                        <XAxis dataKey="timestamp" hide />
-                        <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
-                        <Tooltip
-                            contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                            itemStyle={{ color: 'var(--text)' }}
-                            formatter={(value: any, name: string) => [
-                                `${value.toFixed(2)}%`,
-                                name === 'equityReturn' ? '策略收益' : availableBenchmarks.find(b => b.code === name)?.name || name
-                            ]}
-                            labelFormatter={(label) => label.split(' ')[0]}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                        <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="#22d3ee" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
-                        
-                        {visibleComparisonData.map((c, idx) => {
-                             const color = SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length];
-                             return (
-                                 <Line
-                                     key={c.id}
-                                     type="monotone"
-                                     dataKey={`session_${c.id}`}
-                                     name={`${c.name} (${c.id.slice(0,4)})`}
-                                     stroke={color}
-                                     strokeWidth={2.25}
-                                     dot={false}
-                                     strokeDasharray="6 5"
-                                 />
-                             );
-                        })}
-
-                        {selectedBenchmarks.map(code => (
-                            <Line
-                                key={code}
-                                type="monotone"
-                                dataKey={code}
-                                name={availableBenchmarks.find(b => b.code === code)?.name}
-                                stroke={COLORS[code as keyof typeof COLORS] || 'var(--secondary)'}
-                                strokeWidth={2.25}
-                                dot={false}
+                <div style={{ flex: 1, minHeight: '360px' }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                        <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
+                            <defs>
+                                <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
+                                    <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.38} />
+                                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                                </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                            <XAxis dataKey="timestamp" hide />
+                            <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} width={56} />
+                            <Tooltip
+                                contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                                itemStyle={{ color: 'var(--text)' }}
+                                formatter={(value: any, name: string) => [
+                                    `${value.toFixed(2)}%`,
+                                    name === 'equityReturn' ? '策略收益' : availableBenchmarks.find(b => b.code === name)?.name || name
+                                ]}
+                                labelFormatter={(label) => label.split(' ')[0]}
                             />
-                        ))}
-                    </ComposedChart>
-                </ResponsiveContainer>
+                            <Legend wrapperStyle={{ paddingTop: '12px' }} verticalAlign="bottom" />
+                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="#22d3ee" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
+                            
+                            {visibleComparisonData.map((c, idx) => {
+                                 const color = SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length];
+                                 return (
+                                     <Line
+                                         key={c.id}
+                                         type="monotone"
+                                         dataKey={`session_${c.id}`}
+                                         name={`${c.name} (${c.id.slice(0,4)})`}
+                                         stroke={color}
+                                         strokeWidth={2.25}
+                                         dot={false}
+                                         strokeDasharray="6 5"
+                                     />
+                                 );
+                            })}
+
+                            {selectedBenchmarks.map(code => (
+                                <Line
+                                    key={code}
+                                    type="monotone"
+                                    dataKey={code}
+                                    name={availableBenchmarks.find(b => b.code === code)?.name}
+                                    stroke={COLORS[code as keyof typeof COLORS] || 'var(--secondary)'}
+                                    strokeWidth={2.25}
+                                    dot={false}
+                                />
+                            ))}
+                        </ComposedChart>
+                    </ResponsiveContainer>
+                </div>
             </div>
 
              {/* Holdings & Trades Table Sections */}

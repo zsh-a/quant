@@ -8,7 +8,7 @@
 }
 
 .chart-container {
-  overflow: hidden;
+  overflow: visible;
 }
 
 .recharts-tooltip-cursor {

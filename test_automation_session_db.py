@@ -1,8 +1,13 @@
 from session_db import SessionDB
+from datetime import datetime
+
 from src.automation.service import AutomationService
+from src.core.backtest_broker import BacktestBroker
+from src.core.base import Bar
 from src.core.base import Order
 from src.tasks.automation import (
-    _send_simulation_order_notification,
+    _collect_simulation_order_notification,
+    _send_batched_simulation_order_notifications,
     send_telegram_validation_notification_task,
 )
 
@@ -241,21 +246,7 @@ def test_trade_payload_keeps_snapshot_after_broker_buffer_clear():
     assert new_trades[0]['symbol'] == 'sh.000300'
 
 
-def test_send_simulation_order_notification_uses_job_chat_id(monkeypatch):
-    sent_messages = []
-
-    class DummyNotifier:
-        def __init__(self, config):
-            self.config = config
-
-        def is_enabled(self):
-            return True
-
-        def send_message(self, chat_id, text):
-            sent_messages.append({"chat_id": chat_id, "text": text})
-            return True
-
-    monkeypatch.setattr("src.tasks.automation.TelegramNotifier", DummyNotifier)
+def test_collect_simulation_order_notification_uses_job_chat_id(monkeypatch):
     monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.enabled", True)
     monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.default_chat_id", "fallback-chat")
 
@@ -269,7 +260,7 @@ def test_send_simulation_order_notification_uses_job_chat_id(monkeypatch):
         },
     )()
 
-    _send_simulation_order_notification(
+    notification = _collect_simulation_order_notification(
         job={
             "job_id": "job-1",
             "name": "daily-jsg",
@@ -283,14 +274,40 @@ def test_send_simulation_order_notification_uses_job_chat_id(monkeypatch):
         order=Order("sh.000300", "buy", 100),
     )
 
-    assert len(sent_messages) == 1
-    assert sent_messages[0]["chat_id"] == "job-chat"
-    assert "daily-jsg" in sent_messages[0]["text"]
-    assert "买入" in sent_messages[0]["text"]
-    assert "NEXT_OPEN" in sent_messages[0]["text"]
+    assert notification["chat_id"] == "job-chat"
+    assert notification["job_name"] == "daily-jsg"
+    assert notification["strategy_name"] == "jsg"
+    assert "买入" in notification["order_summary"]
+    assert "NEXT_OPEN" in notification["order_summary"]
 
 
-def test_send_simulation_order_notification_skips_disabled_jobs(monkeypatch):
+def test_collect_simulation_order_notification_skips_disabled_jobs(monkeypatch):
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.enabled", True)
+
+    broker = type(
+        "BrokerStub",
+        (),
+        {"current_bars": {}, "last_prices": {}, "stock_names": {}},
+    )()
+
+    notification = _collect_simulation_order_notification(
+        job={
+            "job_id": "job-1",
+            "name": "daily-jsg",
+            "strategy_name": "jsg",
+            "symbol": "sh.000300",
+            "notification": {"telegram": {"enabled": False}},
+        },
+        session_id="session-1",
+        run_id="run-1",
+        broker=broker,
+        order=Order("sh.000300", "buy", 100),
+    )
+
+    assert notification is None
+
+
+def test_send_batched_simulation_order_notifications_merges_messages(monkeypatch):
     sent_messages = []
 
     class DummyNotifier:
@@ -306,28 +323,60 @@ def test_send_simulation_order_notification_skips_disabled_jobs(monkeypatch):
 
     monkeypatch.setattr("src.tasks.automation.TelegramNotifier", DummyNotifier)
     monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.enabled", True)
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.bot_token", "token")
 
-    broker = type(
-        "BrokerStub",
-        (),
-        {"current_bars": {}, "last_prices": {}, "stock_names": {}},
-    )()
-
-    _send_simulation_order_notification(
-        job={
-            "job_id": "job-1",
-            "name": "daily-jsg",
-            "strategy_name": "jsg",
-            "symbol": "sh.000300",
-            "notification": {"telegram": {"enabled": False}},
-        },
-        session_id="session-1",
-        run_id="run-1",
-        broker=broker,
-        order=Order("sh.000300", "buy", 100),
+    _send_batched_simulation_order_notifications(
+        [
+            {
+                "chat_id": "job-chat",
+                "job_name": "daily-jsg",
+                "strategy_name": "jsg",
+                "session_id": "session-1",
+                "run_id": "run-1",
+                "bar_timestamp": "2024-01-05T09:30:00",
+                "order_summary": "买入 `100` | `AAA` | 订单价 `市价` | 执行 `NEXT_OPEN` | 参考 `3.1800`",
+            },
+            {
+                "chat_id": "job-chat",
+                "job_name": "daily-jsg",
+                "strategy_name": "jsg",
+                "session_id": "session-1",
+                "run_id": "run-1",
+                "bar_timestamp": "2024-01-05T09:30:00",
+                "order_summary": "卖出 `50` | `BBB` | 订单价 `市价` | 执行 `IMMEDIATE_CLOSE` | 参考 `2.4500`",
+            },
+        ]
     )
 
-    assert sent_messages == []
+    assert len(sent_messages) == 1
+    assert sent_messages[0]["chat_id"] == "job-chat"
+    assert "模拟运行订单通知" in sent_messages[0]["text"]
+    assert "*Bar 时间*: `2024-01-05T09:30:00`" in sent_messages[0]["text"]
+    assert "*订单数*: `2`" in sent_messages[0]["text"]
+    assert "1. 买入 `100`" in sent_messages[0]["text"]
+    assert "2. 卖出 `50`" in sent_messages[0]["text"]
+
+
+def test_backtest_broker_submit_order_uses_simulation_bar_timestamp():
+    broker = BacktestBroker()
+    simulation_ts = datetime(2024, 1, 5, 9, 30, 0)
+    broker.current_bars = {
+        "sh.000300": Bar(
+            symbol="sh.000300",
+            timestamp=simulation_ts,
+            open=1.0,
+            high=1.0,
+            low=1.0,
+            close=1.0,
+            volume=1000,
+            amount=1000,
+        )
+    }
+
+    order = Order("sh.000300", "buy", 100)
+    broker.submit_order(order)
+
+    assert order.created_at == simulation_ts
 
 
 def test_send_telegram_validation_notification_uses_default_chat_id(monkeypatch):

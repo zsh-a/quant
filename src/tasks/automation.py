@@ -35,22 +35,21 @@ data_stream_config = get_data_stream_config()
 notifications_config = get_notifications_config()
 
 
-def _send_simulation_order_notification(
+def _collect_simulation_order_notification(
     *,
     job: Dict[str, object],
     session_id: str,
     run_id: str,
     broker: BacktestBroker,
     order,
-) -> None:
+) -> Optional[Dict[str, str]]:
     if not is_trade_notification_enabled(job.get("notification"), notifications_config.telegram):
-        return
+        return None
 
     chat_id = get_notification_chat_id(job.get("notification"), notifications_config.telegram)
-    notifier = TelegramNotifier(notifications_config.telegram)
-    if not notifier.is_enabled():
-        logger.warning("Telegram order notifications enabled on job but global Telegram config is incomplete")
-        return
+    if not chat_id:
+        logger.warning("Telegram order notifications enabled on job but chat_id is missing")
+        return None
 
     reference_price = None
     if order.symbol in broker.current_bars:
@@ -58,7 +57,7 @@ def _send_simulation_order_notification(
     elif order.symbol in broker.last_prices:
         reference_price = broker.last_prices[order.symbol]
 
-    message = build_simulation_order_message(
+    order_message = build_simulation_order_message(
         job_name=str(job.get("name") or job.get("job_id") or "simulation-job"),
         strategy_name=str(job.get("strategy_name") or ""),
         session_id=session_id,
@@ -67,7 +66,80 @@ def _send_simulation_order_notification(
         reference_price=reference_price,
         stock_name=broker.stock_names.get(order.symbol, "Unknown"),
     )
-    notifier.send_message(chat_id=chat_id, text=message)
+    price_text = f"{float(order.price):.4f}" if order.price is not None else "市价"
+    reference_price_text = f"{float(reference_price):.4f}" if reference_price is not None and reference_price > 0 else "N/A"
+    stock_display = f"{order.symbol} {broker.stock_names.get(order.symbol, 'Unknown')}".strip()
+    action = "买入" if order.type == "buy" else "卖出"
+    return {
+        "chat_id": chat_id,
+        "job_name": str(job.get("name") or job.get("job_id") or "simulation-job"),
+        "strategy_name": str(job.get("strategy_name") or ""),
+        "session_id": session_id,
+        "run_id": run_id,
+        "bar_timestamp": order.created_at.isoformat(),
+        "order_message": order_message,
+        "order_summary": " | ".join(
+            [
+                f"{action} `{float(order.quantity):g}`",
+                f"`{stock_display}`",
+                f"订单价 `{price_text}`",
+                f"执行 `{order.execution_type}`",
+                f"参考 `{reference_price_text}`",
+            ]
+        ),
+    }
+
+
+def _send_batched_simulation_order_notifications(order_notifications: list[Dict[str, str]]) -> None:
+    if not order_notifications:
+        return
+
+    notifier = TelegramNotifier(notifications_config.telegram)
+    if not notifier.is_enabled():
+        logger.warning("Telegram order notifications enabled on job but global Telegram config is incomplete")
+        return
+
+    notifications_by_chat: Dict[str, list[Dict[str, str]]] = {}
+    for item in order_notifications:
+        chat_id = str(item.get("chat_id") or "")
+        if not chat_id:
+            continue
+        notifications_by_chat.setdefault(chat_id, []).append(item)
+
+    max_message_length = 3500
+    for chat_id, messages in notifications_by_chat.items():
+        chunks: list[str] = []
+        current_chunk = ""
+        first = messages[0]
+        header = "\n".join(
+            [
+                "*模拟运行订单通知*",
+                f"*任务*: `{first.get('job_name', '')}`",
+                f"*策略*: `{first.get('strategy_name', '')}`",
+                f"*Bar 时间*: `{first.get('bar_timestamp', '')}`",
+                f"*Session*: `{first.get('session_id', '')}`",
+                f"*Run*: `{first.get('run_id', '')}`",
+                "",
+            ]
+        )
+        for index, message in enumerate(messages, start=1):
+            entry = f"{index}. {message.get('order_summary', '')}"
+            next_chunk = f"{current_chunk}\n\n{entry}" if current_chunk else entry
+            if current_chunk and len(next_chunk) > max_message_length:
+                chunks.append(current_chunk)
+                current_chunk = entry
+            else:
+                current_chunk = next_chunk
+        if current_chunk:
+            chunks.append(current_chunk)
+
+        for chunk_index, chunk in enumerate(chunks, start=1):
+            title = (
+                f"{header}*订单数*: `{len(messages)}` | *分片*: `{chunk_index}/{len(chunks)}`\n\n"
+                if len(chunks) > 1
+                else f"{header}*订单数*: `{len(messages)}`\n\n"
+            )
+            notifier.send_message(chat_id=chat_id, text=f"{title}{chunk}")
 
 
 @app.task(name="src.tasks.automation.send_telegram_validation_notification")
@@ -243,6 +315,7 @@ def run_simulation_job_task(
     db_client = DB()
     stream = None
     step_index = 0
+    pending_order_notifications: list[Dict[str, str]] = []
 
     try:
         stream = DBDataStream(
@@ -261,13 +334,17 @@ def run_simulation_job_task(
             initial_cash=initial_cash,
             commission=broker_config.backtest.commission,
             slippage=getattr(broker_config.backtest, "slippage", 0.001),
-            on_order_submitted=lambda order: _send_simulation_order_notification(
-                job=job,
-                session_id=session_id,
-                run_id=run_id,
-                broker=broker,
-                order=order,
-            ),
+            on_order_submitted=lambda order: pending_order_notifications.append(item)
+            if (
+                item := _collect_simulation_order_notification(
+                    job=job,
+                    session_id=session_id,
+                    run_id=run_id,
+                    broker=broker,
+                    order=order,
+                )
+            )
+            else None,
         )
         broker.restore_from_snapshot(snapshot)
 
@@ -325,6 +402,9 @@ def run_simulation_job_task(
             if new_trades:
                 session_db.add_trades(session_id, new_trades)
                 broker.trades.clear()
+            if pending_order_notifications:
+                _send_batched_simulation_order_notifications(pending_order_notifications)
+                pending_order_notifications.clear()
 
             payload = {
                 "bar_timestamp": str(current_ts) if current_ts else None,
@@ -369,6 +449,9 @@ def run_simulation_job_task(
         if broker.trades:
             session_db.add_trades(session_id, broker.trades)
             broker.trades.clear()
+        if pending_order_notifications:
+            _send_batched_simulation_order_notifications(pending_order_notifications)
+            pending_order_notifications.clear()
 
         equity_history = session_db.get_equity_history(session_id)
         trades = session_db.get_trades(session_id)

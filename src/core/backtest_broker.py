@@ -68,6 +68,8 @@ class BacktestBroker(Broker):
                     return "REJECTED_BY_RISK"
 
         order.id = str(uuid.uuid4())
+        if self.current_bars:
+            order.created_at = next(iter(self.current_bars.values())).timestamp
         order.status = "SUBMITTED"
         self.orders[order.id] = order
         if self.on_order_submitted:
