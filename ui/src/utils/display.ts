@@ -5,6 +5,7 @@ const STATUS_LABELS: Record<string, string> = {
   pending: "等待中",
   success: "成功",
   failure: "失败",
+  partial_success: "部分成功",
 }
 
 const MODE_LABELS: Record<string, string> = {
@@ -16,6 +17,7 @@ const MODE_LABELS: Record<string, string> = {
 const SOURCE_LABELS: Record<string, string> = {
   manual: "手动",
   automation: "自动",
+  schedule: "定时",
 }
 
 export function formatStatusLabel(value?: string | null) {

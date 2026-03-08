@@ -8,7 +8,11 @@ from typing import Dict, Optional
 
 from loguru import logger
 
-from data_update import get_reference_latest_date, run_data_update_pipeline
+from data_update import (
+    DEFAULT_SHARE_START_DATE,
+    get_reference_latest_date,
+    run_data_update_pipeline,
+)
 from db import DB
 from session_db import SessionDB
 from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
@@ -180,13 +184,35 @@ def send_telegram_validation_notification_task(
 
 
 @app.task(name="src.tasks.automation.run_data_update_pipeline")
-def run_data_update_pipeline_task(trigger_source: str = "manual", selected_steps=None):
+def run_data_update_pipeline_task(
+    trigger_source: str = "manual",
+    selected_steps=None,
+    share_start_date: Optional[str] = None,
+    update_run_id: Optional[str] = None,
+):
     session_db = SessionDB()
-    update_run = session_db.create_data_update_run(trigger_source=trigger_source)
-    update_run_id = update_run["update_run_id"]
+    if update_run_id:
+        update_run = session_db.update_data_update_run(
+            update_run_id,
+            trigger_source=trigger_source,
+            status="running",
+            started_at=datetime.now().isoformat(),
+            error=None,
+            details={},
+            completed_at=None,
+        )
+        if not update_run:
+            update_run = session_db.create_data_update_run(trigger_source=trigger_source)
+            update_run_id = update_run["update_run_id"]
+    else:
+        update_run = session_db.create_data_update_run(trigger_source=trigger_source)
+        update_run_id = update_run["update_run_id"]
 
     try:
-        result = run_data_update_pipeline(selected_steps=selected_steps)
+        result = run_data_update_pipeline(
+            selected_steps=selected_steps,
+            share_start_date=share_start_date or DEFAULT_SHARE_START_DATE,
+        )
         triggered_jobs = []
 
         if result.get("has_new_data"):

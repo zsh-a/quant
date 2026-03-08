@@ -1,7 +1,17 @@
 import { Badge } from "../ui/badge"
 import { formatModeLabel, formatStatusLabel } from "../../utils/display"
 
-type StatusKind = "live" | "backtest" | "simulation" | "running" | "completed" | "failed" | "default"
+type StatusKind =
+  | "live"
+  | "backtest"
+  | "simulation"
+  | "running"
+  | "completed"
+  | "failed"
+  | "pending"
+  | "success"
+  | "partial_success"
+  | "default"
 
 const variantMap: Record<StatusKind, "default" | "success" | "warning" | "danger" | "info"> = {
   live: "success",
@@ -10,6 +20,9 @@ const variantMap: Record<StatusKind, "default" | "success" | "warning" | "danger
   running: "warning",
   completed: "success",
   failed: "danger",
+  pending: "warning",
+  success: "success",
+  partial_success: "info",
   default: "default",
 }
 

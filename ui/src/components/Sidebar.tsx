@@ -4,6 +4,7 @@ import {
     BarChart3,
     BriefcaseBusiness,
     Compass,
+    Database,
     FlaskConical,
     LayoutDashboard,
     Sparkles,
@@ -28,6 +29,7 @@ const NAV_ITEMS = [
     { key: 'comparison', label: '策略对比', icon: BarChart3 },
     { key: 'heatmap', label: '行业热力图', icon: Activity },
     { key: 'portfolio', label: '组合管理', icon: BriefcaseBusiness },
+    { key: 'marketAdmin', label: '行情数据库', icon: Database },
     { key: 'optimizer', label: '参数优化', icon: Sparkles },
 ] as const;
 

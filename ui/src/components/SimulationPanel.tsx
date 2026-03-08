@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import type { DataUpdateRun, SimulationJob, SimulationRun, SimulationStep, StrategyMeta } from '../types';
+import type { SimulationJob, SimulationRun, SimulationStep, StrategyMeta } from '../types';
 import StrategyConfigForm from './StrategyConfigForm';
 import { API_BASE } from '../utils/api';
 import { formatPrice } from '../utils/format';
-import { formatSourceLabel, formatStatusLabel } from '../utils/display';
+import { formatStatusLabel } from '../utils/display';
 
 interface SimulationPanelProps {
   strategies: StrategyMeta[];
   onSelectSession: (sessionId: string) => void;
+  onOpenMarketAdmin: () => void;
 }
 
 const cardStyle: React.CSSProperties = {
@@ -17,9 +18,8 @@ const cardStyle: React.CSSProperties = {
   padding: '1rem',
 };
 
-export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, onSelectSession }) => {
+export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, onSelectSession, onOpenMarketAdmin }) => {
   const [jobs, setJobs] = useState<SimulationJob[]>([]);
-  const [dataUpdates, setDataUpdates] = useState<DataUpdateRun[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [runs, setRuns] = useState<SimulationRun[]>([]);
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
@@ -41,7 +41,6 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
   const [message, setMessage] = useState<string | null>(null);
   const pollInFlightRef = useRef(false);
   const jobsAbortRef = useRef<AbortController | null>(null);
-  const updatesAbortRef = useRef<AbortController | null>(null);
   const runsAbortRef = useRef<AbortController | null>(null);
   const stepsAbortRef = useRef<AbortController | null>(null);
 
@@ -144,15 +143,6 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     });
   };
 
-  const fetchDataUpdates = async () => {
-    updatesAbortRef.current?.abort();
-    const controller = new AbortController();
-    updatesAbortRef.current = controller;
-    const resp = await fetch(`${API_BASE}/data-update/history?limit=10`, { signal: controller.signal });
-    const data = await resp.json();
-    setDataUpdates(data);
-  };
-
   const fetchRuns = async (jobId: string) => {
     runsAbortRef.current?.abort();
     const controller = new AbortController();
@@ -198,7 +188,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
       }
       pollInFlightRef.current = true;
       try {
-        await Promise.all([fetchJobs(), fetchDataUpdates()]);
+        await Promise.all([fetchJobs()]);
         if (selectedJobId) {
           await fetchRuns(selectedJobId);
         }
@@ -216,7 +206,6 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
       active = false;
       window.clearInterval(interval);
       jobsAbortRef.current?.abort();
-      updatesAbortRef.current?.abort();
       runsAbortRef.current?.abort();
       stepsAbortRef.current?.abort();
     };
@@ -361,8 +350,8 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
       if (!resp.ok) {
         throw new Error(await resp.text());
       }
-      await fetchDataUpdates();
       await fetchJobs();
+      setMessage('数据更新任务已提交，可在行情数据库面板查看详细进度');
     } catch (err) {
       setError(err instanceof Error ? err.message : '更新数据并触发模拟失败');
     } finally {
@@ -492,29 +481,21 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
         </section>
       </div>
 
-      <section style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>数据更新与批次</h3>
-        <div style={{ display: 'grid', gap: '0.75rem' }}>
-          {dataUpdates.map((item) => (
-            <div key={item.update_run_id} style={{ padding: '0.8rem', borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong>{formatStatusLabel(item.status)}</strong>
-                <span className="tagline">{formatSourceLabel(item.trigger_source)}</span>
+        <section style={cardStyle}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
+            <div>
+              <h3 style={{ margin: 0 }}>数据更新与批次</h3>
+              <div className="tagline" style={{ marginTop: '0.35rem' }}>
+                详细的数据库覆盖、批次历史和步骤明细已迁移到独立的行情数据库面板。
               </div>
-              <div className="tagline" style={{ marginTop: '0.4rem' }}>
-                新数据：{item.has_new_data ? '是' : '否'} · {item.completed_at || item.started_at || item.created_at}
-              </div>
-              {item.details?.triggered_jobs?.length ? (
-                <div className="tagline" style={{ marginTop: '0.4rem' }}>
-                  触发任务：{item.details.triggered_jobs.map((job: { name: string }) => job.name).join('，')}
-                </div>
-              ) : null}
             </div>
-          ))}
-        </div>
+            <button className="btn-ghost" onClick={onOpenMarketAdmin}>
+              打开行情数据库面板
+            </button>
+          </div>
 
-        <h3 style={{ marginBottom: '0.75rem', marginTop: '1.2rem' }}>运行批次</h3>
-        <div style={{ display: 'grid', gap: '0.75rem' }}>
+          <h3 style={{ marginBottom: '0.75rem', marginTop: '1.2rem' }}>运行批次</h3>
+          <div style={{ display: 'grid', gap: '0.75rem' }}>
           {runs.map((run) => (
             <div
               key={run.run_id}

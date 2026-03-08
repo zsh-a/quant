@@ -155,15 +155,26 @@ async def list_simulation_run_steps(
 
 class DataUpdateRequest(BaseModel):
     selected_steps: Optional[list[str]] = None
+    share_start_date: Optional[str] = None
 
 
 @router.post("/data-update/run")
 async def trigger_data_update(req: DataUpdateRequest):
+    update_run = await anyio.to_thread.run_sync(session_db.create_data_update_run, "manual")
     task = run_data_update_pipeline_task.apply_async(
-        kwargs={"trigger_source": "manual", "selected_steps": req.selected_steps},
+        kwargs={
+            "trigger_source": "manual",
+            "selected_steps": req.selected_steps,
+            "share_start_date": req.share_start_date,
+            "update_run_id": update_run["update_run_id"],
+        },
         queue="automation",
     )
-    return {"status": "submitted", "task_id": task.id}
+    return {
+        "status": "submitted",
+        "task_id": task.id,
+        "update_run_id": update_run["update_run_id"],
+    }
 
 
 @router.get("/data-update/history")

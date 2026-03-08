@@ -15,6 +15,7 @@ interface LabPanelProps {
   onViewSession: (id: string) => void;
   onStopSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
+  onOpenMarketAdmin: () => void;
   error: string | null;
 }
 
@@ -27,6 +28,7 @@ const LabPanel: React.FC<LabPanelProps> = ({
   onViewSession,
   onStopSession,
   onDeleteSession,
+  onOpenMarketAdmin,
   error,
 }) => {
   const [labSubtab, setLabSubtab] = useState<'manual' | 'simulation'>(() => {
@@ -80,7 +82,11 @@ const LabPanel: React.FC<LabPanelProps> = ({
 
         <TabsContent value="simulation">
           <div className="space-y-6">
-            <SimulationPanel strategies={strategies} onSelectSession={onViewSession} />
+            <SimulationPanel
+              strategies={strategies}
+              onSelectSession={onViewSession}
+              onOpenMarketAdmin={onOpenMarketAdmin}
+            />
             <SessionList
               title="模拟任务列表"
               defaultFilter="simulation"

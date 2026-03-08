@@ -101,6 +101,21 @@ def test_data_update_run_history(tmp_path):
     assert len(history) == 1
     assert history[0]['has_new_data'] is True
     assert history[0]['details']['steps'][0]['step'] == 'kline_daily'
+    assert db.get_latest_data_update_run()['update_run_id'] == created['update_run_id']
+    assert db.get_running_data_update_run() is None
+
+
+def test_get_running_data_update_run(tmp_path):
+    db = SessionDB(str(tmp_path / 'updates-running.sqlite'))
+    first = db.create_data_update_run(trigger_source='manual')
+    second = db.create_data_update_run(trigger_source='schedule')
+    db.update_data_update_run(first['update_run_id'], status='success')
+
+    running = db.get_running_data_update_run()
+
+    assert running is not None
+    assert running['update_run_id'] == second['update_run_id']
+    assert running['status'] == 'running'
 
 
 def test_get_run_window_skips_when_no_new_data(tmp_path):

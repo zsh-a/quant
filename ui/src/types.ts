@@ -137,3 +137,42 @@ export interface DataUpdateRun {
     completed_at?: string;
     created_at: string;
 }
+
+export interface MarketTableSummary {
+    table: string;
+    status: string;
+    row_count?: number | null;
+    distinct_count?: number | null;
+    distinct_label?: string | null;
+    earliest_date?: string | null;
+    latest_date?: string | null;
+    error?: string | null;
+}
+
+export interface MarketUpdateStepDefinition {
+    key: string;
+    label: string;
+    description: string;
+    default_selected: boolean;
+}
+
+export interface MarketUpdateCapabilities {
+    steps: MarketUpdateStepDefinition[];
+    default_selected_steps: string[];
+    share_start_date_default: string;
+    reference_symbol: string;
+}
+
+export interface MarketDbOverview {
+    reference_symbol: string;
+    latest_market_date?: string | null;
+    data_lag_days?: number | null;
+    stock_coverage: {
+        tracked_stock_codes: number;
+        tracked_etf_codes: number;
+    };
+    tables: Record<string, MarketTableSummary>;
+    last_update_run?: DataUpdateRun | null;
+    running_update?: DataUpdateRun | null;
+    generated_at: string;
+}

@@ -24,6 +24,7 @@ import { OptimizerPanel } from './components/OptimizerPanel';
 import { IndustryHeatmap } from './components/IndustryHeatmap';
 import GlobalOverview from './components/GlobalOverview';
 import LabPanel from './components/LabPanel';
+import MarketAdminPanel from './components/MarketAdminPanel';
 import SessionDetail from './components/SessionDetail';
 import { API_BASE } from './utils/api';
 import { AppShell } from './components/layout/AppShell';
@@ -58,11 +59,12 @@ const TITLES: Record<string, string> = {
   comparison: '策略对比',
   heatmap: '行业热力图',
   portfolio: '组合管理',
+  marketAdmin: '行情数据库',
   optimizer: '参数优化',
 };
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'overview' | 'lab' | 'session' | 'comparison' | 'heatmap' | 'portfolio' | 'optimizer'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'lab' | 'session' | 'comparison' | 'heatmap' | 'portfolio' | 'marketAdmin' | 'optimizer'>('overview');
   const [strategies, setStrategies] = useState<StrategyMeta[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -434,7 +436,7 @@ const App: React.FC = () => {
       sidebar={
         <Sidebar
           activeTab={activeTab}
-          onTabChange={(tab) => setActiveTab(tab as 'overview' | 'lab' | 'session' | 'comparison' | 'heatmap' | 'portfolio' | 'optimizer')}
+          onTabChange={(tab) => setActiveTab(tab as 'overview' | 'lab' | 'session' | 'comparison' | 'heatmap' | 'portfolio' | 'marketAdmin' | 'optimizer')}
           activeSessions={activeSessions}
           onSessionSelect={handleOpenSession}
           hasSelectedSession={!!primarySessionId}
@@ -450,6 +452,8 @@ const App: React.FC = () => {
                 ? '统一查看策略运行、最近会话与系统状态。'
                 : activeTab === 'lab'
                   ? '发起新任务、管理模拟流程，并整理实验结果。'
+                  : activeTab === 'marketAdmin'
+                    ? '查看行情数据库覆盖、批次历史和手动更新控制台。'
                   : activeTab === 'session'
                     ? '在同一工作区查看执行过程、风险分析、归因结果与日志。'
                     : '围绕同一套控制台视觉语言呈现分析与工具能力。'
@@ -492,8 +496,11 @@ const App: React.FC = () => {
           onStopSession={stopSession}
           onDeleteSession={deleteSession}
           error={error}
+          onOpenMarketAdmin={() => setActiveTab('marketAdmin')}
         />
       )}
+
+      {activeTab === 'marketAdmin' && <MarketAdminPanel />}
 
       {activeTab === 'session' && (
         <SessionDetail

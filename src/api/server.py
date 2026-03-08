@@ -68,6 +68,7 @@ from src.api.analysis_router import router as analysis_router
 from src.api.logs_router import router as logs_router
 from src.api.market_router import router as market_router
 from src.api.automation_router import router as automation_router
+from src.api.market_admin_router import router as market_admin_router
 from src.tasks.backtest import run_backtest_task
 
 setup_logging()
@@ -99,6 +100,7 @@ app.include_router(analysis_router)
 app.include_router(logs_router)
 app.include_router(market_router)
 app.include_router(automation_router)
+app.include_router(market_admin_router)
 
 logger.info(f"API Server starting with config: port={api_config.port}")
 

@@ -96,16 +96,75 @@ def update_etf_kline() -> Dict:
     return {"updated": updated, "errors": errors[:20]}
 
 
+UPDATE_STEP_DEFINITIONS = [
+    {
+        "key": "financial",
+        "label": "财务数据",
+        "description": "更新财报与衍生财务指标",
+        "default_selected": True,
+        "builder": update_financial,
+    },
+    {
+        "key": "kline_daily",
+        "label": "日线行情",
+        "description": "更新股票日线行情与复权数据",
+        "default_selected": True,
+        "builder": update_kline_daily,
+    },
+    {
+        "key": "share_info",
+        "label": "股本信息",
+        "description": "更新总股本与流通股本数据",
+        "default_selected": True,
+        "builder": update_share_info,
+    },
+    {
+        "key": "industry_weekly",
+        "label": "行业映射",
+        "description": "更新申万行业映射",
+        "default_selected": False,
+        "builder": update_industry_weekly,
+    },
+    {
+        "key": "index_stocks_weekly",
+        "label": "指数成分",
+        "description": "更新主要指数成分股列表",
+        "default_selected": False,
+        "builder": update_index_stocks_weekly,
+    },
+    {
+        "key": "etf_kline",
+        "label": "ETF 行情",
+        "description": "更新 ETF 日线与元数据",
+        "default_selected": False,
+        "builder": update_etf_kline,
+    },
+]
+
 UPDATE_STEP_BUILDERS: Dict[str, Callable[..., Dict]] = {
-    "financial": update_financial,
-    "kline_daily": update_kline_daily,
-    "share_info": update_share_info,
-    "industry_weekly": update_industry_weekly,
-    "index_stocks_weekly": update_index_stocks_weekly,
-    "etf_kline": update_etf_kline,
+    item["key"]: item["builder"] for item in UPDATE_STEP_DEFINITIONS
 }
 
-DEFAULT_UPDATE_STEPS = ["financial", "kline_daily", "share_info"]
+DEFAULT_UPDATE_STEPS = [
+    item["key"] for item in UPDATE_STEP_DEFINITIONS if item["default_selected"]
+]
+
+
+def get_update_step_capabilities() -> Dict[str, List[Dict[str, object]]]:
+    return {
+        "steps": [
+            {
+                "key": item["key"],
+                "label": item["label"],
+                "description": item["description"],
+                "default_selected": item["default_selected"],
+            }
+            for item in UPDATE_STEP_DEFINITIONS
+        ],
+        "default_selected_steps": DEFAULT_UPDATE_STEPS,
+        "share_start_date_default": DEFAULT_SHARE_START_DATE,
+        "reference_symbol": REFERENCE_SYMBOL,
+    }
 
 
 

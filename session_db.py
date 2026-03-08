@@ -796,3 +796,35 @@ class SessionDB:
                 item["details"] = self._json_loads(item.get("details"), {})
                 result.append(item)
             return result
+
+    def get_latest_data_update_run(self):
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                "SELECT * FROM data_update_runs ORDER BY created_at DESC LIMIT 1"
+            ).fetchone()
+            if not row:
+                return None
+            item = dict(row)
+            item["has_new_data"] = bool(item.get("has_new_data", 0))
+            item["details"] = self._json_loads(item.get("details"), {})
+            return item
+
+    def get_running_data_update_run(self):
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute(
+                """
+                SELECT *
+                FROM data_update_runs
+                WHERE status = 'running'
+                ORDER BY created_at DESC
+                LIMIT 1
+                """
+            ).fetchone()
+            if not row:
+                return None
+            item = dict(row)
+            item["has_new_data"] = bool(item.get("has_new_data", 0))
+            item["details"] = self._json_loads(item.get("details"), {})
+            return item
