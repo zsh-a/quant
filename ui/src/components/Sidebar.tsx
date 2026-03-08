@@ -6,23 +6,25 @@ interface SidebarProps {
     onTabChange: (tab: string) => void;
     activeSessions: SessionSummary[];
     onSessionSelect: (id: string) => void;
+    hasSelectedSession: boolean;
 }
 
-const NavItem: React.FC<{ icon: string, label: string, active: boolean, onClick: () => void }> = ({ icon, label, active, onClick }) => (
+const NavItem: React.FC<{ icon: string, label: string, active: boolean, onClick: () => void, disabled?: boolean }> = ({ icon, label, active, onClick, disabled }) => (
     <div
         className={`nav-item ${active ? 'active' : ''}`}
-        onClick={onClick}
+        onClick={disabled ? undefined : onClick}
         style={{
             padding: '0.75rem 1rem',
             borderRadius: '12px',
-            cursor: 'pointer',
+            cursor: disabled ? 'not-allowed' : 'pointer',
             display: 'flex',
             alignItems: 'center',
             gap: '0.75rem',
             backgroundColor: active ? 'rgba(99, 102, 241, 0.1)' : 'transparent',
-            color: active ? 'var(--primary)' : 'var(--text-dim)',
+            color: active ? 'var(--primary)' : disabled ? 'rgba(255,255,255,0.35)' : 'var(--text-dim)',
             fontWeight: active ? 700 : 500,
-            transition: 'all 0.2s'
+            transition: 'all 0.2s',
+            opacity: disabled ? 0.7 : 1,
         }}
     >
         <span>{icon}</span>
@@ -30,23 +32,20 @@ const NavItem: React.FC<{ icon: string, label: string, active: boolean, onClick:
     </div>
 );
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect, hasSelectedSession }) => {
     return (
         <nav className="glass sidebar">
             <div className="logo" style={{ fontSize: '1.5rem', fontWeight: 900, marginBottom: '2rem' }}>
                 QUENT<span style={{ color: 'var(--primary)' }}>AI</span>
             </div>
             <div className="nav-items">
-                <NavItem icon="📊" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => onTabChange('dashboard')} />
+                <NavItem icon="🏠" label="Overview" active={activeTab === 'overview'} onClick={() => onTabChange('overview')} />
+                <NavItem icon="🧪" label="Lab" active={activeTab === 'lab'} onClick={() => onTabChange('lab')} />
+                <NavItem icon="🗂️" label="Session Detail" active={activeTab === 'session'} onClick={() => onTabChange('session')} disabled={!hasSelectedSession} />
+                <NavItem icon="⚖️" label="Comparison" active={activeTab === 'comparison'} onClick={() => onTabChange('comparison')} />
                 <NavItem icon="🔥" label="Sector Heatmap" active={activeTab === 'heatmap'} onClick={() => onTabChange('heatmap')} />
-                <NavItem icon="🧪" label="Lab & Sessions" active={activeTab === 'lab'} onClick={() => onTabChange('lab')} />
-                <NavItem icon="🤖" label="Automation" active={activeTab === 'automation'} onClick={() => onTabChange('automation')} />
-                <NavItem icon="⚖️" label="Analysis" active={activeTab === 'analysis'} onClick={() => onTabChange('analysis')} />
-                <NavItem icon="🛡️" label="Risk Monitor" active={activeTab === 'risk'} onClick={() => onTabChange('risk')} />
                 <NavItem icon="📁" label="Portfolio" active={activeTab === 'portfolio'} onClick={() => onTabChange('portfolio')} />
                 <NavItem icon="🎯" label="Optimizer" active={activeTab === 'optimizer'} onClick={() => onTabChange('optimizer')} />
-                <NavItem icon="📈" label="Attribution" active={activeTab === 'attribution'} onClick={() => onTabChange('attribution')} />
-                <NavItem icon="📋" label="Logs" active={activeTab === 'logs'} onClick={() => onTabChange('logs')} />
             </div>
 
             <div style={{ marginTop: 'auto' }}>

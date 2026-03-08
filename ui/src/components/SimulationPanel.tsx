@@ -1,11 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { DataUpdateRun, SimulationJob, SimulationRun, SimulationStep, StrategyMeta } from '../types';
+import StrategyConfigForm from './StrategyConfigForm';
+import { API_BASE } from '../utils/api';
 
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:8000'
-  : `http://${window.location.hostname}:8000`;
-
-interface AutomationPanelProps {
+interface SimulationPanelProps {
   strategies: StrategyMeta[];
   onSelectSession: (sessionId: string) => void;
 }
@@ -17,7 +15,7 @@ const cardStyle: React.CSSProperties = {
   padding: '1rem',
 };
 
-export const AutomationPanel: React.FC<AutomationPanelProps> = ({ strategies, onSelectSession }) => {
+export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, onSelectSession }) => {
   const [jobs, setJobs] = useState<SimulationJob[]>([]);
   const [dataUpdates, setDataUpdates] = useState<DataUpdateRun[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
@@ -26,11 +24,11 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ strategies, on
   const [steps, setSteps] = useState<SimulationStep[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [dataUpdating, setDataUpdating] = useState(false);
-  const [name, setName] = useState('自动模拟任务');
+  const [name, setName] = useState('模拟任务');
   const [strategy, setStrategy] = useState('');
   const [symbol, setSymbol] = useState('sh.000300');
   const [startDate, setStartDate] = useState('2024-01-01');
-  const [paramsText, setParamsText] = useState('{}');
+  const [paramValues, setParamValues] = useState<Record<string, any>>({});
   const [error, setError] = useState<string | null>(null);
 
   const currentJob = useMemo(
@@ -46,13 +44,45 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ strategies, on
 
   useEffect(() => {
     const strat = strategies.find((item) => item.name === strategy);
-    if (!strat) return;
+    if (!strat?.params) return;
     const defaults: Record<string, unknown> = {};
-    Object.entries(strat.params || {}).forEach(([key, conf]) => {
+    Object.entries(strat.params).forEach(([key, conf]) => {
       defaults[key] = conf.default;
     });
-    setParamsText(JSON.stringify(defaults, null, 2));
+    setParamValues(defaults);
   }, [strategy, strategies]);
+
+  const resetDefaults = () => {
+    const strat = strategies.find((item) => item.name === strategy);
+    if (!strat?.params) return;
+    const defaults: Record<string, unknown> = {};
+    Object.entries(strat.params).forEach(([key, conf]) => {
+      defaults[key] = conf.default;
+    });
+    setParamValues(defaults);
+  };
+
+  const normalizeParams = () => {
+    const strat = strategies.find((item) => item.name === strategy);
+    const finalParams: Record<string, any> = {};
+    if (!strat?.params) return finalParams;
+
+    Object.entries(strat.params).forEach(([key, conf]) => {
+      const userVal = paramValues[key];
+      if (userVal === undefined || userVal === '') {
+        finalParams[key] = conf.default;
+      } else if (conf.type === 'int') {
+        finalParams[key] = parseInt(userVal, 10) || 0;
+      } else if (conf.type === 'float') {
+        finalParams[key] = parseFloat(userVal) || 0;
+      } else if (conf.type === 'bool') {
+        finalParams[key] = Boolean(userVal);
+      } else {
+        finalParams[key] = userVal;
+      }
+    });
+    return finalParams;
+  };
 
   const fetchJobs = async () => {
     const resp = await fetch(`${API_BASE}/simulation-jobs`);
@@ -115,18 +145,25 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ strategies, on
     setError(null);
     setSubmitting(true);
     try {
-      const params = paramsText.trim() ? JSON.parse(paramsText) : {};
       const resp = await fetch(`${API_BASE}/simulation-jobs`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, strategy, symbol, start_date: startDate, params, enabled: true, schedule: 'daily' }),
+        body: JSON.stringify({
+          name,
+          strategy,
+          symbol,
+          start_date: startDate,
+          params: normalizeParams(),
+          enabled: true,
+          schedule: 'daily',
+        }),
       });
       if (!resp.ok) {
         throw new Error(await resp.text());
       }
       await fetchJobs();
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建自动任务失败');
+      setError(err instanceof Error ? err.message : '创建模拟任务失败');
     } finally {
       setSubmitting(false);
     }
@@ -161,38 +198,40 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ strategies, on
   return (
     <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1fr', gap: '1rem' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <section style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-            <h3 style={{ margin: 0 }}>自动模拟任务</h3>
+        <StrategyConfigForm
+          title="Simulation Tasks"
+          strategies={strategies}
+          selectedStrategy={strategy}
+          onStrategyChange={setStrategy}
+          symbol={symbol}
+          onSymbolChange={setSymbol}
+          startDate={startDate}
+          onStartDateChange={setStartDate}
+          paramValues={paramValues}
+          onParamChange={(key, value) => setParamValues((prev) => ({ ...prev, [key]: value }))}
+          onResetDefaults={resetDefaults}
+          showEndDate={false}
+          headerAction={
             <button className="btn-primary" onClick={handleDataUpdate} disabled={dataUpdating}>
-              {dataUpdating ? '触发中...' : '手动更新数据'}
+              {dataUpdating ? '触发中...' : '更新数据并触发模拟'}
             </button>
-          </div>
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
-            <input className="glass-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="任务名称" />
-            <select className="glass-input" value={strategy} onChange={(e) => setStrategy(e.target.value)}>
-              {strategies.map((item) => (
-                <option key={item.name} value={item.name}>{item.label}</option>
-              ))}
-            </select>
-            <input className="glass-input" value={symbol} onChange={(e) => setSymbol(e.target.value)} placeholder="标的，例如 sh.000300" />
-            <input className="glass-input" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
-            <textarea
-              className="glass-input"
-              style={{ minHeight: 160, resize: 'vertical' }}
-              value={paramsText}
-              onChange={(e) => setParamsText(e.target.value)}
-              placeholder="策略参数 JSON"
-            />
-            {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
-            <button className="btn-primary" onClick={handleCreateJob} disabled={submitting || !strategy}>
-              {submitting ? '创建中...' : '创建自动任务'}
-            </button>
-          </div>
-        </section>
+          }
+          footer={
+            <>
+              <div style={{ display: 'grid', gap: '0.4rem' }}>
+                <label className="tagline">模拟任务名称</label>
+                <input className="glass-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="模拟任务名称" />
+              </div>
+              {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
+              <button className="btn-primary" onClick={handleCreateJob} disabled={submitting || !strategy}>
+                {submitting ? '创建中...' : '创建模拟任务'}
+              </button>
+            </>
+          }
+        />
 
         <section style={cardStyle}>
-          <h3 style={{ marginTop: 0 }}>任务列表</h3>
+          <h3 style={{ marginTop: 0 }}>模拟任务列表</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             {jobs.map((job) => (
               <div
@@ -231,7 +270,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ strategies, on
                 </div>
               </div>
             ))}
-            {jobs.length === 0 && <div className="tagline">暂无自动任务</div>}
+            {jobs.length === 0 && <div className="tagline">暂无模拟任务</div>}
           </div>
         </section>
       </div>
@@ -286,7 +325,7 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ strategies, on
               )}
             </div>
           ))}
-          {currentJob && runs.length === 0 && <div className="tagline">该任务暂无运行批次</div>}
+          {currentJob && runs.length === 0 && <div className="tagline">该模拟任务暂无运行批次</div>}
         </div>
       </section>
 
@@ -334,4 +373,4 @@ export const AutomationPanel: React.FC<AutomationPanelProps> = ({ strategies, on
   );
 };
 
-export default AutomationPanel;
+export default SimulationPanel;

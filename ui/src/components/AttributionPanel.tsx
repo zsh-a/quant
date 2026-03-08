@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatMoney } from '../utils/format';
+import { API_BASE } from '../utils/api';
 
 interface AttributionData {
     session_id: string;
@@ -13,7 +14,6 @@ interface AttributionData {
     profit_factor: number;
 }
 
-const API = 'http://localhost:8000';
 
 interface Props {
     sessionId: string;
@@ -31,7 +31,7 @@ export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
     const fetchAttribution = async () => {
         setLoading(true);
         try {
-            const resp = await fetch(`${API}/analysis/attribution/${sessionId}`);
+            const resp = await fetch(`${API_BASE}/analysis/attribution/${sessionId}`);
             if (resp.ok) setData(await resp.json());
         } catch (e) {
             console.error(e);
@@ -40,7 +40,7 @@ export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
     };
 
     const generateReport = async () => {
-        const resp = await fetch(`${API}/analysis/report/${sessionId}?format=json`);
+        const resp = await fetch(`${API_BASE}/analysis/report/${sessionId}?format=json`);
         if (resp.ok) {
             const d = await resp.json();
             setReportUrl(d.path);

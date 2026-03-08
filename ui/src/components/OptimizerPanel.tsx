@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from '../utils/api';
 
 interface ParamSpec {
     name: string;
@@ -20,7 +21,6 @@ interface OptTask {
     };
 }
 
-const API = 'http://localhost:8000';
 
 export const OptimizerPanel: React.FC = () => {
     const [strategy, setStrategy] = useState('jsg');
@@ -42,7 +42,7 @@ export const OptimizerPanel: React.FC = () => {
         if (!running.length) return;
         const id = setInterval(async () => {
             for (const t of running) {
-                const resp = await fetch(`${API}/optimize/${t.task_id}`);
+                const resp = await fetch(`${API_BASE}/optimize/${t.task_id}`);
                 const data = await resp.json();
                 setTasks(prev => prev.map(x => x.task_id === t.task_id ? { ...x, ...data } : x));
             }
@@ -52,7 +52,7 @@ export const OptimizerPanel: React.FC = () => {
 
     const submit = async () => {
         setLoading(true);
-        const resp = await fetch(`${API}/optimize`, {
+        const resp = await fetch(`${API_BASE}/optimize`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

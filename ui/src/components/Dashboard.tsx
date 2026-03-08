@@ -153,7 +153,7 @@ const Dashboard: React.FC<DashboardProps> = ({
         return (
             <div className="dashboard-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-dim)' }}>
                 <h2>No Session Selected</h2>
-                <p>Go to Lab & Sessions to start or select a session.</p>
+                <p>Open a session from Overview or Lab to inspect its details.</p>
             </div>
         );
     }

@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { SessionSummary } from '../types';
+
+type SessionFilter = 'all' | 'manual' | 'simulation' | 'running';
 
 interface SessionListProps {
     sessions: SessionSummary[];
@@ -7,12 +9,67 @@ interface SessionListProps {
     onToggleSelection: (id: string) => void;
     onViewSession: (id: string) => void;
     onStopSession: (id: string) => void;
+    title?: string;
+    defaultFilter?: SessionFilter;
 }
 
-const SessionList: React.FC<SessionListProps> = ({ sessions, selectedSessionIds, onToggleSelection, onViewSession, onStopSession }) => {
+const filterStyle = (active: boolean): React.CSSProperties => ({
+    padding: '0.35rem 0.8rem',
+    borderRadius: 999,
+    border: '1px solid rgba(255,255,255,0.1)',
+    background: active ? 'var(--primary)' : 'rgba(255,255,255,0.04)',
+    color: 'white',
+    cursor: 'pointer',
+    fontSize: '0.75rem',
+});
+
+const SessionList: React.FC<SessionListProps> = ({
+    sessions,
+    selectedSessionIds,
+    onToggleSelection,
+    onViewSession,
+    onStopSession,
+    title = 'All Sessions',
+    defaultFilter = 'all',
+}) => {
+    const [filter, setFilter] = useState<SessionFilter>(defaultFilter);
+
+    useEffect(() => {
+        setFilter(defaultFilter);
+    }, [defaultFilter, title]);
+
+    const counts = useMemo(() => ({
+        all: sessions.length,
+        manual: sessions.filter((s) => s.source !== 'automation' && s.mode !== 'simulation').length,
+        simulation: sessions.filter((s) => s.source === 'automation' || s.mode === 'simulation').length,
+        running: sessions.filter((s) => s.status === 'running').length,
+    }), [sessions]);
+
+    const filteredSessions = useMemo(() => {
+        switch (filter) {
+            case 'manual':
+                return sessions.filter((s) => s.source !== 'automation' && s.mode !== 'simulation');
+            case 'simulation':
+                return sessions.filter((s) => s.source === 'automation' || s.mode === 'simulation');
+            case 'running':
+                return sessions.filter((s) => s.status === 'running');
+            default:
+                return sessions;
+        }
+    }, [sessions, filter]);
+
     return (
         <div className="glass card">
-            <h3 style={{ marginBottom: '1.5rem' }}>All Sessions</h3>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
+                <h3 style={{ margin: 0 }}>{title}</h3>
+                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
+                    <button style={filterStyle(filter === 'all')} onClick={() => setFilter('all')}>All ({counts.all})</button>
+                    <button style={filterStyle(filter === 'manual')} onClick={() => setFilter('manual')}>Manual ({counts.manual})</button>
+                    <button style={filterStyle(filter === 'simulation')} onClick={() => setFilter('simulation')}>Simulation ({counts.simulation})</button>
+                    <button style={filterStyle(filter === 'running')} onClick={() => setFilter('running')}>Running ({counts.running})</button>
+                </div>
+            </div>
+
             <div style={{ overflowX: 'auto' }}>
                 <table className="data-table">
                     <thead>
@@ -28,7 +85,7 @@ const SessionList: React.FC<SessionListProps> = ({ sessions, selectedSessionIds,
                         </tr>
                     </thead>
                     <tbody>
-                        {sessions.map(s => (
+                        {filteredSessions.map(s => (
                             <tr key={s.id} style={{ backgroundColor: selectedSessionIds.includes(s.id) ? 'rgba(99, 102, 241, 0.05)' : 'transparent' }}>
                                 <td>
                                     <input 
@@ -78,7 +135,7 @@ const SessionList: React.FC<SessionListProps> = ({ sessions, selectedSessionIds,
                                 </td>
                             </tr>
                         ))}
-                        {sessions.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '2rem' }}>No sessions found</td></tr>}
+                        {filteredSessions.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '2rem' }}>No sessions found</td></tr>}
                     </tbody>
                 </table>
             </div>

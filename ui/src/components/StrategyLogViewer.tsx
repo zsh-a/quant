@@ -20,7 +20,7 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
 
     const fetchLogs = useCallback(async () => {
         if (!sessionId) {
-            setLogs('No session selected. Please select a session from Dashboard or Lab.');
+            setLogs('No session selected. Please choose a session from Overview or Lab.');
             return;
         }
 
