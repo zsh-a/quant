@@ -7,7 +7,7 @@ import StatCard from './StatCard';
 import { VirtualizedTradeList } from './VirtualizedTradeList';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
 import { calculateMetrics } from '../utils/metrics';
-import { formatMoney, formatSignedMoney, formatSigned, formatPercent, colorFromSign, colorFromValue } from '../utils/format';
+import { formatMoney, formatSignedMoney, formatSigned, formatPercent, colorFromValue } from '../utils/format';
 
 interface DashboardProps {
     primarySession: SessionSummary | undefined;

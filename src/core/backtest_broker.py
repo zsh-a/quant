@@ -167,6 +167,16 @@ class BacktestBroker(Broker):
                     raw_price = bar.open
                 elif timing == 'IMMEDIATE_CLOSE':
                     raw_price = bar.close
+            elif self.db_client:
+                try:
+                    df = self.db_client.get_price(order.symbol, str(current_ts.date()), ["open", "close"], 1)
+                    if not df.empty:
+                        if timing == 'IMMEDIATE_OPEN':
+                            raw_price = df.iloc[0]["open"]
+                        elif timing == 'IMMEDIATE_CLOSE':
+                            raw_price = df.iloc[0]["close"]
+                except Exception as e:
+                    logger.error(f"Failed to fetch price for {order.symbol}: {e}")
             
             if raw_price is None:
                 continue
@@ -421,6 +431,31 @@ class BacktestBroker(Broker):
         # order processing can use today's close as prev_close for limit checks
         for sym, bar in bars.items():
             self.last_prices[sym] = bar.close
+
+    def get_state_snapshot(self, last_processed_at: str | None = None) -> Dict[str, Any]:
+        return {
+            "cash": float(self.cash),
+            "initial_cash": float(self.initial_cash),
+            "commission": float(self.commission),
+            "slippage": float(self.slippage),
+            "positions": {k: float(v) for k, v in self.positions.items()},
+            "position_costs": {k: float(v) for k, v in self.position_costs.items()},
+            "last_prices": {k: float(v) for k, v in self.last_prices.items()},
+            "last_equity": float(self._last_equity),
+            "last_processed_at": last_processed_at,
+        }
+
+    def restore_from_snapshot(self, snapshot: Dict[str, Any]):
+        if not snapshot:
+            return
+        self.cash = float(snapshot.get("cash", self.cash))
+        self.initial_cash = float(snapshot.get("initial_cash", self.initial_cash))
+        self.commission = float(snapshot.get("commission", self.commission))
+        self.slippage = float(snapshot.get("slippage", self.slippage))
+        self.positions = {k: float(v) for k, v in (snapshot.get("positions") or {}).items()}
+        self.position_costs = {k: float(v) for k, v in (snapshot.get("position_costs") or {}).items()}
+        self.last_prices = {k: float(v) for k, v in (snapshot.get("last_prices") or {}).items()}
+        self._last_equity = float(snapshot.get("last_equity", self.cash))
 
     def get_report(self):
         if not self.equity_history:

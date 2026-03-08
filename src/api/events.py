@@ -20,6 +20,15 @@ class EventType:
     TRADE_EXECUTED = "trade_executed"
     EQUITY_UPDATE = "equity_update"
     ERROR_OCCURRED = "error_occurred"
+    DATA_UPDATE_STARTED = "data_update_started"
+    DATA_UPDATE_PROGRESS = "data_update_progress"
+    DATA_UPDATE_COMPLETED = "data_update_completed"
+    DATA_UPDATE_FAILED = "data_update_failed"
+    SIMULATION_BATCH_STARTED = "simulation_batch_started"
+    SIMULATION_BATCH_PROGRESS = "simulation_batch_progress"
+    SIMULATION_BATCH_COMPLETED = "simulation_batch_completed"
+    SIMULATION_BATCH_FAILED = "simulation_batch_failed"
+    STRATEGY_STEP = "strategy_step"
 
 
 class SessionEventBus:
@@ -120,3 +129,39 @@ async def emit_error(session_id: str, error: str):
     await event_bus.emit(EventType.ERROR_OCCURRED, session_id, {
         'error': error
     })
+
+
+async def emit_data_update_started(session_id: str, payload: dict):
+    await event_bus.emit(EventType.DATA_UPDATE_STARTED, session_id, payload)
+
+
+async def emit_data_update_progress(session_id: str, payload: dict):
+    await event_bus.emit(EventType.DATA_UPDATE_PROGRESS, session_id, payload)
+
+
+async def emit_data_update_completed(session_id: str, payload: dict):
+    await event_bus.emit(EventType.DATA_UPDATE_COMPLETED, session_id, payload)
+
+
+async def emit_data_update_failed(session_id: str, payload: dict):
+    await event_bus.emit(EventType.DATA_UPDATE_FAILED, session_id, payload)
+
+
+async def emit_simulation_batch_started(session_id: str, payload: dict):
+    await event_bus.emit(EventType.SIMULATION_BATCH_STARTED, session_id, payload)
+
+
+async def emit_simulation_batch_progress(session_id: str, payload: dict):
+    await event_bus.emit(EventType.SIMULATION_BATCH_PROGRESS, session_id, payload)
+
+
+async def emit_simulation_batch_completed(session_id: str, payload: dict):
+    await event_bus.emit(EventType.SIMULATION_BATCH_COMPLETED, session_id, payload)
+
+
+async def emit_simulation_batch_failed(session_id: str, payload: dict):
+    await event_bus.emit(EventType.SIMULATION_BATCH_FAILED, session_id, payload)
+
+
+async def emit_strategy_step(session_id: str, payload: dict):
+    await event_bus.emit(EventType.STRATEGY_STEP, session_id, payload)

@@ -29,6 +29,7 @@ import { OptimizerPanel } from './components/OptimizerPanel';
 import { AttributionPanel } from './components/AttributionPanel';
 import { StrategyLogViewer } from './components/StrategyLogViewer';
 import { IndustryHeatmap } from './components/IndustryHeatmap';
+import { AutomationPanel } from './components/AutomationPanel';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? "http://localhost:8000"
@@ -72,6 +73,8 @@ const App: React.FC = () => {
   const [selectedBenchmarks, setSelectedBenchmarks] = useState<string[]>([]);
   const [benchmarksData, setBenchmarksData] = useState<Record<string, BenchmarkData[]>>({});
 
+  const primarySession = sessions.find(s => s.id === primarySessionId);
+  const primarySessionSource = primarySession?.source || 'manual';
   const lastUpdatedRef = useRef<string | null>(null);
 
   const fetchStrategies = async () => {
@@ -326,16 +329,16 @@ const App: React.FC = () => {
 
     // Interval for dynamic session updates when NOT using WebSocket/Polling
     let detailInterval: number | null = null;
-    if (!isConnected && !usePolling && primarySessionId) {
+    if (primarySessionId && ((!isConnected && !usePolling) || primarySessionSource === 'automation')) {
       detailInterval = window.setInterval(() => {
         fetchSessionDetails(primarySessionId);
-      }, 5000);
+      }, primarySessionSource === 'automation' ? 3000 : 5000);
     }
 
     return () => {
       if (detailInterval) clearInterval(detailInterval);
     };
-  }, [primarySessionId, isConnected, usePolling]);
+  }, [primarySessionId, isConnected, usePolling, primarySessionSource]);
 
   useEffect(() => {
     selectedSessionIds.forEach(id => {
@@ -359,7 +362,6 @@ const App: React.FC = () => {
   };
 
   const activeSessions = sessions.filter(s => s.status === 'running');
-  const primarySession = sessions.find(s => s.id === primarySessionId);
   const comparisonData = selectedSessionIds
     .filter(id => id !== primarySessionId && sessionDataCache[id])
     .map(id => ({
@@ -388,7 +390,7 @@ const App: React.FC = () => {
 
       <main className="main-content">
         <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1>{activeTab === 'lab' ? 'Strategy Lab' : activeTab === 'analysis' ? 'Analysis' : 'Dashboard'}</h1>
+          <h1>{activeTab === 'lab' ? 'Strategy Lab' : activeTab === 'analysis' ? 'Analysis' : activeTab === 'automation' ? 'Automation' : 'Dashboard'}</h1>
           <div>
             <span className="tagline">Connected: </span>
             <span style={{ color: 'var(--success)', fontWeight: 700 }}>Localhost</span>
@@ -422,6 +424,13 @@ const App: React.FC = () => {
             allSessions={sessions}
             benchmarksData={benchmarksData}
             availableBenchmarks={AVAILABLE_BENCHMARKS}
+          />
+        )}
+
+        {activeTab === 'automation' && (
+          <AutomationPanel
+            strategies={strategies}
+            onSelectSession={handleViewSession}
           />
         )}
 

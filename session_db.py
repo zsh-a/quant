@@ -1,8 +1,9 @@
+import json
 import os
 import sqlite3
-import json
+import uuid
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 
 def _default_db_path() -> str:
@@ -16,13 +17,13 @@ class SessionDB:
 
     def init_db(self):
         with sqlite3.connect(self.db_path) as conn:
-            # Enable WAL mode for better concurrency
             conn.execute("PRAGMA journal_mode=WAL")
             conn.execute("PRAGMA synchronous=NORMAL")
-            
+
             cursor = conn.cursor()
-            # Sessions table
-            cursor.execute("""
+
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS sessions (
                     session_id TEXT PRIMARY KEY,
                     strategy_name TEXT,
@@ -35,10 +36,11 @@ class SessionDB:
                     error TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
-            """)
-            
-            # Equity history table
-            cursor.execute("""
+                """
+            )
+
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS equity_history (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT,
@@ -46,10 +48,11 @@ class SessionDB:
                     total_assets REAL,
                     FOREIGN KEY(session_id) REFERENCES sessions(session_id)
                 )
-            """)
-            
-            # Trades table
-            cursor.execute("""
+                """
+            )
+
+            cursor.execute(
+                """
                 CREATE TABLE IF NOT EXISTS trades (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     session_id TEXT,
@@ -61,24 +64,112 @@ class SessionDB:
                     commission REAL,
                     FOREIGN KEY(session_id) REFERENCES sessions(session_id)
                 )
-            """)
+                """
+            )
 
-            # Migration: add columns if they don't exist
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS simulation_jobs (
+                    job_id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    strategy_name TEXT NOT NULL,
+                    symbol TEXT NOT NULL,
+                    mode TEXT NOT NULL DEFAULT 'simulation',
+                    start_date TEXT NOT NULL,
+                    params TEXT,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    status TEXT NOT NULL DEFAULT 'idle',
+                    schedule TEXT NOT NULL DEFAULT 'daily',
+                    last_processed_at TEXT,
+                    last_update_at TEXT,
+                    latest_session_id TEXT,
+                    latest_run_id TEXT,
+                    snapshot TEXT,
+                    error TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS simulation_runs (
+                    run_id TEXT PRIMARY KEY,
+                    job_id TEXT NOT NULL,
+                    session_id TEXT,
+                    update_run_id TEXT,
+                    trigger_source TEXT NOT NULL DEFAULT 'manual',
+                    start_date TEXT,
+                    end_date TEXT,
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    progress REAL NOT NULL DEFAULT 0.0,
+                    bars_processed INTEGER NOT NULL DEFAULT 0,
+                    steps_recorded INTEGER NOT NULL DEFAULT 0,
+                    summary TEXT,
+                    error TEXT,
+                    started_at TEXT,
+                    completed_at TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(job_id) REFERENCES simulation_jobs(job_id)
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS simulation_run_steps (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    run_id TEXT NOT NULL,
+                    session_id TEXT,
+                    step_index INTEGER NOT NULL,
+                    timestamp TEXT,
+                    event_type TEXT NOT NULL,
+                    payload TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY(run_id) REFERENCES simulation_runs(run_id)
+                )
+                """
+            )
+
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS data_update_runs (
+                    update_run_id TEXT PRIMARY KEY,
+                    trigger_source TEXT NOT NULL DEFAULT 'manual',
+                    status TEXT NOT NULL DEFAULT 'pending',
+                    has_new_data INTEGER NOT NULL DEFAULT 0,
+                    details TEXT,
+                    error TEXT,
+                    started_at TEXT,
+                    completed_at TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            )
+
             self._add_column_if_not_exists(cursor, "equity_history", "cash", "REAL DEFAULT 0.0")
             self._add_column_if_not_exists(cursor, "equity_history", "daily_pnl", "REAL DEFAULT 0.0")
             self._add_column_if_not_exists(cursor, "equity_history", "daily_return", "REAL DEFAULT 0.0")
             self._add_column_if_not_exists(cursor, "equity_history", "positions", "TEXT")
-            
+
             self._add_column_if_not_exists(cursor, "trades", "name", "TEXT")
             self._add_column_if_not_exists(cursor, "trades", "type", "TEXT")
             self._add_column_if_not_exists(cursor, "trades", "amount", "REAL")
             self._add_column_if_not_exists(cursor, "sessions", "params", "TEXT")
-            
-            # Indexes for performance
+            self._add_column_if_not_exists(cursor, "sessions", "source", "TEXT DEFAULT 'manual'")
+            self._add_column_if_not_exists(cursor, "sessions", "job_id", "TEXT")
+            self._add_column_if_not_exists(cursor, "sessions", "run_id", "TEXT")
+            self._add_column_if_not_exists(cursor, "sessions", "last_processed_at", "TEXT")
+
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_equity_session ON equity_history(session_id)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_equity_ts ON equity_history(timestamp)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_trades_session ON trades(session_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_jobs_enabled ON simulation_jobs(enabled, updated_at DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_runs_job ON simulation_runs(job_id, created_at DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_steps_run ON simulation_run_steps(run_id, step_index DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_data_update_runs_created ON data_update_runs(created_at DESC)")
             conn.commit()
 
     def _add_column_if_not_exists(self, cursor, table, column, type_def):
@@ -87,20 +178,65 @@ class SessionDB:
         if column not in columns:
             cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column} {type_def}")
 
+    def _json_dumps(self, value: Any) -> str:
+        if value is None:
+            value = {}
+        return json.dumps(value, ensure_ascii=False, default=str)
+
+    def _json_loads(self, value: Optional[str], default: Any):
+        if not value:
+            return default
+        try:
+            return json.loads(value)
+        except (TypeError, ValueError):
+            return default
+
     def _get_conn(self):
         conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.execute("PRAGMA journal_mode=WAL")
         return conn
 
-    def create_session(self, session_id, strategy_name, symbol, mode, start_date, end_date, params=None):
-        params_json = json.dumps(params or {})
+    def create_session(
+        self,
+        session_id,
+        strategy_name,
+        symbol,
+        mode,
+        start_date,
+        end_date,
+        params=None,
+        source: str = "manual",
+        job_id: Optional[str] = None,
+        run_id: Optional[str] = None,
+        last_processed_at: Optional[str] = None,
+    ):
+        params_json = self._json_dumps(params or {})
         with self._get_conn() as conn:
-            conn.execute("""
-                INSERT INTO sessions (session_id, strategy_name, symbol, mode, start_date, end_date, status, progress, params)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (session_id, strategy_name, symbol, mode, start_date, end_date, "starting", 0.0, params_json))
+            conn.execute(
+                """
+                INSERT INTO sessions (
+                    session_id, strategy_name, symbol, mode, start_date, end_date,
+                    status, progress, params, source, job_id, run_id, last_processed_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    session_id,
+                    strategy_name,
+                    symbol,
+                    mode,
+                    start_date,
+                    end_date,
+                    "starting",
+                    0.0,
+                    params_json,
+                    source,
+                    job_id,
+                    run_id,
+                    last_processed_at,
+                ),
+            )
 
-    def update_session_status(self, session_id, status, progress=None, error=None):
+    def update_session_status(self, session_id, status, progress=None, error=None, last_processed_at=None):
         with self._get_conn() as conn:
             updates = ["status = ?"]
             params = [status]
@@ -110,42 +246,73 @@ class SessionDB:
             if error is not None:
                 updates.append("error = ?")
                 params.append(error)
-            
+            if last_processed_at is not None:
+                updates.append("last_processed_at = ?")
+                params.append(last_processed_at)
             params.append(session_id)
             conn.execute(f"UPDATE sessions SET {', '.join(updates)} WHERE session_id = ?", params)
 
     def add_equity_points(self, session_id, points: List[Dict]):
-        if not points: return
+        if not points:
+            return
         data = [
-            (session_id, str(p["timestamp"]), p["total_equity"], p.get("cash", 0.0), 
-             p.get("daily_pnl", 0.0), p.get("daily_return", 0.0), json.dumps(p.get("positions", {})))
+            (
+                session_id,
+                str(p["timestamp"]),
+                p["total_equity"],
+                p.get("cash", 0.0),
+                p.get("daily_pnl", 0.0),
+                p.get("daily_return", 0.0),
+                self._json_dumps(p.get("positions", {})),
+            )
             for p in points
         ]
         with self._get_conn() as conn:
             conn.executemany(
                 "INSERT INTO equity_history (session_id, timestamp, total_assets, cash, daily_pnl, daily_return, positions) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                data
+                data,
             )
 
     def add_equity_point(self, session_id, timestamp, total_assets, cash=0.0, daily_pnl=0.0, daily_return=0.0, positions=None):
-        self.add_equity_points(session_id, [{
-            "timestamp": timestamp, "total_equity": total_assets, "cash": cash,
-            "daily_pnl": daily_pnl, "daily_return": daily_return, "positions": positions
-        }])
+        self.add_equity_points(
+            session_id,
+            [
+                {
+                    "timestamp": timestamp,
+                    "total_equity": total_assets,
+                    "cash": cash,
+                    "daily_pnl": daily_pnl,
+                    "daily_return": daily_return,
+                    "positions": positions,
+                }
+            ],
+        )
 
     def add_trades(self, session_id, trades: List[Dict]):
-        if not trades: return
+        if not trades:
+            return
         data = [
-            (session_id, str(t.get('timestamp')), t.get('symbol'), t.get('name', 'Unknown'),
-             t.get('type') or t.get('side'), t.get('price'), t.get('quantity'), 
-             t.get('amount') or (t.get('price', 0) * t.get('quantity', 0)), t.get('commission', 0.0))
+            (
+                session_id,
+                str(t.get("timestamp")),
+                t.get("symbol"),
+                t.get("name", "Unknown"),
+                t.get("type") or t.get("side"),
+                t.get("price"),
+                t.get("quantity"),
+                t.get("amount") or (t.get("price", 0) * t.get("quantity", 0)),
+                t.get("commission", 0.0),
+            )
             for t in trades
         ]
         with self._get_conn() as conn:
-            conn.executemany("""
+            conn.executemany(
+                """
                 INSERT INTO trades (session_id, timestamp, symbol, name, type, price, quantity, amount, commission)
                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, data)
+                """,
+                data,
+            )
 
     def add_trade(self, session_id, trade: Dict):
         self.add_trades(session_id, [trade])
@@ -155,19 +322,13 @@ class SessionDB:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute("SELECT * FROM sessions WHERE session_id = ?", (session_id,))
             row = cursor.fetchone()
-            if row:
-                d = dict(row)
-                d['id'] = d['session_id']
-                d['strategy'] = d.get('strategy_name', '')
-                if d.get('params'):
-                    try:
-                        d['params'] = json.loads(d['params'])
-                    except (TypeError, ValueError):
-                        d['params'] = {}
-                else:
-                    d['params'] = {}
-                return d
-            return None
+            if not row:
+                return None
+            d = dict(row)
+            d["id"] = d["session_id"]
+            d["strategy"] = d.get("strategy_name", "")
+            d["params"] = self._json_loads(d.get("params"), {})
+            return d
 
     def get_all_sessions(self):
         with self._get_conn() as conn:
@@ -176,15 +337,9 @@ class SessionDB:
             result = []
             for row in cursor.fetchall():
                 d = dict(row)
-                d['id'] = d['session_id']
-                d['strategy'] = d.get('strategy_name', '')
-                if d.get('params'):
-                    try:
-                        d['params'] = json.loads(d['params'])
-                    except (TypeError, ValueError):
-                        d['params'] = {}
-                else:
-                    d['params'] = {}
+                d["id"] = d["session_id"]
+                d["strategy"] = d.get("strategy_name", "")
+                d["params"] = self._json_loads(d.get("params"), {})
                 result.append(d)
             return result
 
@@ -197,19 +352,13 @@ class SessionDB:
                 query += " AND timestamp > ?"
                 params.append(since)
             query += " ORDER BY timestamp"
-            
+
             cursor = conn.execute(query, params)
             result = []
             for row in cursor.fetchall():
                 d = dict(row)
-                d['total_equity'] = d.pop('total_assets')
-                if d.get('positions'):
-                    try:
-                        d['positions'] = json.loads(d['positions'])
-                    except:
-                        d['positions'] = {}
-                else:
-                    d['positions'] = {}
+                d["total_equity"] = d.pop("total_assets")
+                d["positions"] = self._json_loads(d.get("positions"), {})
                 result.append(d)
             return result
 
@@ -224,3 +373,251 @@ class SessionDB:
             query += " ORDER BY timestamp"
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
+
+    def create_simulation_job(
+        self,
+        name: str,
+        strategy_name: str,
+        symbol: str,
+        start_date: str,
+        params: Optional[Dict[str, Any]] = None,
+        enabled: bool = True,
+        schedule: str = "daily",
+    ) -> Dict[str, Any]:
+        job_id = str(uuid.uuid4())
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO simulation_jobs (
+                    job_id, name, strategy_name, symbol, start_date, params,
+                    enabled, schedule, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    job_id,
+                    name,
+                    strategy_name,
+                    symbol,
+                    start_date,
+                    self._json_dumps(params or {}),
+                    1 if enabled else 0,
+                    schedule,
+                    datetime.now().isoformat(),
+                ),
+            )
+        return self.get_simulation_job(job_id)
+
+    def update_simulation_job(self, job_id: str, **fields):
+        if not fields:
+            return self.get_simulation_job(job_id)
+
+        db_fields = {}
+        for key, value in fields.items():
+            if key in {"params", "snapshot"}:
+                db_fields[key] = self._json_dumps(value)
+            elif key == "enabled":
+                db_fields[key] = 1 if value else 0
+            else:
+                db_fields[key] = value
+        db_fields["updated_at"] = datetime.now().isoformat()
+
+        assignments = ", ".join(f"{key} = ?" for key in db_fields)
+        values = list(db_fields.values()) + [job_id]
+        with self._get_conn() as conn:
+            conn.execute(f"UPDATE simulation_jobs SET {assignments} WHERE job_id = ?", values)
+        return self.get_simulation_job(job_id)
+
+    def set_simulation_job_enabled(self, job_id: str, enabled: bool):
+        return self.update_simulation_job(job_id=job_id, enabled=enabled, status="idle" if enabled else "disabled")
+
+    def get_simulation_job(self, job_id: str):
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM simulation_jobs WHERE job_id = ?", (job_id,)).fetchone()
+            if not row:
+                return None
+            job = dict(row)
+            job["enabled"] = bool(job.get("enabled", 0))
+            job["params"] = self._json_loads(job.get("params"), {})
+            job["snapshot"] = self._json_loads(job.get("snapshot"), None)
+            return job
+
+    def list_simulation_jobs(self, enabled_only: bool = False):
+        query = "SELECT * FROM simulation_jobs"
+        params: List[Any] = []
+        if enabled_only:
+            query += " WHERE enabled = 1"
+        query += " ORDER BY updated_at DESC, created_at DESC"
+
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, params).fetchall()
+            result = []
+            for row in rows:
+                job = dict(row)
+                job["enabled"] = bool(job.get("enabled", 0))
+                job["params"] = self._json_loads(job.get("params"), {})
+                job["snapshot"] = self._json_loads(job.get("snapshot"), None)
+                result.append(job)
+            return result
+
+    def create_simulation_run(
+        self,
+        job_id: str,
+        session_id: str,
+        start_date: str,
+        end_date: Optional[str],
+        trigger_source: str,
+        update_run_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        run_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO simulation_runs (
+                    run_id, job_id, session_id, update_run_id, trigger_source,
+                    start_date, end_date, status, started_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (run_id, job_id, session_id, update_run_id, trigger_source, start_date, end_date, "running", now),
+            )
+        self.update_simulation_job(
+            job_id,
+            status="running",
+            latest_session_id=session_id,
+            latest_run_id=run_id,
+            error=None,
+        )
+        return self.get_simulation_run(run_id)
+
+    def update_simulation_run(self, run_id: str, **fields):
+        if not fields:
+            return self.get_simulation_run(run_id)
+        db_fields = {}
+        for key, value in fields.items():
+            if key == "summary":
+                db_fields[key] = self._json_dumps(value)
+            else:
+                db_fields[key] = value
+        assignments = ", ".join(f"{key} = ?" for key in db_fields)
+        values = list(db_fields.values()) + [run_id]
+        with self._get_conn() as conn:
+            conn.execute(f"UPDATE simulation_runs SET {assignments} WHERE run_id = ?", values)
+        return self.get_simulation_run(run_id)
+
+    def get_simulation_run(self, run_id: str):
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM simulation_runs WHERE run_id = ?", (run_id,)).fetchone()
+            if not row:
+                return None
+            run = dict(row)
+            run["summary"] = self._json_loads(run.get("summary"), {})
+            return run
+
+    def list_simulation_runs(self, job_id: str, limit: int = 20):
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM simulation_runs WHERE job_id = ? ORDER BY created_at DESC LIMIT ?",
+                (job_id, limit),
+            ).fetchall()
+            result = []
+            for row in rows:
+                run = dict(row)
+                run["summary"] = self._json_loads(run.get("summary"), {})
+                result.append(run)
+            return result
+
+    def add_simulation_run_step(
+        self,
+        run_id: str,
+        session_id: str,
+        step_index: int,
+        timestamp: Optional[str],
+        event_type: str,
+        payload: Dict[str, Any],
+    ):
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO simulation_run_steps (run_id, session_id, step_index, timestamp, event_type, payload)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (run_id, session_id, step_index, timestamp, event_type, self._json_dumps(payload)),
+            )
+
+    def list_simulation_run_steps(self, run_id: str, limit: int = 300, since_step: Optional[int] = None):
+        query = "SELECT * FROM simulation_run_steps WHERE run_id = ?"
+        params: List[Any] = [run_id]
+        if since_step is not None:
+            query += " AND step_index > ?"
+            params.append(since_step)
+        query += " ORDER BY step_index DESC LIMIT ?"
+        params.append(limit)
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(query, params).fetchall()
+            result = []
+            for row in reversed(rows):
+                step = dict(row)
+                step["payload"] = self._json_loads(step.get("payload"), {})
+                result.append(step)
+            return result
+
+    def create_data_update_run(self, trigger_source: str = "manual") -> Dict[str, Any]:
+        update_run_id = str(uuid.uuid4())
+        now = datetime.now().isoformat()
+        with self._get_conn() as conn:
+            conn.execute(
+                """
+                INSERT INTO data_update_runs (update_run_id, trigger_source, status, started_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (update_run_id, trigger_source, "running", now),
+            )
+        return self.get_data_update_run(update_run_id)
+
+    def update_data_update_run(self, update_run_id: str, **fields):
+        if not fields:
+            return self.get_data_update_run(update_run_id)
+        db_fields = {}
+        for key, value in fields.items():
+            if key == "details":
+                db_fields[key] = self._json_dumps(value)
+            elif key == "has_new_data":
+                db_fields[key] = 1 if value else 0
+            else:
+                db_fields[key] = value
+        assignments = ", ".join(f"{key} = ?" for key in db_fields)
+        values = list(db_fields.values()) + [update_run_id]
+        with self._get_conn() as conn:
+            conn.execute(f"UPDATE data_update_runs SET {assignments} WHERE update_run_id = ?", values)
+        return self.get_data_update_run(update_run_id)
+
+    def get_data_update_run(self, update_run_id: str):
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            row = conn.execute("SELECT * FROM data_update_runs WHERE update_run_id = ?", (update_run_id,)).fetchone()
+            if not row:
+                return None
+            item = dict(row)
+            item["has_new_data"] = bool(item.get("has_new_data", 0))
+            item["details"] = self._json_loads(item.get("details"), {})
+            return item
+
+    def list_data_update_runs(self, limit: int = 20):
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                "SELECT * FROM data_update_runs ORDER BY created_at DESC LIMIT ?",
+                (limit,),
+            ).fetchall()
+            result = []
+            for row in rows:
+                item = dict(row)
+                item["has_new_data"] = bool(item.get("has_new_data", 0))
+                item["details"] = self._json_loads(item.get("details"), {})
+                result.append(item)
+            return result

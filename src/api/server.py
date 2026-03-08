@@ -67,6 +67,7 @@ from src.api.optimizer_router import router as optimizer_router
 from src.api.analysis_router import router as analysis_router
 from src.api.logs_router import router as logs_router
 from src.api.market_router import router as market_router
+from src.api.automation_router import router as automation_router
 from src.tasks.backtest import run_backtest_task
 
 setup_logging()
@@ -97,6 +98,7 @@ app.include_router(optimizer_router)
 app.include_router(analysis_router)
 app.include_router(logs_router)
 app.include_router(market_router)
+app.include_router(automation_router)
 
 logger.info(f"API Server starting with config: port={api_config.port}")
 
@@ -420,15 +422,14 @@ async def get_session_status(
         error = s_db["error"]
         start_date = s_db["start_date"]
         end_date = s_db["end_date"]
-        positions = {}  # Positions history not fully persisted in simple DB yet, only snapshots in equity?
-        # Actually equity_history doesn't store full positions in DB in my schema (simplified).
-        # So for finished sessions, positions might be empty unless we store final state.
-        # For now, acceptable compromise.
+        positions = {}
 
     equity_history = await anyio.to_thread.run_sync(
         session_db.get_equity_history, session_id, since
     )
     trades = await anyio.to_thread.run_sync(session_db.get_trades, session_id, since)
+    if not positions and equity_history:
+        positions = equity_history[-1].get("positions", {})
 
     return {
         "status": status,
@@ -538,6 +539,15 @@ event_bus.subscribe(EventType.SESSION_FAILED, broadcast_session_event)
 event_bus.subscribe(EventType.TRADE_EXECUTED, broadcast_session_event)
 event_bus.subscribe(EventType.EQUITY_UPDATE, broadcast_session_event)
 event_bus.subscribe(EventType.ERROR_OCCURRED, broadcast_session_event)
+event_bus.subscribe(EventType.DATA_UPDATE_STARTED, broadcast_session_event)
+event_bus.subscribe(EventType.DATA_UPDATE_PROGRESS, broadcast_session_event)
+event_bus.subscribe(EventType.DATA_UPDATE_COMPLETED, broadcast_session_event)
+event_bus.subscribe(EventType.DATA_UPDATE_FAILED, broadcast_session_event)
+event_bus.subscribe(EventType.SIMULATION_BATCH_STARTED, broadcast_session_event)
+event_bus.subscribe(EventType.SIMULATION_BATCH_PROGRESS, broadcast_session_event)
+event_bus.subscribe(EventType.SIMULATION_BATCH_COMPLETED, broadcast_session_event)
+event_bus.subscribe(EventType.SIMULATION_BATCH_FAILED, broadcast_session_event)
+event_bus.subscribe(EventType.STRATEGY_STEP, broadcast_session_event)
 
 logger.info("WebSocket event listeners registered")
 

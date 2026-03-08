@@ -5,6 +5,7 @@ Handles concurrent backtesting and other async tasks.
 
 from celery import Celery
 from kombu import Exchange, Queue
+from celery.schedules import crontab
 import os
 
 # Celery app instance
@@ -43,6 +44,7 @@ app.conf.update(
         'src.tasks.backtest.*': {'queue': 'backtest'},
         'src.tasks.analysis.*': {'queue': 'analysis'},
         'src.tasks.data_tasks.*': {'queue': 'default'},
+        'src.tasks.automation.*': {'queue': 'automation'},
     },
     
     # Queues
@@ -50,10 +52,19 @@ app.conf.update(
         Queue('default', Exchange('default'), routing_key='default'),
         Queue('backtest', Exchange('backtest'), routing_key='backtest'),
         Queue('analysis', Exchange('analysis'), routing_key='analysis'),
+        Queue('automation', Exchange('automation'), routing_key='automation'),
     ),
     
+    beat_schedule={
+        'scheduled-data-update-and-simulation': {
+            'task': 'src.tasks.automation.run_automation_cycle',
+            'schedule': crontab(hour=18, minute=0),
+            'options': {'queue': 'automation'},
+        }
+    },
+
     # Explicit imports for task discovery
-    imports=['src.tasks.backtest', 'src.tasks.data_tasks'],
+    imports=['src.tasks.backtest', 'src.tasks.data_tasks', 'src.tasks.automation'],
 )
 
 if __name__ == '__main__':

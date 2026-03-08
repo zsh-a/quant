@@ -1,63 +1,182 @@
-import preprocess.bao.pre_process as bao
-import preprocess.ak_utils as ak
-from src.utils.tdx_utils import TDXProcess
-import pandas as pd
+import json
 import time
+from datetime import datetime
+from typing import Callable, Dict, List, Optional
+
+import pandas as pd
+
+import preprocess.ak_utils as ak
+import preprocess.bao.pre_process as bao
+from db import DB
+from src.utils.tdx_utils import TDXProcess
+
 INDEX_LIST = [
     "000985",
-    "399673", # 创业板
-    "399101" # 中小板 
+    "399673",
+    "399101",
 ]
 
-last_update_date = "20250101"
+DEFAULT_SHARE_START_DATE = "20250101"
+REFERENCE_SYMBOL = "sh.000300"
 
 
-def update_kline_daily():
+class DataUpdateError(Exception):
+    pass
+
+
+
+def get_reference_latest_date(symbol: str = REFERENCE_SYMBOL) -> Optional[str]:
+    try:
+        db = DB()
+        query = f"SELECT max(date) AS latest_date FROM stock_data.stock_daily WHERE code = '{symbol}'"
+        result = db.client.query(query)
+        if not result.result_rows:
+            return None
+        latest = result.result_rows[0][0]
+        if latest is None:
+            return None
+        if hasattr(latest, "strftime"):
+            return latest.strftime("%Y-%m-%d")
+        return str(latest)
+    except Exception:
+        return None
+
+
+
+def update_kline_daily() -> Dict:
     proc = bao.BaoStockProcessor()
     proc.update_daily_data()
+    return {"message": "daily kline updated"}
 
 
-def update_index_stocks_weekly():
+
+def update_index_stocks_weekly() -> Dict:
     proc = ak.AKDataProcessor()
     for index in INDEX_LIST:
         proc.insert_index_stocks(index)
+    return {"updated_indexes": INDEX_LIST}
 
 
-def update_industry_weekly():
+
+def update_industry_weekly() -> Dict:
     proc = ak.AKDataProcessor()
     proc.insert_sw_industry()
+    return {"message": "industry mapping updated"}
 
 
-def update_fincial():
+
+def update_financial() -> Dict:
     proc = TDXProcess()
-    # update_fincial_db now handles incremental fetch and processing
     proc.update_fincial_db()
+    return {"message": "financial data updated"}
 
 
-def update_share_info():
+
+def update_share_info(start_date: str = DEFAULT_SHARE_START_DATE) -> Dict:
     proc = ak.AKDataProcessor()
-    proc.update_shares(start_date=last_update_date)
+    proc.update_shares(start_date=start_date)
+    return {"start_date": start_date, "message": "share info updated"}
 
 
-def update_etf_kline():
+
+def update_etf_kline() -> Dict:
     proc = ak.AKDataProcessor()
     all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
     all_etfs = all_etfs["基金代码"].astype(str).to_list()
+    updated = 0
+    errors: List[str] = []
     for code in all_etfs:
         try:
             proc.update_etf_data(code)
-        except Exception as e:
-            print(f"Error updating code {code}: {e}")
-            continue
+            updated += 1
+        except Exception as exc:
+            errors.append(f"{code}: {exc}")
         time.sleep(1)
     proc.create_etf_meta()
+    return {"updated": updated, "errors": errors[:20]}
+
+
+UPDATE_STEP_BUILDERS: Dict[str, Callable[..., Dict]] = {
+    "financial": update_financial,
+    "kline_daily": update_kline_daily,
+    "share_info": update_share_info,
+    "industry_weekly": update_industry_weekly,
+    "index_stocks_weekly": update_index_stocks_weekly,
+    "etf_kline": update_etf_kline,
+}
+
+DEFAULT_UPDATE_STEPS = ["financial", "kline_daily", "share_info"]
+
+
+
+def run_data_update_pipeline(
+    selected_steps: Optional[List[str]] = None,
+    share_start_date: str = DEFAULT_SHARE_START_DATE,
+) -> Dict:
+    steps = selected_steps or DEFAULT_UPDATE_STEPS
+    before_date = get_reference_latest_date()
+    started_at = datetime.now().isoformat()
+    results = []
+    errors = []
+
+    for step_name in steps:
+        func = UPDATE_STEP_BUILDERS.get(step_name)
+        if func is None:
+            errors.append({"step": step_name, "error": "unknown step"})
+            results.append(
+                {"step": step_name, "status": "error", "error": "unknown step"}
+            )
+            continue
+
+        step_started = time.time()
+        try:
+            if step_name == "share_info":
+                detail = func(start_date=share_start_date)
+            else:
+                detail = func()
+            results.append(
+                {
+                    "step": step_name,
+                    "status": "success",
+                    "duration_seconds": round(time.time() - step_started, 2),
+                    "detail": detail,
+                }
+            )
+        except Exception as exc:
+            errors.append({"step": step_name, "error": str(exc)})
+            results.append(
+                {
+                    "step": step_name,
+                    "status": "error",
+                    "duration_seconds": round(time.time() - step_started, 2),
+                    "error": str(exc),
+                }
+            )
+
+    after_date = get_reference_latest_date()
+    has_new_data = bool(before_date and after_date and after_date != before_date)
+    if before_date is None and after_date is not None:
+        has_new_data = True
+
+    status = "success"
+    if errors and len(errors) == len(results):
+        status = "failed"
+    elif errors:
+        status = "partial_success"
+
+    return {
+        "status": status,
+        "started_at": started_at,
+        "completed_at": datetime.now().isoformat(),
+        "reference_symbol": REFERENCE_SYMBOL,
+        "before_latest_date": before_date,
+        "after_latest_date": after_date,
+        "has_new_data": has_new_data,
+        "steps": results,
+        "errors": errors,
+    }
 
 
 if __name__ == "__main__":
-    update_fincial()
-    update_kline_daily()
-    #update_industry_weekly()
-    #update_etf_kline()
-    update_share_info()
-    # update_index_stocks_weekly()
-    # update_etf_kline()
+    result = run_data_update_pipeline()
+    print(json.dumps(result, ensure_ascii=False, indent=2))

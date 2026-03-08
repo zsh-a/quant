@@ -40,6 +40,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
                 <NavItem icon="📊" label="Dashboard" active={activeTab === 'dashboard'} onClick={() => onTabChange('dashboard')} />
                 <NavItem icon="🔥" label="Sector Heatmap" active={activeTab === 'heatmap'} onClick={() => onTabChange('heatmap')} />
                 <NavItem icon="🧪" label="Lab & Sessions" active={activeTab === 'lab'} onClick={() => onTabChange('lab')} />
+                <NavItem icon="🤖" label="Automation" active={activeTab === 'automation'} onClick={() => onTabChange('automation')} />
                 <NavItem icon="⚖️" label="Analysis" active={activeTab === 'analysis'} onClick={() => onTabChange('analysis')} />
                 <NavItem icon="🛡️" label="Risk Monitor" active={activeTab === 'risk'} onClick={() => onTabChange('risk')} />
                 <NavItem icon="📁" label="Portfolio" active={activeTab === 'portfolio'} onClick={() => onTabChange('portfolio')} />

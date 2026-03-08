@@ -23,6 +23,7 @@ const SessionList: React.FC<SessionListProps> = ({ sessions, selectedSessionIds,
                             <th>Timeframe</th>
                             <th>Mode</th>
                             <th>Status</th>
+                            <th>Source</th>
                             <th>Actions</th>
                         </tr>
                     </thead>
@@ -52,6 +53,10 @@ const SessionList: React.FC<SessionListProps> = ({ sessions, selectedSessionIds,
                                     {s.status === 'running' && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem' }}>({s.progress.toFixed(0)}%)</span>}
                                 </td>
                                 <td>
+                                    <span className="tagline">{s.source || 'manual'}</span>
+                                    {s.job_id && <div className="tagline" style={{ fontSize: '0.65rem' }}>job {s.job_id.slice(0, 6)}</div>}
+                                </td>
+                                <td>
                                     <div style={{ display: 'flex', gap: '0.5rem' }}>
                                         <button 
                                             className="tagline" 
@@ -73,7 +78,7 @@ const SessionList: React.FC<SessionListProps> = ({ sessions, selectedSessionIds,
                                 </td>
                             </tr>
                         ))}
-                        {sessions.length === 0 && <tr><td colSpan={7} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '2rem' }}>No sessions found</td></tr>}
+                        {sessions.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '2rem' }}>No sessions found</td></tr>}
                     </tbody>
                 </table>
             </div>
