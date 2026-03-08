@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { BenchmarkData, EquityPoint, Position, SessionSummary, Trade } from '../types';
 import Dashboard from './Dashboard';
-import SessionExecutionPanel from './SessionExecutionPanel';
 import { RiskPanel } from './RiskPanel';
 import { CheckpointList } from './CheckpointList';
 import { AttributionPanel } from './AttributionPanel';
@@ -42,9 +41,9 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
   onSelectSession,
   onRestoreCheckpoint,
 }) => {
-  const [subtab, setSubtab] = useState<'overview' | 'execution' | 'risk' | 'analysis' | 'logs'>(() => {
+  const [subtab, setSubtab] = useState<'overview' | 'risk' | 'analysis' | 'logs'>(() => {
     const stored = window.localStorage.getItem('quent.session.subtab');
-    if (stored === 'execution' || stored === 'risk' || stored === 'analysis' || stored === 'logs') return stored;
+    if (stored === 'risk' || stored === 'analysis' || stored === 'logs') return stored;
     return 'overview';
   });
 
@@ -81,9 +80,16 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
             <div className="flex flex-wrap gap-2">
               <StatusBadge value={primarySession.mode} />
               <StatusBadge value={primarySession.status} />
+              <StatusBadge value={primarySession.source || 'manual'} />
             </div>
             <div className="text-sm text-muted-foreground">
               状态：{primarySession.status} · 进度：{(primarySession.progress || 0).toFixed(0)}%
+            </div>
+            <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+              <div>标的：{primarySession.symbol}</div>
+              <div>来源：{formatSourceLabel(primarySession.source)}</div>
+              <div>Run：{primarySession.run_id ? `${primarySession.run_id.slice(0, 8)}...` : '未关联'}</div>
+              <div>最近处理：{primarySession.last_processed_at || '暂无'}</div>
             </div>
           </div>
           <div className="min-w-[260px] space-y-2">
@@ -96,10 +102,9 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
         </div>
       </SectionCard>
 
-      <Tabs value={subtab} onValueChange={(value) => setSubtab(value as 'overview' | 'execution' | 'risk' | 'analysis' | 'logs')}>
+      <Tabs value={subtab} onValueChange={(value) => setSubtab(value as 'overview' | 'risk' | 'analysis' | 'logs')}>
         <TabsList>
           <TabsTrigger value="overview">总览</TabsTrigger>
-          <TabsTrigger value="execution">执行</TabsTrigger>
           <TabsTrigger value="risk">风险</TabsTrigger>
           <TabsTrigger value="analysis">分析</TabsTrigger>
           <TabsTrigger value="logs">日志</TabsTrigger>
@@ -119,10 +124,6 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
             onSelectSession={onSelectSession}
             allSessions={allSessions}
           />
-        </TabsContent>
-
-        <TabsContent value="execution">
-          <SessionExecutionPanel session={primarySession} trades={trades} />
         </TabsContent>
 
         <TabsContent value="risk">
