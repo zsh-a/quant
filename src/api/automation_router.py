@@ -2,6 +2,7 @@
 
 from typing import Any, Dict, Optional
 
+import anyio
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
@@ -22,32 +23,43 @@ class SimulationJobRequest(BaseModel):
     start_date: str
     end_date: Optional[str] = None
     params: Dict[str, Any] = Field(default_factory=dict)
+    notification: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
     schedule: str = "daily"
 
 
+class SimulationJobNotificationRequest(BaseModel):
+    notification: Dict[str, Any] = Field(default_factory=dict)
+
+
 @router.post("/simulation-jobs")
 async def create_simulation_job(req: SimulationJobRequest):
-    return automation_service.create_job(
-        name=req.name,
-        strategy=req.strategy,
-        symbol=req.symbol,
-        start_date=req.start_date,
-        end_date=req.end_date,
-        params=req.params,
-        enabled=req.enabled,
-        schedule=req.schedule,
+    return await anyio.to_thread.run_sync(
+        automation_service.create_job,
+        req.name,
+        req.strategy,
+        req.symbol,
+        req.start_date,
+        req.end_date,
+        req.params,
+        req.notification,
+        req.enabled,
+        req.schedule,
     )
 
 
 @router.get("/simulation-jobs")
 async def list_simulation_jobs(enabled_only: bool = False):
-    return automation_service.list_jobs(enabled_only=enabled_only)
+    return await anyio.to_thread.run_sync(
+        automation_service.list_jobs,
+        enabled_only,
+        False,
+    )
 
 
 @router.post("/simulation-jobs/run-enabled")
 async def run_enabled_simulation_jobs(force: bool = Query(False)):
-    jobs = automation_service.list_jobs(enabled_only=True)
+    jobs = await anyio.to_thread.run_sync(automation_service.list_jobs, True, False)
     tasks = []
     for job in jobs:
         task = run_simulation_job_task.apply_async(
@@ -66,15 +78,25 @@ async def run_enabled_simulation_jobs(force: bool = Query(False)):
 
 @router.get("/simulation-jobs/{job_id}")
 async def get_simulation_job(job_id: str):
-    job = automation_service.get_job(job_id)
+    job = await anyio.to_thread.run_sync(automation_service.get_job, job_id, True)
     if not job:
         raise HTTPException(status_code=404, detail="Simulation job not found")
     return job
 
 
+@router.post("/simulation-jobs/{job_id}/notification")
+async def update_simulation_job_notification(job_id: str, req: SimulationJobNotificationRequest):
+    job = await anyio.to_thread.run_sync(automation_service.get_job, job_id, False)
+    if not job:
+        raise HTTPException(status_code=404, detail="Simulation job not found")
+    return await anyio.to_thread.run_sync(
+        lambda: session_db.update_simulation_job(job_id, notification=req.notification)
+    )
+
+
 @router.post("/simulation-jobs/{job_id}/enable")
 async def enable_simulation_job(job_id: str):
-    job = automation_service.enable_job(job_id)
+    job = await anyio.to_thread.run_sync(automation_service.enable_job, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Simulation job not found")
     return job
@@ -82,7 +104,7 @@ async def enable_simulation_job(job_id: str):
 
 @router.post("/simulation-jobs/{job_id}/disable")
 async def disable_simulation_job(job_id: str):
-    job = automation_service.disable_job(job_id)
+    job = await anyio.to_thread.run_sync(automation_service.disable_job, job_id)
     if not job:
         raise HTTPException(status_code=404, detail="Simulation job not found")
     return job
@@ -90,7 +112,7 @@ async def disable_simulation_job(job_id: str):
 
 @router.post("/simulation-jobs/{job_id}/run")
 async def run_simulation_job(job_id: str, force: bool = Query(False)):
-    job = automation_service.get_job(job_id)
+    job = await anyio.to_thread.run_sync(automation_service.get_job, job_id, False)
     if not job:
         raise HTTPException(status_code=404, detail="Simulation job not found")
     trigger_source = "manual_force" if force else "manual"
@@ -103,15 +125,15 @@ async def run_simulation_job(job_id: str, force: bool = Query(False)):
 
 @router.get("/simulation-jobs/{job_id}/runs")
 async def list_simulation_job_runs(job_id: str, limit: int = Query(20, ge=1, le=200)):
-    job = automation_service.get_job(job_id)
+    job = await anyio.to_thread.run_sync(automation_service.get_job, job_id, False)
     if not job:
         raise HTTPException(status_code=404, detail="Simulation job not found")
-    return session_db.list_simulation_runs(job_id, limit=limit)
+    return await anyio.to_thread.run_sync(lambda: session_db.list_simulation_runs(job_id, limit=limit))
 
 
 @router.get("/simulation-runs/{run_id}")
 async def get_simulation_run(run_id: str):
-    run = session_db.get_simulation_run(run_id)
+    run = await anyio.to_thread.run_sync(session_db.get_simulation_run, run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Simulation run not found")
     return run
@@ -123,10 +145,12 @@ async def list_simulation_run_steps(
     limit: int = Query(200, ge=1, le=1000),
     since_step: Optional[int] = Query(None, ge=0),
 ):
-    run = session_db.get_simulation_run(run_id)
+    run = await anyio.to_thread.run_sync(session_db.get_simulation_run, run_id)
     if not run:
         raise HTTPException(status_code=404, detail="Simulation run not found")
-    return session_db.list_simulation_run_steps(run_id, limit=limit, since_step=since_step)
+    return await anyio.to_thread.run_sync(
+        lambda: session_db.list_simulation_run_steps(run_id, limit=limit, since_step=since_step)
+    )
 
 
 class DataUpdateRequest(BaseModel):
@@ -144,4 +168,4 @@ async def trigger_data_update(req: DataUpdateRequest):
 
 @router.get("/data-update/history")
 async def get_data_update_history(limit: int = Query(20, ge=1, le=200)):
-    return session_db.list_data_update_runs(limit=limit)
+    return await anyio.to_thread.run_sync(session_db.list_data_update_runs, limit)

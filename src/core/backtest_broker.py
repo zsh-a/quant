@@ -1,4 +1,4 @@
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Callable
 from .base import Broker, Order, Bar
 from datetime import datetime
 from loguru import logger
@@ -6,7 +6,8 @@ import uuid
 
 class BacktestBroker(Broker):
     def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0003, 
-                 slippage: float = 0.001, db_client=None, risk_manager=None):
+                 slippage: float = 0.001, db_client=None, risk_manager=None,
+                 on_order_submitted: Optional[Callable[[Order], None]] = None):
         self.cash = initial_cash
         self.initial_cash = initial_cash
         self.commission = commission
@@ -29,6 +30,7 @@ class BacktestBroker(Broker):
         
         # Optimization: Track last equity for PnL calc even if history is cleared
         self._last_equity = initial_cash
+        self.on_order_submitted = on_order_submitted
         
         # Stock name mapping
         self.stock_names: Dict[str, str] = {}
@@ -68,6 +70,11 @@ class BacktestBroker(Broker):
         order.id = str(uuid.uuid4())
         order.status = "SUBMITTED"
         self.orders[order.id] = order
+        if self.on_order_submitted:
+            try:
+                self.on_order_submitted(order)
+            except Exception as e:
+                logger.exception(f"Order submitted callback failed: {e}")
         return order.id
 
     def cancel_order(self, order_id: str):

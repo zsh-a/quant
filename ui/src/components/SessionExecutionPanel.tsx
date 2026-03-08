@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SessionSummary, SimulationRun, SimulationStep, Trade } from '../types';
 import { formatPrice } from '../utils/format';
 import { formatModeLabel, formatSourceLabel, formatStatusLabel } from '../utils/display';
@@ -22,6 +22,8 @@ const cardStyle: React.CSSProperties = {
 const SessionExecutionPanel: React.FC<SessionExecutionPanelProps> = ({ session, trades }) => {
   const [run, setRun] = useState<SimulationRun | null>(null);
   const [steps, setSteps] = useState<SimulationStep[]>([]);
+  const runAbortRef = useRef<AbortController | null>(null);
+  const stepsAbortRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     let interval: number | undefined;
@@ -34,19 +36,42 @@ const SessionExecutionPanel: React.FC<SessionExecutionPanelProps> = ({ session, 
       }
 
       try {
+        runAbortRef.current?.abort();
+        stepsAbortRef.current?.abort();
+        const runController = new AbortController();
+        const stepsController = new AbortController();
+        runAbortRef.current = runController;
+        stepsAbortRef.current = stepsController;
+        const latestStep = steps[0]?.run_id === session.run_id ? Math.max(...steps.map((step) => step.step_index)) : null;
         const [runResp, stepsResp] = await Promise.all([
-          fetch(`${API_BASE}/simulation-runs/${session.run_id}`),
-          fetch(`${API_BASE}/simulation-runs/${session.run_id}/steps?limit=150`),
+          fetch(`${API_BASE}/simulation-runs/${session.run_id}`, { signal: runController.signal }),
+          fetch(
+            `${API_BASE}/simulation-runs/${session.run_id}/steps${latestStep !== null ? `?limit=150&since_step=${latestStep}` : '?limit=80'}`,
+            { signal: stepsController.signal },
+          ),
         ]);
 
         if (runResp.ok) {
           setRun(await runResp.json());
         }
         if (stepsResp.ok) {
-          setSteps(await stepsResp.json());
+          const data = await stepsResp.json();
+          setSteps((prev) => {
+            if (latestStep === null) {
+              return data;
+            }
+            if (!Array.isArray(data) || data.length === 0) {
+              return prev;
+            }
+            const seen = new Set(prev.map((step) => step.id));
+            const incoming = data.filter((step: SimulationStep) => !seen.has(step.id));
+            return incoming.length > 0 ? [...incoming.reverse(), ...prev] : prev;
+          });
         }
       } catch (error) {
-        console.error('Failed to fetch execution details', error);
+        if (!(error instanceof DOMException && error.name === 'AbortError')) {
+          console.error('Failed to fetch execution details', error);
+        }
       }
     };
 
@@ -57,6 +82,8 @@ const SessionExecutionPanel: React.FC<SessionExecutionPanelProps> = ({ session, 
 
     return () => {
       if (interval) clearInterval(interval);
+      runAbortRef.current?.abort();
+      stepsAbortRef.current?.abort();
     };
   }, [session.run_id, session.status]);
 

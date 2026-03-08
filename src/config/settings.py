@@ -113,6 +113,22 @@ class MonitoringConfig(BaseModel):
     alerts: AlertsConfig = Field(default_factory=AlertsConfig)
 
 
+class TelegramConfig(BaseModel):
+    """Telegram notification configuration"""
+
+    enabled: bool = False
+    bot_token: str = ""
+    default_chat_id: str = ""
+    api_base_url: str = "https://api.telegram.org"
+    timeout_seconds: int = 10
+
+
+class NotificationsConfig(BaseModel):
+    """Notification configuration"""
+
+    telegram: TelegramConfig = Field(default_factory=TelegramConfig)
+
+
 class FeaturesConfig(BaseModel):
     """Features configuration"""
 
@@ -126,7 +142,11 @@ class Settings(BaseSettings):
     """Application settings with environment variable support"""
 
     model_config = SettingsConfigDict(
-        env_prefix="QUANT_", env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_prefix="QUANT_",
+        env_file=".env",
+        env_file_encoding="utf-8",
+        env_nested_delimiter="__",
+        extra="ignore",
     )
 
     data_stream: DataStreamConfig = Field(default_factory=DataStreamConfig)
@@ -134,6 +154,7 @@ class Settings(BaseSettings):
     api: APIConfig = Field(default_factory=APIConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
+    notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
     features: FeaturesConfig = Field(default_factory=FeaturesConfig)
 
     @property
@@ -185,6 +206,11 @@ def get_logging_config() -> LoggingConfig:
 def get_monitoring_config() -> MonitoringConfig:
     """Get monitoring configuration"""
     return settings.monitoring
+
+
+def get_notifications_config() -> NotificationsConfig:
+    """Get notification configuration"""
+    return settings.notifications
 
 
 def get_features_config() -> FeaturesConfig:

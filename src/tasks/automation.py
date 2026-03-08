@@ -13,15 +13,98 @@ from db import DB
 from session_db import SessionDB
 from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
 from src.automation.service import AutomationService
-from src.config.settings import get_broker_config, get_data_stream_config
+from src.config.settings import (
+    get_broker_config,
+    get_data_stream_config,
+    get_notifications_config,
+)
 from src.core.backtest_broker import BacktestBroker
 from src.core.data_stream import DBDataStream
 from src.core.engine import TradingEngine
+from src.notifications.telegram import (
+    TelegramNotifier,
+    build_simulation_order_message,
+    get_notification_chat_id,
+    is_trade_notification_enabled,
+)
 from src.strategies.registry import StrategyRegistry
 from src.tasks.celery_app import app
 
 broker_config = get_broker_config()
 data_stream_config = get_data_stream_config()
+notifications_config = get_notifications_config()
+
+
+def _send_simulation_order_notification(
+    *,
+    job: Dict[str, object],
+    session_id: str,
+    run_id: str,
+    broker: BacktestBroker,
+    order,
+) -> None:
+    if not is_trade_notification_enabled(job.get("notification"), notifications_config.telegram):
+        return
+
+    chat_id = get_notification_chat_id(job.get("notification"), notifications_config.telegram)
+    notifier = TelegramNotifier(notifications_config.telegram)
+    if not notifier.is_enabled():
+        logger.warning("Telegram order notifications enabled on job but global Telegram config is incomplete")
+        return
+
+    reference_price = None
+    if order.symbol in broker.current_bars:
+        reference_price = broker.current_bars[order.symbol].close
+    elif order.symbol in broker.last_prices:
+        reference_price = broker.last_prices[order.symbol]
+
+    message = build_simulation_order_message(
+        job_name=str(job.get("name") or job.get("job_id") or "simulation-job"),
+        strategy_name=str(job.get("strategy_name") or ""),
+        session_id=session_id,
+        run_id=run_id,
+        order=order,
+        reference_price=reference_price,
+        stock_name=broker.stock_names.get(order.symbol, "Unknown"),
+    )
+    notifier.send_message(chat_id=chat_id, text=message)
+
+
+@app.task(name="src.tasks.automation.send_telegram_validation_notification")
+def send_telegram_validation_notification_task(
+    chat_id: Optional[str] = None,
+    context: str = "manual",
+):
+    notifier = TelegramNotifier(notifications_config.telegram)
+    if not notifier.is_enabled():
+        return {
+            "status": "error",
+            "error": "telegram notifier is disabled or bot token is missing",
+        }
+
+    target_chat_id = str(chat_id or notifications_config.telegram.default_chat_id or "")
+    if not target_chat_id:
+        return {
+            "status": "error",
+            "error": "telegram chat_id is missing",
+        }
+
+    timestamp = datetime.now().isoformat()
+    message = "\n".join(
+        [
+            "*Telegram 验证通知*",
+            f"*Context*: `{context}`",
+            f"*Timestamp*: `{timestamp}`",
+            "*Status*: 配置已生效，自动任务可发送通知。",
+        ]
+    )
+    delivered = notifier.send_message(chat_id=target_chat_id, text=message)
+    return {
+        "status": "success" if delivered else "error",
+        "chat_id": target_chat_id,
+        "context": context,
+        "timestamp": timestamp,
+    }
 
 
 @app.task(name="src.tasks.automation.run_data_update_pipeline")
@@ -178,6 +261,13 @@ def run_simulation_job_task(
             initial_cash=initial_cash,
             commission=broker_config.backtest.commission,
             slippage=getattr(broker_config.backtest, "slippage", 0.001),
+            on_order_submitted=lambda order: _send_simulation_order_notification(
+                job=job,
+                session_id=session_id,
+                run_id=run_id,
+                broker=broker,
+                order=order,
+            ),
         )
         broker.restore_from_snapshot(snapshot)
 

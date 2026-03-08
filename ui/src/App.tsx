@@ -82,6 +82,7 @@ const App: React.FC = () => {
   const selectedSessionSource = primarySession?.source || 'manual';
   const primarySessionRunId = primarySession?.run_id || null;
   const lastUpdatedRef = useRef<string | null>(null);
+  const sessionDetailInFlightRef = useRef(false);
 
   const fetchStrategies = async () => {
     try {
@@ -127,7 +128,11 @@ const App: React.FC = () => {
   };
 
   const fetchSessionDetails = async (id: string) => {
+    if (sessionDetailInFlightRef.current) {
+      return;
+    }
     try {
+      sessionDetailInFlightRef.current = true;
       const since = lastUpdatedRef.current;
       const url = since
         ? `${API_BASE}/session/${id}/status?since=${encodeURIComponent(since)}`
@@ -157,6 +162,8 @@ const App: React.FC = () => {
       setPositions(data.positions || {});
     } catch (err) {
       console.error('Fetch details error', err);
+    } finally {
+      sessionDetailInFlightRef.current = false;
     }
   };
 
@@ -318,7 +325,7 @@ const App: React.FC = () => {
   }, [selectedBenchmarks, fetchBenchmarks]);
 
   useEffect(() => {
-    if (primarySessionId) {
+    if (activeTab === 'session' && primarySessionId) {
       setEquityHistory([]);
       setTrades([]);
       setPositions({});
@@ -327,16 +334,20 @@ const App: React.FC = () => {
     }
 
     let detailInterval: number | null = null;
-    if (primarySessionId && ((!isConnected && !usePolling) || selectedSessionSource === 'automation')) {
+    if (
+      activeTab === 'session' &&
+      primarySessionId &&
+      ((!isConnected && !usePolling) || selectedSessionSource === 'automation')
+    ) {
       detailInterval = window.setInterval(() => {
         fetchSessionDetails(primarySessionId);
-      }, selectedSessionSource === 'automation' ? 3000 : 5000);
+      }, selectedSessionSource === 'automation' ? 5000 : 7000);
     }
 
     return () => {
       if (detailInterval) clearInterval(detailInterval);
     };
-  }, [primarySessionId, primarySessionRunId, isConnected, usePolling, selectedSessionSource]);
+  }, [activeTab, primarySessionId, primarySessionRunId, isConnected, usePolling, selectedSessionSource]);
 
   useEffect(() => {
     selectedSessionIds.forEach((id) => {

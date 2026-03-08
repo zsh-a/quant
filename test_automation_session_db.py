@@ -1,5 +1,10 @@
 from session_db import SessionDB
 from src.automation.service import AutomationService
+from src.core.base import Order
+from src.tasks.automation import (
+    _send_simulation_order_notification,
+    send_telegram_validation_notification_task,
+)
 
 
 def test_simulation_job_and_run_persistence(tmp_path):
@@ -13,14 +18,16 @@ def test_simulation_job_and_run_persistence(tmp_path):
         start_date='2024-01-01',
         end_date='2024-01-31',
         params={'lookback': 20},
+        notification={'telegram': {'enabled': True, 'chat_id': '10001'}},
     )
     assert job['enabled'] is True
     assert job['params']['lookback'] == 20
+    assert job['notification']['telegram']['chat_id'] == '10001'
     assert job['end_date'] == '2024-01-31'
 
     db.update_simulation_job(job['job_id'], last_processed_at='2024-01-10')
     window = service.get_run_window(db.get_simulation_job(job['job_id']), latest_market_date='2024-01-12')
-    assert window == {'start_date': '2024-01-11', 'end_date': '2024-01-12'}
+    assert window == {'start_date': '2024-01-11', 'end_date': '2024-01-12', 'force_full_replay': False}
 
     db.create_session(
         session_id='session-1',
@@ -54,6 +61,25 @@ def test_simulation_job_and_run_persistence(tmp_path):
     assert len(steps) == 1
     assert steps[0]['payload']['progress'] == 50
     assert steps[0]['payload']['new_trades'] == []
+
+
+def test_list_simulation_jobs_omits_snapshot_by_default(tmp_path):
+    db = SessionDB(str(tmp_path / 'summary.sqlite'))
+    job = db.create_simulation_job(
+        name='summary-job',
+        strategy_name='jsg',
+        symbol='sh.000300',
+        start_date='2024-01-01',
+        params={'lookback': 20},
+        notification={'telegram': {'enabled': True}},
+    )
+    db.update_simulation_job(job['job_id'], snapshot={'cash': 123456.0, 'positions': {'sh.000300': 100}})
+
+    listed = db.list_simulation_jobs()
+    detailed = db.get_simulation_job(job['job_id'])
+
+    assert 'snapshot' not in listed[0]
+    assert detailed['snapshot']['cash'] == 123456.0
 
 
 def test_data_update_run_history(tmp_path):
@@ -213,3 +239,139 @@ def test_trade_payload_keeps_snapshot_after_broker_buffer_clear():
 
     assert len(new_trades) == 1
     assert new_trades[0]['symbol'] == 'sh.000300'
+
+
+def test_send_simulation_order_notification_uses_job_chat_id(monkeypatch):
+    sent_messages = []
+
+    class DummyNotifier:
+        def __init__(self, config):
+            self.config = config
+
+        def is_enabled(self):
+            return True
+
+        def send_message(self, chat_id, text):
+            sent_messages.append({"chat_id": chat_id, "text": text})
+            return True
+
+    monkeypatch.setattr("src.tasks.automation.TelegramNotifier", DummyNotifier)
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.enabled", True)
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.default_chat_id", "fallback-chat")
+
+    broker = type(
+        "BrokerStub",
+        (),
+        {
+            "current_bars": {},
+            "last_prices": {"sh.000300": 3.18},
+            "stock_names": {"sh.000300": "沪深300"},
+        },
+    )()
+
+    _send_simulation_order_notification(
+        job={
+            "job_id": "job-1",
+            "name": "daily-jsg",
+            "strategy_name": "jsg",
+            "symbol": "sh.000300",
+            "notification": {"telegram": {"enabled": True, "chat_id": "job-chat"}},
+        },
+        session_id="session-1",
+        run_id="run-1",
+        broker=broker,
+        order=Order("sh.000300", "buy", 100),
+    )
+
+    assert len(sent_messages) == 1
+    assert sent_messages[0]["chat_id"] == "job-chat"
+    assert "daily-jsg" in sent_messages[0]["text"]
+    assert "买入" in sent_messages[0]["text"]
+    assert "NEXT_OPEN" in sent_messages[0]["text"]
+
+
+def test_send_simulation_order_notification_skips_disabled_jobs(monkeypatch):
+    sent_messages = []
+
+    class DummyNotifier:
+        def __init__(self, config):
+            self.config = config
+
+        def is_enabled(self):
+            return True
+
+        def send_message(self, chat_id, text):
+            sent_messages.append({"chat_id": chat_id, "text": text})
+            return True
+
+    monkeypatch.setattr("src.tasks.automation.TelegramNotifier", DummyNotifier)
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.enabled", True)
+
+    broker = type(
+        "BrokerStub",
+        (),
+        {"current_bars": {}, "last_prices": {}, "stock_names": {}},
+    )()
+
+    _send_simulation_order_notification(
+        job={
+            "job_id": "job-1",
+            "name": "daily-jsg",
+            "strategy_name": "jsg",
+            "symbol": "sh.000300",
+            "notification": {"telegram": {"enabled": False}},
+        },
+        session_id="session-1",
+        run_id="run-1",
+        broker=broker,
+        order=Order("sh.000300", "buy", 100),
+    )
+
+    assert sent_messages == []
+
+
+def test_send_telegram_validation_notification_uses_default_chat_id(monkeypatch):
+    sent_messages = []
+
+    class DummyNotifier:
+        def __init__(self, config):
+            self.config = config
+
+        def is_enabled(self):
+            return True
+
+        def send_message(self, chat_id, text):
+            sent_messages.append({"chat_id": chat_id, "text": text})
+            return True
+
+    monkeypatch.setattr("src.tasks.automation.TelegramNotifier", DummyNotifier)
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.enabled", True)
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.bot_token", "token")
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.default_chat_id", "fallback-chat")
+
+    result = send_telegram_validation_notification_task(context="test")
+
+    assert result["status"] == "success"
+    assert result["chat_id"] == "fallback-chat"
+    assert len(sent_messages) == 1
+    assert sent_messages[0]["chat_id"] == "fallback-chat"
+    assert "Telegram 验证通知" in sent_messages[0]["text"]
+
+
+def test_send_telegram_validation_notification_requires_chat_id(monkeypatch):
+    class DummyNotifier:
+        def __init__(self, config):
+            self.config = config
+
+        def is_enabled(self):
+            return True
+
+    monkeypatch.setattr("src.tasks.automation.TelegramNotifier", DummyNotifier)
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.enabled", True)
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.bot_token", "token")
+    monkeypatch.setattr("src.tasks.automation.notifications_config.telegram.default_chat_id", "")
+
+    result = send_telegram_validation_notification_task(context="test")
+
+    assert result["status"] == "error"
+    assert result["error"] == "telegram chat_id is missing"

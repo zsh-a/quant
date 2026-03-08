@@ -174,6 +174,7 @@ class SessionDB:
             self._add_column_if_not_exists(cursor, "trades", "type", "TEXT")
             self._add_column_if_not_exists(cursor, "trades", "amount", "REAL")
             self._add_column_if_not_exists(cursor, "simulation_jobs", "end_date", "TEXT")
+            self._add_column_if_not_exists(cursor, "simulation_jobs", "notification", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "params", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "source", "TEXT DEFAULT 'manual'")
             self._add_column_if_not_exists(cursor, "sessions", "job_id", "TEXT")
@@ -523,6 +524,7 @@ class SessionDB:
         start_date: str,
         end_date: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
+        notification: Optional[Dict[str, Any]] = None,
         enabled: bool = True,
         schedule: str = "daily",
     ) -> Dict[str, Any]:
@@ -532,8 +534,8 @@ class SessionDB:
                 """
                 INSERT INTO simulation_jobs (
                     job_id, name, strategy_name, symbol, start_date, end_date, params,
-                    enabled, schedule, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    notification, enabled, schedule, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     job_id,
@@ -543,6 +545,7 @@ class SessionDB:
                     start_date,
                     end_date,
                     self._json_dumps(params or {}),
+                    self._json_dumps(notification or {}),
                     1 if enabled else 0,
                     schedule,
                     datetime.now().isoformat(),
@@ -556,7 +559,7 @@ class SessionDB:
 
         db_fields = {}
         for key, value in fields.items():
-            if key in {"params", "snapshot"}:
+            if key in {"params", "snapshot", "notification"}:
                 db_fields[key] = self._json_dumps(value)
             elif key == "enabled":
                 db_fields[key] = 1 if value else 0
@@ -573,20 +576,33 @@ class SessionDB:
     def set_simulation_job_enabled(self, job_id: str, enabled: bool):
         return self.update_simulation_job(job_id=job_id, enabled=enabled, status="idle" if enabled else "disabled")
 
-    def get_simulation_job(self, job_id: str):
+    def _decode_simulation_job_row(self, row: sqlite3.Row, include_snapshot: bool = True):
+        job = dict(row)
+        job["enabled"] = bool(job.get("enabled", 0))
+        job["params"] = self._json_loads(job.get("params"), {})
+        if include_snapshot:
+            job["snapshot"] = self._json_loads(job.get("snapshot"), None)
+        else:
+            job.pop("snapshot", None)
+        job["notification"] = self._json_loads(job.get("notification"), {})
+        return job
+
+    def get_simulation_job(self, job_id: str, include_snapshot: bool = True):
         with self._get_conn() as conn:
             conn.row_factory = sqlite3.Row
             row = conn.execute("SELECT * FROM simulation_jobs WHERE job_id = ?", (job_id,)).fetchone()
             if not row:
                 return None
-            job = dict(row)
-            job["enabled"] = bool(job.get("enabled", 0))
-            job["params"] = self._json_loads(job.get("params"), {})
-            job["snapshot"] = self._json_loads(job.get("snapshot"), None)
-            return job
+            return self._decode_simulation_job_row(row, include_snapshot=include_snapshot)
 
-    def list_simulation_jobs(self, enabled_only: bool = False):
-        query = "SELECT * FROM simulation_jobs"
+    def list_simulation_jobs(self, enabled_only: bool = False, include_snapshot: bool = False):
+        query = """
+            SELECT
+                job_id, name, strategy_name, symbol, mode, start_date, end_date,
+                params, notification, enabled, status, schedule, last_processed_at,
+                last_update_at, latest_session_id, latest_run_id, error, created_at, updated_at
+            FROM simulation_jobs
+        """
         params: List[Any] = []
         if enabled_only:
             query += " WHERE enabled = 1"
@@ -597,11 +613,7 @@ class SessionDB:
             rows = conn.execute(query, params).fetchall()
             result = []
             for row in rows:
-                job = dict(row)
-                job["enabled"] = bool(job.get("enabled", 0))
-                job["params"] = self._json_loads(job.get("params"), {})
-                job["snapshot"] = self._json_loads(job.get("snapshot"), None)
-                result.append(job)
+                result.append(self._decode_simulation_job_row(row, include_snapshot=include_snapshot))
             return result
 
     def create_simulation_run(

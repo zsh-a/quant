@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { DataUpdateRun, SimulationJob, SimulationRun, SimulationStep, StrategyMeta } from '../types';
 import StrategyConfigForm from './StrategyConfigForm';
 import { API_BASE } from '../utils/api';
@@ -35,8 +35,15 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
   const [startDate, setStartDate] = useState('2024-01-01');
   const [endDate, setEndDate] = useState('');
   const [paramValues, setParamValues] = useState<Record<string, any>>({});
+  const [notifyOnOrder, setNotifyOnOrder] = useState(false);
+  const [telegramChatId, setTelegramChatId] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const pollInFlightRef = useRef(false);
+  const jobsAbortRef = useRef<AbortController | null>(null);
+  const updatesAbortRef = useRef<AbortController | null>(null);
+  const runsAbortRef = useRef<AbortController | null>(null);
+  const stepsAbortRef = useRef<AbortController | null>(null);
 
   const currentJob = useMemo(
     () => jobs.find((job) => job.job_id === selectedJobId) || null,
@@ -124,22 +131,33 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
   };
 
   const fetchJobs = async () => {
-    const resp = await fetch(`${API_BASE}/simulation-jobs`);
+    jobsAbortRef.current?.abort();
+    const controller = new AbortController();
+    jobsAbortRef.current = controller;
+    const resp = await fetch(`${API_BASE}/simulation-jobs`, { signal: controller.signal });
     const data = await resp.json();
     setJobs(data);
-    if (!selectedJobId && data.length > 0) {
-      setSelectedJobId(data[0].job_id);
-    }
+    setSelectedJobId((prev) => {
+      if (data.length === 0) return null;
+      if (prev && data.some((job: SimulationJob) => job.job_id === prev)) return prev;
+      return data[0].job_id;
+    });
   };
 
   const fetchDataUpdates = async () => {
-    const resp = await fetch(`${API_BASE}/data-update/history?limit=10`);
+    updatesAbortRef.current?.abort();
+    const controller = new AbortController();
+    updatesAbortRef.current = controller;
+    const resp = await fetch(`${API_BASE}/data-update/history?limit=10`, { signal: controller.signal });
     const data = await resp.json();
     setDataUpdates(data);
   };
 
   const fetchRuns = async (jobId: string) => {
-    const resp = await fetch(`${API_BASE}/simulation-jobs/${jobId}/runs?limit=20`);
+    runsAbortRef.current?.abort();
+    const controller = new AbortController();
+    runsAbortRef.current = controller;
+    const resp = await fetch(`${API_BASE}/simulation-jobs/${jobId}/runs?limit=20`, { signal: controller.signal });
     const data = await resp.json();
     setRuns(data);
     if (data.length > 0) {
@@ -151,21 +169,57 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
   };
 
   const fetchSteps = async (runId: string) => {
-    const resp = await fetch(`${API_BASE}/simulation-runs/${runId}/steps?limit=300`);
+    stepsAbortRef.current?.abort();
+    const controller = new AbortController();
+    stepsAbortRef.current = controller;
+    const latestStep = steps[0]?.run_id === runId ? Math.max(...steps.map((step) => step.step_index)) : null;
+    const query = latestStep !== null ? `?limit=300&since_step=${latestStep}` : '?limit=120';
+    const resp = await fetch(`${API_BASE}/simulation-runs/${runId}/steps${query}`, { signal: controller.signal });
     const data = await resp.json();
-    setSteps(data);
+    setSteps((prev) => {
+      if (latestStep === null) {
+        return data;
+      }
+      if (!Array.isArray(data) || data.length === 0) {
+        return prev;
+      }
+      const seen = new Set(prev.map((step) => step.id));
+      const incoming = data.filter((step: SimulationStep) => !seen.has(step.id));
+      return incoming.length > 0 ? [...incoming.reverse(), ...prev] : prev;
+    });
   };
 
   useEffect(() => {
-    fetchJobs();
-    fetchDataUpdates();
-    const interval = window.setInterval(() => {
-      fetchJobs();
-      fetchDataUpdates();
-      if (selectedJobId) fetchRuns(selectedJobId);
-      if (selectedRunId) fetchSteps(selectedRunId);
-    }, 3000);
-    return () => clearInterval(interval);
+    let active = true;
+
+    const poll = async () => {
+      if (!active || pollInFlightRef.current) {
+        return;
+      }
+      pollInFlightRef.current = true;
+      try {
+        await Promise.all([fetchJobs(), fetchDataUpdates()]);
+        if (selectedJobId) {
+          await fetchRuns(selectedJobId);
+        }
+        if (selectedRunId) {
+          await fetchSteps(selectedRunId);
+        }
+      } finally {
+        pollInFlightRef.current = false;
+      }
+    };
+
+    poll();
+    const interval = window.setInterval(poll, 5000);
+    return () => {
+      active = false;
+      window.clearInterval(interval);
+      jobsAbortRef.current?.abort();
+      updatesAbortRef.current?.abort();
+      runsAbortRef.current?.abort();
+      stepsAbortRef.current?.abort();
+    };
   }, [selectedJobId, selectedRunId]);
 
   useEffect(() => {
@@ -195,6 +249,12 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
           start_date: startDate,
           end_date: endDate || null,
           params: normalizeParams(),
+          notification: {
+            telegram: {
+              enabled: notifyOnOrder,
+              chat_id: telegramChatId.trim() || undefined,
+            },
+          },
           enabled: true,
           schedule: 'daily',
         }),
@@ -203,6 +263,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
         throw new Error(await resp.text());
       }
       await fetchJobs();
+      setMessage('模拟任务已创建');
     } catch (err) {
       setError(err instanceof Error ? err.message : '创建模拟任务失败');
     } finally {
@@ -214,6 +275,31 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     const endpoint = job.enabled ? 'disable' : 'enable';
     await fetch(`${API_BASE}/simulation-jobs/${job.job_id}/${endpoint}`, { method: 'POST' });
     await fetchJobs();
+  };
+
+  const handleToggleNotification = async (job: SimulationJob) => {
+    setError(null);
+    setMessage(null);
+    const telegram = job.notification?.telegram;
+    const nextEnabled = !telegram?.enabled;
+    const resp = await fetch(`${API_BASE}/simulation-jobs/${job.job_id}/notification`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        notification: {
+          telegram: {
+            enabled: nextEnabled,
+            chat_id: telegram?.chat_id || undefined,
+          },
+        },
+      }),
+    });
+    if (!resp.ok) {
+      setError(await resp.text());
+      return;
+    }
+    await fetchJobs();
+    setMessage(nextEnabled ? '已开启下单通知' : '已关闭下单通知');
   };
 
   const handleRunJob = async (jobId: string, force = false) => {
@@ -318,6 +404,26 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                 <label className="tagline">模拟任务名称</label>
                 <input className="glass-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="模拟任务名称" />
               </div>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
+                <input
+                  type="checkbox"
+                  checked={notifyOnOrder}
+                  onChange={(e) => setNotifyOnOrder(e.target.checked)}
+                  style={{ width: 'auto' }}
+                />
+                <span className="tagline" style={{ marginBottom: 0 }}>Telegram 下单通知</span>
+              </label>
+              {notifyOnOrder && (
+                <div style={{ display: 'grid', gap: '0.4rem' }}>
+                  <label className="tagline">Telegram Chat ID，可留空走服务端默认值</label>
+                  <input
+                    className="glass-input"
+                    value={telegramChatId}
+                    onChange={(e) => setTelegramChatId(e.target.value)}
+                    placeholder="例如 123456789"
+                  />
+                </div>
+              )}
               {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
               {message && <div style={{ color: 'var(--success)' }}>{message}</div>}
               <div className="tagline">可选结束时间仅用于首次验证窗口，后续“立即续跑”会自动追到最新日期。</div>
@@ -356,9 +462,16 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                 <div className="tagline" style={{ marginTop: '0.35rem' }}>
                   状态：{formatStatusLabel(job.status)} · 最近处理到：{job.last_processed_at || '未开始'}
                 </div>
+                <div className="tagline" style={{ marginTop: '0.35rem' }}>
+                  下单通知：{job.notification?.telegram?.enabled ? '已开启' : '已关闭'}
+                  {job.notification?.telegram?.chat_id ? ` · Chat ID ${job.notification.telegram.chat_id}` : ''}
+                </div>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
                   <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleToggleJob(job); }}>
                     {job.enabled ? '停用' : '启用'}
+                  </button>
+                  <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleToggleNotification(job); }}>
+                    {job.notification?.telegram?.enabled ? '关闭通知' : '开启通知'}
                   </button>
                   <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleRunJob(job.job_id); }} disabled={runningJobKey === `run:${job.job_id}` || runningJobKey === `force:${job.job_id}`}>
                     {runningJobKey === `run:${job.job_id}` ? '提交中...' : '立即续跑'}

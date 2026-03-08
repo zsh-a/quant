@@ -64,6 +64,15 @@ export interface StrategyMeta {
     params: Record<string, StrategyParam>;
 }
 
+export interface TelegramNotificationConfig {
+    enabled?: boolean;
+    chat_id?: string;
+}
+
+export interface SimulationJobNotification {
+    telegram?: TelegramNotificationConfig;
+}
+
 export interface SimulationJob {
     job_id: string;
     name: string;
@@ -73,6 +82,7 @@ export interface SimulationJob {
     start_date: string;
     end_date?: string;
     params: Record<string, unknown>;
+    notification?: SimulationJobNotification;
     enabled: boolean;
     status: string;
     schedule: string;

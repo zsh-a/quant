@@ -19,6 +19,7 @@ class AutomationService:
         start_date: str,
         end_date: Optional[str] = None,
         params: Optional[Dict[str, Any]] = None,
+        notification: Optional[Dict[str, Any]] = None,
         enabled: bool = True,
         schedule: str = "daily",
     ) -> Dict[str, Any]:
@@ -29,15 +30,19 @@ class AutomationService:
             start_date=start_date,
             end_date=end_date,
             params=params or {},
+            notification=notification or {},
             enabled=enabled,
             schedule=schedule,
         )
 
-    def get_job(self, job_id: str) -> Optional[Dict[str, Any]]:
-        return self.session_db.get_simulation_job(job_id)
+    def get_job(self, job_id: str, include_snapshot: bool = True) -> Optional[Dict[str, Any]]:
+        return self.session_db.get_simulation_job(job_id, include_snapshot=include_snapshot)
 
-    def list_jobs(self, enabled_only: bool = False):
-        return self.session_db.list_simulation_jobs(enabled_only=enabled_only)
+    def list_jobs(self, enabled_only: bool = False, include_snapshot: bool = False):
+        return self.session_db.list_simulation_jobs(
+            enabled_only=enabled_only,
+            include_snapshot=include_snapshot,
+        )
 
     def enable_job(self, job_id: str):
         return self.session_db.set_simulation_job_enabled(job_id, True)
