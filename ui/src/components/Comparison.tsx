@@ -6,6 +6,10 @@ import { lttb } from '../lttb';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
 import { calculateMetrics, PerformanceMetrics } from '../utils/metrics';
 import { formatMoney, formatPercent } from '../utils/format';
+import { EmptyState } from './layout/EmptyState';
+import { PageHeader } from './layout/PageHeader';
+import { SectionCard } from './layout/SectionCard';
+import { Button } from './ui/button';
 
 interface ComparisonProps {
     selectedSessionIds: string[];
@@ -16,13 +20,13 @@ interface ComparisonProps {
 }
 
 const COLORS = [
-    '#6366f1', // Indigo (Primary)
-    '#ec4899', // Pink
-    '#10b981', // Emerald
+    '#22d3ee', // Cyan
+    '#fb7185', // Rose
     '#f59e0b', // Amber
-    '#8b5cf6', // Violet
-    '#3b82f6', // Blue
-    '#ef4444', // Red
+    '#34d399', // Emerald
+    '#a78bfa', // Violet
+    '#38bdf8', // Sky
+    '#f97316', // Orange
 ];
 
 // Subset of metrics to display in comparison table
@@ -123,22 +127,25 @@ const Comparison: React.FC<ComparisonProps> = ({
 
     if (selectedSessionIds.length === 0) {
         return (
-            <div className="dashboard-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-dim)' }}>
-                <h2>No Sessions Selected</h2>
-                <p>Go to Strategy Lab to select sessions for comparison.</p>
-            </div>
+            <EmptyState title="No Sessions Selected" description="Go to Strategy Lab to select sessions for comparison." />
         );
     }
 
     return (
-        <div className="dashboard-view">
-            <header style={{ marginBottom: '2rem' }}>
-                <h2>Strategy Comparison</h2>
-                <p className="tagline">Comparing {sessionMetrics.length} sessions</p>
-            </header>
+        <div className="dashboard-view space-y-6">
+            <PageHeader
+                eyebrow="Cross-run Analytics"
+                title="Strategy Comparison"
+                description={`Comparing ${sessionMetrics.length} sessions`}
+                actions={
+                    <Button variant={useLttb ? 'default' : 'outline'} size="sm" onClick={() => setUseLttb(!useLttb)}>
+                        LTTB: {useLttb ? 'ON' : 'OFF'}
+                    </Button>
+                }
+            />
 
-            {/* Metrics Comparison Table */}
-            <div className="glass card" style={{ overflowX: 'auto', marginBottom: '2rem' }}>
+            <SectionCard title="Metrics Matrix" description="Key return and risk metrics normalized across selected runs.">
+            <div className="overflow-x-auto">
                 <table className="data-table">
                     <thead>
                         <tr>
@@ -179,28 +186,10 @@ const Comparison: React.FC<ComparisonProps> = ({
                     </tbody>
                 </table>
             </div>
+            </SectionCard>
 
-            {/* Comparison Chart */}
-            <div className="glass card chart-container" style={{ height: '500px', padding: '2rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '1rem' }}>
-                    <h3>Equity Curve Comparison (%)</h3>
-                    <button
-                        onClick={() => setUseLttb(!useLttb)}
-                        className="glass"
-                        style={{
-                            padding: '0.3rem 0.6rem',
-                            fontSize: '0.75rem',
-                            background: useLttb ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                            color: 'white',
-                            border: '1px solid rgba(255,255,255,0.1)',
-                            cursor: 'pointer',
-                            borderRadius: '4px'
-                        }}
-                    >
-                        LTTB: {useLttb ? 'ON' : 'OFF'}
-                    </button>
-                </div>
-                
+            <SectionCard title="Equity Curve Comparison (%)" description="Relative return trajectories for selected sessions.">
+            <div className="chart-container h-[500px]">
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
@@ -224,13 +213,14 @@ const Comparison: React.FC<ComparisonProps> = ({
                                 dataKey={`session_${s.id}`}
                                 name={s.name} // Legend uses this
                                 stroke={COLORS[idx % COLORS.length]}
-                                strokeWidth={2}
+                                strokeWidth={2.4}
                                 dot={false}
                             />
                         ))}
                     </ComposedChart>
                 </ResponsiveContainer>
             </div>
+            </SectionCard>
         </div>
     );
 };

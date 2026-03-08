@@ -24,10 +24,12 @@ interface DashboardProps {
 }
 
 const COLORS = {
-    'sh.000300': '#ec4899', // Pink
-    'sh.000905': '#f59e0b', // Amber
-    'sz.399006': '#10b981', // Emerald
+    'sh.000300': '#f59e0b', // Amber
+    'sh.000905': '#38bdf8', // Sky
+    'sz.399006': '#34d399', // Emerald
 };
+
+const SESSION_COMPARE_COLORS = ['#fb7185', '#f59e0b', '#a78bfa', '#22d3ee', '#f97316', '#4ade80'];
 
 const PAGE_SIZE = 10;
 
@@ -194,9 +196,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     padding: '0.3rem 0.6rem',
                                     fontSize: '0.75rem',
                                     background: selectedBenchmarks.includes(bm.code) ? COLORS[bm.code as keyof typeof COLORS] || 'var(--secondary)' : 'rgba(255,255,255,0.1)',
-                                    color: 'white',
-                                    border: '1px solid rgba(255,255,255,0.1)',
-                                    opacity: selectedBenchmarks.includes(bm.code) ? 1 : 0.7
+                                    color: selectedBenchmarks.includes(bm.code) ? '#08111f' : 'white',
+                                    border: selectedBenchmarks.includes(bm.code) ? '1px solid transparent' : '1px solid rgba(255,255,255,0.12)',
+                                    opacity: selectedBenchmarks.includes(bm.code) ? 1 : 0.84,
+                                    fontWeight: 700,
+                                    borderRadius: '999px'
                                 }}
                             >
                                 {bm.name}
@@ -268,7 +272,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     <ComposedChart data={chartData}>
                         <defs>
                             <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                <stop offset="5%" stopColor="var(--primary)" stopOpacity={0.3} />
+                                <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.38} />
                                 <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
                             </linearGradient>
                         </defs>
@@ -285,10 +289,10 @@ const Dashboard: React.FC<DashboardProps> = ({
                             labelFormatter={(label) => label.split(' ')[0]}
                         />
                         <Legend wrapperStyle={{ paddingTop: '10px' }} />
-                        <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="var(--primary)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
+                        <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="#22d3ee" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
                         
                         {comparisonData.map((c, idx) => {
-                             const color = `hsl(${(idx * 137) % 360}, 70%, 50%)`;
+                             const color = SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length];
                              return (
                                  <Line
                                      key={c.id}
@@ -296,9 +300,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                                      dataKey={`session_${c.id}`}
                                      name={`${c.name} (${c.id.slice(0,4)})`}
                                      stroke={color}
-                                     strokeWidth={2}
+                                     strokeWidth={2.25}
                                      dot={false}
-                                     strokeDasharray="5 5"
+                                     strokeDasharray="6 5"
                                  />
                              );
                         })}
@@ -310,7 +314,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 dataKey={code}
                                 name={availableBenchmarks.find(b => b.code === code)?.name}
                                 stroke={COLORS[code as keyof typeof COLORS] || 'var(--secondary)'}
-                                strokeWidth={2}
+                                strokeWidth={2.25}
                                 dot={false}
                             />
                         ))}

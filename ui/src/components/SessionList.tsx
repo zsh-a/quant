@@ -1,5 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { SessionSummary } from '../types';
+import { SectionCard } from './layout/SectionCard';
+import { StatusBadge } from './layout/StatusBadge';
+import { Button } from './ui/button';
+import { Progress } from './ui/progress';
 
 type SessionFilter = 'all' | 'manual' | 'simulation' | 'running';
 
@@ -12,16 +16,6 @@ interface SessionListProps {
     title?: string;
     defaultFilter?: SessionFilter;
 }
-
-const filterStyle = (active: boolean): React.CSSProperties => ({
-    padding: '0.35rem 0.8rem',
-    borderRadius: 999,
-    border: '1px solid rgba(255,255,255,0.1)',
-    background: active ? 'var(--primary)' : 'rgba(255,255,255,0.04)',
-    color: 'white',
-    cursor: 'pointer',
-    fontSize: '0.75rem',
-});
 
 const SessionList: React.FC<SessionListProps> = ({
     sessions,
@@ -59,18 +53,30 @@ const SessionList: React.FC<SessionListProps> = ({
     }, [sessions, filter]);
 
     return (
-        <div className="glass card">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem', gap: '1rem', flexWrap: 'wrap' }}>
-                <h3 style={{ margin: 0 }}>{title}</h3>
-                <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-                    <button style={filterStyle(filter === 'all')} onClick={() => setFilter('all')}>All ({counts.all})</button>
-                    <button style={filterStyle(filter === 'manual')} onClick={() => setFilter('manual')}>Manual ({counts.manual})</button>
-                    <button style={filterStyle(filter === 'simulation')} onClick={() => setFilter('simulation')}>Simulation ({counts.simulation})</button>
-                    <button style={filterStyle(filter === 'running')} onClick={() => setFilter('running')}>Running ({counts.running})</button>
+        <SectionCard
+            title={title}
+            description="Review saved sessions, select comparison targets and jump back into execution details."
+            action={
+                <div className="flex flex-wrap gap-2">
+                    {([
+                        ['all', `All (${counts.all})`],
+                        ['manual', `Manual (${counts.manual})`],
+                        ['simulation', `Simulation (${counts.simulation})`],
+                        ['running', `Running (${counts.running})`],
+                    ] as Array<[SessionFilter, string]>).map(([value, label]) => (
+                        <Button
+                            key={value}
+                            variant={filter === value ? 'default' : 'outline'}
+                            size="sm"
+                            onClick={() => setFilter(value)}
+                        >
+                            {label}
+                        </Button>
+                    ))}
                 </div>
-            </div>
-
-            <div style={{ overflowX: 'auto' }}>
+            }
+        >
+            <div className="overflow-x-auto">
                 <table className="data-table">
                     <thead>
                         <tr>
@@ -86,7 +92,7 @@ const SessionList: React.FC<SessionListProps> = ({
                     </thead>
                     <tbody>
                         {filteredSessions.map(s => (
-                            <tr key={s.id} style={{ backgroundColor: selectedSessionIds.includes(s.id) ? 'rgba(99, 102, 241, 0.05)' : 'transparent' }}>
+                            <tr key={s.id} style={{ backgroundColor: selectedSessionIds.includes(s.id) ? 'rgba(34, 211, 238, 0.08)' : 'transparent' }}>
                                 <td>
                                     <input 
                                         type="checkbox" 
@@ -97,39 +103,38 @@ const SessionList: React.FC<SessionListProps> = ({
                                 </td>
                                 <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-dim)' }}>{s.id.slice(0, 8)}...</td>
                                 <td>
-                                    <div style={{ fontWeight: 500 }}>{s.strategy}</div>
+                                    <div style={{ fontWeight: 600 }}>{s.strategy}</div>
                                     <div className="tagline" style={{ fontSize: '0.7rem' }}>{s.symbol}</div>
                                 </td>
                                 <td style={{ fontSize: '0.8rem' }}>
                                     {s.start_date}<br />
                                     {s.end_date || 'Ongoing'}
                                 </td>
-                                <td><span className={`status-badge ${s.mode === 'live' ? 'status-live' : s.mode === 'simulation' ? 'status-backtest' : ''}`}>{s.mode}</span></td>
+                                <td><StatusBadge value={s.mode} /></td>
                                 <td>
-                                    {s.status}
-                                    {s.status === 'running' && <span style={{ marginLeft: '0.5rem', fontSize: '0.7rem' }}>({s.progress.toFixed(0)}%)</span>}
+                                    <div className="space-y-2">
+                                        <StatusBadge value={s.status} />
+                                        {s.status === 'running' && (
+                                            <div className="space-y-1">
+                                                <div className="text-xs text-muted-foreground">{s.progress.toFixed(0)}%</div>
+                                                <Progress value={s.progress} />
+                                            </div>
+                                        )}
+                                    </div>
                                 </td>
                                 <td>
                                     <span className="tagline">{s.source || 'manual'}</span>
                                     {s.job_id && <div className="tagline" style={{ fontSize: '0.65rem' }}>job {s.job_id.slice(0, 6)}</div>}
                                 </td>
                                 <td>
-                                    <div style={{ display: 'flex', gap: '0.5rem' }}>
-                                        <button 
-                                            className="tagline" 
-                                            style={{ padding: '0.3rem 0.8rem', background: 'rgba(255,255,255,0.1)', color: 'white', fontSize: '0.7rem', border: '1px solid rgba(255,255,255,0.1)' }} 
-                                            onClick={() => onViewSession(s.id)}
-                                        >
+                                    <div className="flex gap-2">
+                                        <Button variant="outline" size="sm" onClick={() => onViewSession(s.id)}>
                                             View
-                                        </button>
+                                        </Button>
                                         {s.status === 'running' && (
-                                            <button 
-                                                className="tagline" 
-                                                style={{ padding: '0.3rem 0.8rem', background: 'rgba(239, 68, 68, 0.2)', color: 'var(--danger)', fontSize: '0.7rem', border: '1px solid rgba(239, 68, 68, 0.2)' }} 
-                                                onClick={() => onStopSession(s.id)}
-                                            >
+                                            <Button variant="danger" size="sm" onClick={() => onStopSession(s.id)}>
                                                 Stop
-                                            </button>
+                                            </Button>
                                         )}
                                     </div>
                                 </td>
@@ -139,7 +144,7 @@ const SessionList: React.FC<SessionListProps> = ({
                     </tbody>
                 </table>
             </div>
-        </div>
+        </SectionCard>
     );
 };
 

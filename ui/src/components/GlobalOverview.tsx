@@ -1,5 +1,10 @@
 import React from 'react';
 import type { SessionSummary } from '../types';
+import { Button } from './ui/button';
+import { SectionCard } from './layout/SectionCard';
+import { MetricCard } from './layout/MetricCard';
+import { StatusBadge } from './layout/StatusBadge';
+import { Progress } from './ui/progress';
 
 interface GlobalOverviewProps {
   sessions: SessionSummary[];
@@ -8,13 +13,6 @@ interface GlobalOverviewProps {
   onOpenSession: (sessionId: string) => void;
   onOpenLab: () => void;
 }
-
-const cardStyle: React.CSSProperties = {
-  background: 'var(--glass-bg)',
-  border: '1px solid rgba(255,255,255,0.08)',
-  borderRadius: 16,
-  padding: '1rem',
-};
 
 const GlobalOverview: React.FC<GlobalOverviewProps> = ({
   sessions,
@@ -28,85 +26,81 @@ const GlobalOverview: React.FC<GlobalOverviewProps> = ({
   const recentSessions = sessions.slice(0, 8);
 
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '1rem' }}>
-        <div style={cardStyle}>
-          <div className="tagline">Total Sessions</div>
-          <div style={{ fontSize: '2rem', fontWeight: 800 }}>{sessions.length}</div>
-        </div>
-        <div style={cardStyle}>
-          <div className="tagline">Running Now</div>
-          <div style={{ fontSize: '2rem', fontWeight: 800, color: 'var(--primary)' }}>{activeSessions.length}</div>
-        </div>
-        <div style={cardStyle}>
-          <div className="tagline">Completed</div>
-          <div style={{ fontSize: '2rem', fontWeight: 800 }}>{completedSessions.length}</div>
-        </div>
-        <div style={cardStyle}>
-          <div className="tagline">Simulation Sessions</div>
-          <div style={{ fontSize: '2rem', fontWeight: 800 }}>{simulationSessions.length}</div>
-        </div>
+    <div className="space-y-6">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label="Total Sessions" value={sessions.length} hint="Historic and active runs" />
+        <MetricCard label="Running Now" value={<span className="text-primary">{activeSessions.length}</span>} hint="Backtests or live tasks in progress" />
+        <MetricCard label="Completed" value={completedSessions.length} hint="Finished with persisted results" />
+        <MetricCard label="Simulation Jobs" value={simulationSessions.length} hint="Automation-backed sessions" />
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: primarySession ? '1.2fr 1fr' : '1fr', gap: '1rem' }}>
-        <section style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-            <div>
-              <h2 style={{ margin: 0 }}>Platform Overview</h2>
-              <p className="tagline" style={{ marginTop: '0.4rem' }}>从这里进入 Lab、打开最近 session，或查看当前运行情况。</p>
-            </div>
-            <button className="btn-primary" onClick={onOpenLab}>打开 Lab</button>
-          </div>
-
-          <div style={{ display: 'grid', gap: '0.75rem' }}>
+      <div className={`grid gap-6 ${primarySession ? 'xl:grid-cols-[minmax(0,1.35fr)_380px]' : ''}`}>
+        <SectionCard
+          title="Platform Overview"
+          description="从这里进入 Lab、打开最近 session，或查看当前运行情况。"
+          action={<Button onClick={onOpenLab}>打开 Lab</Button>}
+        >
+          <div className="grid gap-3">
             {recentSessions.map((session) => (
-              <div key={session.id} style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                gap: '1rem',
-                padding: '0.9rem',
-                borderRadius: 12,
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.06)',
-              }}>
-                <div>
-                  <div style={{ fontWeight: 700 }}>{session.strategy}</div>
-                  <div className="tagline">{session.symbol} · {session.mode} · {session.source || 'manual'}</div>
-                  <div className="tagline">{session.start_date} → {session.end_date || 'Ongoing'}</div>
-                </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
-                  <div style={{ textAlign: 'right' }}>
-                    <div style={{ fontWeight: 700 }}>{session.status}</div>
-                    <div className="tagline">{session.progress?.toFixed?.(0) ?? session.progress}%</div>
+              <div
+                key={session.id}
+                className="rounded-2xl border border-border/70 bg-secondary/45 p-4 transition hover:border-primary/30 hover:bg-accent/45"
+              >
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="text-base font-semibold text-foreground">{session.strategy}</div>
+                      <StatusBadge value={session.mode} />
+                      <StatusBadge value={session.status} />
+                    </div>
+                    <div className="text-sm text-muted-foreground">{session.symbol} · {session.source || 'manual'}</div>
+                    <div className="text-sm text-muted-foreground">{session.start_date} → {session.end_date || 'Ongoing'}</div>
                   </div>
-                  <button className="btn-ghost" onClick={() => onOpenSession(session.id)}>查看详情</button>
+
+                  <div className="rounded-2xl border border-border/60 bg-card/75 px-4 py-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <span className="text-sm text-muted-foreground">Progress</span>
+                      <span className="text-sm font-semibold text-foreground">{session.progress?.toFixed?.(0) ?? session.progress}%</span>
+                    </div>
+                    <div className="mt-3">
+                      <Progress value={session.progress || 0} />
+                    </div>
+                    <div className="mt-4">
+                      <Button className="w-full" variant="outline" size="sm" onClick={() => onOpenSession(session.id)}>
+                        查看详情
+                      </Button>
+                    </div>
+                  </div>
                 </div>
               </div>
             ))}
             {recentSessions.length === 0 && (
-              <div className="tagline">还没有 session，去 Lab 创建第一个运行任务。</div>
+              <div className="rounded-2xl border border-dashed border-border/70 bg-card/40 p-5 text-sm text-muted-foreground">
+                还没有 session，去 Lab 创建第一个运行任务。
+              </div>
             )}
           </div>
-        </section>
+        </SectionCard>
 
         {primarySession && (
-          <section style={cardStyle}>
-            <div className="tagline">Current Session</div>
-            <h3 style={{ marginTop: '0.4rem', marginBottom: '0.75rem' }}>{primarySession.strategy}</h3>
-            <div className="tagline">{primarySession.symbol} · {primarySession.mode}</div>
-            <div className="tagline">状态：{primarySession.status}</div>
-            <div className="tagline">来源：{primarySession.source || 'manual'}</div>
-            {primarySession.last_processed_at && (
-              <div className="tagline">最近处理到：{primarySession.last_processed_at}</div>
-            )}
-            <div style={{ marginTop: '1rem', height: 6, background: 'rgba(255,255,255,0.08)', borderRadius: 999 }}>
-              <div style={{ width: `${primarySession.progress || 0}%`, height: '100%', background: 'var(--primary)', borderRadius: 999 }} />
+          <SectionCard title="Current Session" description="Primary context pinned into the shell">
+            <div className="space-y-3 rounded-2xl border border-border/60 bg-card/75 p-4">
+              <div className="text-xl font-semibold text-foreground">{primarySession.strategy}</div>
+              <div className="flex flex-wrap gap-2">
+                <StatusBadge value={primarySession.mode} />
+                <StatusBadge value={primarySession.status} />
+              </div>
+              <div className="text-sm text-muted-foreground">{primarySession.symbol} · {primarySession.source || 'manual'}</div>
+              <div className="text-sm text-muted-foreground">进度：{(primarySession.progress || 0).toFixed(0)}%</div>
+              <Progress value={primarySession.progress || 0} />
             </div>
-            <button className="btn-primary" style={{ marginTop: '1rem', width: '100%' }} onClick={() => onOpenSession(primarySession.id)}>
+            {primarySession.last_processed_at && (
+              <div className="text-sm text-muted-foreground">最近处理到：{primarySession.last_processed_at}</div>
+            )}
+            <Button className="mt-2 w-full" onClick={() => onOpenSession(primarySession.id)}>
               打开 Session Detail
-            </button>
-          </section>
+            </Button>
+          </SectionCard>
         )}
       </div>
     </div>

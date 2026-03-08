@@ -3,6 +3,8 @@ import type { SessionSummary, StrategyMeta } from '../types';
 import NewSessionForm from './NewSessionForm';
 import SessionList from './SessionList';
 import SimulationPanel from './SimulationPanel';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { PageHeader } from './layout/PageHeader';
 
 interface LabPanelProps {
   strategies: StrategyMeta[];
@@ -14,15 +16,6 @@ interface LabPanelProps {
   onStopSession: (id: string) => void;
   error: string | null;
 }
-
-const tabButtonStyle = (active: boolean): React.CSSProperties => ({
-  padding: '0.5rem 1rem',
-  borderRadius: 999,
-  border: '1px solid rgba(255,255,255,0.1)',
-  background: active ? 'var(--primary)' : 'rgba(255,255,255,0.04)',
-  color: 'white',
-  cursor: 'pointer',
-});
 
 const LabPanel: React.FC<LabPanelProps> = ({
   strategies,
@@ -54,45 +47,49 @@ const LabPanel: React.FC<LabPanelProps> = ({
   );
 
   return (
-    <div style={{ display: 'grid', gap: '1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        <div>
-          <h2 style={{ margin: 0 }}>Strategy Lab</h2>
-          <p className="tagline" style={{ marginTop: '0.4rem' }}>Manual Runs 只保留 backtest / live，所有 simulation 统一在 Simulation 视图里。</p>
-        </div>
-        <div style={{ display: 'flex', gap: '0.5rem' }}>
-          <button style={tabButtonStyle(labSubtab === 'manual')} onClick={() => setLabSubtab('manual')}>Manual Runs</button>
-          <button style={tabButtonStyle(labSubtab === 'simulation')} onClick={() => setLabSubtab('simulation')}>Simulation</button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Execution Workspace"
+        title="Strategy Lab"
+        description="Manual Runs 只保留 backtest / live，所有 simulation 统一在 Simulation 视图里。"
+      />
 
-      {labSubtab === 'manual' ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: '2rem' }}>
-          <NewSessionForm strategies={strategies} onStart={onStart} error={error} />
-          <SessionList
-            title="Manual Session List"
-            defaultFilter="manual"
-            sessions={manualSessions}
-            selectedSessionIds={selectedSessionIds}
-            onToggleSelection={onToggleSelection}
-            onViewSession={onViewSession}
-            onStopSession={onStopSession}
-          />
-        </div>
-      ) : (
-        <div style={{ display: 'grid', gap: '1rem' }}>
-          <SimulationPanel strategies={strategies} onSelectSession={onViewSession} />
-          <SessionList
-            title="Simulation Session List"
-            defaultFilter="simulation"
-            sessions={simulationSessions}
-            selectedSessionIds={selectedSessionIds}
-            onToggleSelection={onToggleSelection}
-            onViewSession={onViewSession}
-            onStopSession={onStopSession}
-          />
-        </div>
-      )}
+      <Tabs value={labSubtab} onValueChange={(value) => setLabSubtab(value as 'manual' | 'simulation')}>
+        <TabsList>
+          <TabsTrigger value="manual">Manual Runs</TabsTrigger>
+          <TabsTrigger value="simulation">Simulation</TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="manual">
+          <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.4fr)]">
+            <NewSessionForm strategies={strategies} onStart={onStart} error={error} />
+            <SessionList
+              title="Manual Session List"
+              defaultFilter="manual"
+              sessions={manualSessions}
+              selectedSessionIds={selectedSessionIds}
+              onToggleSelection={onToggleSelection}
+              onViewSession={onViewSession}
+              onStopSession={onStopSession}
+            />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="simulation">
+          <div className="space-y-6">
+            <SimulationPanel strategies={strategies} onSelectSession={onViewSession} />
+            <SessionList
+              title="Simulation Session List"
+              defaultFilter="simulation"
+              sessions={simulationSessions}
+              selectedSessionIds={selectedSessionIds}
+              onToggleSelection={onToggleSelection}
+              onViewSession={onViewSession}
+              onStopSession={onStopSession}
+            />
+          </div>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

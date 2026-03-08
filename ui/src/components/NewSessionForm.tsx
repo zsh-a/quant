@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { StrategyMeta } from '../types';
 import StrategyConfigForm from './StrategyConfigForm';
+import { Button } from './ui/button';
 
 interface NewSessionFormProps {
     strategies: StrategyMeta[];
@@ -101,23 +102,23 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                 </div>
             }
             footer={
-                <>
+                <div className="space-y-4">
                     {mode === 'backtest' && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                        <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-secondary/35 px-4 py-3">
                             <input
                                 type="checkbox"
                                 checked={useAsync}
                                 onChange={(e) => setUseAsync(e.target.checked)}
                                 style={{ width: 'auto' }}
                             />
-                            <span className="tagline">Run in background (Celery queue)</span>
+                            <span className="tagline !mb-0">Run in background (Celery queue)</span>
                         </label>
                     )}
                     {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
-                    <button className="btn-primary" onClick={handleStart} disabled={!selectedStrategy}>
+                    <Button className="w-full" onClick={handleStart} disabled={!selectedStrategy}>
                         Start Session
-                    </button>
-                </>
+                    </Button>
+                </div>
             }
         />
     );

@@ -25,10 +25,10 @@ import { IndustryHeatmap } from './components/IndustryHeatmap';
 import GlobalOverview from './components/GlobalOverview';
 import LabPanel from './components/LabPanel';
 import SessionDetail from './components/SessionDetail';
-
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? 'http://localhost:8000'
-  : `http://${window.location.hostname}:8000`;
+import { API_BASE } from './utils/api';
+import { AppShell } from './components/layout/AppShell';
+import { PageHeader } from './components/layout/PageHeader';
+import { StatusBadge } from './components/layout/StatusBadge';
 
 const AVAILABLE_BENCHMARKS = [
   { code: 'sh.000300', name: 'HS300' },
@@ -364,79 +364,101 @@ const App: React.FC = () => {
     }));
 
   return (
-    <div className="app-container">
-      <Sidebar
-        activeTab={activeTab}
-        onTabChange={(tab) => setActiveTab(tab as 'overview' | 'lab' | 'session' | 'comparison' | 'heatmap' | 'portfolio' | 'optimizer')}
-        activeSessions={activeSessions}
-        onSessionSelect={handleOpenSession}
-        hasSelectedSession={!!primarySessionId}
-      />
-
-      <main className="main-content">
-        <header style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '2rem' }}>
-          <h1>{TITLES[activeTab]}</h1>
-          <div>
-            <span className="tagline">Connected: </span>
-            <span style={{ color: 'var(--success)', fontWeight: 700 }}>Localhost</span>
+    <AppShell
+      sidebar={
+        <Sidebar
+          activeTab={activeTab}
+          onTabChange={(tab) => setActiveTab(tab as 'overview' | 'lab' | 'session' | 'comparison' | 'heatmap' | 'portfolio' | 'optimizer')}
+          activeSessions={activeSessions}
+          onSessionSelect={handleOpenSession}
+          hasSelectedSession={!!primarySessionId}
+        />
+      }
+      header={
+        <div className="glass flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+          <PageHeader
+            eyebrow="Modernized Operator View"
+            title={TITLES[activeTab]}
+            description={
+              activeTab === 'overview'
+                ? 'Monitor all strategy runs, reopen recent sessions and track system health from a unified shell.'
+                : activeTab === 'lab'
+                  ? 'Launch new runs, compare saved experiments and manage simulation workflows.'
+                  : activeTab === 'session'
+                    ? 'Inspect execution, risk, attribution and live logs within one session workspace.'
+                    : 'Unified analytics and tooling surfaces aligned to the new console design.'
+            }
+          />
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Connection</div>
+              <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
+                <StatusBadge value={isConnected || usePolling ? 'running' : 'failed'} />
+                <span>{API_BASE.replace(/^https?:\/\//, '')}</span>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3">
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Selected</div>
+              <div className="mt-1 text-lg font-semibold text-foreground">{selectedSessionIds.length}</div>
+            </div>
           </div>
-        </header>
+        </div>
+      }
+    >
+      {activeTab === 'overview' && (
+        <GlobalOverview
+          sessions={sessions}
+          activeSessions={activeSessions}
+          primarySession={primarySession}
+          onOpenSession={handleOpenSession}
+          onOpenLab={() => setActiveTab('lab')}
+        />
+      )}
 
-        {activeTab === 'overview' && (
-          <GlobalOverview
-            sessions={sessions}
-            activeSessions={activeSessions}
-            primarySession={primarySession}
-            onOpenSession={handleOpenSession}
-            onOpenLab={() => setActiveTab('lab')}
-          />
-        )}
+      {activeTab === 'lab' && (
+        <LabPanel
+          strategies={strategies}
+          sessions={sessions}
+          selectedSessionIds={selectedSessionIds}
+          onStart={startSession}
+          onToggleSelection={toggleSession}
+          onViewSession={handleOpenSession}
+          onStopSession={stopSession}
+          error={error}
+        />
+      )}
 
-        {activeTab === 'lab' && (
-          <LabPanel
-            strategies={strategies}
-            sessions={sessions}
-            selectedSessionIds={selectedSessionIds}
-            onStart={startSession}
-            onToggleSelection={toggleSession}
-            onViewSession={handleOpenSession}
-            onStopSession={stopSession}
-            error={error}
-          />
-        )}
+      {activeTab === 'session' && (
+        <SessionDetail
+          primarySession={primarySession}
+          allSessions={sessions}
+          equityHistory={equityHistory}
+          trades={trades}
+          positions={positions}
+          comparisonData={comparisonData}
+          benchmarksData={benchmarksData}
+          selectedBenchmarks={selectedBenchmarks}
+          onToggleBenchmark={toggleBenchmark}
+          availableBenchmarks={AVAILABLE_BENCHMARKS}
+          onSelectSession={handleOpenSession}
+          onRestoreCheckpoint={() => primarySessionId && fetchSessionDataFull(primarySessionId)}
+        />
+      )}
 
-        {activeTab === 'session' && (
-          <SessionDetail
-            primarySession={primarySession}
-            allSessions={sessions}
-            equityHistory={equityHistory}
-            trades={trades}
-            positions={positions}
-            comparisonData={comparisonData}
-            benchmarksData={benchmarksData}
-            selectedBenchmarks={selectedBenchmarks}
-            onToggleBenchmark={toggleBenchmark}
-            availableBenchmarks={AVAILABLE_BENCHMARKS}
-            onSelectSession={handleOpenSession}
-            onRestoreCheckpoint={() => primarySessionId && fetchSessionDataFull(primarySessionId)}
-          />
-        )}
+      {activeTab === 'comparison' && (
+        <Comparison
+          selectedSessionIds={selectedSessionIds}
+          sessionDataCache={sessionDataCache}
+          allSessions={sessions}
+          benchmarksData={benchmarksData}
+          availableBenchmarks={AVAILABLE_BENCHMARKS}
+        />
+      )}
 
-        {activeTab === 'comparison' && (
-          <Comparison
-            selectedSessionIds={selectedSessionIds}
-            sessionDataCache={sessionDataCache}
-            allSessions={sessions}
-            benchmarksData={benchmarksData}
-            availableBenchmarks={AVAILABLE_BENCHMARKS}
-          />
-        )}
-
-        {activeTab === 'heatmap' && <IndustryHeatmap />}
-        {activeTab === 'portfolio' && <PortfolioManager />}
-        {activeTab === 'optimizer' && <OptimizerPanel />}
-      </main>
-    </div>
+      {activeTab === 'heatmap' && <IndustryHeatmap />}
+      {activeTab === 'portfolio' && <PortfolioManager />}
+      {activeTab === 'optimizer' && <OptimizerPanel />}
+    </AppShell>
   );
 };
 

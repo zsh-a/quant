@@ -1,5 +1,9 @@
 import React from 'react';
 import type { StrategyMeta } from '../types';
+import { SectionCard } from './layout/SectionCard';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Separator } from './ui/separator';
 
 interface StrategyConfigFormProps {
   title: string;
@@ -19,12 +23,6 @@ interface StrategyConfigFormProps {
   footer?: React.ReactNode;
   showEndDate?: boolean;
 }
-
-const fieldStyle: React.CSSProperties = {
-  display: 'flex',
-  flexDirection: 'column',
-  gap: '0.4rem',
-};
 
 const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
   title,
@@ -46,19 +44,21 @@ const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
 }) => {
   const currentStrategy = strategies.find((strategy) => strategy.name === selectedStrategy);
 
+  const fieldClassName = 'flex flex-col gap-2';
+
   const renderParamInput = (key: string, conf: any) => {
     const value = paramValues[key] ?? conf.default;
 
     if (conf.type === 'bool') {
       return (
-        <label style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+        <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-secondary/40 px-4 py-3">
           <input
             type="checkbox"
             checked={Boolean(value)}
             onChange={(e) => onParamChange(key, e.target.checked)}
             style={{ width: 'auto' }}
           />
-          <span className="tagline">{conf.description || key}</span>
+          <span className="tagline !mb-0">{conf.description || key}</span>
         </label>
       );
     }
@@ -75,8 +75,7 @@ const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
 
     const inputType = conf.type === 'int' || conf.type === 'float' ? 'number' : 'text';
     return (
-      <input
-        className="glass-input"
+      <Input
         type={inputType}
         value={value ?? ''}
         min={conf.min}
@@ -89,14 +88,13 @@ const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
   };
 
   return (
-    <div className="glass card">
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.25rem', gap: '1rem' }}>
-        <h3 style={{ margin: 0 }}>{title}</h3>
-        {headerAction}
-      </div>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        <div style={fieldStyle}>
+    <SectionCard
+      title={title}
+      description="Configure strategy parameters, data range and execution mode."
+      action={headerAction}
+      contentClassName="space-y-5"
+    >
+        <div className={fieldClassName}>
           <label className="tagline">Strategy</label>
           <select className="glass-input" value={selectedStrategy} onChange={(e) => onStrategyChange(e.target.value)}>
             <option value="" disabled>Select a strategy...</option>
@@ -106,38 +104,38 @@ const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
           </select>
         </div>
 
-        <div style={fieldStyle}>
+        <div className={fieldClassName}>
           <label className="tagline">Symbol</label>
-          <input className="glass-input" value={symbol} onChange={(e) => onSymbolChange(e.target.value)} placeholder="例如 sh.000300" />
+          <Input value={symbol} onChange={(e) => onSymbolChange(e.target.value)} placeholder="例如 sh.000300" />
         </div>
 
-        <div style={{ display: 'grid', gridTemplateColumns: showEndDate ? '1fr 1fr' : '1fr', gap: '1rem' }}>
-          <div style={fieldStyle}>
+        <div className={`grid gap-4 ${showEndDate ? 'md:grid-cols-2' : ''}`}>
+          <div className={fieldClassName}>
             <label className="tagline">Start Date</label>
-            <input className="glass-input" type="date" value={startDate} onChange={(e) => onStartDateChange(e.target.value)} />
+            <Input type="date" value={startDate} onChange={(e) => onStartDateChange(e.target.value)} />
           </div>
           {showEndDate && onEndDateChange && (
-            <div style={fieldStyle}>
+            <div className={fieldClassName}>
               <label className="tagline">End Date</label>
-              <input className="glass-input" type="date" value={endDate} onChange={(e) => onEndDateChange(e.target.value)} />
+              <Input type="date" value={endDate} onChange={(e) => onEndDateChange(e.target.value)} />
             </div>
           )}
         </div>
 
         {selectedStrategy && (
-          <div style={{ padding: '1rem', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.05)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+          <div className="rounded-[1.4rem] border border-border/70 bg-secondary/35 p-4">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
               <div className="tagline" style={{ color: 'var(--primary)' }}>
                 Configuration {currentStrategy?.params ? `(${Object.keys(currentStrategy.params).length} fields)` : ''}
               </div>
-              <button className="btn-ghost" style={{ padding: '2px 8px', fontSize: '0.7rem' }} onClick={onResetDefaults}>
+              <Button variant="ghost" size="sm" onClick={onResetDefaults}>
                 Reset Defaults
-              </button>
+              </Button>
             </div>
-
-            <div style={{ display: 'grid', gap: '0.85rem' }}>
+            <Separator className="mb-4" />
+            <div className="grid gap-4">
               {currentStrategy?.params && Object.entries(currentStrategy.params).map(([key, conf]) => (
-                <div key={key} style={fieldStyle}>
+                <div key={key} className={fieldClassName}>
                   {conf.type !== 'bool' && (
                     <label className="tagline">
                       {key}
@@ -152,8 +150,7 @@ const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
         )}
 
         {footer}
-      </div>
-    </div>
+    </SectionCard>
   );
 };
 

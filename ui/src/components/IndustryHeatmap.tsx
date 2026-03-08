@@ -1,5 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import ReactECharts from 'echarts-for-react';
+import { PageHeader } from './layout/PageHeader';
+import { SectionCard } from './layout/SectionCard';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? "http://localhost:8000"
@@ -167,82 +171,51 @@ export const IndustryHeatmap: React.FC = () => {
   };
 
   return (
-    <div className="glass card" style={{ minHeight: '1100px', display: 'flex', flexDirection: 'column' }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-        <div>
-          <h3>Sector Heatmap ({metric === 'breadth' ? 'Market Breadth' : 'Liquidity Share'})</h3>
-          <p className="tagline">
-            {metric === 'breadth' 
-              ? 'Percentage of stocks in sector above 20-day Moving Average' 
-              : 'Percentage of total market liquidity captured by each sector'}
-          </p>
-        </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          <div className="glass" style={{ display: 'flex', padding: '2px', borderRadius: '8px', background: 'rgba(255,255,255,0.05)' }}>
-            <button 
-              onClick={() => setMetric('breadth')}
-              style={{ 
-                padding: '0.4rem 0.8rem', 
-                fontSize: '0.75rem', 
-                background: metric === 'breadth' ? 'var(--primary)' : 'transparent',
-                borderRadius: '6px',
-                transition: 'all 0.2s',
-                border: 'none',
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              Breadth
-            </button>
-            <button 
-              onClick={() => setMetric('amount')}
-              style={{ 
-                padding: '0.4rem 0.8rem', 
-                fontSize: '0.75rem', 
-                background: metric === 'amount' ? 'var(--primary)' : 'transparent',
-                borderRadius: '6px',
-                transition: 'all 0.2s',
-                border: 'none',
-                color: 'white',
-                cursor: 'pointer'
-              }}
-            >
-              Liquidity
-            </button>
-          </div>
-          <input 
-            type="date" 
-            className="glass-input" 
-            style={{ width: 'auto' }} 
-            value={startDate} 
-            onChange={e => setStartDate(e.target.value)} 
-          />
-          <input 
-            type="date" 
-            className="glass-input" 
-            style={{ width: 'auto' }} 
-            value={endDate} 
-            onChange={e => setEndDate(e.target.value)} 
-          />
-          <button onClick={fetchData} disabled={loading} style={{ background: 'var(--primary)', color: 'white', border: 'none', borderRadius: '8px', padding: '0.5rem 1rem', cursor: 'pointer' }}>
-            {loading ? 'Refreshing...' : 'Refresh'}
-          </button>
-        </div>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        eyebrow="Market Structure"
+        title={`Sector Heatmap (${metric === 'breadth' ? 'Market Breadth' : 'Liquidity Share'})`}
+        description={
+          metric === 'breadth'
+            ? 'Percentage of stocks in sector above 20-day Moving Average'
+            : 'Percentage of total market liquidity captured by each sector'
+        }
+      />
 
-      <div style={{ flex: 1, minHeight: '950px' }}>
-        {heatmapData ? (
-          <ReactECharts 
-            option={getOption()} 
-            style={{ height: '950px', width: '100%' }}
-            theme="dark"
-          />
-        ) : (
-          <div style={{ height: '950px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            {loading ? 'Loading data...' : 'No data available'}
-          </div>
-        )}
-      </div>
+      <SectionCard
+        title="Heatmap Controls"
+        description="Switch metrics and adjust the time window before refreshing the market map."
+        action={<Button onClick={fetchData} disabled={loading}>{loading ? 'Refreshing...' : 'Refresh'}</Button>}
+      >
+        <div className="flex flex-wrap gap-2">
+          <Button variant={metric === 'breadth' ? 'default' : 'outline'} size="sm" onClick={() => setMetric('breadth')}>
+            Breadth
+          </Button>
+          <Button variant={metric === 'amount' ? 'default' : 'outline'} size="sm" onClick={() => setMetric('amount')}>
+            Liquidity
+          </Button>
+        </div>
+        <div className="grid gap-3 md:grid-cols-2">
+          <Input type="date" value={startDate} onChange={e => setStartDate(e.target.value)} />
+          <Input type="date" value={endDate} onChange={e => setEndDate(e.target.value)} />
+        </div>
+      </SectionCard>
+
+      <SectionCard title="Sector Map" description="Blacklisted industries are highlighted to make defensive or crowded groups easier to spot.">
+        <div style={{ minHeight: '950px' }}>
+          {heatmapData ? (
+            <ReactECharts 
+              option={getOption()} 
+              style={{ height: '950px', width: '100%' }}
+              theme="dark"
+            />
+          ) : (
+            <div style={{ height: '950px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              {loading ? 'Loading data...' : 'No data available'}
+            </div>
+          )}
+        </div>
+      </SectionCard>
     </div>
   );
 };
