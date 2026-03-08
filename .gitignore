@@ -14,4 +14,4 @@ alpha/sample_models
 data
 utils/TGW-SDK_V1.0.8
 logs
-*.db
+*.db*
