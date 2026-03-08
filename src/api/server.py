@@ -374,6 +374,28 @@ async def get_sessions():
     return await anyio.to_thread.run_sync(session_db.get_all_sessions)
 
 
+@app.delete("/session/{session_id}")
+async def delete_session(session_id: str):
+    s_mem = SESSIONS.get(session_id)
+    s_db = await anyio.to_thread.run_sync(session_db.get_session, session_id) if not s_mem else None
+
+    if not s_mem and not s_db:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    status = s_mem.status if s_mem else s_db["status"]
+    if status == "running":
+        raise HTTPException(status_code=409, detail="Running sessions cannot be deleted")
+
+    deleted = await anyio.to_thread.run_sync(session_db.delete_session, session_id)
+    await anyio.to_thread.run_sync(persistence.delete_checkpoints, session_id)
+    SESSIONS.pop(session_id, None)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    return {"session_id": session_id, "deleted": True}
+
+
 @app.get("/session/{session_id}/risk")
 async def get_session_risk(session_id: str):
     """Risk metrics and alerts for a session. Returns 404 if session not found."""

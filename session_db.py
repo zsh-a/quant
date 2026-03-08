@@ -296,6 +296,26 @@ class SessionDB:
             if clear_logs:
                 conn.execute("DELETE FROM session_logs WHERE session_id = ?", (session_id,))
 
+    def delete_session(self, session_id: str) -> bool:
+        with self._get_conn() as conn:
+            conn.execute("DELETE FROM equity_history WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM trades WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM session_logs WHERE session_id = ?", (session_id,))
+            conn.execute(
+                "UPDATE simulation_jobs SET latest_session_id = NULL WHERE latest_session_id = ?",
+                (session_id,),
+            )
+            conn.execute(
+                "UPDATE simulation_runs SET session_id = NULL WHERE session_id = ?",
+                (session_id,),
+            )
+            conn.execute(
+                "UPDATE simulation_run_steps SET session_id = NULL WHERE session_id = ?",
+                (session_id,),
+            )
+            result = conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
+            return result.rowcount > 0
+
     def add_equity_points(self, session_id, points: List[Dict]):
         if not points:
             return

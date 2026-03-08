@@ -233,6 +233,39 @@ const App: React.FC = () => {
     }
   };
 
+  const deleteSession = async (id: string) => {
+    const session = sessions.find((item) => item.id === id);
+    if (!session) {
+      return;
+    }
+
+    const confirmed = window.confirm(`删除会话 ${session.strategy} (${id.slice(0, 8)})？此操作会移除历史记录、交易、日志和检查点。`);
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const resp = await fetch(`${API_BASE}/session/${id}`, { method: 'DELETE' });
+      if (!resp.ok) {
+        const data = await resp.json().catch(() => null);
+        throw new Error(data?.detail || '删除会话失败');
+      }
+
+      removeSession(id);
+      if (primarySessionId === id) {
+        setEquityHistory([]);
+        setTrades([]);
+        setPositions({});
+        setBenchmarksData({});
+        setActiveTab('lab');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : '删除会话失败';
+      setError(message);
+      console.error('Failed to delete session', err);
+    }
+  };
+
   const fetchBenchmarks = useCallback(async () => {
     if (!primarySessionId) {
       setBenchmarksData({});
@@ -457,6 +490,7 @@ const App: React.FC = () => {
           onToggleSelection={toggleSession}
           onViewSession={handleOpenSession}
           onStopSession={stopSession}
+          onDeleteSession={deleteSession}
           error={error}
         />
       )}

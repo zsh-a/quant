@@ -254,6 +254,20 @@ class StatePersistence:
             logger.error(f"Failed to delete old checkpoints: {e}")
             return 0
 
+    def delete_checkpoints(self, session_id: str) -> int:
+        """Delete all checkpoints for a session"""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM checkpoints WHERE session_id = ?", (session_id,))
+            deleted = cursor.rowcount
+            conn.commit()
+            conn.close()
+            return deleted
+        except Exception as e:
+            logger.error(f"Failed to delete checkpoints: {e}")
+            return 0
+
     def get_stats(self) -> Dict[str, Any]:
         """Get persistence statistics"""
         try:

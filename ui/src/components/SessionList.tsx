@@ -14,6 +14,7 @@ interface SessionListProps {
     onToggleSelection: (id: string) => void;
     onViewSession: (id: string) => void;
     onStopSession: (id: string) => void;
+    onDeleteSession: (id: string) => void;
     title?: string;
     defaultFilter?: SessionFilter;
 }
@@ -24,6 +25,7 @@ const SessionList: React.FC<SessionListProps> = ({
     onToggleSelection,
     onViewSession,
     onStopSession,
+    onDeleteSession,
     title = '全部会话',
     defaultFilter = 'all',
 }) => {
@@ -135,6 +137,11 @@ const SessionList: React.FC<SessionListProps> = ({
                                         {s.status === 'running' && (
                                             <Button variant="danger" size="sm" onClick={() => onStopSession(s.id)}>
                                                 停止
+                                            </Button>
+                                        )}
+                                        {s.status !== 'running' && (
+                                            <Button variant="danger" size="sm" onClick={() => onDeleteSession(s.id)}>
+                                                删除
                                             </Button>
                                         )}
                                     </div>

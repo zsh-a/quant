@@ -14,6 +14,7 @@ interface LabPanelProps {
   onToggleSelection: (id: string) => void;
   onViewSession: (id: string) => void;
   onStopSession: (id: string) => void;
+  onDeleteSession: (id: string) => void;
   error: string | null;
 }
 
@@ -25,6 +26,7 @@ const LabPanel: React.FC<LabPanelProps> = ({
   onToggleSelection,
   onViewSession,
   onStopSession,
+  onDeleteSession,
   error,
 }) => {
   const [labSubtab, setLabSubtab] = useState<'manual' | 'simulation'>(() => {
@@ -71,6 +73,7 @@ const LabPanel: React.FC<LabPanelProps> = ({
               onToggleSelection={onToggleSelection}
               onViewSession={onViewSession}
               onStopSession={onStopSession}
+              onDeleteSession={onDeleteSession}
             />
           </div>
         </TabsContent>
@@ -86,6 +89,7 @@ const LabPanel: React.FC<LabPanelProps> = ({
               onToggleSelection={onToggleSelection}
               onViewSession={onViewSession}
               onStopSession={onStopSession}
+              onDeleteSession={onDeleteSession}
             />
           </div>
         </TabsContent>
