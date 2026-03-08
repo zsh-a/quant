@@ -22,13 +22,13 @@ interface SidebarProps {
 }
 
 const NAV_ITEMS = [
-    { key: 'overview', label: 'Overview', icon: LayoutDashboard },
-    { key: 'lab', label: 'Lab', icon: FlaskConical },
-    { key: 'session', label: 'Session Detail', icon: Compass },
-    { key: 'comparison', label: 'Comparison', icon: BarChart3 },
-    { key: 'heatmap', label: 'Sector Heatmap', icon: Activity },
-    { key: 'portfolio', label: 'Portfolio', icon: BriefcaseBusiness },
-    { key: 'optimizer', label: 'Optimizer', icon: Sparkles },
+    { key: 'overview', label: '总览', icon: LayoutDashboard },
+    { key: 'lab', label: '实验室', icon: FlaskConical },
+    { key: 'session', label: '会话详情', icon: Compass },
+    { key: 'comparison', label: '策略对比', icon: BarChart3 },
+    { key: 'heatmap', label: '行业热力图', icon: Activity },
+    { key: 'portfolio', label: '组合管理', icon: BriefcaseBusiness },
+    { key: 'optimizer', label: '参数优化', icon: Sparkles },
 ] as const;
 
 const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect, hasSelectedSession }) => {
@@ -40,12 +40,12 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
                         <Sparkles className="size-5" />
                     </div>
                     <div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Codex-style UI</div>
+                        <div className="text-xs font-semibold uppercase tracking-[0.24em] text-primary/80">Operator Console</div>
                         <div className="text-xl font-semibold tracking-tight text-foreground">Quent Console</div>
                     </div>
                 </div>
                 <p className="mt-4 text-sm leading-6 text-muted-foreground">
-                    Trading workflows, simulation runs and diagnostics in one unified operator shell.
+                    用一套清晰的控制台界面管理策略运行、模拟任务和诊断视图。
                 </p>
             </div>
 
@@ -81,7 +81,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
                 <div className="flex items-center justify-between border-b border-border/70 px-4 py-4">
                     <div>
                         <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Live Queue</div>
-                        <div className="mt-1 text-sm font-medium text-foreground">Active Sessions</div>
+                        <div className="mt-1 text-sm font-medium text-foreground">运行中的会话</div>
                     </div>
                     <div className="rounded-full bg-primary/12 px-3 py-1 text-xs font-semibold text-primary">
                         {activeSessions.length}
@@ -114,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
                         ))}
                         {activeSessions.length === 0 ? (
                             <div className="rounded-2xl border border-dashed border-border/70 bg-card/40 p-4 text-sm text-muted-foreground">
-                                No active sessions. Start a run from the Lab panel.
+                                当前没有运行中的会话，可在实验室中发起新任务。
                             </div>
                         ) : null}
                     </div>

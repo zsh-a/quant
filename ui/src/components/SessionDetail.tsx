@@ -53,18 +53,18 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
 
   if (!primarySession) {
     return (
-      <EmptyState title="No Session Selected" description="从 Overview 或 Lab 选择一个 session 查看详情。" />
+      <EmptyState title="未选择会话" description="可从总览或实验室中选择一个会话进入详情视图。" />
     );
   }
 
   return (
     <div className="space-y-6">
       <SectionCard
-        title="Session Detail"
+        title="会话详情"
         description={`${primarySession.strategy} · ${primarySession.symbol} · ${primarySession.source || 'manual'}`}
         action={
           <div className="min-w-[280px] space-y-2">
-            <div className="tagline">切换 Session</div>
+            <div className="tagline">切换会话</div>
             <select className="glass-input" value={primarySession.id} onChange={(e) => onSelectSession(e.target.value)}>
               {allSessions.map((session) => (
                 <option key={session.id} value={session.id}>
@@ -87,7 +87,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
           </div>
           <div className="min-w-[260px] space-y-2">
             <div className="flex items-center justify-between text-xs uppercase tracking-[0.22em] text-muted-foreground">
-              <span>Execution Progress</span>
+              <span>执行进度</span>
               <span>{(primarySession.progress || 0).toFixed(0)}%</span>
             </div>
             <Progress value={primarySession.progress || 0} />
@@ -97,11 +97,11 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
 
       <Tabs value={subtab} onValueChange={(value) => setSubtab(value as 'overview' | 'execution' | 'risk' | 'analysis' | 'logs')}>
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="execution">Execution</TabsTrigger>
-          <TabsTrigger value="risk">Risk</TabsTrigger>
-          <TabsTrigger value="analysis">Analysis</TabsTrigger>
-          <TabsTrigger value="logs">Logs</TabsTrigger>
+          <TabsTrigger value="overview">总览</TabsTrigger>
+          <TabsTrigger value="execution">执行</TabsTrigger>
+          <TabsTrigger value="risk">风险</TabsTrigger>
+          <TabsTrigger value="analysis">分析</TabsTrigger>
+          <TabsTrigger value="logs">日志</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">

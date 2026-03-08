@@ -154,8 +154,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     if (!primarySession) {
         return (
             <div className="dashboard-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-dim)' }}>
-                <h2>No Session Selected</h2>
-                <p>Open a session from Overview or Lab to inspect its details.</p>
+                <h2>未选择会话</h2>
+                <p>可从总览或实验室中打开一个会话查看详情。</p>
             </div>
         );
     }
@@ -186,7 +186,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     )}
                 </div>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="tagline">Benchmarks:</span>
+                    <span className="tagline">基准:</span>
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
                         {availableBenchmarks.map(bm => (
                             <button
@@ -254,9 +254,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                     subtext={`Vol: ${formatPercent(metrics.volatility, 2)}`}
                 />
                 <StatCard 
-                    label="Max Drawdown" 
+                    label="最大回撤" 
                     value={formatPercent(metrics.maxDrawdown, 2)}
-                    delta={metrics.maxDrawdown > 0.2 ? 'High Risk' : 'Acceptable'}
+                    delta={metrics.maxDrawdown > 0.2 ? '风险偏高' : '风险可控'}
                 />
                  <StatCard 
                     label="Daily P&L" 
@@ -267,7 +267,7 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Chart */}
             <div className="glass card chart-container" style={{ marginTop: '2rem', height: '400px', padding: '2rem' }}>
-                <h3 style={{ marginBottom: '1rem' }}>Equity Curve (%)</h3>
+                <h3 style={{ marginBottom: '1rem' }}>收益曲线 (%)</h3>
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
                         <defs>
@@ -284,7 +284,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             itemStyle={{ color: 'var(--text)' }}
                             formatter={(value: any, name: string) => [
                                 `${value.toFixed(2)}%`,
-                                name === 'equityReturn' ? 'Strategy' : availableBenchmarks.find(b => b.code === name)?.name || name
+                                name === 'equityReturn' ? '策略收益' : availableBenchmarks.find(b => b.code === name)?.name || name
                             ]}
                             labelFormatter={(label) => label.split(' ')[0]}
                         />
@@ -328,9 +328,9 @@ const Dashboard: React.FC<DashboardProps> = ({
                 {/* Holdings Card */}
                 <div className="glass card">
                 <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {selectedDay ? `Holdings: ${selectedDay.timestamp.split(' ')[0]}` : 'Current Holdings'}
+                    {selectedDay ? `持仓快照 · ${selectedDay.timestamp.split(' ')[0]}` : '当前持仓'}
                     <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {selectedDay && <button className="tagline" style={{ marginRight: '0.5rem', padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={clearDaySelection}>Back to Live</button>}
+                    {selectedDay && <button className="tagline" style={{ marginRight: '0.5rem', padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={clearDaySelection}>返回实时视图</button>}
                     <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setHoldingsPage(p => Math.max(1, p - 1))} disabled={holdingsPage === 1}>Prev</button>
                     <span className="tagline" style={{ fontSize: '0.7rem' }}>{holdingsPage} / {Math.ceil(positionKeys.length / PAGE_SIZE) || 1}</span>
                     <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setHoldingsPage(p => Math.min(Math.ceil(positionKeys.length / PAGE_SIZE), p + 1))} disabled={holdingsPage >= Math.ceil(positionKeys.length / PAGE_SIZE)}>Next</button>
@@ -379,7 +379,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </tr>
                         );
                         })}
-                        {positionKeys.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No positions</td></tr>}
+                        {positionKeys.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>暂无持仓</td></tr>}
                     </tbody>
                     </table>
                 </div>
@@ -388,7 +388,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                 {/* Trades Card - Virtualized */}
                 <div className="glass card" style={{ display: 'flex', flexDirection: 'column' }}>
                 <h3 style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {selectedDay ? `Trades: ${selectedDay.timestamp.split(' ')[0]}` : 'All Trades'}
+                    {selectedDay ? `成交记录 · ${selectedDay.timestamp.split(' ')[0]}` : '全部成交'}
                     <span className="tagline" style={{ fontSize: '0.7rem' }}>
                         {sortedTrades.length} trades
                     </span>
@@ -404,7 +404,7 @@ const Dashboard: React.FC<DashboardProps> = ({
             {/* Daily Evolution Card */}
             <div className="glass card" style={{ marginTop: '2rem' }}>
                 <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                Daily History
+                每日历史
                 <div style={{ display: 'flex', gap: '0.5rem' }}>
                     <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.max(1, p - 1))} disabled={equityPage === 1}>Prev</button>
                     <span className="tagline" style={{ fontSize: '0.7rem' }}>{equityPage} / {Math.ceil(equityHistory.length / PAGE_SIZE) || 1}</span>
@@ -437,7 +437,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </td>
                     </tr>
                     ))}
-                    {equityHistory.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>No history yet</td></tr>}
+                    {equityHistory.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>暂无历史数据</td></tr>}
                 </tbody>
                 </table>
             </div>

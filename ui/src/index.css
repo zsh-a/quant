@@ -64,12 +64,14 @@
   body {
     @apply min-h-screen bg-background text-foreground antialiased;
     margin: 0;
-    font-family: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", sans-serif;
+    font-family: "Manrope", "IBM Plex Sans", "SF Pro Display", "Segoe UI", sans-serif;
     background-image:
       radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 30%),
       radial-gradient(circle at top, rgba(56, 189, 248, 0.1), transparent 25%),
       linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(9, 14, 24, 1));
     overflow-x: hidden;
+    letter-spacing: -0.011em;
+    line-height: 1.5;
   }
 
   button,
@@ -77,6 +79,13 @@
   select,
   textarea {
     font: inherit;
+  }
+
+  code,
+  pre,
+  kbd,
+  samp {
+    font-family: "IBM Plex Mono", "SFMono-Regular", "JetBrains Mono", monospace;
   }
 
   a {
@@ -114,6 +123,8 @@
 
   .tagline {
     @apply text-sm text-muted-foreground;
+    letter-spacing: -0.01em;
+    line-height: 1.55;
   }
 
   .grid {
@@ -133,11 +144,12 @@
   }
 
   .data-table th {
-    @apply px-3 py-3 text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground;
+    @apply px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground;
   }
 
   .data-table td {
     @apply border-b border-border/50 px-3 py-3 align-top text-sm text-foreground;
+    letter-spacing: -0.01em;
   }
 
   .data-table tbody tr:hover {
@@ -252,7 +264,7 @@
   .metric-limit,
   .checkpoint-time,
   .alert-time {
-    @apply text-xs font-medium uppercase tracking-[0.18em] text-muted-foreground;
+    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
   }
 
   .empty-state,

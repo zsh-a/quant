@@ -50,21 +50,21 @@ const LabPanel: React.FC<LabPanelProps> = ({
     <div className="space-y-6">
       <PageHeader
         eyebrow="Execution Workspace"
-        title="Strategy Lab"
-        description="Manual Runs 只保留 backtest / live，所有 simulation 统一在 Simulation 视图里。"
+        title="策略实验室"
+        description="手动任务仅保留回测与实盘，所有模拟流程统一收纳在模拟视图中。"
       />
 
       <Tabs value={labSubtab} onValueChange={(value) => setLabSubtab(value as 'manual' | 'simulation')}>
         <TabsList>
-          <TabsTrigger value="manual">Manual Runs</TabsTrigger>
-          <TabsTrigger value="simulation">Simulation</TabsTrigger>
+          <TabsTrigger value="manual">手动任务</TabsTrigger>
+          <TabsTrigger value="simulation">模拟任务</TabsTrigger>
         </TabsList>
 
         <TabsContent value="manual">
           <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.4fr)]">
             <NewSessionForm strategies={strategies} onStart={onStart} error={error} />
             <SessionList
-              title="Manual Session List"
+              title="手动任务列表"
               defaultFilter="manual"
               sessions={manualSessions}
               selectedSessionIds={selectedSessionIds}
@@ -79,7 +79,7 @@ const LabPanel: React.FC<LabPanelProps> = ({
           <div className="space-y-6">
             <SimulationPanel strategies={strategies} onSelectSession={onViewSession} />
             <SessionList
-              title="Simulation Session List"
+              title="模拟任务列表"
               defaultFilter="simulation"
               sessions={simulationSessions}
               selectedSessionIds={selectedSessionIds}

@@ -52,13 +52,13 @@ function mergeTrades(prev: Trade[], next: Trade[]): Trade[] {
 }
 
 const TITLES: Record<string, string> = {
-  overview: 'Overview',
-  lab: 'Strategy Lab',
-  session: 'Session Detail',
-  comparison: 'Comparison',
-  heatmap: 'Sector Heatmap',
-  portfolio: 'Portfolio',
-  optimizer: 'Optimizer',
+  overview: '总览',
+  lab: '策略实验室',
+  session: '会话详情',
+  comparison: '策略对比',
+  heatmap: '行业热力图',
+  portfolio: '组合管理',
+  optimizer: '参数优化',
 };
 
 const App: React.FC = () => {
@@ -381,24 +381,24 @@ const App: React.FC = () => {
             title={TITLES[activeTab]}
             description={
               activeTab === 'overview'
-                ? 'Monitor all strategy runs, reopen recent sessions and track system health from a unified shell.'
+                ? '统一查看策略运行、最近会话与系统状态。'
                 : activeTab === 'lab'
-                  ? 'Launch new runs, compare saved experiments and manage simulation workflows.'
+                  ? '发起新任务、管理模拟流程，并整理实验结果。'
                   : activeTab === 'session'
-                    ? 'Inspect execution, risk, attribution and live logs within one session workspace.'
-                    : 'Unified analytics and tooling surfaces aligned to the new console design.'
+                    ? '在同一工作区查看执行过程、风险分析、归因结果与日志。'
+                    : '围绕同一套控制台视觉语言呈现分析与工具能力。'
             }
           />
           <div className="flex flex-wrap items-center gap-3">
             <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Connection</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">连接状态</div>
               <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
                 <StatusBadge value={isConnected || usePolling ? 'running' : 'failed'} />
                 <span>{API_BASE.replace(/^https?:\/\//, '')}</span>
               </div>
             </div>
             <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Selected</div>
+              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">已选会话</div>
               <div className="mt-1 text-lg font-semibold text-foreground">{selectedSessionIds.length}</div>
             </div>
           </div>

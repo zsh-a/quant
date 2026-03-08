@@ -127,7 +127,7 @@ const Comparison: React.FC<ComparisonProps> = ({
 
     if (selectedSessionIds.length === 0) {
         return (
-            <EmptyState title="No Sessions Selected" description="Go to Strategy Lab to select sessions for comparison." />
+            <EmptyState title="未选择对比会话" description="前往策略实验室选择需要对比的会话。" />
         );
     }
 
@@ -135,8 +135,8 @@ const Comparison: React.FC<ComparisonProps> = ({
         <div className="dashboard-view space-y-6">
             <PageHeader
                 eyebrow="Cross-run Analytics"
-                title="Strategy Comparison"
-                description={`Comparing ${sessionMetrics.length} sessions`}
+                title="策略对比"
+                description={`当前正在比较 ${sessionMetrics.length} 个会话`}
                 actions={
                     <Button variant={useLttb ? 'default' : 'outline'} size="sm" onClick={() => setUseLttb(!useLttb)}>
                         LTTB: {useLttb ? 'ON' : 'OFF'}
@@ -144,7 +144,7 @@ const Comparison: React.FC<ComparisonProps> = ({
                 }
             />
 
-            <SectionCard title="Metrics Matrix" description="Key return and risk metrics normalized across selected runs.">
+            <SectionCard title="指标矩阵" description="对齐展示各会话的收益、风险与交易效率指标。">
             <div className="overflow-x-auto">
                 <table className="data-table">
                     <thead>
@@ -188,7 +188,7 @@ const Comparison: React.FC<ComparisonProps> = ({
             </div>
             </SectionCard>
 
-            <SectionCard title="Equity Curve Comparison (%)" description="Relative return trajectories for selected sessions.">
+            <SectionCard title="收益曲线对比 (%)" description="查看各会话的相对收益轨迹变化。">
             <div className="chart-container h-[500px]">
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>

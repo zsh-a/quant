@@ -19,13 +19,13 @@ export function MetricCard({ label, value, hint, trend, className }: MetricCardP
       )}
     >
       <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">
+      <div className="space-y-3.5">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
           {label}
         </p>
-        <div className="text-2xl font-semibold tracking-tight text-foreground">{value}</div>
-        {trend ? <div className="text-sm font-medium text-foreground/90">{trend}</div> : null}
-        {hint ? <div className="text-sm text-muted-foreground">{hint}</div> : null}
+        <div className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">{value}</div>
+        {trend ? <div className="text-sm font-semibold tracking-[-0.012em] text-foreground/92">{trend}</div> : null}
+        {hint ? <div className="text-[13px] leading-6 text-muted-foreground">{hint}</div> : null}
       </div>
     </div>
   )

@@ -80,7 +80,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
 
     return (
         <StrategyConfigForm
-            title="Manual Runs"
+            title="手动任务"
             strategies={strategies}
             selectedStrategy={selectedStrategy}
             onStrategyChange={setSelectedStrategy}
