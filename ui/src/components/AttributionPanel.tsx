@@ -1,6 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { formatMoney } from '../utils/format';
+import React, { useEffect, useMemo, useState } from 'react';
 import { API_BASE } from '../utils/api';
+import { formatMoney, formatPercent, colorFromValue } from '../utils/format';
+import { EmptyState } from './layout/EmptyState';
+import { MetricCard } from './layout/MetricCard';
+import { SectionCard } from './layout/SectionCard';
 
 interface AttributionData {
     session_id: string;
@@ -14,7 +17,6 @@ interface AttributionData {
     profit_factor: number;
 }
 
-
 interface Props {
     sessionId: string;
 }
@@ -22,127 +24,163 @@ interface Props {
 export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
     const [data, setData] = useState<AttributionData | null>(null);
     const [loading, setLoading] = useState(false);
-    const [reportUrl, setReportUrl] = useState<string | null>(null);
 
     useEffect(() => {
-        if (sessionId) fetchAttribution();
+        if (!sessionId) {
+            setData(null);
+            return;
+        }
+
+        const fetchAttribution = async () => {
+            setLoading(true);
+            try {
+                const resp = await fetch(`${API_BASE}/analysis/attribution/${sessionId}`);
+                if (resp.ok) {
+                    setData(await resp.json());
+                } else {
+                    setData(null);
+                }
+            } catch (e) {
+                console.error(e);
+                setData(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchAttribution();
     }, [sessionId]);
 
-    const fetchAttribution = async () => {
-        setLoading(true);
-        try {
-            const resp = await fetch(`${API_BASE}/analysis/attribution/${sessionId}`);
-            if (resp.ok) setData(await resp.json());
-        } catch (e) {
-            console.error(e);
-        }
-        setLoading(false);
-    };
+    const sortedAssets = useMemo(
+        () => Object.entries(data?.by_asset || {}).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])),
+        [data],
+    );
+    const sortedSectors = useMemo(
+        () => Object.entries(data?.by_sector || {}).sort((a, b) => Math.abs(b[1]) - Math.abs(a[1])),
+        [data],
+    );
+    const sortedPeriods = useMemo(
+        () => Object.entries(data?.by_period || {}).sort((a, b) => a[0].localeCompare(b[0])),
+        [data],
+    );
 
-    const generateReport = async () => {
-        const resp = await fetch(`${API_BASE}/analysis/report/${sessionId}?format=json`);
-        if (resp.ok) {
-            const d = await resp.json();
-            setReportUrl(d.path);
-        }
-    };
+    if (loading) {
+        return (
+            <SectionCard title="归因分析" description="正在加载收益来源、行业贡献和时间维度表现。">
+                <div className="empty-state">归因分析加载中...</div>
+            </SectionCard>
+        );
+    }
 
-    if (loading) return <div style={containerStyle}>加载中...</div>;
-    if (!data) return <div style={containerStyle}>选择会话查看归因分析</div>;
-
-    const sortedAssets = Object.entries(data.by_asset).sort((a, b) => b[1] - a[1]);
-    const sortedSectors = Object.entries(data.by_sector).sort((a, b) => b[1] - a[1]);
-    const sortedPeriods = Object.entries(data.by_period).sort();
+    if (!data) {
+        return (
+            <EmptyState
+                title="暂无归因分析"
+                description="选择一个已有收益数据的会话后，这里会展示资产、行业与时间维度的收益归因。"
+            />
+        );
+    }
 
     return (
-        <div style={containerStyle}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <h2>📊 归因分析</h2>
-                <button onClick={generateReport} style={btnStyle}>生成报告</button>
+        <div className="space-y-6">
+            <SectionCard
+                title="归因分析"
+                description="直接在前端查看收益来源、结构分布和月度节奏，无需生成额外报告文件。"
+            >
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                    <MetricCard
+                        label="总收益"
+                        value={<span style={{ color: colorFromValue(data.total_return * 100) }}>{formatPercent(data.total_return, 2)}</span>}
+                        hint="整体收益表现"
+                    />
+                    <MetricCard
+                        label="胜率"
+                        value={formatPercent(data.win_rate, 1)}
+                        hint="盈利交易占比"
+                    />
+                    <MetricCard
+                        label="盈亏比"
+                        value={data.profit_factor.toFixed(2)}
+                        hint="盈利与亏损的效率比"
+                    />
+                    <MetricCard
+                        label="平均盈利"
+                        value={<span style={{ color: 'var(--success)' }}>{formatPercent(data.avg_win, 2)}</span>}
+                        hint="单笔盈利均值"
+                    />
+                    <MetricCard
+                        label="平均亏损"
+                        value={<span style={{ color: 'var(--danger)' }}>{formatPercent(data.avg_loss, 2)}</span>}
+                        hint="单笔亏损均值"
+                    />
+                </div>
+            </SectionCard>
+
+            <div className="grid gap-6 xl:grid-cols-2">
+                <SectionCard title="资产贡献" description="识别最主要的收益来源与拖累资产。">
+                    <div className="space-y-3">
+                        {sortedAssets.slice(0, 8).map(([symbol, pnl]) => (
+                            <ContributionBar key={symbol} label={symbol} value={pnl} entries={sortedAssets.map((item) => item[1])} />
+                        ))}
+                        {sortedAssets.length === 0 ? <div className="empty-state">暂无资产维度数据</div> : null}
+                    </div>
+                </SectionCard>
+
+                <SectionCard title="行业贡献" description="查看不同行业对整体收益的推动或拖累。">
+                    <div className="space-y-3">
+                        {sortedSectors.map(([sector, pnl]) => (
+                            <ContributionBar key={sector} label={sector} value={pnl} entries={sortedSectors.map((item) => item[1])} />
+                        ))}
+                        {sortedSectors.length === 0 ? <div className="empty-state">暂无行业维度数据</div> : null}
+                    </div>
+                </SectionCard>
             </div>
 
-            {/* Summary */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 12, margin: '16px 0' }}>
-                <StatCard label="总收益" value={`${(data.total_return * 100).toFixed(2)}%`} positive={data.total_return >= 0} />
-                <StatCard label="胜率" value={`${(data.win_rate * 100).toFixed(1)}%`} />
-                <StatCard label="盈亏比" value={data.profit_factor.toFixed(2)} />
-                <StatCard label="平均盈利" value={`${(data.avg_win * 100).toFixed(2)}%`} positive />
-            </div>
-
-            {/* By Asset */}
-            <Section title="按资产">
-                {sortedAssets.slice(0, 8).map(([symbol, pnl]) => (
-                    <BarItem key={symbol} label={symbol} value={pnl} />
-                ))}
-            </Section>
-
-            {/* By Sector */}
-            <Section title="按行业">
-                {sortedSectors.map(([sector, pnl]) => (
-                    <BarItem key={sector} label={sector} value={pnl} />
-                ))}
-            </Section>
-
-            {/* By Period */}
-            <Section title="月度收益">
-                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+            <SectionCard title="月度节奏" description="快速查看按月份聚合后的收益分布。">
+                <div className="flex flex-wrap gap-3">
                     {sortedPeriods.map(([month, ret]) => (
-                        <div key={month} style={{
-                            padding: '6px 10px', borderRadius: 4,
-                            background: ret >= 0 ? 'rgba(40,167,69,0.2)' : 'rgba(220,53,69,0.2)',
-                            color: ret >= 0 ? '#28a745' : '#dc3545',
-                            fontSize: 12
-                        }}>
-                            {month}: {(ret * 100).toFixed(1)}%
+                        <div
+                            key={month}
+                            className="rounded-2xl border px-4 py-3"
+                            style={{
+                                borderColor: ret >= 0 ? 'rgba(52,211,153,0.18)' : 'rgba(251,113,133,0.18)',
+                                background: ret >= 0 ? 'rgba(52,211,153,0.08)' : 'rgba(251,113,133,0.08)',
+                                color: ret >= 0 ? '#86efac' : '#fda4af',
+                            }}
+                        >
+                            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-80">{month}</div>
+                            <div className="mt-1 text-base font-semibold tracking-[-0.02em]">{formatPercent(ret, 1)}</div>
                         </div>
                     ))}
+                    {sortedPeriods.length === 0 ? <div className="empty-state">暂无月度收益数据</div> : null}
                 </div>
-            </Section>
-
-            {reportUrl && (
-                <div style={{ marginTop: 16, padding: 12, background: '#252525', borderRadius: 8 }}>
-                    ✅ 报告已生成: {reportUrl}
-                </div>
-            )}
+            </SectionCard>
         </div>
     );
 };
 
-const StatCard: React.FC<{ label: string; value: string; positive?: boolean }> = ({ label, value, positive }) => (
-    <div style={{ background: '#252525', borderRadius: 8, padding: 12, textAlign: 'center' }}>
-        <div style={{ fontSize: 11, color: '#888' }}>{label}</div>
-        <div style={{ fontSize: 18, fontWeight: 600, color: positive ? '#28a745' : positive === false ? '#dc3545' : '#fff' }}>{value}</div>
-    </div>
-);
-
-const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
-    <div style={{ marginBottom: 16 }}>
-        <h4 style={{ margin: '0 0 8px', color: '#aaa', fontSize: 13 }}>{title}</h4>
-        {children}
-    </div>
-);
-
-const BarItem: React.FC<{ label: string; value: number }> = ({ label, value }) => {
-    const max = 50000;
-    const width = Math.min(Math.abs(value) / max * 100, 100);
+const ContributionBar: React.FC<{ label: string; value: number; entries: number[] }> = ({ label, value, entries }) => {
+    const max = Math.max(...entries.map((item) => Math.abs(item)), 1);
+    const width = `${Math.min((Math.abs(value) / max) * 100, 100)}%`;
     const positive = value >= 0;
+
     return (
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <span style={{ width: 80, fontSize: 12, color: '#888', overflow: 'hidden', textOverflow: 'ellipsis' }}>{label}</span>
-            <div style={{ flex: 1, height: 8, background: '#333', borderRadius: 4, overflow: 'hidden' }}>
-                <div style={{
-                    width: `${width}%`, height: '100%',
-                    background: positive ? '#28a745' : '#dc3545'
-                }} />
+        <div className="grid gap-2 sm:grid-cols-[120px_minmax(0,1fr)_88px] sm:items-center">
+            <div className="truncate text-sm font-medium text-foreground">{label}</div>
+            <div className="h-2 overflow-hidden rounded-full bg-secondary/90">
+                <div
+                    className="h-full rounded-full"
+                    style={{
+                        width,
+                        background: positive ? 'linear-gradient(90deg, #34d399, #22c55e)' : 'linear-gradient(90deg, #fb7185, #ef4444)',
+                    }}
+                />
             </div>
-            <span style={{ width: 60, fontSize: 11, textAlign: 'right', color: positive ? '#28a745' : '#dc3545' }}>
+            <div className="text-right text-sm font-semibold" style={{ color: positive ? 'var(--success)' : 'var(--danger)' }}>
                 {formatMoney(value, { symbol: '¥' })}
-            </span>
+            </div>
         </div>
     );
 };
-
-const containerStyle: React.CSSProperties = { padding: 20, background: '#1a1a1a', borderRadius: 12, color: '#fff' };
-const btnStyle: React.CSSProperties = { background: '#667eea', border: 'none', padding: '8px 16px', borderRadius: 6, color: 'white', cursor: 'pointer' };
 
 export default AttributionPanel;
