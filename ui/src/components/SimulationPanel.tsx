@@ -3,6 +3,7 @@ import type { DataUpdateRun, SimulationJob, SimulationRun, SimulationStep, Strat
 import StrategyConfigForm from './StrategyConfigForm';
 import { API_BASE } from '../utils/api';
 import { formatPrice } from '../utils/format';
+import { formatSourceLabel, formatStatusLabel } from '../utils/display';
 
 interface SimulationPanelProps {
   strategies: StrategyMeta[];
@@ -287,7 +288,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1fr', gap: '1rem' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <StrategyConfigForm
-          title="Simulation Tasks"
+          title="模拟任务"
           strategies={strategies}
           selectedStrategy={strategy}
           onStrategyChange={setStrategy}
@@ -347,13 +348,13 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                     <div style={{ fontWeight: 700 }}>{job.name}</div>
                     <div className="tagline">{job.strategy_name} · {job.symbol}</div>
                   </div>
-                  <span className={`status-badge ${job.enabled ? 'status-backtest' : ''}`}>{job.enabled ? 'enabled' : 'disabled'}</span>
+                  <span className={`status-badge ${job.enabled ? 'status-backtest' : ''}`}>{job.enabled ? '启用中' : '已停用'}</span>
                 </div>
                 <div className="tagline" style={{ marginTop: '0.5rem' }}>
                   首次验证：{job.start_date} → {job.end_date || '最新数据'}
                 </div>
                 <div className="tagline" style={{ marginTop: '0.35rem' }}>
-                  状态：{job.status} · 最近处理到：{job.last_processed_at || '未开始'}
+                  状态：{formatStatusLabel(job.status)} · 最近处理到：{job.last_processed_at || '未开始'}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
                   <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleToggleJob(job); }}>
@@ -384,8 +385,8 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
           {dataUpdates.map((item) => (
             <div key={item.update_run_id} style={{ padding: '0.8rem', borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong>{item.status}</strong>
-                <span className="tagline">{item.trigger_source}</span>
+                <strong>{formatStatusLabel(item.status)}</strong>
+                <span className="tagline">{formatSourceLabel(item.trigger_source)}</span>
               </div>
               <div className="tagline" style={{ marginTop: '0.4rem' }}>
                 新数据：{item.has_new_data ? '是' : '否'} · {item.completed_at || item.started_at || item.created_at}
@@ -414,7 +415,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
               }}
             >
               <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                <strong>{run.status}</strong>
+                <strong>{formatStatusLabel(run.status)}</strong>
                 <span className="tagline">{run.progress.toFixed(0)}%</span>
               </div>
               <div className="tagline" style={{ marginTop: '0.4rem' }}>

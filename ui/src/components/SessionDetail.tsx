@@ -11,6 +11,7 @@ import { EmptyState } from './layout/EmptyState';
 import { SectionCard } from './layout/SectionCard';
 import { StatusBadge } from './layout/StatusBadge';
 import { Progress } from './ui/progress';
+import { formatSourceLabel } from '../utils/display';
 
 interface SessionDetailProps {
   primarySession?: SessionSummary;
@@ -61,7 +62,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
     <div className="space-y-6">
       <SectionCard
         title="会话详情"
-        description={`${primarySession.strategy} · ${primarySession.symbol} · ${primarySession.source || 'manual'}`}
+        description={`${primarySession.strategy} · ${primarySession.symbol} · ${formatSourceLabel(primarySession.source)}`}
         action={
           <div className="min-w-[280px] space-y-2">
             <div className="tagline">切换会话</div>

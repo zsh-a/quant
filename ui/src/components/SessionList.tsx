@@ -4,6 +4,7 @@ import { SectionCard } from './layout/SectionCard';
 import { StatusBadge } from './layout/StatusBadge';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
+import { formatSourceLabel } from '../utils/display';
 
 type SessionFilter = 'all' | 'manual' | 'simulation' | 'running';
 
@@ -23,7 +24,7 @@ const SessionList: React.FC<SessionListProps> = ({
     onToggleSelection,
     onViewSession,
     onStopSession,
-    title = 'All Sessions',
+    title = '全部会话',
     defaultFilter = 'all',
 }) => {
     const [filter, setFilter] = useState<SessionFilter>(defaultFilter);
@@ -55,14 +56,14 @@ const SessionList: React.FC<SessionListProps> = ({
     return (
         <SectionCard
             title={title}
-            description="Review saved sessions, select comparison targets and jump back into execution details."
+            description="查看会话记录、选择对比对象，并快速回到执行详情。"
             action={
                 <div className="flex flex-wrap gap-2">
                     {([
-                        ['all', `All (${counts.all})`],
-                        ['manual', `Manual (${counts.manual})`],
-                        ['simulation', `Simulation (${counts.simulation})`],
-                        ['running', `Running (${counts.running})`],
+                        ['all', `全部 (${counts.all})`],
+                        ['manual', `手动 (${counts.manual})`],
+                        ['simulation', `模拟 (${counts.simulation})`],
+                        ['running', `运行中 (${counts.running})`],
                     ] as Array<[SessionFilter, string]>).map(([value, label]) => (
                         <Button
                             key={value}
@@ -82,12 +83,12 @@ const SessionList: React.FC<SessionListProps> = ({
                         <tr>
                             <th style={{ width: '40px' }}></th>
                             <th>ID</th>
-                            <th>Strategy</th>
-                            <th>Timeframe</th>
-                            <th>Mode</th>
-                            <th>Status</th>
-                            <th>Source</th>
-                            <th>Actions</th>
+                            <th>策略</th>
+                            <th>时间区间</th>
+                            <th>模式</th>
+                            <th>状态</th>
+                            <th>来源</th>
+                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -108,7 +109,7 @@ const SessionList: React.FC<SessionListProps> = ({
                                 </td>
                                 <td style={{ fontSize: '0.8rem' }}>
                                     {s.start_date}<br />
-                                    {s.end_date || 'Ongoing'}
+                                    {s.end_date || '进行中'}
                                 </td>
                                 <td><StatusBadge value={s.mode} /></td>
                                 <td>
@@ -123,24 +124,24 @@ const SessionList: React.FC<SessionListProps> = ({
                                     </div>
                                 </td>
                                 <td>
-                                    <span className="tagline">{s.source || 'manual'}</span>
-                                    {s.job_id && <div className="tagline" style={{ fontSize: '0.65rem' }}>job {s.job_id.slice(0, 6)}</div>}
+                                    <span className="tagline">{formatSourceLabel(s.source)}</span>
+                                    {s.job_id && <div className="tagline" style={{ fontSize: '0.65rem' }}>任务 {s.job_id.slice(0, 6)}</div>}
                                 </td>
                                 <td>
                                     <div className="flex gap-2">
                                         <Button variant="outline" size="sm" onClick={() => onViewSession(s.id)}>
-                                            View
+                                            查看
                                         </Button>
                                         {s.status === 'running' && (
                                             <Button variant="danger" size="sm" onClick={() => onStopSession(s.id)}>
-                                                Stop
+                                                停止
                                             </Button>
                                         )}
                                     </div>
                                 </td>
                             </tr>
                         ))}
-                        {filteredSessions.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '2rem' }}>No sessions found</td></tr>}
+                        {filteredSessions.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '2rem' }}>未找到会话</td></tr>}
                     </tbody>
                 </table>
             </div>

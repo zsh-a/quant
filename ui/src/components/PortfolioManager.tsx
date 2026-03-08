@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { formatMoney } from '../utils/format';
+import { PageHeader } from './layout/PageHeader';
 
 interface Strategy {
     name: string;
@@ -154,8 +155,19 @@ export const PortfolioManager: React.FC = () => {
 
     return (
         <div className="portfolio-manager">
-            <div className="portfolio-header">
-                <h2>📊 多策略组合管理</h2>
+            <PageHeader
+                eyebrow="Portfolio Lab"
+                title="组合管理"
+                description="创建多策略组合、调整配置，并直接发起组合回测。"
+                actions={
+                    <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
+                        创建组合
+                    </button>
+                }
+            />
+
+            <div className="portfolio-header" style={{ marginTop: '1.25rem' }}>
+                <h2>组合列表</h2>
                 <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
                     + 创建组合
                 </button>
@@ -169,9 +181,9 @@ export const PortfolioManager: React.FC = () => {
                         className={`portfolio-card ${selectedPortfolio === p.portfolio_id ? 'selected' : ''}`}
                         onClick={() => setSelectedPortfolio(p.portfolio_id)}
                     >
-                        <h3>{p.portfolio_id}</h3>
+                        <h3>{p.name || p.portfolio_id}</h3>
                         <div className="portfolio-info">
-                            <span>策略数: {p.n_strategies}</span>
+                            <span>策略数：{p.n_strategies}</span>
                         </div>
                         <div className="weight-bars">
                             {Object.entries(p.weights).map(([name, weight]) => (
@@ -187,7 +199,7 @@ export const PortfolioManager: React.FC = () => {
 
                 {portfolios.length === 0 && (
                     <div className="empty-state">
-                        <p>暂无组合，点击"创建组合"开始</p>
+                        <p>暂无组合，点击“创建组合”开始。</p>
                     </div>
                 )}
             </div>

@@ -5,6 +5,7 @@ import { SectionCard } from './layout/SectionCard';
 import { MetricCard } from './layout/MetricCard';
 import { StatusBadge } from './layout/StatusBadge';
 import { Progress } from './ui/progress';
+import { formatSourceLabel } from '../utils/display';
 
 interface GlobalOverviewProps {
   sessions: SessionSummary[];
@@ -53,11 +54,11 @@ const GlobalOverview: React.FC<GlobalOverviewProps> = ({
                       <StatusBadge value={session.mode} />
                       <StatusBadge value={session.status} />
                     </div>
-                    <div className="text-sm text-muted-foreground">{session.symbol} · {session.source || 'manual'}</div>
+                    <div className="text-sm text-muted-foreground">{session.symbol} · {formatSourceLabel(session.source)}</div>
                     <div className="text-sm text-muted-foreground">{session.start_date} → {session.end_date || 'Ongoing'}</div>
                   </div>
 
-                  <div className="rounded-2xl border border-border/60 bg-card/75 px-4 py-4">
+                  <div className="rounded-2xl border border-white/8 bg-white/[0.035] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.03)]">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <span className="text-sm text-muted-foreground">进度</span>
                       <span className="text-sm font-semibold text-foreground">{session.progress?.toFixed?.(0) ?? session.progress}%</span>
@@ -90,7 +91,7 @@ const GlobalOverview: React.FC<GlobalOverviewProps> = ({
                 <StatusBadge value={primarySession.mode} />
                 <StatusBadge value={primarySession.status} />
               </div>
-              <div className="text-sm text-muted-foreground">{primarySession.symbol} · {primarySession.source || 'manual'}</div>
+              <div className="text-sm text-muted-foreground">{primarySession.symbol} · {formatSourceLabel(primarySession.source)}</div>
               <div className="text-sm text-muted-foreground">进度：{(primarySession.progress || 0).toFixed(0)}%</div>
               <Progress value={primarySession.progress || 0} />
             </div>

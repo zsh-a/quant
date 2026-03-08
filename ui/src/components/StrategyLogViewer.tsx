@@ -1,16 +1,23 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LazyLog, ScrollFollow } from '@melloware/react-logviewer';
+import { SectionCard } from './layout/SectionCard';
+import { Button } from './ui/button';
+import { API_BASE } from '../utils/api';
 
 interface LogViewerProps {
     sessionId: string | null;
 }
 
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? "http://localhost:8000"
-    : `http://${window.location.hostname}:8000`;
+interface SessionLogEntry {
+    timestamp: string;
+    level: string;
+    source: string;
+    message: string;
+    extra?: Record<string, unknown>;
+}
 
 export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
-    const [logs, setLogs] = useState<string>('Waiting for session...');
+    const [logs, setLogs] = useState<string>('等待会话日志...');
     const [filter, setFilter] = useState<string>('');
     const [levelFilter, setLevelFilter] = useState<string>('');
     const [sourceFilter, setSourceFilter] = useState<string>('');
@@ -18,9 +25,22 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
     const refreshInterval = 2000;
     const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+    const formatLogLines = (entries: SessionLogEntry[]) => {
+        if (!entries.length) return '当前会话还没有日志。';
+
+        return entries.map((entry) => {
+            const level = `[${String(entry.level || 'INFO').padEnd(7, ' ')}]`;
+            const source = `[${String(entry.source || 'system').padEnd(10, ' ')}]`;
+            const extras = entry.extra && Object.keys(entry.extra).length > 0
+                ? ` | ${Object.entries(entry.extra).map(([key, value]) => `${key}=${String(value)}`).join(' | ')}`
+                : '';
+            return `${entry.timestamp} ${level} ${source} ${entry.message}${extras}`;
+        }).join('\n');
+    };
+
     const fetchLogs = useCallback(async () => {
         if (!sessionId) {
-            setLogs('No session selected. Please choose a session from Overview or Lab.');
+            setLogs('尚未选择会话，请先从总览或实验室中打开一个会话。');
             return;
         }
 
@@ -29,16 +49,17 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
             if (levelFilter) params.append('level', levelFilter);
             if (sourceFilter) params.append('source', sourceFilter);
             params.append('limit', '1000');
+            params.append('format', 'json');
 
             const response = await fetch(`${API_BASE}/logs/${sessionId}?${params.toString()}`);
             if (response.ok) {
-                const text = await response.text();
-                setLogs(text || 'No logs yet for this session.');
+                const payload = await response.json();
+                setLogs(formatLogLines(payload.logs || []));
             } else {
-                setLogs(`Error fetching logs: ${response.statusText}`);
+                setLogs(`获取日志失败：${response.statusText}`);
             }
         } catch (error) {
-            setLogs(`Error: ${error}`);
+            setLogs(`异常：${error}`);
         }
     }, [sessionId, levelFilter, sourceFilter]);
 
@@ -60,7 +81,7 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
         if (!sessionId) return;
         try {
             await fetch(`${API_BASE}/logs/${sessionId}`, { method: 'DELETE' });
-            setLogs('Logs cleared.');
+            setLogs('日志已清空。');
         } catch (error) {
             console.error('Failed to clear logs:', error);
         }
@@ -72,19 +93,15 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
         : logs;
 
     return (
-        <div style={containerStyle}>
-            <div style={headerStyle}>
-                <h2 style={{ margin: 0, fontSize: '1.2rem' }}>📋 策略调试日志</h2>
-                <span style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                    Session: {sessionId || 'None'}
-                </span>
-            </div>
-
-            {/* Filters */}
+        <SectionCard
+            title="策略日志"
+            description="按级别、来源和关键词筛选会话日志。"
+            action={<span style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>会话：{sessionId || '未选择'}</span>}
+        >
             <div style={filtersStyle}>
                 <input
                     type="text"
-                    placeholder="🔍 搜索日志..."
+                    placeholder="搜索日志..."
                     value={filter}
                     onChange={(e) => setFilter(e.target.value)}
                     style={inputStyle}
@@ -94,7 +111,7 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                     onChange={(e) => setLevelFilter(e.target.value)}
                     style={selectStyle}
                 >
-                    <option value="">All Levels</option>
+                    <option value="">全部级别</option>
                     <option value="DEBUG">DEBUG</option>
                     <option value="INFO">INFO</option>
                     <option value="WARNING">WARNING</option>
@@ -105,8 +122,8 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                     onChange={(e) => setSourceFilter(e.target.value)}
                     style={selectStyle}
                 >
-                    <option value="">All Sources</option>
-                    <option value="strategy">Strategy</option>
+                    <option value="">全部来源</option>
+                    <option value="strategy">策略</option>
                     <option value="broker">Broker</option>
                     <option value="engine">Engine</option>
                 </select>
@@ -116,39 +133,37 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                         checked={autoRefresh}
                         onChange={(e) => setAutoRefresh(e.target.checked)}
                     />
-                    Auto Refresh
+                    自动刷新
                 </label>
-                <button onClick={fetchLogs} style={buttonStyle}>
-                    🔄 刷新
-                </button>
-                <button onClick={handleClearLogs} style={{ ...buttonStyle, background: '#dc3545' }}>
-                    🗑️ 清除
-                </button>
+                <Button onClick={fetchLogs} variant="outline" size="sm">刷新</Button>
+                <Button onClick={handleClearLogs} variant="danger" size="sm">清空</Button>
             </div>
 
-            {/* Log Viewer */}
             <div style={logContainerStyle}>
-                <ScrollFollow
-                    startFollowing={true}
-                    render={({ follow, onScroll }) => (
-                        <LazyLog
-                            text={filteredLogs}
-                            follow={follow}
-                            onScroll={onScroll}
-                            enableSearch={true}
-                            caseInsensitive={true}
-                            enableHotKeys={true}
-                            selectableLines={true}
-                            style={{
-                                backgroundColor: '#0d1117',
-                                color: '#c9d1d9',
-                                fontSize: '12px',
-                                fontFamily: 'JetBrains Mono, Consolas, Monaco, monospace',
-                            }}
-                            lineClassName="log-line"
-                        />
-                    )}
-                />
+                <div style={{ height: '100%', minHeight: 'inherit' }}>
+                    <ScrollFollow
+                        startFollowing={true}
+                        render={({ follow, onScroll }) => (
+                            <LazyLog
+                                text={filteredLogs}
+                                follow={follow}
+                                onScroll={onScroll}
+                                enableSearch={true}
+                                caseInsensitive={true}
+                                enableHotKeys={true}
+                                selectableLines={true}
+                                style={{
+                                    height: '100%',
+                                    backgroundColor: '#0d1117',
+                                    color: '#c9d1d9',
+                                    fontSize: '12px',
+                                    fontFamily: 'IBM Plex Mono, JetBrains Mono, Consolas, Monaco, monospace',
+                                }}
+                                lineClassName="log-line"
+                            />
+                        )}
+                    />
+                </div>
             </div>
 
             <style>{`
@@ -160,24 +175,8 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                     background: #161b22 !important;
                 }
             `}</style>
-        </div>
+        </SectionCard>
     );
-};
-
-const containerStyle: React.CSSProperties = {
-    display: 'flex',
-    flexDirection: 'column',
-    height: 'calc(100vh - 200px)',
-    background: 'var(--glass-bg)',
-    borderRadius: '16px',
-    padding: '1rem',
-    gap: '1rem',
-};
-
-const headerStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
 };
 
 const filtersStyle: React.CSSProperties = {
@@ -208,17 +207,6 @@ const selectStyle: React.CSSProperties = {
     cursor: 'pointer',
 };
 
-const buttonStyle: React.CSSProperties = {
-    padding: '0.5rem 1rem',
-    borderRadius: '8px',
-    border: 'none',
-    background: 'var(--primary)',
-    color: 'white',
-    fontSize: '0.9rem',
-    cursor: 'pointer',
-    transition: 'opacity 0.2s',
-};
-
 const checkboxLabelStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -228,7 +216,8 @@ const checkboxLabelStyle: React.CSSProperties = {
 };
 
 const logContainerStyle: React.CSSProperties = {
-    flex: 1,
+    minHeight: 'calc(100vh - 360px)',
+    height: 'calc(100vh - 360px)',
     borderRadius: '8px',
     overflow: 'hidden',
     border: '1px solid var(--border)',

@@ -79,9 +79,9 @@ export const OptimizerPanel: React.FC = () => {
             <PageHeader
                 eyebrow="Model Search"
                 title="参数优化器"
-                description="Search parameter ranges, track optimization tasks and inspect best-performing configurations."
+                description="搜索参数区间、跟踪优化任务，并查看当前最优配置。"
             />
-            <SectionCard title="Optimization Setup" description="Choose strategy, objective, search budget and backtest universe.">
+            <SectionCard title="优化配置" description="选择策略、目标函数、搜索预算和回测区间。">
                 <div className="grid gap-3 xl:grid-cols-4">
                     <select value={strategy} onChange={e => setStrategy(e.target.value)} className="glass-input">
                         <option value="jsg">JSG策略</option>
@@ -114,7 +114,7 @@ export const OptimizerPanel: React.FC = () => {
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div className="space-y-1">
                                     <div className="font-mono text-sm text-foreground">{t.task_id}</div>
-                                    <div className="text-xs text-muted-foreground">Progress {t.progress ?? 0}%</div>
+                                    <div className="text-xs text-muted-foreground">进度 {t.progress ?? 0}%</div>
                                 </div>
                                 <StatusBadge value={t.status} />
                             </div>

@@ -1,4 +1,5 @@
 import { Badge } from "../ui/badge"
+import { formatModeLabel, formatStatusLabel } from "../../utils/display"
 
 type StatusKind = "live" | "backtest" | "simulation" | "running" | "completed" | "failed" | "default"
 
@@ -16,5 +17,10 @@ export function StatusBadge({ value }: { value?: string | null }) {
   const normalized = value?.toLowerCase() ?? "default"
   const kind = (normalized in variantMap ? normalized : "default") as StatusKind
 
-  return <Badge variant={variantMap[kind]}>{value ?? "unknown"}</Badge>
+  const label =
+    kind === "live" || kind === "backtest" || kind === "simulation"
+      ? formatModeLabel(value)
+      : formatStatusLabel(value)
+
+  return <Badge variant={variantMap[kind]}>{label}</Badge>
 }

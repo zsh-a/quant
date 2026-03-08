@@ -96,8 +96,8 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
             headerAction={
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <select className="glass-input" style={{ width: 'auto' }} value={mode} onChange={(e) => setMode(e.target.value)}>
-                        <option value="backtest">Backtest</option>
-                                                <option value="live">Live</option>
+                        <option value="backtest">回测</option>
+                        <option value="live">实盘</option>
                     </select>
                 </div>
             }
@@ -111,12 +111,12 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                                 onChange={(e) => setUseAsync(e.target.checked)}
                                 style={{ width: 'auto' }}
                             />
-                            <span className="tagline !mb-0">Run in background (Celery queue)</span>
+                            <span className="tagline !mb-0">后台运行（Celery 队列）</span>
                         </label>
                     )}
                     {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
                     <Button className="w-full" onClick={handleStart} disabled={!selectedStrategy}>
-                        Start Session
+                        启动会话
                     </Button>
                 </div>
             }

@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import {
     Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, Legend, ComposedChart
 } from 'recharts';
@@ -8,6 +8,8 @@ import { VirtualizedTradeList } from './VirtualizedTradeList';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
 import { calculateMetrics } from '../utils/metrics';
 import { formatMoney, formatSignedMoney, formatSigned, formatPercent, colorFromValue } from '../utils/format';
+import { formatModeLabel } from '../utils/display';
+import { Button } from './ui/button';
 
 interface DashboardProps {
     primarySession: SessionSummary | undefined;
@@ -50,8 +52,13 @@ const Dashboard: React.FC<DashboardProps> = ({
     const [selectedDay, setSelectedDay] = useState<EquityPoint | null>(null);
     const [equityPage, setEquityPage] = useState(1);
     const [holdingsPage, setHoldingsPage] = useState(1);
+    const [visibleComparisonIds, setVisibleComparisonIds] = useState<string[]>([]);
 
     const metrics = useMemo(() => calculateMetrics(equityHistory, trades), [equityHistory, trades]);
+
+    useEffect(() => {
+        setVisibleComparisonIds((prev) => prev.filter((id) => comparisonData.some((item) => item.id === id)));
+    }, [comparisonData]);
 
     const chartData = useMemo(() => {
         if (!primarySession && comparisonData.length === 0) return [];
@@ -62,7 +69,9 @@ const Dashboard: React.FC<DashboardProps> = ({
             relevantCurves.push({ id: 'Primary', data: equityHistory });
         }
 
-        comparisonData.forEach(c => {
+        comparisonData
+            .filter((c) => visibleComparisonIds.includes(c.id))
+            .forEach(c => {
             relevantCurves.push({ id: c.id, data: c.data });
         });
 
@@ -123,7 +132,20 @@ const Dashboard: React.FC<DashboardProps> = ({
 
         return Array.from(dataMap.values()).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
 
-    }, [equityHistory, comparisonData, benchmarksData, useLttb, primarySession]);
+    }, [equityHistory, comparisonData, benchmarksData, useLttb, primarySession, visibleComparisonIds]);
+
+    const visibleComparisonData = useMemo(
+        () => comparisonData.filter((item) => visibleComparisonIds.includes(item.id)),
+        [comparisonData, visibleComparisonIds],
+    );
+
+    const toggleComparisonVisibility = (sessionId: string) => {
+        setVisibleComparisonIds((prev) =>
+            prev.includes(sessionId)
+                ? prev.filter((id) => id !== sessionId)
+                : [...prev, sessionId]
+        );
+    };
 
     // Derived Display Data
     const currentPositions = (selectedDay ? selectedDay.positions : positions) || {};
@@ -167,11 +189,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                         <h2>
-                            Session: {primarySession.strategy || 'Unknown'}
-                            <span className="tagline" style={{ fontSize: '1rem' }}> ({primarySession.mode})</span>
+                            会话：{primarySession.strategy || '未知'}
+                            <span className="tagline" style={{ fontSize: '1rem' }}> ({formatModeLabel(primarySession.mode)})</span>
                         </h2>
                         <select className="glass-input" style={{ width: 'auto' }} value={primarySession.id} onChange={e => onSelectSession(e.target.value)}>
-                            {allSessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {s.mode} ({s.id.slice(0, 6)}...)</option>)}
+                            {allSessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {formatModeLabel(s.mode)} ({s.id.slice(0, 6)}...)</option>)}
                         </select>
                     </div>
                     {(primarySession.params && Object.keys(primarySession.params).length > 0) && (
@@ -185,55 +207,6 @@ const Dashboard: React.FC<DashboardProps> = ({
                         </div>
                     )}
                 </div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className="tagline">基准:</span>
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                        {availableBenchmarks.map(bm => (
-                            <button
-                                key={bm.code}
-                                onClick={() => onToggleBenchmark(bm.code)}
-                                style={{
-                                    padding: '0.3rem 0.6rem',
-                                    fontSize: '0.75rem',
-                                    background: selectedBenchmarks.includes(bm.code) ? COLORS[bm.code as keyof typeof COLORS] || 'var(--secondary)' : 'rgba(255,255,255,0.1)',
-                                    color: selectedBenchmarks.includes(bm.code) ? '#08111f' : 'white',
-                                    border: selectedBenchmarks.includes(bm.code) ? '1px solid transparent' : '1px solid rgba(255,255,255,0.12)',
-                                    opacity: selectedBenchmarks.includes(bm.code) ? 1 : 0.84,
-                                    fontWeight: 700,
-                                    borderRadius: '999px'
-                                }}
-                            >
-                                {bm.name}
-                            </button>
-                        ))}
-                        <div style={{ width: '1px', height: '16px', background: 'rgba(255,255,255,0.1)', margin: '0 4px' }} />
-                        <button
-                            onClick={() => setUseLttb(!useLttb)}
-                            className="glass"
-                            style={{
-                                padding: '0.3rem 0.6rem',
-                                fontSize: '0.75rem',
-                                background: useLttb ? 'var(--primary)' : 'rgba(255,255,255,0.05)',
-                                color: 'white',
-                                border: '1px solid rgba(255,255,255,0.1)',
-                                cursor: 'pointer',
-                                borderRadius: '4px',
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '4px'
-                            }}
-                        >
-                            <span style={{
-                                width: '6px',
-                                height: '6px',
-                                borderRadius: '50%',
-                                background: useLttb ? '#4ade80' : '#94a3b8',
-                                display: 'inline-block'
-                            }} />
-                            LTTB: {useLttb ? 'ON' : 'OFF'}
-                        </button>
-                    </div>
-                </div>
             </div>
 
             {/* Key Stats Grid */}
@@ -244,12 +217,12 @@ const Dashboard: React.FC<DashboardProps> = ({
                     delta={equityHistory.length > 1 ? `${formatPercent(metrics.totalReturn, 2)} total` : undefined}
                 />
                 <StatCard 
-                    label="CAGR" 
+                    label="年化收益" 
                     value={formatPercent(metrics.annualizedReturn, 2)}
-                    subtext="Annualized Return"
+                    subtext="按年度折算"
                 />
                 <StatCard 
-                    label="Sharpe Ratio" 
+                    label="夏普比率" 
                     value={metrics.sharpeRatio.toFixed(2)}
                     subtext={`Vol: ${formatPercent(metrics.volatility, 2)}`}
                 />
@@ -259,7 +232,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                     delta={metrics.maxDrawdown > 0.2 ? '风险偏高' : '风险可控'}
                 />
                  <StatCard 
-                    label="Daily P&L" 
+                    label="当日盈亏" 
                     value={equityHistory.length > 0 ? formatSignedMoney(equityHistory[equityHistory.length - 1].daily_pnl) : "--"}
                     delta={equityHistory.length > 0 ? formatSigned((equityHistory[equityHistory.length - 1].daily_return ?? 0) * 100, { asPercent: true }) : undefined}
                 />
@@ -267,7 +240,65 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Chart */}
             <div className="glass card chart-container" style={{ marginTop: '2rem', height: '400px', padding: '2rem' }}>
-                <h3 style={{ marginBottom: '1rem' }}>收益曲线 (%)</h3>
+                <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+                    <div>
+                        <h3 style={{ marginBottom: '0.35rem' }}>收益曲线 (%)</h3>
+                        <div className="tagline">默认仅显示当前会话；可按需叠加基准线与对比会话。</div>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-end' }}>
+                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
+                            <Button variant={useLttb ? 'default' : 'outline'} size="sm" onClick={() => setUseLttb(!useLttb)}>
+                                LTTB: {useLttb ? '开' : '关'}
+                            </Button>
+                        </div>
+                        {availableBenchmarks.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                {availableBenchmarks.map((benchmark) => (
+                                    <Button
+                                        key={benchmark.code}
+                                        variant={selectedBenchmarks.includes(benchmark.code) ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => onToggleBenchmark(benchmark.code)}
+                                        style={{
+                                            borderColor: selectedBenchmarks.includes(benchmark.code)
+                                                ? COLORS[benchmark.code as keyof typeof COLORS]
+                                                : undefined,
+                                            background: selectedBenchmarks.includes(benchmark.code)
+                                                ? COLORS[benchmark.code as keyof typeof COLORS]
+                                                : undefined,
+                                            color: selectedBenchmarks.includes(benchmark.code) ? '#08111f' : undefined,
+                                        }}
+                                    >
+                                        {benchmark.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        ) : null}
+                        {comparisonData.length > 0 ? (
+                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                                {comparisonData.map((session, idx) => (
+                                    <Button
+                                        key={session.id}
+                                        variant={visibleComparisonIds.includes(session.id) ? 'default' : 'outline'}
+                                        size="sm"
+                                        onClick={() => toggleComparisonVisibility(session.id)}
+                                        style={{
+                                            borderColor: visibleComparisonIds.includes(session.id)
+                                                ? SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length]
+                                                : undefined,
+                                            background: visibleComparisonIds.includes(session.id)
+                                                ? SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length]
+                                                : undefined,
+                                            color: visibleComparisonIds.includes(session.id) ? '#08111f' : undefined,
+                                        }}
+                                    >
+                                        {session.name}
+                                    </Button>
+                                ))}
+                            </div>
+                        ) : null}
+                    </div>
+                </div>
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
                         <defs>
@@ -291,7 +322,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <Legend wrapperStyle={{ paddingTop: '10px' }} />
                         <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="#22d3ee" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
                         
-                        {comparisonData.map((c, idx) => {
+                        {visibleComparisonData.map((c, idx) => {
                              const color = SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length];
                              return (
                                  <Line

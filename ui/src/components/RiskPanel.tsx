@@ -1,6 +1,7 @@
 import React from 'react';
 import { formatMoney } from '../utils/format';
 import { API_BASE } from '../utils/api';
+import { formatStatusLabel } from '../utils/display';
 
 interface RiskMetric {
     label: string;
@@ -60,7 +61,7 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
     if (loading) {
         return (
             <div className="risk-panel loading">
-                <div className="spinner">Loading risk data...</div>
+                <div className="spinner" />
             </div>
         );
     }
@@ -68,7 +69,7 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
     if (!riskData || !riskData.enabled) {
         return (
             <div className="risk-panel disabled">
-                <p>Risk management not enabled for this session</p>
+                <p>当前会话未启用风险控制</p>
             </div>
         );
     }
@@ -79,35 +80,35 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
     // Calculate risk metrics
     const riskMetrics: RiskMetric[] = [
         {
-            label: 'Position Count',
+            label: '持仓数量',
             value: metrics.position_count || 0,
             limit: 10,
             unit: '',
             status: (metrics.position_count || 0) > 8 ? 'warning' : 'safe'
         },
         {
-            label: 'Total Exposure',
+            label: '总暴露',
             value: (metrics.total_exposure_pct || 0) * 100,
             limit: (limits.max_total_position || 0.95) * 100,
             unit: '%',
             status: (metrics.total_exposure_pct || 0) > 0.85 ? 'warning' : 'safe'
         },
         {
-            label: 'Largest Position',
+            label: '最大单仓',
             value: (metrics.largest_position_pct || 0) * 100,
             limit: (limits.max_position_pct || 0.1) * 100,
             unit: '%',
             status: (metrics.largest_position_pct || 0) > 0.09 ? 'warning' : 'safe'
         },
         {
-            label: 'Daily P&L',
+            label: '当日盈亏',
             value: (metrics.daily_pnl_pct || 0) * 100,
             limit: (limits.max_daily_loss_pct || 0.1) * 100,
             unit: '%',
             status: Math.abs(metrics.daily_pnl_pct || 0) > 0.08 ? 'warning' : 'safe'
         },
         {
-            label: 'Max Drawdown',
+            label: '最大回撤',
             value: (metrics.max_drawdown_pct || 0) * 100,
             limit: (limits.max_drawdown_pct || 0.2) * 100,
             unit: '%',
@@ -118,9 +119,9 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
     return (
         <div className="risk-panel">
             <div className="risk-header">
-                <h3>🛡️ Risk Management</h3>
+                <h3>风险控制</h3>
                 <span className={`status-badge ${riskData.status}`}>
-                    {riskData.status || 'Active'}
+                    {formatStatusLabel(riskData.status || 'running')}
                 </span>
             </div>
 
@@ -146,11 +147,11 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
             {/* Capital Info */}
             <div className="capital-info">
                 <div className="capital-item">
-                    <span className="label">Current Capital:</span>
+                    <span className="label">当前资金:</span>
                     <span className="value">{formatMoney(metrics.current_capital)}</span>
                 </div>
                 <div className="capital-item">
-                    <span className="label">Peak Capital:</span>
+                    <span className="label">峰值资金:</span>
                     <span className="value">{formatMoney(metrics.peak_capital)}</span>
                 </div>
             </div>
@@ -158,7 +159,7 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
             {/* Alerts */}
             {alerts.length > 0 && (
                 <div className="risk-alerts">
-                    <h4>⚠️ Recent Alerts</h4>
+                    <h4>近期告警</h4>
                     <div className="alerts-list">
                         {alerts.slice(0, 5).map((alert) => (
                             <div key={alert.id} className={`alert-item ${alert.severity}`}>

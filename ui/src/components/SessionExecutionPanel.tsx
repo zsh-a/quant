@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import type { SessionSummary, SimulationRun, SimulationStep, Trade } from '../types';
 import { formatPrice } from '../utils/format';
+import { formatModeLabel, formatSourceLabel, formatStatusLabel } from '../utils/display';
 
 const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
   ? 'http://localhost:8000'
@@ -69,26 +70,26 @@ const SessionExecutionPanel: React.FC<SessionExecutionPanelProps> = ({ session, 
           <div className="tagline">该 session 没有关联模拟批次，当前仅展示运行摘要。</div>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: '1rem', marginTop: '1rem' }}>
             <div>
-              <div className="tagline">Status</div>
-              <div style={{ fontWeight: 700 }}>{session.status}</div>
+              <div className="tagline">状态</div>
+              <div style={{ fontWeight: 700 }}>{formatStatusLabel(session.status)}</div>
             </div>
             <div>
-              <div className="tagline">Mode</div>
-              <div style={{ fontWeight: 700 }}>{session.mode}</div>
+              <div className="tagline">模式</div>
+              <div style={{ fontWeight: 700 }}>{formatModeLabel(session.mode)}</div>
             </div>
             <div>
-              <div className="tagline">Source</div>
-              <div style={{ fontWeight: 700 }}>{session.source || 'manual'}</div>
+              <div className="tagline">来源</div>
+              <div style={{ fontWeight: 700 }}>{formatSourceLabel(session.source)}</div>
             </div>
             <div>
-              <div className="tagline">Progress</div>
+              <div className="tagline">进度</div>
               <div style={{ fontWeight: 700 }}>{(session.progress || 0).toFixed(0)}%</div>
             </div>
           </div>
         </section>
 
         <section style={cardStyle}>
-          <h3 style={{ marginTop: 0 }}>Recent Trades</h3>
+          <h3 style={{ marginTop: 0 }}>最近成交</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             {recentTrades.map((trade) => (
               <div key={`${trade.timestamp}-${trade.symbol}-${trade.type}`} style={{ padding: '0.8rem', borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}>
@@ -96,7 +97,7 @@ const SessionExecutionPanel: React.FC<SessionExecutionPanelProps> = ({ session, 
                   <strong>{trade.type.toUpperCase()} {trade.symbol}</strong>
                   <span className="tagline">{trade.timestamp}</span>
                 </div>
-                <div className="tagline">{trade.quantity} @ {formatPrice(trade.price, 2)} · amount {trade.amount}</div>
+                <div className="tagline">{trade.quantity} @ {formatPrice(trade.price, 2)} · 成交额 {trade.amount}</div>
               </div>
             ))}
             {recentTrades.length === 0 && <div className="tagline">暂无成交记录。</div>}
@@ -111,25 +112,25 @@ const SessionExecutionPanel: React.FC<SessionExecutionPanelProps> = ({ session, 
       <section style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: '1rem' }}>
           <div>
-            <h3 style={{ marginTop: 0 }}>Execution Timeline</h3>
-            <div className="tagline">展示模拟批次、逐 Bar 执行轨迹和触发信息。</div>
+            <h3 style={{ marginTop: 0 }}>执行时间线</h3>
+            <div className="tagline">展示模拟批次、逐 Bar 执行轨迹和触发来源。</div>
           </div>
           <div className="tagline">run {session.run_id?.slice(0, 8)}...</div>
         </div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: '1rem', marginTop: '1rem' }}>
-          <div><div className="tagline">Status</div><div style={{ fontWeight: 700 }}>{run?.status || session.status}</div></div>
-          <div><div className="tagline">Progress</div><div style={{ fontWeight: 700 }}>{(run?.progress ?? session.progress ?? 0).toFixed(0)}%</div></div>
-          <div><div className="tagline">Bars</div><div style={{ fontWeight: 700 }}>{run?.bars_processed ?? 0}</div></div>
-          <div><div className="tagline">Steps</div><div style={{ fontWeight: 700 }}>{run?.steps_recorded ?? steps.length}</div></div>
-          <div><div className="tagline">Trigger</div><div style={{ fontWeight: 700 }}>{run?.trigger_source || 'manual'}</div></div>
+          <div><div className="tagline">状态</div><div style={{ fontWeight: 700 }}>{formatStatusLabel(run?.status || session.status)}</div></div>
+          <div><div className="tagline">进度</div><div style={{ fontWeight: 700 }}>{(run?.progress ?? session.progress ?? 0).toFixed(0)}%</div></div>
+          <div><div className="tagline">Bar 数</div><div style={{ fontWeight: 700 }}>{run?.bars_processed ?? 0}</div></div>
+          <div><div className="tagline">步骤数</div><div style={{ fontWeight: 700 }}>{run?.steps_recorded ?? steps.length}</div></div>
+          <div><div className="tagline">触发来源</div><div style={{ fontWeight: 700 }}>{formatSourceLabel(run?.trigger_source || 'manual')}</div></div>
         </div>
 
         {session.last_processed_at && <div className="tagline" style={{ marginTop: '0.75rem' }}>最近处理到：{session.last_processed_at}</div>}
       </section>
 
       <section style={cardStyle}>
-        <h3 style={{ marginTop: 0 }}>Step Trace</h3>
+        <h3 style={{ marginTop: 0 }}>步骤轨迹</h3>
         <div style={{ display: 'grid', gap: '0.75rem', maxHeight: '70vh', overflowY: 'auto' }}>
           {steps.map((step) => (
             <div key={step.id} style={{ padding: '0.85rem', borderRadius: 12, background: 'rgba(255,255,255,0.03)' }}>
