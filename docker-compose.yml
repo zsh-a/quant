@@ -83,26 +83,6 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  # Flower - Celery monitoring
-  flower:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: quant_flower
-    command: celery -A src.tasks.celery_app flower --port=5555
-    ports:
-      - "5555:5555"
-    environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
-    depends_on:
-      - redis
-      - celery_worker
-    networks:
-      - quant_network
-    restart: unless-stopped
-    logging: *default-logging
-
   # Frontend - React app with Nginx
   frontend:
     build:
@@ -118,46 +98,9 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  # Prometheus - Metrics collection (optional)
-  prometheus:
-    image: prom/prometheus:latest
-    container_name: quant_prometheus
-    ports:
-      - "9090:9090"
-    volumes:
-      - ./prometheus.yml:/etc/prometheus/prometheus.yml
-      - prometheus_data:/prometheus
-    command:
-      - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.path=/prometheus'
-    networks:
-      - quant_network
-    restart: unless-stopped
-    logging: *default-logging
-
-  # Grafana - Metrics visualization (optional)
-  grafana:
-    image: grafana/grafana:latest
-    container_name: quant_grafana
-    ports:
-      - "3000:3000"
-    volumes:
-      - grafana_data:/var/lib/grafana
-    environment:
-      - GF_SECURITY_ADMIN_PASSWORD=admin
-      - GF_USERS_ALLOW_SIGN_UP=false
-    depends_on:
-      - prometheus
-    networks:
-      - quant_network
-    restart: unless-stopped
-    logging: *default-logging
-
 networks:
   quant_network:
     driver: bridge
 
 volumes:
   redis_data:
-  prometheus_data:
-  grafana_data:

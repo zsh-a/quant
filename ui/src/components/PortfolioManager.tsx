@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { formatMoney } from '../utils/format';
 import { PageHeader } from './layout/PageHeader';
+import { API_BASE } from '../utils/api';
 
 interface Strategy {
     name: string;
@@ -25,10 +26,6 @@ interface BacktestResult {
     strategy_results: Record<string, { final_equity: number; weight: number; trades: number }>;
     n_trades: number;
 }
-
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'http://localhost:8000'
-    : `${window.location.protocol}//${window.location.hostname}:8000`;
 
 const AVAILABLE_STRATEGIES = [
     { id: 'jsg', name: 'JSG策略', description: '金叉死叉策略' },

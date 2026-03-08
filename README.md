@@ -38,7 +38,34 @@ make dev_local_status
 make dev_local_down
 ```
 
-### 3. 手动启动后端API
+### 3. Docker 单机部署
+
+```bash
+./deploy.sh up
+```
+
+常用命令：
+
+```bash
+./deploy.sh build
+./deploy.sh status
+./deploy.sh logs
+./deploy.sh logs api
+./deploy.sh restart
+./deploy.sh down
+```
+
+默认 Docker 部署只包含核心服务：
+- `frontend`
+- `api`
+- `redis`
+- `celery_worker`
+
+说明：
+- `celery_worker` 是异步回测和自动化任务执行器，属于核心服务
+- `ClickHouse` 仍按外部依赖处理，不由当前 `docker-compose.yml` 启动
+
+### 4. 手动启动后端API
 
 ```bash
 uvicorn src.api.server:app --reload
@@ -46,7 +73,7 @@ uvicorn src.api.server:app --reload
 
 访问 http://localhost:8000/docs 查看API文档
 
-### 4. 启动前端（新终端）
+### 5. 启动前端（新终端）
 
 ```bash
 cd ui && npm run dev

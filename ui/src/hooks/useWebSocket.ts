@@ -4,6 +4,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { API_BASE, WS_BASE } from '../utils/api';
 
 interface WebSocketMessage {
     type: string;
@@ -22,10 +23,6 @@ interface UseWebSocketOptions {
     fallbackToPolling?: boolean;
     pollingInterval?: number;
 }
-
-const WS_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-    ? 'ws://localhost:8000'
-    : `ws://${window.location.hostname}:8000`;
 
 export const useWebSocket = ({
     sessionId,
@@ -141,15 +138,11 @@ export const useWebSocket = ({
     useEffect(() => {
         if (!usePolling || !enabled || !sessionId) return;
 
-        const baseUrl = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-            ? 'http://localhost:8000'
-            : `${window.location.protocol}//${window.location.hostname}:8000`;
-
         const poll = async () => {
             try {
                 const url = lastMessageTimeRef.current
-                    ? `${baseUrl}/session/${sessionId}/status?since=${encodeURIComponent(lastMessageTimeRef.current)}`
-                    : `${baseUrl}/session/${sessionId}/status`;
+                    ? `${API_BASE}/session/${sessionId}/status?since=${encodeURIComponent(lastMessageTimeRef.current)}`
+                    : `${API_BASE}/session/${sessionId}/status`;
 
                 const response = await fetch(url);
                 if (response.status === 404) {

@@ -4,10 +4,7 @@ import { PageHeader } from './layout/PageHeader';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-
-const API_BASE = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-  ? "http://localhost:8000"
-  : `http://${window.location.hostname}:8000`;
+import { API_BASE } from '../utils/api';
 
 interface HeatmapData {
   dates: string[];

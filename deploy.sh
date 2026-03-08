@@ -1,19 +1,17 @@
 #!/bin/bash
 # Deployment script for Quant Trading Platform
 
-set -e
+set -euo pipefail
 
-echo "=================================================="
-echo "Quant Trading Platform - Deployment Script"
-echo "=================================================="
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+SERVICES=(redis api celery_worker frontend)
+VALID_LOG_SERVICES=(redis api celery_worker frontend)
 
-# Colors
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 RED='\033[0;31m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Function to print colored output
 print_info() {
     echo -e "${GREEN}[INFO]${NC} $1"
 }
@@ -26,124 +24,119 @@ print_error() {
     echo -e "${RED}[ERROR]${NC} $1"
 }
 
-# Check if Docker is installed
-if ! command -v docker &> /dev/null; then
-    print_error "Docker is not installed. Please install Docker first."
-    exit 1
-fi
+compose_cmd() {
+    if command -v docker-compose >/dev/null 2>&1; then
+        docker-compose "$@"
+    else
+        docker compose "$@"
+    fi
+}
 
-# Check if Docker Compose is installed
-if ! command -v docker-compose &> /dev/null && ! docker compose version &> /dev/null; then
-    print_error "Docker Compose is not installed. Please install Docker Compose first."
-    exit 1
-fi
+ensure_requirements() {
+    if ! command -v docker >/dev/null 2>&1; then
+        print_error "Docker is not installed. Please install Docker first."
+        exit 1
+    fi
 
-# Parse command line arguments
-MODE=${1:-"dev"}  # dev, prod, or stop
+    if ! command -v docker-compose >/dev/null 2>&1 && ! docker compose version >/dev/null 2>&1; then
+        print_error "Docker Compose is not installed. Please install Docker Compose first."
+        exit 1
+    fi
+}
 
-case $MODE in
-    dev)
-        print_info "Starting in DEVELOPMENT mode..."
-        
-        # Build images
-        print_info "Building Docker images..."
-        docker-compose build
-        docker image prune -f
-        
-        # Start services
-        print_info "Starting services..."
-        docker-compose up -d
-        
-        # Wait for services to be healthy
-        print_info "Waiting for services to be ready..."
-        sleep 10
-        
-        # Show status
-        docker-compose ps
-        
-        print_info "Development environment is ready!"
-        echo ""
-        echo "Access points:"
-        echo "  - Frontend:  http://localhost"
-        echo "  - API:       http://localhost:8000"
-        echo "  - API Docs:  http://localhost:8000/docs"
-        echo "  - Flower:    http://localhost:5555"
-        echo "  - Prometheus: http://localhost:9090"
-        echo "  - Grafana:   http://localhost:3000 (admin/admin)"
-        echo ""
-        echo "To view logs: docker-compose logs -f [service_name]"
-        echo "To stop:      ./deploy.sh stop"
-        ;;
-    
-    prod)
-        print_info "Starting in PRODUCTION mode..."
-        
-        # Build images with no cache
-        print_info "Building Docker images (no cache)..."
-        docker-compose build --no-cache
-        docker image prune -f
-        
-        # Start services in detached mode
-        print_info "Starting services..."
-        docker-compose up -d
-        
-        # Wait for health checks
-        print_info "Waiting for health checks..."
-        sleep 15
-        
-        # Verify services are running
-        if ! docker-compose ps | grep -q "Up"; then
-            print_error "Some services failed to start. Check logs with: docker-compose logs"
-            exit 1
+ensure_directories() {
+    mkdir -p "$ROOT_DIR/data" "$ROOT_DIR/config" "$ROOT_DIR/logs"
+}
+
+print_access_points() {
+    cat <<'EOF'
+Access points:
+  - Frontend:  http://localhost
+  - API:       http://localhost:8000
+  - API Docs:  http://localhost:8000/docs
+
+Core services:
+  - redis
+  - api
+  - celery_worker
+  - frontend
+EOF
+}
+
+validate_log_service() {
+    local service="$1"
+    local candidate
+    for candidate in "${VALID_LOG_SERVICES[@]}"; do
+        if [ "$candidate" = "$service" ]; then
+            return 0
         fi
-        
-        print_info "Production environment is ready!"
-        docker-compose ps
+    done
+
+    print_error "Unknown service: $service"
+    echo "Valid services: ${VALID_LOG_SERVICES[*]}"
+    exit 1
+}
+
+cmd="${1:-up}"
+
+ensure_requirements
+ensure_directories
+
+case "$cmd" in
+    build)
+        print_info "Building core service images..."
+        compose_cmd build "${SERVICES[@]}"
         ;;
-    
-    stop)
-        print_info "Stopping all services..."
-        docker-compose down
-        print_info "All services stopped."
+
+    up)
+        print_info "Building core service images..."
+        compose_cmd build "${SERVICES[@]}"
+        print_info "Starting core services..."
+        compose_cmd up -d "${SERVICES[@]}"
+        print_info "Deployment started."
+        compose_cmd ps "${SERVICES[@]}"
+        print_access_points
         ;;
-    
+
+    down)
+        print_info "Stopping core services..."
+        compose_cmd down
+        ;;
+
     restart)
-        print_info "Restarting all services..."
-        docker-compose restart
-        print_info "All services restarted."
+        print_info "Restarting core services..."
+        compose_cmd restart "${SERVICES[@]}"
+        compose_cmd ps "${SERVICES[@]}"
         ;;
-    
+
     logs)
-        SERVICE=${2:-""}
-        if [ -z "$SERVICE" ]; then
-            docker-compose logs -f
+        service="${2:-}"
+        if [ -n "$service" ]; then
+            validate_log_service "$service"
+            compose_cmd logs -f "$service"
         else
-            docker-compose logs -f $SERVICE
+            compose_cmd logs -f "${SERVICES[@]}"
         fi
         ;;
-    
-    clean)
-        print_warn "This will remove all containers, volumes, and images. Are you sure? (y/N)"
-        read -r response
-        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-            print_info "Cleaning up..."
-            docker-compose down -v --rmi all
-            print_info "Cleanup complete."
-        else
-            print_info "Cleanup cancelled."
-        fi
+
+    status)
+        compose_cmd ps "${SERVICES[@]}"
+        echo
+        print_access_points
         ;;
-    
+
     *)
-        echo "Usage: $0 {dev|prod|stop|restart|logs|clean}"
-        echo ""
-        echo "Commands:"
-        echo "  dev      - Start in development mode"
-        echo "  prod     - Start in production mode"
-        echo "  stop     - Stop all services"
-        echo "  restart  - Restart all services"
-        echo "  logs     - View logs (optionally specify service name)"
-        echo "  clean    - Remove all containers, volumes, and images"
+        cat <<'EOF'
+Usage: ./deploy.sh {build|up|down|restart|logs [service]|status}
+
+Commands:
+  build    Build the core service images
+  up       Build and start the core services in the background
+  down     Stop and remove the compose stack
+  restart  Restart the core services
+  logs     Follow logs for all core services or a specific service
+  status   Show compose status and access points
+EOF
         exit 1
         ;;
 esac
