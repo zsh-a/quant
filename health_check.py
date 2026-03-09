@@ -154,7 +154,7 @@ def check_database():
     print("=" * 60)
 
     try:
-        from db import DB
+        from src.market_data.db import DB
 
         db = DB()
         print("✓ Database client initialized")

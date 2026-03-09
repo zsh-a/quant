@@ -10,7 +10,7 @@ import talib as ta
 from loguru import logger
 from datetime import datetime, timedelta
 
-from db import DB
+from src.market_data.db import DB
 
 router = APIRouter(prefix="/market", tags=["market"])
 

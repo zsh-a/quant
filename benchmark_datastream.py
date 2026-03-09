@@ -15,7 +15,7 @@ from datetime import datetime
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.core.data_stream import DBDataStream
-from db import DB
+from src.market_data.db import DB
 from loguru import logger
 
 def format_bytes(bytes_val):

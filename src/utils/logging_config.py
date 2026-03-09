@@ -1,17 +1,20 @@
 """
 Unified logging configuration for the quantitative trading platform.
-Uses loguru for structured, configurable logging with rotation and retention.
-Supports JSON output for log aggregation and request correlation.
+Routes stdlib logging, Uvicorn, and Celery through loguru so console and file
+output stay consistent across processes.
 """
 
-import sys
-import json
 import contextvars
-from pathlib import Path
-from datetime import datetime
+import json
+import logging
+import sys
 from functools import wraps
-from typing import Any, Dict, Optional, Callable
+from pathlib import Path
+from typing import Any, Callable, Dict, Optional
+
 from loguru import logger
+
+from src.config.settings import get_logging_config
 
 # Context variables for request correlation
 request_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
@@ -21,12 +24,12 @@ session_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
     "session_id", default=None
 )
 
-# Configuration
+# Fallback configuration
 LOG_LEVEL = "INFO"
 LOG_ROTATION = "100 MB"
 LOG_RETENTION = "30 days"
-LOG_PATH = "logs/quant_{time:YYYY-MM-DD}.log"
-JSON_LOG_PATH = "logs/quant_{time:YYYY-MM-DD}.json"
+LOG_PATH = "logs/quant.log"
+JSON_LOG_PATH = "logs/quant.jsonl"
 
 # Human-readable format for console
 CONSOLE_FORMAT = (
@@ -44,10 +47,76 @@ FILE_FORMAT = (
 )
 
 
+class InterceptHandler(logging.Handler):
+    """Route stdlib logging records through loguru."""
+
+    def emit(self, record: logging.LogRecord) -> None:
+        try:
+            level: str | int = logger.level(record.levelname).name
+        except ValueError:
+            level = record.levelno
+
+        frame = logging.currentframe()
+        depth = 2
+        while frame and frame.f_code.co_filename == logging.__file__:
+            frame = frame.f_back
+            depth += 1
+
+        logger.bind(name=record.name).opt(
+            depth=depth,
+            exception=record.exc_info,
+            ansi=False,
+        ).log(level, record.getMessage())
+
+
+def _resolve_logging_options(
+    level: Optional[str],
+    json_output: Optional[bool],
+    console: Optional[bool],
+    file_output: Optional[bool],
+) -> Dict[str, Any]:
+    cfg = get_logging_config()
+    return {
+        "level": (level or cfg.level or LOG_LEVEL).upper(),
+        "json_output": bool(json_output) if json_output is not None else False,
+        "console": cfg.console.enabled if console is None else console,
+        "console_colorize": cfg.console.colorize,
+        "file_output": cfg.file.enabled if file_output is None else file_output,
+        "file_path": cfg.file.path or LOG_PATH,
+        "rotation": cfg.rotation or LOG_ROTATION,
+        "retention": cfg.retention or LOG_RETENTION,
+    }
+
+
+def _configure_stdlib_logging(level: str) -> None:
+    """Redirect stdlib loggers to loguru so runtime logs share the same sinks."""
+    logging.captureWarnings(True)
+    handler = InterceptHandler()
+
+    root_logger = logging.getLogger()
+    root_logger.handlers = [handler]
+    root_logger.setLevel(level)
+
+    managed_loggers = (
+        "uvicorn",
+        "uvicorn.error",
+        "uvicorn.access",
+        "fastapi",
+        "celery",
+        "celery.app.trace",
+        "celery.worker",
+        "kombu",
+        "asyncio",
+    )
+    for logger_name in managed_loggers:
+        managed_logger = logging.getLogger(logger_name)
+        managed_logger.handlers = [handler]
+        managed_logger.propagate = False
+        managed_logger.setLevel(level)
+
+
 def json_serializer(record: Dict[str, Any]) -> str:
     """Serialize log record to JSON for structured logging."""
-
-    # Extract context from extras
     request_id = request_id_ctx.get()
     session_id = session_id_ctx.get()
 
@@ -61,22 +130,19 @@ def json_serializer(record: Dict[str, Any]) -> str:
         "file": record["file"].name if record["file"] else None,
     }
 
-    # Add correlation IDs if present
     if request_id:
         log_entry["request_id"] = request_id
     if session_id:
         log_entry["session_id"] = session_id
 
-    # Add extra fields (excluding internal ones)
     extra_fields = {
-        k: v
-        for k, v in record["extra"].items()
-        if k not in ("name", "context_str") and not k.startswith("_")
+        key: value
+        for key, value in record["extra"].items()
+        if key not in ("name", "context_str") and not key.startswith("_")
     }
     if extra_fields:
         log_entry["context"] = extra_fields
 
-    # Add exception info if present
     if record["exception"]:
         log_entry["exception"] = {
             "type": record["exception"].type.__name__
@@ -104,14 +170,11 @@ def format_context_string(record: Dict[str, Any]) -> str:
     if session_id:
         context_parts.append(f"sess={session_id[:8]}")
 
-    # Add other extra fields
-    for k, v in extra.items():
-        if k not in ("name", "context_str") and not k.startswith("_"):
-            context_parts.append(f"{k}={v}")
+    for key, value in extra.items():
+        if key not in ("name", "context_str") and not key.startswith("_"):
+            context_parts.append(f"{key}={value}")
 
-    if context_parts:
-        return f" | {' '.join(context_parts)}"
-    return ""
+    return f" | {' '.join(context_parts)}" if context_parts else ""
 
 
 def patcher(record: Dict[str, Any]) -> None:
@@ -122,76 +185,70 @@ def patcher(record: Dict[str, Any]) -> None:
 
 
 def setup_logging(
-    level: str = LOG_LEVEL,
-    json_output: bool = False,
-    console: bool = True,
-    file_output: bool = True,
+    level: Optional[str] = None,
+    json_output: Optional[bool] = None,
+    console: Optional[bool] = None,
+    file_output: Optional[bool] = None,
 ) -> None:
-    """
-    Setup global logging configuration.
+    """Setup unified logging sinks and stdlib interception."""
+    options = _resolve_logging_options(level, json_output, console, file_output)
 
-    Args:
-        level: Log level (DEBUG, INFO, WARNING, ERROR)
-        json_output: Enable JSON log file output
-        console: Enable console output
-        file_output: Enable file output
-    """
     logger.remove()
-
-    # Apply patcher to all handlers
     logger.configure(patcher=patcher)
+    _configure_stdlib_logging(options["level"])
 
-    # Console handler (human-readable)
-    if console:
+    if options["console"]:
         logger.add(
             sys.stderr,
             format=CONSOLE_FORMAT,
-            level=level,
-            colorize=True,
+            level=options["level"],
+            colorize=options["console_colorize"],
             backtrace=True,
             diagnose=True,
+            enqueue=True,
         )
 
-    # Ensure log directory exists
-    log_dir = Path(LOG_PATH).parent
-    log_dir.mkdir(parents=True, exist_ok=True)
+    log_path = Path(options["file_path"])
+    log_path.parent.mkdir(parents=True, exist_ok=True)
 
-    # File handler (human-readable)
-    if file_output:
+    if options["file_output"]:
         logger.add(
-            LOG_PATH,
+            str(log_path),
             format=FILE_FORMAT,
-            level=level,
-            rotation=LOG_ROTATION,
-            retention=LOG_RETENTION,
+            level=options["level"],
+            rotation=options["rotation"],
+            retention=options["retention"],
             compression="zip",
             backtrace=True,
             diagnose=True,
             enqueue=True,
         )
 
-    # JSON file handler (for log aggregation)
-    if json_output:
+    if options["json_output"]:
+        json_log_path = log_path.with_suffix(".jsonl")
         logger.add(
-            JSON_LOG_PATH,
+            str(json_log_path),
             format=json_serializer,
-            level=level,
-            rotation=LOG_ROTATION,
-            retention=LOG_RETENTION,
+            level=options["level"],
+            rotation=options["rotation"],
+            retention=options["retention"],
             compression="zip",
             enqueue=True,
-            serialize=False,  # We handle serialization ourselves
+            serialize=False,
         )
 
-    logger.info(f"Logging system initialized: level={level}, json={json_output}")
+    logger.bind(name="root").info(
+        "Logging system initialized",
+        log_level=options["level"],
+        log_path=str(log_path),
+        json_output=options["json_output"],
+        console_output=options["console"],
+    )
 
 
 def get_logger(name: str = "root"):
     """Get a logger instance with optional name binding."""
     return logger.bind(name=name)
-
-
-# ============= Context Management =============
 
 
 def set_request_context(request_id: str, session_id: Optional[str] = None) -> None:
@@ -233,9 +290,6 @@ def asyncio_iscoroutinefunction(func):
     import asyncio
 
     return asyncio.iscoroutinefunction(func)
-
-
-# ============= Specialized Loggers =============
 
 
 def log_performance(operation: str, duration: float, **kwargs) -> None:
@@ -291,7 +345,6 @@ def log_api_request(
 ) -> None:
     """Log API request for monitoring."""
     level = "INFO" if status_code < 400 else "WARNING" if status_code < 500 else "ERROR"
-
     getattr(logger, level.lower())(
         f"API: {method} {path} -> {status_code} ({duration_ms:.0f}ms)",
         api_method=method,
@@ -302,55 +355,42 @@ def log_api_request(
     )
 
 
-# ============= FastAPI Middleware Integration =============
-
-
 async def logging_middleware(request, call_next):
     """FastAPI middleware for request logging with correlation IDs."""
-    import uuid
     import time
+    import uuid
 
-    # Generate request ID
     request_id = request.headers.get("X-Request-ID", str(uuid.uuid4())[:8])
     session_id = request.headers.get("X-Session-ID")
-
-    # Set context
     set_request_context(request_id, session_id)
 
-    # Track timing
     start_time = time.perf_counter()
 
     try:
         response = await call_next(request)
         duration_ms = (time.perf_counter() - start_time) * 1000
-
-        # Log request
         log_api_request(
             method=request.method,
             path=request.url.path,
             status_code=response.status_code,
             duration_ms=duration_ms,
         )
-
-        # Add request ID to response headers
         response.headers["X-Request-ID"] = request_id
-
         return response
-    except Exception as e:
+    except Exception as exc:
         duration_ms = (time.perf_counter() - start_time) * 1000
         log_api_request(
             method=request.method,
             path=request.url.path,
             status_code=500,
             duration_ms=duration_ms,
-            error=str(e),
+            error=str(exc),
         )
         raise
     finally:
         clear_request_context()
 
 
-# Auto-initialize on import (can be reconfigured)
 try:
     setup_logging()
 except Exception:

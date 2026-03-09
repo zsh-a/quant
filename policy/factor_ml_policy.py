@@ -714,7 +714,7 @@ class Agent:
 
 if __name__ == "__main__":
     # 示例用法
-    from db import DB
+    from src.market_data.db import DB
 
     # 初始化参数
     db_client = DB()

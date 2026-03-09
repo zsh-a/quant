@@ -310,7 +310,7 @@ def run_backtest(
         sig = inspect.signature(strategy_class.__init__)
         
         if 'db_client' in sig.parameters:
-            from db import DB
+            from src.market_data.db import DB
             db_client = DB()
             return strategy_class(db_client, **params)
         

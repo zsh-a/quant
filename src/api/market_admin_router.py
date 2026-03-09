@@ -9,8 +9,8 @@ import anyio
 from fastapi import APIRouter
 from pydantic import BaseModel
 
-from data_update import REFERENCE_SYMBOL, get_update_step_capabilities
-from db import DB
+from src.market_data.db import DB
+from src.market_data.update_pipeline import REFERENCE_SYMBOL, get_update_step_capabilities
 from session_db import SessionDB
 from src.tasks.automation import run_data_update_pipeline_task
 

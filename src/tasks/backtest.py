@@ -9,7 +9,7 @@ from src.core.backtest_broker import BacktestBroker
 from src.core.data_stream import DBDataStream
 from src.strategies.registry import StrategyRegistry
 from src.core.risk_manager import RiskManager
-from db import DB
+from src.market_data.db import DB
 from session_db import SessionDB
 from loguru import logger
 import time

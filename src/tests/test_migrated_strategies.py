@@ -11,7 +11,7 @@ from src.core.backtest_broker import BacktestBroker
 from src.core.data_stream import DBDataStream
 from src.strategies.jsg_strategy import JSGStrategy
 from src.strategies.rotation_strategy import RotationStrategy
-from db import DB
+from src.market_data.db import DB
 import global_var
 
 # Setup loguru

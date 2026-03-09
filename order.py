@@ -5,7 +5,6 @@ import numpy as np
 import pandas as pd
 from account import Account, PositionInfo
 import global_var
-import db
 
 from pyecharts.components import Table
 from pyecharts.options import ComponentTitleOpts

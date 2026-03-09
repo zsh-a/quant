@@ -5,10 +5,10 @@ from typing import Callable, Dict, List, Optional
 
 import pandas as pd
 
-import preprocess.ak_utils as ak
-import preprocess.bao.pre_process as bao
-from db import DB
-from src.utils.tdx_utils import TDXProcess
+from src.market_data.db import DB
+from src.market_data.processors.akshare import AKDataProcessor
+from src.market_data.processors.baostock import BaoStockProcessor
+from src.market_data.processors.tdx import TDXProcess
 
 INDEX_LIST = [
     "000985",
@@ -22,7 +22,6 @@ REFERENCE_SYMBOL = "sh.000300"
 
 class DataUpdateError(Exception):
     pass
-
 
 
 def get_reference_latest_date(symbol: str = REFERENCE_SYMBOL) -> Optional[str]:
@@ -42,27 +41,23 @@ def get_reference_latest_date(symbol: str = REFERENCE_SYMBOL) -> Optional[str]:
         return None
 
 
-
 def update_kline_daily() -> Dict:
-    proc = bao.BaoStockProcessor()
+    proc = BaoStockProcessor()
     proc.update_daily_data()
     return {"message": "daily kline updated"}
 
 
-
 def update_index_stocks_weekly() -> Dict:
-    proc = ak.AKDataProcessor()
+    proc = AKDataProcessor()
     for index in INDEX_LIST:
         proc.insert_index_stocks(index)
     return {"updated_indexes": INDEX_LIST}
 
 
-
 def update_industry_weekly() -> Dict:
-    proc = ak.AKDataProcessor()
+    proc = AKDataProcessor()
     proc.insert_sw_industry()
     return {"message": "industry mapping updated"}
-
 
 
 def update_financial() -> Dict:
@@ -71,16 +66,14 @@ def update_financial() -> Dict:
     return {"message": "financial data updated"}
 
 
-
 def update_share_info(start_date: str = DEFAULT_SHARE_START_DATE) -> Dict:
-    proc = ak.AKDataProcessor()
+    proc = AKDataProcessor()
     proc.update_shares(start_date=start_date)
     return {"start_date": start_date, "message": "share info updated"}
 
 
-
 def update_etf_kline() -> Dict:
-    proc = ak.AKDataProcessor()
+    proc = AKDataProcessor()
     all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
     all_etfs = all_etfs["基金代码"].astype(str).to_list()
     updated = 0
@@ -165,7 +158,6 @@ def get_update_step_capabilities() -> Dict[str, List[Dict[str, object]]]:
         "share_start_date_default": DEFAULT_SHARE_START_DATE,
         "reference_symbol": REFERENCE_SYMBOL,
     }
-
 
 
 def run_data_update_pipeline(

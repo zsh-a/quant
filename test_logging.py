@@ -103,7 +103,7 @@ def test_log_file_creation():
     log_dir = Path("logs")
     
     if log_dir.exists():
-        log_files = list(log_dir.glob("quant_*.log"))
+        log_files = list(log_dir.glob("quant*.log"))
         print(f"Found {len(log_files)} log file(s):")
         for log_file in log_files:
             size_kb = log_file.stat().st_size / 1024

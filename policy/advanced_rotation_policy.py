@@ -400,7 +400,7 @@ class AdvancedAgent:
             self.market_env.order_manager.create_order(code, "buy", abs(action), None, exec_time)
 
 if __name__ == "__main__":
-    from db import DB
+    from src.market_data.db import DB
     from market_env import MultiMarketEnv
     db_client = DB()
     # Simple verification code...

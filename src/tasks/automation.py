@@ -8,12 +8,12 @@ from typing import Dict, Optional
 
 from loguru import logger
 
-from data_update import (
+from src.market_data.update_pipeline import (
     DEFAULT_SHARE_START_DATE,
     get_reference_latest_date,
     run_data_update_pipeline,
 )
-from db import DB
+from src.market_data.db import DB
 from session_db import SessionDB
 from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
 from src.automation.service import AutomationService

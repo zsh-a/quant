@@ -14,7 +14,7 @@ from loguru import logger
 parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.append(parent_dir)
 
-from db import DB
+from src.market_data.db import DB
 from policy.factor_ml_policy import Agent
 
 

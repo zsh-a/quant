@@ -129,13 +129,12 @@ class HealthCheck:
     def check_database(self) -> Dict[str, Any]:
         """Check database connectivity"""
         try:
-            from db import DB
-            
+            from src.market_data.db import DB
+
             db = DB()
-            # Simple query to test connection
-            result = db.conn.execute("SELECT 1").fetchone()
-            
-            if result:
+            result = db.client.query("SELECT 1")
+
+            if result.result_rows:
                 return {
                     'component': 'database',
                     'status': HealthStatus.HEALTHY,

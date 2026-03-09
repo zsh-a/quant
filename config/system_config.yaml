@@ -3,6 +3,7 @@
 # Database Configuration
 database:
   host: "localhost"
+  port: 8123
   username: "default"
   password: ""
   cache_enabled: true
@@ -63,7 +64,7 @@ logging:
   # Log to file
   file:
     enabled: true
-    path: "logs/quant_{time:YYYY-MM-DD}.log"
+    path: "logs/quant.log"
   
   # Log to console
   console:

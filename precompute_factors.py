@@ -25,7 +25,7 @@ from datetime import datetime
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from alpha.factor_model import FactorModel
-from db import DB
+from src.market_data.db import DB
 
 
 def main():

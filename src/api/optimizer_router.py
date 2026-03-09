@@ -261,7 +261,7 @@ def _run_single_backtest(strategy_class, params: Dict, config: Dict) -> Dict:
         # Initialize db_client for strategies that need it
         db_client = None
         try:
-            from db import DB
+            from src.market_data.db import DB
             db_client = DB()
         except Exception as e:
             logger.debug(f"Could not initialize DB: {e}")

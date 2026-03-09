@@ -45,7 +45,7 @@ from src.config.settings import (
     get_api_config,
     get_settings,
 )
-from src.utils.logging_config import setup_logging, get_logger
+from src.utils.logging_config import setup_logging, get_logger, logging_middleware
 from src.api.websocket_manager import manager as ws_manager, handle_websocket_message
 from src.api.events import (
     event_bus,
@@ -58,7 +58,7 @@ from src.api.events import (
 )
 from src.api.state_persistence import persistence
 from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
-from db import DB
+from src.market_data.db import DB
 from session_db import SessionDB
 from src.api.tasks_router import router as tasks_router
 from src.api.monitoring_router import router as monitoring_router
@@ -90,6 +90,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(logging_middleware)
 
 # Include routers
 app.include_router(tasks_router)

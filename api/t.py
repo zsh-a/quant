@@ -5,11 +5,11 @@ import numpy as np
 from datetime import datetime
 import pandas as pd
 import talib as ta
-import clickhouse_connect
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 import matplotlib.pyplot as plt
 from talib import EMA
+from src.market_data.clickhouse import create_clickhouse_client
 
 from loguru import logger
 
@@ -25,9 +25,7 @@ START_DATE = "2023-01-01"
 
 
 def get_stock_by_symbol(symbol: str):
-    client = clickhouse_connect.get_client(
-        host="localhost", username="default", password=""
-    )
+    client = create_clickhouse_client()
 
     query = f"""
     SELECT *,
@@ -224,9 +222,7 @@ def get_stock_name(code):
 
 
 if __name__ == '__main__':
-    client = clickhouse_connect.get_client(
-        host="localhost", username="default", password=""
-    )
+    client = create_clickhouse_client()
 
     query = """
         SELECT

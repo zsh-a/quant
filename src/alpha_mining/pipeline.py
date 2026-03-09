@@ -3,7 +3,7 @@ from src.alpha_mining.mcts import AlphaMiningMCTS
 from src.alpha_mining.llm_agent import LLMAgent
 from src.alpha_mining.evaluator import AlphaEvaluator
 from src.alpha_mining.persistence import AlphaZooPersistence
-from db import DB
+from src.market_data.db import DB
 from loguru import logger
 from dotenv import load_dotenv
 load_dotenv()

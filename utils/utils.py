@@ -13,7 +13,7 @@ parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 # 将外层目录添加到 sys.path
 sys.path.append(parent_dir)
 
-from db import DB
+from src.market_data.db import DB
 
 
 def log2percent(x):

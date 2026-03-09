@@ -3,8 +3,12 @@ Pydantic Settings for the quantitative trading platform.
 Modern configuration management with environment variable support.
 """
 
+import os
 from functools import lru_cache
+from pathlib import Path
 from typing import Any, Dict, List, Optional
+
+import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -48,6 +52,15 @@ class BrokerConfig(BaseModel):
     live: LiveBrokerConfig = Field(default_factory=LiveBrokerConfig)
 
 
+class DatabaseConfig(BaseModel):
+    """ClickHouse connection configuration."""
+
+    host: str = "localhost"
+    port: int = 8123
+    username: str = "default"
+    password: str = ""
+
+
 class APISessionConfig(BaseModel):
     """API session configuration"""
 
@@ -78,7 +91,7 @@ class FileConfig(BaseModel):
     """File logging configuration"""
 
     enabled: bool = True
-    path: str = "logs/quant_{time:YYYY-MM-DD}.log"
+    path: str = "logs/quant.log"
 
 
 class LoggingConfig(BaseModel):
@@ -151,6 +164,7 @@ class Settings(BaseSettings):
 
     data_stream: DataStreamConfig = Field(default_factory=DataStreamConfig)
     broker: BrokerConfig = Field(default_factory=BrokerConfig)
+    database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     api: APIConfig = Field(default_factory=APIConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     monitoring: MonitoringConfig = Field(default_factory=MonitoringConfig)
@@ -174,45 +188,92 @@ class Settings(BaseSettings):
         return self.broker.backtest.commission
 
 
+def _load_yaml_settings() -> Dict[str, Any]:
+    """Load project defaults from YAML when available."""
+    config_path = Path(os.getenv("QUANT_CONFIG_PATH", "config/system_config.yaml"))
+    if not config_path.exists():
+        return {}
+
+    try:
+        raw_data = yaml.safe_load(config_path.read_text(encoding="utf-8")) or {}
+    except Exception:
+        return {}
+
+    return raw_data if isinstance(raw_data, dict) else {}
+
+
+def _load_env_overrides() -> Dict[str, Any]:
+    """Load QUANT_* environment variables as nested settings overrides."""
+    prefix = "QUANT_"
+    overrides: Dict[str, Any] = {}
+
+    for env_key, value in os.environ.items():
+        if not env_key.startswith(prefix):
+            continue
+
+        path = env_key[len(prefix) :].lower().split("__")
+        cursor = overrides
+        for part in path[:-1]:
+            cursor = cursor.setdefault(part, {})
+        cursor[path[-1]] = value
+
+    return overrides
+
+
+def _deep_merge(base: Dict[str, Any], override: Dict[str, Any]) -> Dict[str, Any]:
+    """Recursively merge two settings dictionaries."""
+    merged = dict(base)
+    for key, value in override.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = _deep_merge(merged[key], value)
+        else:
+            merged[key] = value
+    return merged
+
+
 @lru_cache()
 def get_settings() -> Settings:
     """Get cached settings instance"""
-    return Settings()
-
-
-settings = get_settings()
+    merged_settings = _load_yaml_settings()
+    merged_settings = _deep_merge(merged_settings, _load_env_overrides())
+    return Settings(**merged_settings)
 
 
 def get_data_stream_config() -> DataStreamConfig:
     """Get data stream configuration"""
-    return settings.data_stream
+    return get_settings().data_stream
 
 
 def get_broker_config() -> BrokerConfig:
     """Get broker configuration"""
-    return settings.broker
+    return get_settings().broker
+
+
+def get_database_config() -> DatabaseConfig:
+    """Get database configuration."""
+    return get_settings().database
 
 
 def get_api_config() -> APIConfig:
     """Get API configuration"""
-    return settings.api
+    return get_settings().api
 
 
 def get_logging_config() -> LoggingConfig:
     """Get logging configuration"""
-    return settings.logging
+    return get_settings().logging
 
 
 def get_monitoring_config() -> MonitoringConfig:
     """Get monitoring configuration"""
-    return settings.monitoring
+    return get_settings().monitoring
 
 
 def get_notifications_config() -> NotificationsConfig:
     """Get notification configuration"""
-    return settings.notifications
+    return get_settings().notifications
 
 
 def get_features_config() -> FeaturesConfig:
     """Get features configuration"""
-    return settings.features
+    return get_settings().features

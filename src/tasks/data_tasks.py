@@ -2,9 +2,10 @@
 Data synchronization tasks for the quantitative trading platform.
 """
 
-from src.tasks.celery_app import app
-from src.utils.tdx_utils import TDXProcess
 from loguru import logger
+
+from src.market_data.processors.tdx import TDXProcess
+from src.tasks.celery_app import app
 
 @app.task(name='src.tasks.data_tasks.sync_financial_data')
 def sync_financial_data(start_year=None):

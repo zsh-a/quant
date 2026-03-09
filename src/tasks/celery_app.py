@@ -3,10 +3,13 @@ Celery application configuration for distributed task processing.
 Handles concurrent backtesting and other async tasks.
 """
 
+from celery.schedules import crontab
+from celery.signals import setup_logging as celery_setup_logging
 from celery import Celery
 from kombu import Exchange, Queue
-from celery.schedules import crontab
 import os
+
+from src.utils.logging_config import setup_logging
 
 # Celery app instance
 app = Celery('quant_tasks')
@@ -28,6 +31,7 @@ app.conf.update(
     worker_concurrency=4,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100,  # Prevent memory leaks
+    worker_hijack_root_logger=False,
     
     # Task execution
     task_time_limit=3600,  # 1 hour hard limit
@@ -69,3 +73,9 @@ app.conf.update(
 
 if __name__ == '__main__':
     app.start()
+
+
+@celery_setup_logging.connect
+def _configure_celery_logging(*args, **kwargs):
+    """Route Celery logs through the shared logging configuration."""
+    setup_logging()
