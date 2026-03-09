@@ -14,10 +14,13 @@ import pandas as pd
 import numpy as np
 from loguru import logger
 from src.market_data.db import DB
+from src.config.settings import get_broker_config
 from src.core.engine import TradingEngine
 from src.core.backtest_broker import BacktestBroker
 from src.core.data_stream import DBDataStream
 from src.strategies.multi_factor_strategy import MultiFactorStrategy
+
+broker_config = get_broker_config()
 
 
 def print_report(broker: BacktestBroker, start_date: str, end_date: str):
@@ -150,8 +153,8 @@ def run_backtest(
     # 3. Setup broker
     broker = BacktestBroker(
         initial_cash=initial_cash,
-        commission=0.0003,
-        slippage=0.001,
+        commission=broker_config.backtest.commission,
+        slippage=broker_config.backtest.slippage,
         db_client=db,
     )
 

@@ -359,7 +359,7 @@ def run_simulation_job_task(
             db_client=db_client,
             initial_cash=initial_cash,
             commission=broker_config.backtest.commission,
-            slippage=getattr(broker_config.backtest, "slippage", 0.001),
+            slippage=broker_config.backtest.slippage,
             on_order_submitted=lambda order: pending_order_notifications.append(item)
             if (
                 item := _collect_simulation_order_notification(

@@ -6,11 +6,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Optional, List
 from celery.result import AsyncResult
+from src.config.settings import get_broker_config
 from src.tasks.celery_app import app as celery_app
 from src.tasks.backtest import run_backtest_task, cancel_backtest_task
 from loguru import logger
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
+broker_config = get_broker_config()
 
 
 class BacktestTaskRequest(BaseModel):
@@ -21,8 +23,9 @@ class BacktestTaskRequest(BaseModel):
     start_date: str
     end_date: str
     params: dict = {}
-    initial_cash: float = 1000000.0
-    commission: float = 0.0001
+    initial_cash: float = broker_config.backtest.initial_cash
+    commission: float = broker_config.backtest.commission
+    slippage: float = broker_config.backtest.slippage
     enable_risk_management: bool = True
     chunk_size_months: Optional[int] = None
 
@@ -61,6 +64,7 @@ async def create_backtest_task(request: BacktestTaskRequest):
             'params': request.params,
             'initial_cash': request.initial_cash,
             'commission': request.commission,
+            'slippage': request.slippage,
             'enable_risk_management': request.enable_risk_management,
             'chunk_size_months': request.chunk_size_months
         }

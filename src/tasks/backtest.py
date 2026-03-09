@@ -10,10 +10,13 @@ from src.core.data_stream import DBDataStream
 from src.strategies.registry import StrategyRegistry
 from src.core.risk_manager import RiskManager
 from src.market_data.db import DB
+from src.config.settings import get_broker_config
 from session_db import SessionDB
 from loguru import logger
 import time
 from datetime import datetime
+
+broker_config = get_broker_config()
 
 
 class BacktestTask(Task):
@@ -78,8 +81,9 @@ def run_backtest_task(self, session_id: str, config: dict):
         # Setup broker
         broker = BacktestBroker(
             db_client=db_client,
-            initial_cash=config.get('initial_cash', 1000000.0),
-            commission=config.get('commission', 0.0001)
+            initial_cash=config.get('initial_cash', broker_config.backtest.initial_cash),
+            commission=config.get('commission', broker_config.backtest.commission),
+            slippage=config.get('slippage', broker_config.backtest.slippage),
         )
         
         # Setup risk manager if enabled

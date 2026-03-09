@@ -215,6 +215,7 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                     db_client=db_client,
                     initial_cash=broker_config.backtest.initial_cash,
                     commission=broker_config.backtest.commission,
+                    slippage=broker_config.backtest.slippage,
                 )
 
             session.broker = broker
@@ -354,6 +355,7 @@ async def run_session_async(req: SessionRequest):
         "params": req.params or {},
         "initial_cash": broker_config.backtest.initial_cash,
         "commission": broker_config.backtest.commission,
+        "slippage": broker_config.backtest.slippage,
         "enable_risk_management": False,
         "chunk_size_months": data_stream_config.chunk_size_months,
     }

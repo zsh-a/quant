@@ -1,141 +1,37 @@
 # Quantitative Trading Platform Configuration
 
-# Database Configuration
 database:
   host: "localhost"
   port: 8123
   username: "default"
   password: ""
-  cache_enabled: true
-  
-# Data Stream Configuration
+
 data_stream:
-  # Chunk size in months for DBDataStream
-  # null = auto (based on symbol count)
-  # 1 = 1 month chunks (for 1000+ symbols)
-  # 3 = 3 month chunks (for 100-1000 symbols)
-  # 12 = 12 month chunks (for <100 symbols)
   chunk_size_months: null
-  
-  # Enable memory monitoring and logging
-  enable_memory_monitoring: true
-  
-  # Realtime data stream settings
   realtime:
     interval_seconds: 60
-    data_source: "akshare"  # akshare, tushare, etc.
-    enable_websocket: false  # Future: WebSocket support
+    data_source: "akshare"
 
-# Broker Configuration
 broker:
   backtest:
     initial_cash: 1000000.0
-    commission: 0.0001  # 0.01%
-    slippage: 0.0
-    
+    commission: 0.0001
+    slippage: 0.001
   live:
     server_url: "http://localhost:11122"
-    timeout_seconds: 30
-    retry_attempts: 3
 
-# API Server Configuration
 api:
   host: "0.0.0.0"
   port: 8000
   cors_origins: ["*"]
-  
-  # Session management
-  session:
-    persist_to_db: true
-    clear_memory_on_persist: true
-    update_db_interval_bars: 10  # Update DB every N bars
-    
-  # Performance
-  enable_incremental_updates: true
-  max_response_size_mb: 10
 
-# Logging Configuration
 logging:
-  level: "INFO"  # DEBUG, INFO, WARNING, ERROR
-  format: "{time:YYYY-MM-DD HH:mm:ss} | {level: <8} | {name}:{function}:{line} - {message}"
+  level: "INFO"
   rotation: "100 MB"
   retention: "30 days"
-  
-  # Log to file
   file:
     enabled: true
     path: "logs/quant.log"
-  
-  # Log to console
   console:
     enabled: true
     colorize: true
-
-# Task Queue Configuration (Future: Celery)
-task_queue:
-  enabled: false
-  broker_url: "redis://localhost:6379/0"
-  result_backend: "redis://localhost:6379/1"
-  worker_concurrency: 4
-
-# Performance Monitoring
-monitoring:
-  enabled: true
-  
-  # Metrics to track
-  metrics:
-    - memory_usage
-    - api_response_time
-    - backtest_throughput
-    - database_query_time
-  
-  # Alert thresholds
-  alerts:
-    memory_usage_mb: 8000  # Alert if memory > 8GB
-    api_response_time_ms: 1000  # Alert if response > 1s
-    
-# Feature Flags
-features:
-  enable_websocket: true  # Phase 2: WebSocket real-time updates
-  enable_parameter_optimization: false
-  enable_multi_strategy: false
-  enable_risk_manager: false
-  enable_state_persistence: false  # Phase 2: Coming soon
-
-# WebSocket Configuration (Phase 2)
-websocket:
-  enabled: true
-  heartbeat_interval: 30  # seconds
-  max_connections: 1000
-  message_queue_size: 100
-  ping_timeout: 60  # seconds
-  reconnect_interval: 5  # seconds
-
-# State Persistence Configuration (Phase 2)
-persistence:
-  enabled: true
-  checkpoint_interval: 60  # seconds
-  checkpoint_path: "data/checkpoints"
-  use_compression: true
-  keep_checkpoints: 5  # Keep last N checkpoints per session
-  storage_backend: "sqlite"  # sqlite, clickhouse (future)
-
-# Risk Management Configuration (Phase 2)
-risk_management:
-  enabled: true
-  
-  # Position limits
-  max_position_pct: 0.10  # Max 10% per position
-  max_total_position: 0.95  # Max 95% total exposure
-  
-  # Stop loss and take profit
-  stop_loss_pct: 0.05  # 5% stop loss
-  take_profit_pct: 0.15  # 15% take profit
-  
-  # Portfolio limits
-  max_daily_loss_pct: 0.10  # Max 10% daily loss
-  max_drawdown_pct: 0.20  # Max 20% drawdown
-  
-  # Alerts
-  alert_on_limit: true
-  alert_channels: ["log", "websocket"]  # log, websocket, email (future)
