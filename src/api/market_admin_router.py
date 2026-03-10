@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import date, datetime
 from typing import Any, Dict, Optional
 
@@ -92,9 +93,50 @@ class MarketDbOverviewService:
             latest = datetime.strptime(latest_market_date, "%Y-%m-%d").date()
         return max((date.today() - latest).days, 0)
 
+    def _parse_timestamp(self, value: Optional[str]) -> Optional[datetime]:
+        if not value:
+            return None
+        try:
+            return datetime.fromisoformat(value)
+        except ValueError:
+            try:
+                return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return None
+
+    def _mark_stale_run_if_needed(self, run: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+        if not run or run.get("status") != "running":
+            return run
+
+        stale_seconds = int(os.getenv("DATA_UPDATE_STALE_SECONDS", "600"))
+        last_heartbeat = (
+            run.get("last_heartbeat_at")
+            or run.get("started_at")
+            or run.get("created_at")
+        )
+        last_dt = self._parse_timestamp(last_heartbeat)
+        if not last_dt:
+            return run
+
+        elapsed = (datetime.now() - last_dt).total_seconds()
+        if elapsed < stale_seconds:
+            return run
+
+        now = datetime.now().isoformat()
+        session_db.update_data_update_run(
+            run["update_run_id"],
+            status="failed_timeout",
+            error=f"Heartbeat timeout after {stale_seconds}s",
+            completed_at=now,
+        )
+        return session_db.get_data_update_run(run["update_run_id"])
+
     def get_overview(self) -> Dict[str, Any]:
-        latest_run = session_db.get_latest_data_update_run()
         running_run = session_db.get_running_data_update_run()
+        running_run = self._mark_stale_run_if_needed(running_run)
+        latest_run = session_db.get_latest_data_update_run()
+        if running_run and running_run.get("status") != "running":
+            running_run = None
 
         table_summaries = {
             "stock_daily": self._table_summary(

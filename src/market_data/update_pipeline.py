@@ -41,50 +41,91 @@ def get_reference_latest_date(symbol: str = REFERENCE_SYMBOL) -> Optional[str]:
         return None
 
 
-def update_kline_daily() -> Dict:
+def update_kline_daily(progress_callback: Optional[Callable[[Dict[str, object]], None]] = None) -> Dict:
     proc = BaoStockProcessor()
-    proc.update_daily_data()
+
+    def on_batch_progress(completed_batches: int, total_batches: int, fetched_count: int):
+        if not progress_callback or total_batches <= 0:
+            return
+        progress = round((completed_batches / total_batches) * 100, 2)
+        progress_callback(
+            {
+                "event": "step_progress",
+                "step": "kline_daily",
+                "progress": progress,
+                "current": completed_batches,
+                "total": total_batches,
+                "fetched": fetched_count,
+            }
+        )
+
+    proc.update_daily_data(progress_callback=on_batch_progress)
     return {"message": "daily kline updated"}
 
 
-def update_index_stocks_weekly() -> Dict:
+def update_index_stocks_weekly(
+    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
+) -> Dict:
     proc = AKDataProcessor()
     for index in INDEX_LIST:
         proc.insert_index_stocks(index)
     return {"updated_indexes": INDEX_LIST}
 
 
-def update_industry_weekly() -> Dict:
+def update_industry_weekly(
+    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
+) -> Dict:
     proc = AKDataProcessor()
     proc.insert_sw_industry()
     return {"message": "industry mapping updated"}
 
 
-def update_financial() -> Dict:
+def update_financial(
+    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
+) -> Dict:
     proc = TDXProcess()
     proc.update_fincial_db()
     return {"message": "financial data updated"}
 
 
-def update_share_info(start_date: str = DEFAULT_SHARE_START_DATE) -> Dict:
+def update_share_info(
+    start_date: str = DEFAULT_SHARE_START_DATE,
+    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None,
+) -> Dict:
     proc = AKDataProcessor()
     proc.update_shares(start_date=start_date)
     return {"start_date": start_date, "message": "share info updated"}
 
 
-def update_etf_kline() -> Dict:
+def update_etf_kline(
+    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
+) -> Dict:
     proc = AKDataProcessor()
     all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
     all_etfs = all_etfs["基金代码"].astype(str).to_list()
+    total = len(all_etfs)
     updated = 0
     errors: List[str] = []
-    for code in all_etfs:
+    for idx, code in enumerate(all_etfs, start=1):
         try:
             proc.update_etf_data(code)
             updated += 1
         except Exception as exc:
             errors.append(f"{code}: {exc}")
         time.sleep(1)
+        if progress_callback and total > 0:
+            progress = round((idx / total) * 100, 2)
+            progress_callback(
+                {
+                    "event": "step_progress",
+                    "step": "etf_kline",
+                    "progress": progress,
+                    "current": idx,
+                    "total": total,
+                    "updated": updated,
+                    "errors": len(errors),
+                }
+            )
     proc.create_etf_meta()
     return {"updated": updated, "errors": errors[:20]}
 
@@ -163,34 +204,75 @@ def get_update_step_capabilities() -> Dict[str, List[Dict[str, object]]]:
 def run_data_update_pipeline(
     selected_steps: Optional[List[str]] = None,
     share_start_date: str = DEFAULT_SHARE_START_DATE,
+    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None,
 ) -> Dict:
     steps = selected_steps or DEFAULT_UPDATE_STEPS
     before_date = get_reference_latest_date()
     started_at = datetime.now().isoformat()
     results = []
     errors = []
+    total_steps = len(steps)
+    step_label_map = {item["key"]: item.get("label", item["key"]) for item in UPDATE_STEP_DEFINITIONS}
 
-    for step_name in steps:
+    def emit_progress(payload: Dict[str, object]):
+        if progress_callback:
+            progress_callback(payload)
+
+    for step_index, step_name in enumerate(steps, start=1):
         func = UPDATE_STEP_BUILDERS.get(step_name)
+        step_label = step_label_map.get(step_name, step_name)
         if func is None:
             errors.append({"step": step_name, "error": "unknown step"})
             results.append(
                 {"step": step_name, "status": "error", "error": "unknown step"}
             )
+            emit_progress(
+                {
+                    "event": "step_failed",
+                    "step": step_name,
+                    "label": step_label,
+                    "error": "unknown step",
+                    "index": step_index,
+                    "total_steps": total_steps,
+                }
+            )
             continue
 
+        emit_progress(
+            {
+                "event": "step_started",
+                "step": step_name,
+                "label": step_label,
+                "index": step_index,
+                "total_steps": total_steps,
+                "timestamp": datetime.now().isoformat(),
+            }
+        )
         step_started = time.time()
         try:
             if step_name == "share_info":
-                detail = func(start_date=share_start_date)
+                detail = func(start_date=share_start_date, progress_callback=progress_callback)
             else:
-                detail = func()
+                detail = func(progress_callback=progress_callback)
             results.append(
                 {
                     "step": step_name,
+                    "label": step_label,
                     "status": "success",
                     "duration_seconds": round(time.time() - step_started, 2),
                     "detail": detail,
+                }
+            )
+            emit_progress(
+                {
+                    "event": "step_completed",
+                    "step": step_name,
+                    "label": step_label,
+                    "status": "success",
+                    "duration_seconds": round(time.time() - step_started, 2),
+                    "detail": detail,
+                    "index": step_index,
+                    "total_steps": total_steps,
                 }
             )
         except Exception as exc:
@@ -198,9 +280,22 @@ def run_data_update_pipeline(
             results.append(
                 {
                     "step": step_name,
+                    "label": step_label,
                     "status": "error",
                     "duration_seconds": round(time.time() - step_started, 2),
                     "error": str(exc),
+                }
+            )
+            emit_progress(
+                {
+                    "event": "step_failed",
+                    "step": step_name,
+                    "label": step_label,
+                    "status": "error",
+                    "duration_seconds": round(time.time() - step_started, 2),
+                    "error": str(exc),
+                    "index": step_index,
+                    "total_steps": total_steps,
                 }
             )
 
@@ -229,5 +324,5 @@ def run_data_update_pipeline(
 
 
 if __name__ == "__main__":
-    result = run_data_update_pipeline()
+    result = run_data_update_pipeline(["kline_daily"])
     print(json.dumps(result, ensure_ascii=False, indent=2))

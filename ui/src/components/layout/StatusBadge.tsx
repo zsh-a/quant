@@ -8,6 +8,7 @@ type StatusKind =
   | "running"
   | "completed"
   | "failed"
+  | "failed_timeout"
   | "pending"
   | "success"
   | "partial_success"
@@ -20,6 +21,7 @@ const variantMap: Record<StatusKind, "default" | "success" | "warning" | "danger
   running: "warning",
   completed: "success",
   failed: "danger",
+  failed_timeout: "danger",
   pending: "warning",
   success: "success",
   partial_success: "info",

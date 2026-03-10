@@ -103,7 +103,7 @@ def _fetch_stock_batch(batch_tasks):
                 logger.exception(f"Error processing {code} (start_date={start_str}) in batch: {exc}")
                 continue
 
-            if (idx + 1) % 200 == 0 or idx + 1 == batch_total:
+            if (idx + 1) % 50 == 0 or idx + 1 == batch_total:
                 pct = 100 * (idx + 1) / batch_total
                 logger.info(
                     f"Batch progress: {idx + 1}/{batch_total} ({pct:.1f}%), fetched {len(meta_updates)} with new data"
@@ -209,7 +209,7 @@ class BaoStockProcessor:
             column_names=["code", "last_update_date", "last_adjfactor", "error_update_count", "name"],
         )
 
-    def update_daily_data(self, max_workers=1):
+    def update_daily_data(self, max_workers=1, progress_callback=None):
         logger.info("Starting daily K-line update with batch processing...")
         query = """
             SELECT code, last_update_date, last_adjfactor
@@ -252,9 +252,13 @@ class BaoStockProcessor:
                         logger.info(
                             f"Batch {completed_batches}/{total_batches} done, +{len(batch_meta)} new, total fetched: {len(all_meta_updates)}"
                         )
+                        if progress_callback:
+                            progress_callback(completed_batches, total_batches, len(all_meta_updates))
                     except Exception as exc:
                         completed_batches += 1
                         logger.error(f"Batch {completed_batches}/{total_batches} failed: {exc}")
+                        if progress_callback:
+                            progress_callback(completed_batches, total_batches, len(all_meta_updates))
         else:
             if worker_count > 1 and current_process().daemon:
                 logger.info("Current process is daemonized; falling back to in-process BaoStock execution")
@@ -270,9 +274,13 @@ class BaoStockProcessor:
                     logger.info(
                         f"Batch {completed_batches}/{total_batches} done, +{len(batch_meta)} new, total fetched: {len(all_meta_updates)}"
                     )
+                    if progress_callback:
+                        progress_callback(completed_batches, total_batches, len(all_meta_updates))
                 except Exception as exc:
                     completed_batches += 1
                     logger.error(f"Batch {completed_batches}/{total_batches} failed: {exc}")
+                    if progress_callback:
+                        progress_callback(completed_batches, total_batches, len(all_meta_updates))
 
         if all_new_kline:
             combined_kline = pd.concat(all_new_kline)

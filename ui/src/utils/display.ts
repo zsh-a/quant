@@ -2,6 +2,7 @@ const STATUS_LABELS: Record<string, string> = {
   running: "运行中",
   completed: "已完成",
   failed: "失败",
+  failed_timeout: "超时失败",
   pending: "等待中",
   success: "成功",
   failure: "失败",

@@ -143,6 +143,7 @@ class SessionDB:
                     details TEXT,
                     error TEXT,
                     started_at TEXT,
+                    last_heartbeat_at TEXT,
                     completed_at TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                 )
@@ -180,6 +181,7 @@ class SessionDB:
             self._add_column_if_not_exists(cursor, "sessions", "job_id", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "run_id", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "last_processed_at", "TEXT")
+            self._add_column_if_not_exists(cursor, "data_update_runs", "last_heartbeat_at", "TEXT")
 
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_equity_session ON equity_history(session_id)")
@@ -747,10 +749,10 @@ class SessionDB:
         with self._get_conn() as conn:
             conn.execute(
                 """
-                INSERT INTO data_update_runs (update_run_id, trigger_source, status, started_at)
-                VALUES (?, ?, ?, ?)
+                INSERT INTO data_update_runs (update_run_id, trigger_source, status, started_at, last_heartbeat_at)
+                VALUES (?, ?, ?, ?, ?)
                 """,
-                (update_run_id, trigger_source, "running", now),
+                (update_run_id, trigger_source, "running", now, now),
             )
         return self.get_data_update_run(update_run_id)
 

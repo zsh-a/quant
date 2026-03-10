@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import os
+import threading
+import time
 import uuid
 from datetime import datetime
 from typing import Dict, Optional
@@ -10,6 +13,8 @@ from loguru import logger
 
 from src.market_data.update_pipeline import (
     DEFAULT_SHARE_START_DATE,
+    DEFAULT_UPDATE_STEPS,
+    UPDATE_STEP_DEFINITIONS,
     get_reference_latest_date,
     run_data_update_pipeline,
 )
@@ -37,6 +42,153 @@ from src.tasks.celery_app import app
 broker_config = get_broker_config()
 data_stream_config = get_data_stream_config()
 notifications_config = get_notifications_config()
+
+DATA_UPDATE_SOFT_TIME_LIMIT = int(os.getenv("DATA_UPDATE_SOFT_TIME_LIMIT", "7200"))
+DATA_UPDATE_TIME_LIMIT = int(os.getenv("DATA_UPDATE_TIME_LIMIT", "10800"))
+DATA_UPDATE_HEARTBEAT_SECONDS = float(os.getenv("DATA_UPDATE_HEARTBEAT_SECONDS", "5"))
+
+
+class DataUpdateProgressTracker:
+    def __init__(
+        self,
+        session_db: SessionDB,
+        update_run_id: str,
+        steps_meta: list[dict],
+        heartbeat_interval: float = DATA_UPDATE_HEARTBEAT_SECONDS,
+    ):
+        self.session_db = session_db
+        self.update_run_id = update_run_id
+        self.steps_meta = steps_meta
+        self.step_index_map = {step["key"]: idx for idx, step in enumerate(steps_meta)}
+        self.steps_state = [
+            {
+                "step": step["key"],
+                "label": step.get("label", step["key"]),
+                "status": "pending",
+                "progress": 0.0,
+            }
+            for step in steps_meta
+        ]
+        self.current_step_key: Optional[str] = None
+        self.heartbeat_interval = heartbeat_interval
+        self.last_persist_at = 0.0
+        self._lock = threading.Lock()
+
+    def bootstrap(self):
+        self._persist(force=True)
+
+    def _current_step_payload(self) -> Optional[dict]:
+        if not self.current_step_key:
+            return None
+        idx = self.step_index_map.get(self.current_step_key)
+        if idx is None:
+            return None
+        step = self.steps_state[idx]
+        return {
+            "key": step.get("step"),
+            "label": step.get("label"),
+            "progress": step.get("progress"),
+            "current": step.get("current"),
+            "total": step.get("total"),
+            "message": step.get("message"),
+        }
+
+    def _build_details(self) -> dict:
+        with self._lock:
+            steps_snapshot = [dict(step) for step in self.steps_state]
+            current_step = self._current_step_payload()
+        total = len(steps_snapshot)
+        completed = sum(1 for step in steps_snapshot if step["status"] in {"success", "error", "skipped"})
+        current_progress = 0.0
+        for step in steps_snapshot:
+            if step["status"] == "running":
+                current_progress = max(current_progress, float(step.get("progress") or 0.0))
+        overall = 100.0 if total == 0 else round(((completed + current_progress / 100.0) / total) * 100, 2)
+        return {
+            "progress": overall,
+            "current_step": current_step,
+            "total_steps": total,
+            "completed_steps": completed,
+            "steps": steps_snapshot,
+        }
+
+    def _persist(self, force: bool = False):
+        now = time.time()
+        if not force and now - self.last_persist_at < self.heartbeat_interval:
+            return
+        self.last_persist_at = now
+        heartbeat = datetime.now().isoformat()
+        self.session_db.update_data_update_run(
+            self.update_run_id,
+            details=self._build_details(),
+            last_heartbeat_at=heartbeat,
+        )
+
+    def handle_event(self, event: dict):
+        step_key = event.get("step")
+        if step_key not in self.step_index_map:
+            return
+        idx = self.step_index_map[step_key]
+        event_type = event.get("event")
+        with self._lock:
+            step = self.steps_state[idx]
+            if event_type == "step_started":
+                step["status"] = "running"
+                step["progress"] = 0.0
+                step["started_at"] = event.get("timestamp") or datetime.now().isoformat()
+                step["label"] = event.get("label") or step.get("label")
+                self.current_step_key = step_key
+            elif event_type == "step_progress":
+                progress = event.get("progress")
+                if progress is not None:
+                    step["progress"] = float(progress)
+                for key in ("current", "total", "message", "fetched", "updated", "errors"):
+                    if key in event:
+                        step[key] = event.get(key)
+            elif event_type == "step_completed":
+                step["status"] = "success"
+                step["progress"] = 100.0
+                step["label"] = event.get("label") or step.get("label")
+                if event.get("duration_seconds") is not None:
+                    step["duration_seconds"] = event.get("duration_seconds")
+                if event.get("detail") is not None:
+                    step["detail"] = event.get("detail")
+                self.current_step_key = None
+            elif event_type == "step_failed":
+                step["status"] = "error"
+                step["label"] = event.get("label") or step.get("label")
+                if event.get("duration_seconds") is not None:
+                    step["duration_seconds"] = event.get("duration_seconds")
+                if event.get("error") is not None:
+                    step["error"] = event.get("error")
+                self.current_step_key = None
+        if event_type in {"step_started", "step_completed", "step_failed"}:
+            self._persist(force=True)
+        elif event_type == "step_progress":
+            self._persist()
+
+    def finalize(self, result: dict) -> dict:
+        steps_result = {item.get("step"): item for item in result.get("steps", [])}
+        with self._lock:
+            for step in self.steps_state:
+                step_key = step.get("step")
+                if step_key not in steps_result:
+                    continue
+                final = steps_result[step_key]
+                step["status"] = final.get("status", step.get("status"))
+                step["progress"] = 100.0 if step["status"] in {"success", "error"} else step.get("progress", 0.0)
+                if "duration_seconds" in final:
+                    step["duration_seconds"] = final["duration_seconds"]
+                if "detail" in final:
+                    step["detail"] = final["detail"]
+                if "error" in final:
+                    step["error"] = final["error"]
+                if "label" in final:
+                    step["label"] = final["label"]
+        details = self._build_details()
+        details.update({k: v for k, v in result.items() if k != "steps"})
+        details["progress"] = 100.0
+        return details
 
 
 def _collect_simulation_order_notification(
@@ -183,7 +335,11 @@ def send_telegram_validation_notification_task(
     }
 
 
-@app.task(name="src.tasks.automation.run_data_update_pipeline")
+@app.task(
+    name="src.tasks.automation.run_data_update_pipeline",
+    soft_time_limit=DATA_UPDATE_SOFT_TIME_LIMIT,
+    time_limit=DATA_UPDATE_TIME_LIMIT,
+)
 def run_data_update_pipeline_task(
     trigger_source: str = "manual",
     selected_steps=None,
@@ -200,6 +356,7 @@ def run_data_update_pipeline_task(
             error=None,
             details={},
             completed_at=None,
+            last_heartbeat_at=datetime.now().isoformat(),
         )
         if not update_run:
             update_run = session_db.create_data_update_run(trigger_source=trigger_source)
@@ -208,10 +365,29 @@ def run_data_update_pipeline_task(
         update_run = session_db.create_data_update_run(trigger_source=trigger_source)
         update_run_id = update_run["update_run_id"]
 
+    steps = selected_steps or DEFAULT_UPDATE_STEPS
+    step_label_map = {item["key"]: item.get("label", item["key"]) for item in UPDATE_STEP_DEFINITIONS}
+    steps_meta = [{"key": key, "label": step_label_map.get(key, key)} for key in steps]
+    tracker = DataUpdateProgressTracker(session_db, update_run_id, steps_meta)
+    tracker.bootstrap()
+    heartbeat_stop = threading.Event()
+
+    def heartbeat_loop():
+        while not heartbeat_stop.wait(tracker.heartbeat_interval):
+            tracker._persist(force=True)
+
+    heartbeat_thread = threading.Thread(target=heartbeat_loop, daemon=True)
+    heartbeat_thread.start()
+
+    def stop_heartbeat():
+        heartbeat_stop.set()
+        heartbeat_thread.join(timeout=1)
+
     try:
         result = run_data_update_pipeline(
-            selected_steps=selected_steps,
+            selected_steps=steps,
             share_start_date=share_start_date or DEFAULT_SHARE_START_DATE,
+            progress_callback=tracker.handle_event,
         )
         triggered_jobs = []
 
@@ -231,24 +407,34 @@ def run_data_update_pipeline_task(
                     }
                 )
 
-        details = {**result, "triggered_jobs": triggered_jobs}
+        stop_heartbeat()
+        details = tracker.finalize({**result, "triggered_jobs": triggered_jobs})
         session_db.update_data_update_run(
             update_run_id,
             status=result["status"],
             has_new_data=result.get("has_new_data", False),
             details=details,
             completed_at=datetime.now().isoformat(),
+            last_heartbeat_at=datetime.now().isoformat(),
         )
         return {"update_run_id": update_run_id, **details}
     except Exception as exc:
         logger.exception("Data update pipeline failed")
+        stop_heartbeat()
+        details = tracker.finalize(
+            {
+                "status": "failed",
+                "errors": [{"error": str(exc)}],
+            }
+        )
         session_db.update_data_update_run(
             update_run_id,
             status="failed",
             has_new_data=False,
             error=str(exc),
-            details={"errors": [{"error": str(exc)}]},
+            details=details,
             completed_at=datetime.now().isoformat(),
+            last_heartbeat_at=datetime.now().isoformat(),
         )
         return {"update_run_id": update_run_id, "status": "failed", "error": str(exc)}
 
@@ -571,4 +757,8 @@ def run_simulation_job_task(
 
 @app.task(name="src.tasks.automation.run_automation_cycle")
 def run_automation_cycle_task():
-    return run_data_update_pipeline_task(trigger_source="schedule")
+    task = run_data_update_pipeline_task.apply_async(
+        kwargs={"trigger_source": "schedule"},
+        queue="automation",
+    )
+    return {"status": "submitted", "task_id": task.id}

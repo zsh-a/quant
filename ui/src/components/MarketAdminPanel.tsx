@@ -10,6 +10,7 @@ import type {
 import { API_BASE } from '../utils/api';
 import { formatSourceLabel, formatStatusLabel } from '../utils/display';
 import { Button } from './ui/button';
+import { Progress } from './ui/progress';
 import { MetricCard } from './layout/MetricCard';
 import { PageHeader } from './layout/PageHeader';
 import { SectionCard } from './layout/SectionCard';
@@ -25,6 +26,11 @@ function formatDateTime(value?: string | null) {
 function formatCount(value?: number | null) {
   if (value === null || value === undefined) return 'N/A';
   return value.toLocaleString('zh-CN');
+}
+
+function formatProgress(value?: number | null) {
+  if (value === null || value === undefined || Number.isNaN(value)) return 'N/A';
+  return `${value.toFixed(1)}%`;
 }
 
 function durationLabel(run?: DataUpdateRun | null) {
@@ -126,6 +132,14 @@ export default function MarketAdminPanel() {
     () => history.find((item) => item.update_run_id === selectedRunId) || overview?.running_update || null,
     [history, overview?.running_update, selectedRunId],
   );
+  const runningProgress =
+    typeof overview?.running_update?.details?.progress === 'number'
+      ? overview?.running_update?.details?.progress
+      : null;
+  const runningCurrentStep = overview?.running_update?.details?.current_step || null;
+  const selectedProgress =
+    typeof selectedRun?.details?.progress === 'number' ? selectedRun?.details?.progress : null;
+  const selectedCurrentStep = selectedRun?.details?.current_step || null;
 
   const handleStepToggle = (stepKey: string) => {
     setSelectedSteps((current) =>
@@ -321,6 +335,39 @@ export default function MarketAdminPanel() {
               <div className="space-y-2 text-sm text-muted-foreground">
                 <div>批次 ID：{overview.running_update.update_run_id}</div>
                 <div>触发来源：{formatSourceLabel(overview.running_update.trigger_source)}</div>
+                <div>最后心跳：{formatDateTime(overview.running_update.last_heartbeat_at || overview.running_update.started_at)}</div>
+                {typeof runningProgress === 'number' ? (
+                  <div className="space-y-2 rounded-2xl border border-border/70 bg-background/70 p-3">
+                    <div className="flex items-center justify-between text-xs text-muted-foreground">
+                      <span>总体进度</span>
+                      <span>{formatProgress(runningProgress)}</span>
+                    </div>
+                    <Progress value={runningProgress} />
+                  </div>
+                ) : null}
+                {runningCurrentStep ? (
+                  <div className="space-y-2 rounded-2xl border border-border/70 bg-background/70 p-3">
+                    <div className="text-xs font-semibold text-foreground">当前步骤</div>
+                    <div className="text-sm text-muted-foreground">
+                      {String(runningCurrentStep.label || runningCurrentStep.key || 'unknown')}
+                    </div>
+                    {typeof runningCurrentStep.progress === 'number' ? (
+                      <>
+                        <div className="flex items-center justify-between text-xs text-muted-foreground">
+                          <span>步骤进度</span>
+                          <span>{formatProgress(runningCurrentStep.progress)}</span>
+                        </div>
+                        <Progress value={runningCurrentStep.progress} />
+                      </>
+                    ) : null}
+                    {typeof runningCurrentStep.current === 'number' &&
+                    typeof runningCurrentStep.total === 'number' ? (
+                      <div className="text-xs text-muted-foreground">
+                        批次 {runningCurrentStep.current}/{runningCurrentStep.total}
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -400,9 +447,40 @@ export default function MarketAdminPanel() {
                     <div>批次 ID：{selectedRun.update_run_id}</div>
                     <div>触发来源：{formatSourceLabel(selectedRun.trigger_source)}</div>
                     <div>开始时间：{formatDateTime(selectedRun.started_at)}</div>
+                    <div>最后心跳：{formatDateTime(selectedRun.last_heartbeat_at || selectedRun.started_at)}</div>
                     <div>完成时间：{formatDateTime(selectedRun.completed_at)}</div>
                     <div>发现新数据：{selectedRun.has_new_data ? '是' : '否'}</div>
                   </div>
+                  {typeof selectedProgress === 'number' ? (
+                    <div className="mt-4 space-y-2">
+                      <div className="flex items-center justify-between text-xs text-muted-foreground">
+                        <span>总体进度</span>
+                        <span>{formatProgress(selectedProgress)}</span>
+                      </div>
+                      <Progress value={selectedProgress} />
+                    </div>
+                  ) : null}
+                  {selectedCurrentStep ? (
+                    <div className="mt-3 space-y-2 rounded-2xl border border-border/70 bg-background/70 p-3 text-xs text-muted-foreground">
+                      <div className="font-semibold text-foreground">当前步骤</div>
+                      <div>{String(selectedCurrentStep.label || selectedCurrentStep.key || 'unknown')}</div>
+                      {typeof selectedCurrentStep.progress === 'number' ? (
+                        <>
+                          <div className="flex items-center justify-between">
+                            <span>步骤进度</span>
+                            <span>{formatProgress(selectedCurrentStep.progress)}</span>
+                          </div>
+                          <Progress value={selectedCurrentStep.progress} />
+                        </>
+                      ) : null}
+                      {typeof selectedCurrentStep.current === 'number' &&
+                      typeof selectedCurrentStep.total === 'number' ? (
+                        <div>
+                          批次 {selectedCurrentStep.current}/{selectedCurrentStep.total}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="rounded-3xl border border-border/70 bg-secondary/25 p-4">
@@ -426,7 +504,9 @@ export default function MarketAdminPanel() {
                     <div key={`${selectedRun.update_run_id}-${index}`} className="rounded-3xl border border-border/70 bg-card/60 p-4">
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-sm font-semibold text-foreground">{String(step.step || 'unknown')}</div>
+                          <div className="text-sm font-semibold text-foreground">
+                            {String(step.label || step.step || 'unknown')}
+                          </div>
                           <div className="mt-1 text-xs text-muted-foreground">
                             {formatStatusLabel(String(step.status || 'unknown'))}
                             {' · '}
@@ -435,6 +515,20 @@ export default function MarketAdminPanel() {
                         </div>
                         <StatusBadge value={String(step.status || 'unknown')} />
                       </div>
+                      {typeof step.progress === 'number' ? (
+                        <div className="mt-3 space-y-2">
+                          <div className="flex items-center justify-between text-xs text-muted-foreground">
+                            <span>进度</span>
+                            <span>{formatProgress(Number(step.progress))}</span>
+                          </div>
+                          <Progress value={Number(step.progress)} />
+                          {typeof step.current === 'number' && typeof step.total === 'number' ? (
+                            <div className="text-xs text-muted-foreground">
+                              批次 {String(step.current)}/{String(step.total)}
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
                       {step.detail ? (
                         <pre className="mt-4 overflow-x-auto rounded-2xl bg-background/70 p-3 text-xs leading-6 text-muted-foreground">
                           {JSON.stringify(step.detail, null, 2)}

@@ -134,6 +134,7 @@ export interface DataUpdateRun {
     details?: Record<string, any>;
     error?: string | null;
     started_at?: string;
+    last_heartbeat_at?: string;
     completed_at?: string;
     created_at: string;
 }
