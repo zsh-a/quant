@@ -428,6 +428,54 @@ class SessionDB:
                 result.append(d)
             return result
 
+    def get_equity_history_page(
+        self,
+        session_id: str,
+        since: Optional[str] = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        limit = max(1, int(limit))
+        offset = max(0, int(offset))
+
+        where = "WHERE session_id = ?"
+        params: List[Any] = [session_id]
+        if since:
+            where += " AND timestamp > ?"
+            params.append(since)
+
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM equity_history {where}",
+                params,
+            ).fetchone()[0]
+            rows = conn.execute(
+                f"""
+                SELECT *
+                FROM equity_history
+                {where}
+                ORDER BY timestamp
+                LIMIT ? OFFSET ?
+                """,
+                params + [limit, offset],
+            ).fetchall()
+
+        items = []
+        for row in rows:
+            item = dict(row)
+            item["total_equity"] = item.pop("total_assets")
+            item["positions"] = self._json_loads(item.get("positions"), {})
+            items.append(item)
+
+        return {
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(items) < total,
+        }
+
     def get_trades(self, session_id, since=None):
         with self._get_conn() as conn:
             conn.row_factory = sqlite3.Row
@@ -439,6 +487,48 @@ class SessionDB:
             query += " ORDER BY timestamp"
             cursor = conn.execute(query, params)
             return [dict(row) for row in cursor.fetchall()]
+
+    def get_trades_page(
+        self,
+        session_id: str,
+        since: Optional[str] = None,
+        limit: int = 200,
+        offset: int = 0,
+    ) -> Dict[str, Any]:
+        limit = max(1, int(limit))
+        offset = max(0, int(offset))
+
+        where = "WHERE session_id = ?"
+        params: List[Any] = [session_id]
+        if since:
+            where += " AND timestamp > ?"
+            params.append(since)
+
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            total = conn.execute(
+                f"SELECT COUNT(*) FROM trades {where}",
+                params,
+            ).fetchone()[0]
+            rows = conn.execute(
+                f"""
+                SELECT *
+                FROM trades
+                {where}
+                ORDER BY timestamp
+                LIMIT ? OFFSET ?
+                """,
+                params + [limit, offset],
+            ).fetchall()
+
+        items = [dict(row) for row in rows]
+        return {
+            "items": items,
+            "total": total,
+            "limit": limit,
+            "offset": offset,
+            "has_more": offset + len(items) < total,
+        }
 
     def add_session_logs(self, session_id: str, logs: List[Dict[str, Any]]):
         if not logs:

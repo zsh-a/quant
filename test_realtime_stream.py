@@ -38,8 +38,9 @@ def test_trading_hours_check():
         logger.info("✓ Currently in trading hours")
     else:
         logger.info("✗ Currently outside trading hours")
-    
-    return is_trading
+
+    assert isinstance(is_trading, bool), "Trading hours check should return a boolean"
+    return None
 
 def test_mock_data_fetch():
     """Test mock data generation"""

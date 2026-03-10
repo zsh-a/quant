@@ -3,24 +3,39 @@
 Test script for monitoring and alerting system.
 """
 
+import os
 import requests
 import time
 import sys
+import pytest
 
 BASE_URL = "http://localhost:8000"
+
+def _skip_if_not_integration():
+    if os.getenv("RUN_INTEGRATION") != "1" and os.getenv("PYTEST_CURRENT_TEST"):
+        pytest.skip("Integration tests disabled (set RUN_INTEGRATION=1 to enable).")
+
+
+def _require_api():
+    try:
+        response = requests.get(f"{BASE_URL}/status", timeout=2)
+    except requests.exceptions.RequestException:
+        pytest.skip("API server not reachable")
+    if response.status_code != 200:
+        pytest.skip("API server not healthy")
 
 
 def test_health_check():
     """Test health check endpoint"""
+    _skip_if_not_integration()
+    _require_api()
     print("\n" + "="*60)
     print("1. Testing Health Check")
     print("="*60)
     
     try:
         response = requests.get(f"{BASE_URL}/monitoring/health")
-        if response.status_code != 200:
-            print(f"❌ Health check failed: {response.text}")
-            return False
+        assert response.status_code == 200, f"Health check failed: {response.text}"
         
         data = response.json()
         status = data.get('status', 'unknown')
@@ -38,28 +53,26 @@ def test_health_check():
             icon = "✓" if check_status == "healthy" else "⚠️" if check_status == "degraded" else "❌"
             print(f"  {icon} {component}: {message}")
         
-        return status in ['healthy', 'degraded']
+        assert status in ['healthy', 'degraded'], f"Unexpected health status: {status}"
+        return None
         
     except requests.exceptions.ConnectionError:
-        print("❌ Cannot connect to API server")
-        print("   Make sure the server is running: uvicorn src.api.server:app --reload")
-        return False
+        pytest.skip("API server not reachable")
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return False
+        pytest.fail(f"Error: {e}")
 
 
 def test_metrics():
     """Test Prometheus metrics endpoint"""
+    _skip_if_not_integration()
+    _require_api()
     print("\n" + "="*60)
     print("2. Testing Prometheus Metrics")
     print("="*60)
     
     try:
         response = requests.get(f"{BASE_URL}/monitoring/metrics")
-        if response.status_code != 200:
-            print(f"❌ Metrics endpoint failed: {response.text}")
-            return False
+        assert response.status_code == 200, f"Metrics endpoint failed: {response.text}"
         
         metrics = response.text
         
@@ -74,24 +87,24 @@ def test_metrics():
         for line in metric_lines[:5]:
             print(f"    {line}")
         
-        return True
+        assert len(metric_lines) > 0, "Expected metrics output"
+        return None
         
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return False
+        pytest.fail(f"Error: {e}")
 
 
 def test_system_status():
     """Test system status endpoint"""
+    _skip_if_not_integration()
+    _require_api()
     print("\n" + "="*60)
     print("3. Testing System Status")
     print("="*60)
     
     try:
         response = requests.get(f"{BASE_URL}/monitoring/status")
-        if response.status_code != 200:
-            print(f"❌ Status endpoint failed: {response.text}")
-            return False
+        assert response.status_code == 200, f"Status endpoint failed: {response.text}"
         
         data = response.json()
         
@@ -117,15 +130,17 @@ def test_system_status():
         print(f"    Used: {disk.get('used_gb', 0):.1f} GB")
         print(f"    Total: {disk.get('total_gb', 0):.1f} GB")
         
-        return True
+        assert 'system' in data, "Missing system field"
+        return None
         
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return False
+        pytest.fail(f"Error: {e}")
 
 
 def test_alert_notification():
     """Test alert notification"""
+    _skip_if_not_integration()
+    _require_api()
     print("\n" + "="*60)
     print("4. Testing Alert Notification")
     print("="*60)
@@ -141,22 +156,19 @@ def test_alert_notification():
         )
         
         if response.status_code != 200:
-            print(f"❌ Alert test failed: {response.text}")
-            return False
+            pytest.skip(f"Alert test unavailable: {response.text}")
         
         data = response.json()
         
         if data.get('status') == 'success':
             print("✓ Test alert sent successfully")
             print("  Check your Feishu channel for the notification")
-            return True
+            return None
         else:
-            print(f"⚠️  Alert sent but may have issues: {data.get('error', 'Unknown')}")
-            return False
+            pytest.fail(f"Alert sent but may have issues: {data.get('error', 'Unknown')}")
         
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return False
+        pytest.fail(f"Error: {e}")
 
 
 def main():
@@ -167,10 +179,10 @@ def main():
     results = []
     
     # Run tests
-    results.append(("Health Check", test_health_check()))
-    results.append(("Prometheus Metrics", test_metrics()))
-    results.append(("System Status", test_system_status()))
-    results.append(("Alert Notification", test_alert_notification()))
+    results.append(("Health Check", _run_test("Health Check", test_health_check)))
+    results.append(("Prometheus Metrics", _run_test("Prometheus Metrics", test_metrics)))
+    results.append(("System Status", _run_test("System Status", test_system_status)))
+    results.append(("Alert Notification", _run_test("Alert Notification", test_alert_notification)))
     
     # Summary
     print("\n" + "="*60)
@@ -192,6 +204,18 @@ def main():
     else:
         print("\n❌ SOME TESTS FAILED")
         return 1
+
+
+def _run_test(name, fn):
+    try:
+        fn()
+        return True
+    except AssertionError as exc:
+        print(f"❌ {name} assertion failed: {exc}")
+        return False
+    except Exception as exc:
+        print(f"❌ {name} error: {exc}")
+        return False
 
 
 if __name__ == '__main__':

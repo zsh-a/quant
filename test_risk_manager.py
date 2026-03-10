@@ -42,7 +42,7 @@ def test_position_limits():
     assert not allowed, "Should exceed total exposure limit"
     print(f"✓ Total exposure limit (would be 100%): REJECTED - {reason}")
     
-    return True
+    return None
 
 
 def test_stop_loss():
@@ -66,7 +66,7 @@ def test_stop_loss():
     assert triggered, "Stop loss should trigger at 6% loss"
     print(f"✓ 6% loss: Stop loss triggered - {reason}")
     
-    return True
+    return None
 
 
 def test_take_profit():
@@ -90,7 +90,7 @@ def test_take_profit():
     assert triggered, "Take profit should trigger at 20% gain"
     print(f"✓ 20% gain: Take profit triggered - {reason}")
     
-    return True
+    return None
 
 
 def test_daily_loss_limit():
@@ -118,7 +118,7 @@ def test_daily_loss_limit():
     assert exceeded, "Daily loss limit should be exceeded"
     print(f"✓ Daily loss limit exceeded: {reason}")
     
-    return True
+    return None
 
 
 def test_max_drawdown():
@@ -145,7 +145,7 @@ def test_max_drawdown():
     if exceeded:
         print(f"  Reason: {reason}")
     
-    return True
+    return None
 
 
 def test_risk_metrics():
@@ -181,7 +181,7 @@ def test_risk_metrics():
     
     print(f"✓ Risk metrics calculated correctly")
     
-    return True
+    return None
 
 
 def test_alerts():
@@ -210,7 +210,7 @@ def test_alerts():
     assert len(alerts) >= 2, "Should have at least 2 alerts"
     print(f"✓ Alert system working")
     
-    return True
+    return None
 
 
 def test_status():
@@ -238,7 +238,19 @@ def test_status():
     
     print(f"✓ Status reporting working")
     
-    return True
+    return None
+
+
+def _run_test(name, fn):
+    try:
+        fn()
+        return True
+    except AssertionError as exc:
+        print(f"❌ {name} assertion failed: {exc}")
+        return False
+    except Exception as exc:
+        print(f"❌ {name} error: {exc}")
+        return False
 
 
 def main():
@@ -250,14 +262,14 @@ def main():
     results = {}
     
     # Run tests
-    results['position_limits'] = test_position_limits()
-    results['stop_loss'] = test_stop_loss()
-    results['take_profit'] = test_take_profit()
-    results['daily_loss_limit'] = test_daily_loss_limit()
-    results['max_drawdown'] = test_max_drawdown()
-    results['risk_metrics'] = test_risk_metrics()
-    results['alerts'] = test_alerts()
-    results['status'] = test_status()
+    results['position_limits'] = _run_test("position_limits", test_position_limits)
+    results['stop_loss'] = _run_test("stop_loss", test_stop_loss)
+    results['take_profit'] = _run_test("take_profit", test_take_profit)
+    results['daily_loss_limit'] = _run_test("daily_loss_limit", test_daily_loss_limit)
+    results['max_drawdown'] = _run_test("max_drawdown", test_max_drawdown)
+    results['risk_metrics'] = _run_test("risk_metrics", test_risk_metrics)
+    results['alerts'] = _run_test("alerts", test_alerts)
+    results['status'] = _run_test("status", test_status)
     
     # Summary
     print(f"\n{'='*60}")

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { Suspense, lazy, useState, useEffect, useRef, useCallback } from 'react';
 import './App.css';
 import {
   Trade,
@@ -18,18 +18,19 @@ import {
 } from './store';
 
 import Sidebar from './components/Sidebar';
-import Comparison from './components/Comparison';
-import { PortfolioManager } from './components/PortfolioManager';
-import { OptimizerPanel } from './components/OptimizerPanel';
-import { IndustryHeatmap } from './components/IndustryHeatmap';
-import GlobalOverview from './components/GlobalOverview';
-import LabPanel from './components/LabPanel';
-import MarketAdminPanel from './components/MarketAdminPanel';
-import SessionDetail from './components/SessionDetail';
 import { API_BASE } from './utils/api';
 import { AppShell } from './components/layout/AppShell';
 import { PageHeader } from './components/layout/PageHeader';
 import { StatusBadge } from './components/layout/StatusBadge';
+
+const Comparison = lazy(() => import('./components/Comparison'));
+const PortfolioManager = lazy(() => import('./components/PortfolioManager'));
+const OptimizerPanel = lazy(() => import('./components/OptimizerPanel'));
+const IndustryHeatmap = lazy(() => import('./components/IndustryHeatmap'));
+const GlobalOverview = lazy(() => import('./components/GlobalOverview'));
+const LabPanel = lazy(() => import('./components/LabPanel'));
+const MarketAdminPanel = lazy(() => import('./components/MarketAdminPanel'));
+const SessionDetail = lazy(() => import('./components/SessionDetail'));
 
 const AVAILABLE_BENCHMARKS = [
   { code: 'sh.000300', name: 'HS300' },
@@ -62,6 +63,12 @@ const TITLES: Record<string, string> = {
   marketAdmin: '行情数据库',
   optimizer: '参数优化',
 };
+
+const TabFallback: React.FC = () => (
+  <div className="glass flex min-h-[320px] items-center justify-center rounded-[28px] border border-border/70 px-6 py-10 text-sm text-muted-foreground">
+    正在加载模块...
+  </div>
+);
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'overview' | 'lab' | 'session' | 'comparison' | 'heatmap' | 'portfolio' | 'marketAdmin' | 'optimizer'>('overview');
@@ -112,16 +119,44 @@ const App: React.FC = () => {
         return;
       }
 
-      const resp = await fetch(`${API_BASE}/session/${id}/status`);
-      if (resp.status === 404) {
-        removeSession(id);
-        return;
-      }
-      const data = await resp.json();
+      const fetchPaged = async (path: string, limit = 2000) => {
+        let offset = 0;
+        let hasMore = true;
+        const items: any[] = [];
+        while (hasMore) {
+          const resp = await fetch(`${API_BASE}${path}?limit=${limit}&offset=${offset}`);
+          if (resp.status === 404) {
+            removeSession(id);
+            return [];
+          }
+          if (!resp.ok) {
+            throw new Error(`Failed to fetch ${path}`);
+          }
+          const data = await resp.json();
+          const pageItems = Array.isArray(data.items) ? data.items : [];
+          items.push(...pageItems);
+          hasMore = Boolean(data.has_more);
+          if (pageItems.length === 0) {
+            hasMore = false;
+          } else {
+            offset += pageItems.length;
+          }
+        }
+        return items;
+      };
+
+      const [equity, trades] = await Promise.all([
+        fetchPaged(`/sessions/${id}/equity`),
+        fetchPaged(`/sessions/${id}/trades`),
+      ]);
+
+      const positions =
+        equity.length > 0 ? equity[equity.length - 1]?.positions || {} : {};
+
       addSessionData(id, {
-        equity: data.equity_history || [],
-        trades: data.trades || [],
-        positions: data.positions || {},
+        equity,
+        trades,
+        positions,
       });
     } catch (err) {
       console.error('Error fetching full session data', err);
@@ -349,6 +384,13 @@ const App: React.FC = () => {
             fetchSessionDetails(message.session_id);
           }
           break;
+        case 'session_failed':
+          updateSession(message.session_id, { status: 'failed' });
+          setError(message.data.error || 'Session failed');
+          break;
+        case 'session_stopped':
+          updateSession(message.session_id, { status: 'stopped' });
+          break;
         case 'error_occurred':
           setError(message.data.error);
           break;
@@ -475,63 +517,65 @@ const App: React.FC = () => {
         </div>
       }
     >
-      {activeTab === 'overview' && (
-        <GlobalOverview
-          sessions={sessions}
-          activeSessions={activeSessions}
-          primarySession={primarySession}
-          onOpenSession={handleOpenSession}
-          onOpenLab={() => setActiveTab('lab')}
-        />
-      )}
+      <Suspense fallback={<TabFallback />}>
+        {activeTab === 'overview' && (
+          <GlobalOverview
+            sessions={sessions}
+            activeSessions={activeSessions}
+            primarySession={primarySession}
+            onOpenSession={handleOpenSession}
+            onOpenLab={() => setActiveTab('lab')}
+          />
+        )}
 
-      {activeTab === 'lab' && (
-        <LabPanel
-          strategies={strategies}
-          sessions={sessions}
-          selectedSessionIds={selectedSessionIds}
-          onStart={startSession}
-          onToggleSelection={toggleSession}
-          onViewSession={handleOpenSession}
-          onStopSession={stopSession}
-          onDeleteSession={deleteSession}
-          error={error}
-          onOpenMarketAdmin={() => setActiveTab('marketAdmin')}
-        />
-      )}
+        {activeTab === 'lab' && (
+          <LabPanel
+            strategies={strategies}
+            sessions={sessions}
+            selectedSessionIds={selectedSessionIds}
+            onStart={startSession}
+            onToggleSelection={toggleSession}
+            onViewSession={handleOpenSession}
+            onStopSession={stopSession}
+            onDeleteSession={deleteSession}
+            error={error}
+            onOpenMarketAdmin={() => setActiveTab('marketAdmin')}
+          />
+        )}
 
-      {activeTab === 'marketAdmin' && <MarketAdminPanel />}
+        {activeTab === 'marketAdmin' && <MarketAdminPanel />}
 
-      {activeTab === 'session' && (
-        <SessionDetail
-          primarySession={primarySession}
-          allSessions={sessions}
-          equityHistory={equityHistory}
-          trades={trades}
-          positions={positions}
-          comparisonData={comparisonData}
-          benchmarksData={benchmarksData}
-          selectedBenchmarks={selectedBenchmarks}
-          onToggleBenchmark={toggleBenchmark}
-          availableBenchmarks={AVAILABLE_BENCHMARKS}
-          onSelectSession={handleOpenSession}
-          onRestoreCheckpoint={() => primarySessionId && fetchSessionDataFull(primarySessionId)}
-        />
-      )}
+        {activeTab === 'session' && (
+          <SessionDetail
+            primarySession={primarySession}
+            allSessions={sessions}
+            equityHistory={equityHistory}
+            trades={trades}
+            positions={positions}
+            comparisonData={comparisonData}
+            benchmarksData={benchmarksData}
+            selectedBenchmarks={selectedBenchmarks}
+            onToggleBenchmark={toggleBenchmark}
+            availableBenchmarks={AVAILABLE_BENCHMARKS}
+            onSelectSession={handleOpenSession}
+            onRestoreCheckpoint={() => primarySessionId && fetchSessionDataFull(primarySessionId)}
+          />
+        )}
 
-      {activeTab === 'comparison' && (
-        <Comparison
-          selectedSessionIds={selectedSessionIds}
-          sessionDataCache={sessionDataCache}
-          allSessions={sessions}
-          benchmarksData={benchmarksData}
-          availableBenchmarks={AVAILABLE_BENCHMARKS}
-        />
-      )}
+        {activeTab === 'comparison' && (
+          <Comparison
+            selectedSessionIds={selectedSessionIds}
+            sessionDataCache={sessionDataCache}
+            allSessions={sessions}
+            benchmarksData={benchmarksData}
+            availableBenchmarks={AVAILABLE_BENCHMARKS}
+          />
+        )}
 
-      {activeTab === 'heatmap' && <IndustryHeatmap />}
-      {activeTab === 'portfolio' && <PortfolioManager />}
-      {activeTab === 'optimizer' && <OptimizerPanel />}
+        {activeTab === 'heatmap' && <IndustryHeatmap />}
+        {activeTab === 'portfolio' && <PortfolioManager />}
+        {activeTab === 'optimizer' && <OptimizerPanel />}
+      </Suspense>
     </AppShell>
   );
 };

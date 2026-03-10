@@ -4,13 +4,41 @@ Test script for Celery task system.
 Tests task submission, progress tracking, and result retrieval.
 """
 
+import os
 import requests
 import time
 import sys
+import pytest
 
 BASE_URL = "http://localhost:8000"
 
+def _skip_if_not_integration():
+    if os.getenv("RUN_INTEGRATION") != "1" and os.getenv("PYTEST_CURRENT_TEST"):
+        pytest.skip("Integration tests disabled (set RUN_INTEGRATION=1 to enable).")
+
+
+def _require_api():
+    try:
+        response = requests.get(f"{BASE_URL}/status", timeout=2)
+    except requests.exceptions.RequestException:
+        pytest.skip("API server not reachable")
+    if response.status_code != 200:
+        pytest.skip("API server not healthy")
+
+
+def _require_workers():
+    response = requests.get(f"{BASE_URL}/tasks/workers")
+    if response.status_code != 200:
+        pytest.skip("Celery worker status not available")
+    data = response.json()
+    if not data.get('workers'):
+        pytest.skip("No Celery workers online")
+
+
 def test_task_system():
+    _skip_if_not_integration()
+    _require_api()
+    _require_workers()
     print("="*60)
     print("Testing Celery Task System")
     print("="*60)
@@ -31,9 +59,7 @@ def test_task_system():
     
     try:
         response = requests.post(f"{BASE_URL}/tasks/backtest", json=task_request)
-        if response.status_code != 200:
-            print(f"❌ Failed to submit task: {response.text}")
-            return False
+        assert response.status_code == 200, f"Failed to submit task: {response.text}"
         
         task_data = response.json()
         task_id = task_data['task_id']
@@ -41,13 +67,8 @@ def test_task_system():
         print(f"  Session: {task_data['session_id']}")
         print(f"  Status: {task_data['status']}")
         
-    except requests.exceptions.ConnectionError:
-        print("❌ Cannot connect to API server")
-        print("   Make sure the server is running: uvicorn src.api.server:app --reload")
-        return False
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return False
+        pytest.fail(f"Error submitting task: {e}")
     
     # Test 2: Monitor task progress
     print(f"\n2. Monitoring task progress...")
@@ -57,9 +78,7 @@ def test_task_system():
     while time.time() - start_time < max_wait:
         try:
             response = requests.get(f"{BASE_URL}/tasks/backtest/{task_id}")
-            if response.status_code != 200:
-                print(f"❌ Failed to get task status: {response.text}")
-                break
+            assert response.status_code == 200, f"Failed to get task status: {response.text}"
             
             status_data = response.json()
             status = status_data['status']
@@ -73,40 +92,36 @@ def test_task_system():
                 result = status_data.get('result', {})
                 print(f"  Final equity: ${result.get('final_equity', 0):,.2f}")
                 print(f"  Total trades: {result.get('total_trades', 0)}")
-                return True
+                return None
             
             elif status == 'FAILURE':
                 print(f"\n❌ Task failed!")
                 print(f"  Error: {status_data.get('error', 'Unknown error')}")
-                return False
+                pytest.fail("Task failed")
             
             time.sleep(2)
             
         except Exception as e:
-            print(f"❌ Error checking status: {e}")
-            break
+            pytest.fail(f"Error checking status: {e}")
     
-    print(f"\n⚠️  Task did not complete within {max_wait} seconds")
-    return False
+    pytest.fail(f"Task did not complete within {max_wait} seconds")
 
 
 def test_worker_status():
     """Test worker status endpoint"""
+    _skip_if_not_integration()
+    _require_api()
     print("\n3. Checking worker status...")
     
     try:
         response = requests.get(f"{BASE_URL}/tasks/workers")
-        if response.status_code != 200:
-            print(f"❌ Failed to get workers: {response.text}")
-            return False
+        assert response.status_code == 200, f"Failed to get workers: {response.text}"
         
         data = response.json()
         workers = data.get('workers', [])
         
         if not workers:
-            print("⚠️  No workers online!")
-            print("   Start a worker with: ./start_worker.sh")
-            return False
+            pytest.fail("No workers online. Start one with: ./start_worker.sh")
         
         print(f"✓ Found {len(workers)} worker(s):")
         for worker in workers:
@@ -114,11 +129,10 @@ def test_worker_status():
             print(f"    Concurrency: {worker['concurrency']}")
             print(f"    Active tasks: {worker['active_tasks']}")
         
-        return True
+        return None
         
     except Exception as e:
-        print(f"❌ Error: {e}")
-        return False
+        pytest.fail(f"Error: {e}")
 
 
 def main():
@@ -127,7 +141,7 @@ def main():
     print("#"*60)
     
     # Check worker status first
-    if not test_worker_status():
+    if not _run_test("worker_status", test_worker_status):
         print("\n⚠️  Please start a Celery worker before running tasks:")
         print("   ./start_worker.sh")
         print("\nOr start Redis if not running:")
@@ -135,7 +149,7 @@ def main():
         return 1
     
     # Run task test
-    success = test_task_system()
+    success = _run_test("task_system", test_task_system)
     
     print("\n" + "="*60)
     if success:
@@ -144,6 +158,18 @@ def main():
     else:
         print("❌ TESTS FAILED")
         return 1
+
+
+def _run_test(name, fn):
+    try:
+        fn()
+        return True
+    except AssertionError as exc:
+        print(f"❌ {name} assertion failed: {exc}")
+        return False
+    except Exception as exc:
+        print(f"❌ {name} error: {exc}")
+        return False
 
 
 if __name__ == '__main__':

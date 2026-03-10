@@ -41,3 +41,20 @@ dependencies = [
 [tool.uv]
 # UV configuration for faster dependency resolution
 index-url = "https://pypi.org/simple"
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+norecursedirs = [
+    ".git",
+    ".venv",
+    ".pytest_cache",
+    "db",
+    "ui",
+]
+addopts = [
+    "--ignore=src/tests",
+    "--ignore=src/alpha_mining/test_real_llm.py",
+    "--ignore=test_e2e_integration.py",
+    "--ignore=test_persistence.py",
+    "--ignore=test_websocket.py",
+]

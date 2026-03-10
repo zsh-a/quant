@@ -37,7 +37,7 @@ def test_connection():
     assert not broker.is_connected(), "Should not be connected"
     print(f"✓ Disconnected successfully")
     
-    return True
+    return None
 
 
 def test_market_order():
@@ -85,7 +85,7 @@ def test_market_order():
     assert position.avg_cost == 150.0, "Avg cost should be $150"
     print(f"✓ Position created: {position.quantity} shares @ ${position.avg_cost:.2f}")
     
-    return True
+    return None
 
 
 def test_sell_order():
@@ -134,7 +134,7 @@ def test_sell_order():
     profit = 50 * (160.0 - 150.0)  # $500 profit
     print(f"✓ Realized profit: ${profit:.2f}")
     
-    return True
+    return None
 
 
 def test_insufficient_cash():
@@ -167,7 +167,7 @@ def test_insufficient_cash():
     assert account.cash == 10000, "Cash should be unchanged"
     print(f"✓ Cash unchanged: ${account.cash:.2f}")
     
-    return True
+    return None
 
 
 def test_insufficient_position():
@@ -209,7 +209,7 @@ def test_insufficient_position():
     assert position.quantity == 100, "Position should be unchanged"
     print(f"✓ Position unchanged: {position.quantity} shares")
     
-    return True
+    return None
 
 
 def test_position_pnl():
@@ -253,7 +253,7 @@ def test_position_pnl():
     
     print(f"✓ P&L calculated correctly")
     
-    return True
+    return None
 
 
 def test_account_equity():
@@ -295,7 +295,19 @@ def test_account_equity():
     
     print(f"✓ Account equity calculated correctly")
     
-    return True
+    return None
+
+
+def _run_test(name, fn):
+    try:
+        fn()
+        return True
+    except AssertionError as exc:
+        print(f"❌ {name} assertion failed: {exc}")
+        return False
+    except Exception as exc:
+        print(f"❌ {name} error: {exc}")
+        return False
 
 
 def main():
@@ -307,13 +319,13 @@ def main():
     results = {}
     
     # Run tests
-    results['connection'] = test_connection()
-    results['market_order'] = test_market_order()
-    results['sell_order'] = test_sell_order()
-    results['insufficient_cash'] = test_insufficient_cash()
-    results['insufficient_position'] = test_insufficient_position()
-    results['position_pnl'] = test_position_pnl()
-    results['account_equity'] = test_account_equity()
+    results['connection'] = _run_test("connection", test_connection)
+    results['market_order'] = _run_test("market_order", test_market_order)
+    results['sell_order'] = _run_test("sell_order", test_sell_order)
+    results['insufficient_cash'] = _run_test("insufficient_cash", test_insufficient_cash)
+    results['insufficient_position'] = _run_test("insufficient_position", test_insufficient_position)
+    results['position_pnl'] = _run_test("position_pnl", test_position_pnl)
+    results['account_equity'] = _run_test("account_equity", test_account_equity)
     
     # Summary
     print(f"\n{'='*60}")

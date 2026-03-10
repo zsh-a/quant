@@ -110,6 +110,18 @@ async def emit_session_completed(session_id: str, final_equity: float, total_tra
     })
 
 
+async def emit_session_failed(session_id: str, error: str):
+    """Emit session failed event"""
+    await event_bus.emit(EventType.SESSION_FAILED, session_id, {
+        'error': error
+    })
+
+
+async def emit_session_stopped(session_id: str):
+    """Emit session stopped event"""
+    await event_bus.emit(EventType.SESSION_STOPPED, session_id, {})
+
+
 async def emit_trade_executed(session_id: str, trade: dict):
     """Emit trade executed event"""
     await event_bus.emit(EventType.TRADE_EXECUTED, session_id, {

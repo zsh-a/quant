@@ -12,31 +12,23 @@ try:
 except ImportError:
     WsConnectionClosed = None
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 import os
 import sys
 import uuid
-import threading
-from datetime import datetime
 import asyncio
-import time
-import pandas as pd
 import anyio
 
 # Patch requests timeout globally to prevent 20s stalls
 import requests
 from functools import partial
 requests.get = partial(requests.get, timeout=5)
-requests.post = partial(requests.get, timeout=5)
+requests.post = partial(requests.post, timeout=5)
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from src.core.engine import TradingEngine
-from src.core.backtest_broker import BacktestBroker
-from src.core.live_broker import LiveBroker
-from src.core.data_stream import DBDataStream, RealtimeDataStream
 from src.strategies.registry import StrategyRegistry
 from src.utils.cache import get_cache, get_backtest_cache
 from src.config.settings import (
@@ -50,16 +42,25 @@ from src.api.websocket_manager import manager as ws_manager, handle_websocket_me
 from src.api.events import (
     event_bus,
     EventType,
+    emit_session_started,
     emit_equity_update,
     emit_session_progress,
     emit_trade_executed,
     emit_session_completed,
+    emit_session_failed,
+    emit_session_stopped,
     emit_error,
 )
 from src.api.state_persistence import persistence
 from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
 from src.market_data.db import DB
 from session_db import SessionDB
+from src.services import (
+    SessionExecutionConfig,
+    SessionExecutionHooks,
+    SessionService,
+    execute_session,
+)
 from src.api.tasks_router import router as tasks_router
 from src.api.monitoring_router import router as monitoring_router
 from src.api.portfolio_router import router as portfolio_router
@@ -81,6 +82,7 @@ broker_config = get_broker_config()
 
 app = FastAPI()
 session_db = SessionDB()
+session_service = SessionService(session_db, persistence)
 
 app.add_middleware(
     CORSMiddleware,
@@ -112,39 +114,7 @@ class SessionRequest(BaseModel):
     start_date: str
     end_date: Optional[str] = None
     mode: str = "backtest"  # backtest, simulation, live
-    params: Optional[Dict[str, Any]] = {}
-
-
-class Session:
-    def __init__(
-        self,
-        session_id: str,
-        strategy_name: str,
-        symbol: str,
-        mode: str,
-        start_date: str,
-        end_date: Optional[str],
-        params: Dict[str, Any] = {},
-    ):
-        self.session_id = session_id
-        self.strategy_name = strategy_name
-        self.symbol = symbol
-        self.mode = mode
-        self.start_date = start_date
-        self.end_date = end_date
-        self.params = params
-        self.status = "starting"
-        self.progress = 0.0
-        # self.equity_history = [] # Removed to save memory, use DB
-        # self.trades = [] # Removed to save memory, use DB
-        self.positions = {}
-        self.metrics = {}
-        self.error = None
-        self.engine = None
-        self.broker = None
-
-
-SESSIONS: Dict[str, Session] = {}
+    params: Dict[str, Any] = Field(default_factory=dict)
 
 # Mock live server URL - in real scenario this might be config
 LIVE_SERVER_URL = "http://localhost:11122"
@@ -160,174 +130,101 @@ async def get_strategies():
 
 @app.post("/session/run")
 async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
-    print(f"Running session: {req}")
     session_id = str(uuid.uuid4())
-    session = Session(
-        session_id,
-        req.strategy,
-        req.symbol,
-        req.mode,
-        req.start_date,
-        req.end_date,
-        req.params,
+    runtime = session_service.create_session(
+        session_id=session_id,
+        strategy_name=req.strategy,
+        symbol=req.symbol,
+        mode=req.mode,
+        start_date=req.start_date,
+        end_date=req.end_date,
+        params=req.params,
     )
-    SESSIONS[session_id] = session
-
-    # Persist initial session state
-    session_db.create_session(
-        session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date, req.params
-    )
-
     loop = asyncio.get_running_loop()
 
+    def schedule(coro):
+        asyncio.run_coroutine_threadsafe(coro, loop)
+
+    def update_status(status: str, progress: float, error: Optional[str]):
+        session_service.update_runtime(
+            session_id,
+            status=status,
+            progress=progress,
+            error=error,
+        )
+
+    def update_progress(progress: float, status: str):
+        session_service.update_runtime(session_id, status=status, progress=progress)
+        schedule(emit_session_progress(session_id, progress, status))
+
+    def update_equity(point: Dict[str, Any]):
+        session_service.update_runtime(session_id, positions=point.get("positions", {}))
+        schedule(emit_equity_update(session_id, point))
+
+    def update_trade(trade: Dict[str, Any]):
+        schedule(emit_trade_executed(session_id, trade))
+
+    def session_started(config: SessionExecutionConfig):
+        schedule(emit_session_started(config.session_id, config.strategy, config.symbol))
+
+    def engine_created(engine, broker):
+        session_service.update_runtime(session_id, engine=engine, broker=broker)
+
+    def session_completed(result):
+        session_service.update_runtime(
+            session_id,
+            status="completed",
+            progress=100.0,
+            positions=result.positions,
+            error=None,
+        )
+        schedule(
+            emit_session_completed(
+                result.session_id,
+                result.final_equity,
+                result.total_trades,
+            )
+        )
+
+    def session_failed(error_message: str):
+        session_service.update_runtime(
+            session_id,
+            status="failed",
+            error=error_message,
+        )
+        schedule(emit_session_failed(session_id, error_message))
+        schedule(emit_error(session_id, error_message))
+
+    hooks = SessionExecutionHooks(
+        on_session_started=session_started,
+        on_engine_created=engine_created,
+        on_status_change=update_status,
+        on_progress=update_progress,
+        on_equity_point=update_equity,
+        on_trade=update_trade,
+        on_completed=session_completed,
+        on_failed=session_failed,
+    )
+
     def execute_session_task():
-        try:
-            db_client = DB()
-            session.status = "running"
-            session_db.update_session_status(session_id, "running")
-
-            # Setup data stream (Chunked automatically by DBDataStream optimization)
-            symbols = [req.symbol]
-
-            if req.mode == "live":
-                stream = RealtimeDataStream(
-                    symbols,
-                    interval_seconds=data_stream_config.realtime.interval_seconds,
-                    data_source=data_stream_config.realtime.data_source,
-                    enable_trading_hours_check=True,
-                )
-                total_bars = 0  # Live stream is indefinite
-            else:
-                stream = DBDataStream(
-                    db_client,
-                    symbols,
-                    req.start_date,
-                    req.end_date,
-                    chunk_size_months=data_stream_config.chunk_size_months,
-                )
-                total_bars = getattr(stream, "total_bars", 1)
-
-            # Setup broker
-            if req.mode == "live":
-                broker = LiveBroker(server_url=broker_config.live.server_url)
-            else:
-                broker = BacktestBroker(
-                    db_client=db_client,
-                    initial_cash=broker_config.backtest.initial_cash,
-                    commission=broker_config.backtest.commission,
-                    slippage=broker_config.backtest.slippage,
-                )
-
-            session.broker = broker
-
-            # Setup strategy with params - use registry
-            strategy = StrategyRegistry.create_strategy(
-                req.strategy,
-                db_client,
-                session_id=session.session_id,
-                **(req.params or {}),
-            )
-
-            if strategy is None:
-                raise ValueError(f"Unknown strategy: {req.strategy}")
-
-
-# ... inside execute_session_task ...
-            # Progress callback
-            last_db_write = time.time()
-
-            def on_step(bars):
-                nonlocal last_db_write
-                
-                # Update progress
-                if req.mode == "backtest" and total_bars > 0:
-                    session.progress = (stream.idx / total_bars) * 100
-                else:
-                    session.progress = 50.0
-
-                # Throttle DB writes to every 2 seconds
-                current_time = time.time()
-                if current_time - last_db_write >= 2.0 or session.progress >= 100:
-                    info = broker.get_account_info()
-
-                    new_equity_points = list(info.get("equity_history", []))
-                    if new_equity_points:
-                        session_db.add_equity_points(session_id, new_equity_points)
-                        for pt in new_equity_points:
-                            # Keep latest positions in memory for quick access
-                            session.positions = pt.get("positions", {})
-                            # Broadcast to WebSocket
-                            asyncio.run_coroutine_threadsafe(
-                                emit_equity_update(session_id, pt), loop
-                            )
-
-                        if isinstance(broker, BacktestBroker):
-                            broker.equity_history.clear()
-                        
-                        asyncio.run_coroutine_threadsafe(
-                            emit_session_progress(
-                                session_id, session.progress, session.status
-                            ),
-                            loop,
-                        )
-
-                    new_trades = list(info.get("trades", []))
-                    if new_trades:
-                        session_db.add_trades(session_id, new_trades)
-                        for trade in new_trades:
-                            asyncio.run_coroutine_threadsafe(
-                                emit_trade_executed(session_id, trade), loop
-                            )
-
-                        if isinstance(broker, BacktestBroker):
-                            broker.trades.clear()
-                    
-                    last_db_write = current_time
-
-                # For simulation mode, we might want to slow down
-                if req.mode == "simulation":
-                    time.sleep(1)  # Simulate 1 second per bar
-
-            # Initialize risk manager if enabled
-            risk_manager = None
-            if False:
-                from src.core.risk_manager import RiskManager
-
-                initial_capital = (
-                    broker_config.backtest.initial_cash
-                    if req.mode != "live"
-                    else 1000000.0
-                )
-                risk_manager = RiskManager(initial_capital=initial_capital)
-                logger.info(f"Risk manager initialized for session {session_id}")
-
-                if isinstance(broker, BacktestBroker):
-                    broker.risk_manager = risk_manager
-                    logger.info(f"Risk manager attached to BacktestBroker")
-
-            engine = TradingEngine(
-                strategy, broker, stream, on_step=on_step, risk_manager=risk_manager
-            )
-            session.engine = engine
-            engine.run()
-
-            session.status = "completed"
-            session.progress = 100.0
-            session_db.update_session_status(session_id, "completed", 100.0)
-            # Notify WebSocket clients so frontend marks session complete
-            eq_hist = session_db.get_equity_history(session_id)
-            final_equity = eq_hist[-1]["total_equity"] if eq_hist else 0.0
-            trades_list = session_db.get_trades(session_id)
-            asyncio.run_coroutine_threadsafe(
-                emit_session_completed(session_id, final_equity, len(trades_list)), loop
-            )
-
-        except Exception as e:
-            session.status = "failed"
-            session.error = str(e)
-            session_db.update_session_status(session_id, "failed", error=str(e))
-            print(f"Session failed: {e}")
-            asyncio.run_coroutine_threadsafe(emit_error(session_id, str(e)), loop)
+        execute_session(
+            SessionExecutionConfig(
+                session_id=runtime.session_id,
+                strategy=req.strategy,
+                symbol=req.symbol,
+                start_date=req.start_date,
+                end_date=req.end_date,
+                mode=req.mode,
+                params=req.params,
+                initial_cash=broker_config.backtest.initial_cash,
+                commission=broker_config.backtest.commission,
+                slippage=broker_config.backtest.slippage,
+                enable_risk_management=False,
+                chunk_size_months=data_stream_config.chunk_size_months,
+            ),
+            session_db=session_db,
+            hooks=hooks,
+        )
 
     background_tasks.add_task(execute_session_task)
     return {"session_id": session_id}
@@ -341,9 +238,15 @@ async def run_session_async(req: SessionRequest):
     """
     session_id = str(uuid.uuid4())
 
-    # Persist initial session state
-    session_db.create_session(
-        session_id, req.strategy, req.symbol, req.mode, req.start_date, req.end_date, req.params
+    session_service.create_session(
+        session_id=session_id,
+        strategy_name=req.strategy,
+        symbol=req.symbol,
+        mode=req.mode,
+        start_date=req.start_date,
+        end_date=req.end_date,
+        params=req.params,
+        register_runtime=False,
     )
 
     # Build config for Celery task
@@ -381,39 +284,24 @@ async def get_sessions():
 
 @app.delete("/session/{session_id}")
 async def delete_session(session_id: str):
-    s_mem = SESSIONS.get(session_id)
-    s_db = await anyio.to_thread.run_sync(session_db.get_session, session_id) if not s_mem else None
-
-    if not s_mem and not s_db:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    status = s_mem.status if s_mem else s_db["status"]
-    if status == "running":
-        raise HTTPException(status_code=409, detail="Running sessions cannot be deleted")
-
-    deleted = await anyio.to_thread.run_sync(session_db.delete_session, session_id)
-    await anyio.to_thread.run_sync(persistence.delete_checkpoints, session_id)
-    SESSIONS.pop(session_id, None)
-
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    return {"session_id": session_id, "deleted": True}
+    deleted = await anyio.to_thread.run_sync(session_service.delete_session, session_id)
+    return {"session_id": session_id, "deleted": deleted}
 
 
 @app.get("/session/{session_id}/risk")
 async def get_session_risk(session_id: str):
     """Risk metrics and alerts for a session. Returns 404 if session not found."""
-    s_mem = SESSIONS.get(session_id)
-    s_db = await anyio.to_thread.run_sync(session_db.get_session, session_id) if not s_mem else None
-    if not s_mem and not s_db:
+    runtime, persisted = await anyio.to_thread.run_sync(
+        session_service.get_runtime_or_persisted, session_id
+    )
+    if not runtime and not persisted:
         raise HTTPException(status_code=404, detail="Session not found")
     # Risk manager state is not persisted; return safe default so RiskPanel doesn't 404
     return {
         "enabled": bool(
-            s_mem
-            and getattr(s_mem, "engine", None)
-            and getattr(s_mem.engine, "risk_manager", None)
+            runtime
+            and getattr(runtime, "engine", None)
+            and getattr(runtime.engine, "risk_manager", None)
         ),
         "metrics": {},
         "limits": {},
@@ -426,49 +314,58 @@ async def get_session_status(
     session_id: str,
     since: Optional[str] = Query(None, description="Return data since this timestamp"),
 ):
-    # Try to find in memory first for running status
-    s_mem = SESSIONS.get(session_id)
-
-    # Get basic info from DB or Memory
-    if s_mem:
-        status = s_mem.status
-        mode = s_mem.mode
-        progress = s_mem.progress
-        error = s_mem.error
-        start_date = s_mem.start_date
-        end_date = s_mem.end_date
-        positions = s_mem.positions
-    else:
-        # Fallback to DB
-        s_db = await anyio.to_thread.run_sync(session_db.get_session, session_id)
-        if not s_db:
-            raise HTTPException(status_code=404, detail="Session not found")
-        status = s_db["status"]
-        mode = s_db["mode"]
-        progress = s_db["progress"]
-        error = s_db["error"]
-        start_date = s_db["start_date"]
-        end_date = s_db["end_date"]
-        positions = {}
-
-    equity_history = await anyio.to_thread.run_sync(
-        session_db.get_equity_history, session_id, since
+    return await anyio.to_thread.run_sync(
+        session_service.get_status_payload,
+        session_id,
+        since,
     )
-    trades = await anyio.to_thread.run_sync(session_db.get_trades, session_id, since)
-    if not positions and equity_history:
-        positions = equity_history[-1].get("positions", {})
 
-    return {
-        "status": status,
-        "mode": mode,
-        "progress": progress,
-        "equity_history": equity_history,
-        "trades": trades,
-        "positions": positions,
-        "error": error,
-        "start_date": start_date,
-        "end_date": end_date,
-    }
+
+@app.get("/sessions/{session_id}")
+async def get_session_resource(session_id: str):
+    payload = await anyio.to_thread.run_sync(session_service.get_status_payload, session_id, None)
+    payload["session_id"] = session_id
+    return payload
+
+
+@app.get("/sessions/{session_id}/equity")
+async def get_session_equity(
+    session_id: str,
+    since: Optional[str] = Query(None, description="Return data since this timestamp"),
+    limit: int = Query(200, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
+):
+    session = await anyio.to_thread.run_sync(session_db.get_session, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    page = await anyio.to_thread.run_sync(
+        session_db.get_equity_history_page,
+        session_id,
+        since,
+        limit,
+        offset,
+    )
+    return {"session_id": session_id, **page}
+
+
+@app.get("/sessions/{session_id}/trades")
+async def get_session_trades(
+    session_id: str,
+    since: Optional[str] = Query(None, description="Return data since this timestamp"),
+    limit: int = Query(200, ge=1, le=5000),
+    offset: int = Query(0, ge=0),
+):
+    session = await anyio.to_thread.run_sync(session_db.get_session, session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    page = await anyio.to_thread.run_sync(
+        session_db.get_trades_page,
+        session_id,
+        since,
+        limit,
+        offset,
+    )
+    return {"session_id": session_id, **page}
 
 
 @app.get("/session/{session_id}/metrics")
@@ -494,23 +391,22 @@ async def get_session_metrics(session_id: str):
     return {"session_id": session_id, "metrics": metrics.to_dict()}
 
 
+@app.get("/sessions/{session_id}/metrics")
+async def get_session_metrics_resource(session_id: str):
+    return await get_session_metrics(session_id)
+
+
 @app.post("/session/{session_id}/stop")
 async def stop_session(session_id: str):
-    if session_id in SESSIONS:
-        s = SESSIONS[session_id]
-        if s.engine:
-            s.engine.stop()
-        s.status = "stopped"
-        session_db.update_session_status(session_id, "stopped")
-        return {"status": "stopped"}
+    result = await anyio.to_thread.run_sync(session_service.stop_session, session_id)
+    await emit_session_stopped(session_id)
+    await emit_session_progress(session_id, 0.0, "stopped")
+    return result
 
-    # If not in memory (e.g. restarted), update DB just in case
-    s_db = session_db.get_session(session_id)
-    if s_db and s_db["status"] == "running":
-        session_db.update_session_status(session_id, "stopped")
-        return {"status": "stopped (db updated)"}
 
-    raise HTTPException(status_code=404, detail="Session not found or not running")
+@app.post("/sessions/{session_id}/stop")
+async def stop_session_resource(session_id: str):
+    return await stop_session(session_id)
 
 
 @app.get("/market/benchmark")
@@ -563,6 +459,7 @@ event_bus.subscribe(EventType.SESSION_STARTED, broadcast_session_event)
 event_bus.subscribe(EventType.SESSION_PROGRESS, broadcast_session_event)
 event_bus.subscribe(EventType.SESSION_COMPLETED, broadcast_session_event)
 event_bus.subscribe(EventType.SESSION_FAILED, broadcast_session_event)
+event_bus.subscribe(EventType.SESSION_STOPPED, broadcast_session_event)
 event_bus.subscribe(EventType.TRADE_EXECUTED, broadcast_session_event)
 event_bus.subscribe(EventType.EQUITY_UPDATE, broadcast_session_event)
 event_bus.subscribe(EventType.ERROR_OCCURRED, broadcast_session_event)
@@ -583,35 +480,9 @@ logger.info("WebSocket event listeners registered")
 @app.post("/session/{session_id}/checkpoint")
 async def create_checkpoint(session_id: str):
     """Create a checkpoint for a session"""
-    session = SESSIONS.get(session_id)
-    if not session:
-        raise HTTPException(status_code=404, detail="Session not found")
-
-    # Collect session state
-    state = {
-        "session_id": session_id,
-        "strategy": session.strategy_name,
-        "symbol": session.symbol,
-        "mode": session.mode,
-        "status": session.status,
-        "progress": session.progress,
-        "equity_history": [
-            {"timestamp": str(e["timestamp"]), "value": e["value"]}
-            for e in session.equity_history
-        ],
-        "trades": session.trades,
-        "positions": session.positions,
-        "start_date": session.start_date,
-        "end_date": session.end_date,
-        "params": session.params,
-    }
-
-    metadata = {
-        "checkpoint_type": "manual",
-        "status": session.status,
-        "progress": session.progress,
-    }
-
+    state, metadata = await anyio.to_thread.run_sync(
+        session_service.build_checkpoint_state, session_id
+    )
     success = persistence.save_checkpoint(session_id, state, metadata)
 
     if success:
@@ -620,11 +491,21 @@ async def create_checkpoint(session_id: str):
         raise HTTPException(status_code=500, detail="Failed to create checkpoint")
 
 
+@app.post("/sessions/{session_id}/checkpoint")
+async def create_checkpoint_resource(session_id: str):
+    return await create_checkpoint(session_id)
+
+
 @app.get("/session/{session_id}/checkpoints")
 async def list_checkpoints(session_id: str):
     """List all checkpoints for a session"""
     checkpoints = persistence.list_checkpoints(session_id)
     return {"session_id": session_id, "checkpoints": checkpoints}
+
+
+@app.get("/sessions/{session_id}/checkpoints")
+async def list_checkpoints_resource(session_id: str):
+    return await list_checkpoints(session_id)
 
 
 @app.post("/session/{session_id}/restore")
@@ -638,23 +519,7 @@ async def restore_session(session_id: str):
     state = checkpoint["state"]
 
     # Restore session
-    session = Session(
-        session_id=state["session_id"],
-        strategy_name=state["strategy"],
-        symbol=state["symbol"],
-        mode=state["mode"],
-        start_date=state["start_date"],
-        end_date=state.get("end_date"),
-        params=state.get("params", {}),
-    )
-
-    session.status = state["status"]
-    session.progress = state["progress"]
-    session.equity_history = state["equity_history"]
-    session.trades = state["trades"]
-    session.positions = state["positions"]
-
-    SESSIONS[session_id] = session
+    session = await anyio.to_thread.run_sync(session_service.restore_session, state)
 
     logger.info(
         f"Session restored: {session_id} from checkpoint {checkpoint['checkpoint_time']}"
@@ -667,6 +532,11 @@ async def restore_session(session_id: str):
         "status": session.status,
         "progress": session.progress,
     }
+
+
+@app.post("/sessions/{session_id}/restore")
+async def restore_session_resource(session_id: str):
+    return await restore_session(session_id)
 
 
 @app.get("/persistence/stats")
@@ -697,7 +567,7 @@ async def status():
     ws_connections = ws_manager.get_connection_count()
     return {
         "status": "up",
-        "active_sessions": len([s for s in SESSIONS.values() if s.status == "running"]),
+        "active_sessions": session_service.count_running_sessions(),
         "websocket_connections": ws_connections,
     }
 

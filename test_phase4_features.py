@@ -58,7 +58,7 @@ def test_portfolio_manager():
     print(f"✅ Signal combination: {len(combined)} combined signals")
     
     print("✅ PortfolioManager tests passed!")
-    return True
+    return None
 
 
 def test_parameter_optimizer():
@@ -119,7 +119,7 @@ def test_parameter_optimizer():
     print(f"✅ Random search: {report.n_iterations} iterations")
     
     print("✅ ParameterOptimizer tests passed!")
-    return True
+    return None
 
 
 def test_attribution():
@@ -163,7 +163,7 @@ def test_attribution():
     print(f"✅ Max Drawdown: {risk['max_drawdown']:.2%}")
     
     print("✅ Attribution tests passed!")
-    return True
+    return None
 
 
 def test_report_generator():
@@ -215,7 +215,19 @@ def test_report_generator():
     os.remove(report_path)
     
     print("✅ Report Generator tests passed!")
-    return True
+    return None
+
+
+def _run_test(name, fn):
+    try:
+        fn()
+        return True
+    except AssertionError as exc:
+        logger.error(f"{name} assertion failed: {exc}")
+        return False
+    except Exception as exc:
+        logger.error(f"{name} error: {exc}")
+        return False
 
 
 def main():
@@ -233,12 +245,7 @@ def main():
     
     results = []
     for name, test_fn in tests:
-        try:
-            success = test_fn()
-            results.append((name, success))
-        except Exception as e:
-            logger.error(f"{name} failed: {e}")
-            results.append((name, False))
+        results.append((name, _run_test(name, test_fn)))
     
     # Summary
     print("\n" + "="*60)

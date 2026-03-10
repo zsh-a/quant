@@ -1,10 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import ReactECharts from 'echarts-for-react';
+import React, { Suspense, lazy, useState, useEffect } from 'react';
 import { PageHeader } from './layout/PageHeader';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { API_BASE } from '../utils/api';
+
+const HeatmapChart = lazy(() => import('./charts/HeatmapChart'));
 
 interface HeatmapData {
   dates: string[];
@@ -201,11 +202,13 @@ export const IndustryHeatmap: React.FC = () => {
       <SectionCard title="Sector Map" description="Blacklisted industries are highlighted to make defensive or crowded groups easier to spot.">
         <div style={{ minHeight: '950px' }}>
           {heatmapData ? (
-            <ReactECharts 
-              option={getOption()} 
-              style={{ height: '950px', width: '100%' }}
-              theme="dark"
-            />
+            <Suspense fallback={<div style={{ height: '950px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading chart...</div>}>
+              <HeatmapChart 
+                option={getOption()} 
+                style={{ height: '950px', width: '100%' }}
+                theme="dark"
+              />
+            </Suspense>
           ) : (
             <div style={{ height: '950px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
               {loading ? 'Loading data...' : 'No data available'}

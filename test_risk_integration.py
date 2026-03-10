@@ -108,7 +108,7 @@ def test_risk_integration():
     print(f"  Total exposure: ${risk_status['metrics']['total_exposure']:,.2f}")
     print(f"  ✓ Risk metrics calculated")
     
-    return True
+    return None
 
 
 def test_stop_loss_integration():
@@ -146,7 +146,7 @@ def test_stop_loss_integration():
     assert stop_triggered, "Stop loss should be triggered at 6% loss"
     print(f"  ✓ Stop loss triggered: {reason}")
     
-    return True
+    return None
 
 
 def test_take_profit_integration():
@@ -171,7 +171,19 @@ def test_take_profit_integration():
     assert profit_triggered, "Take profit should be triggered at 20% gain"
     print(f"  ✓ Take profit triggered: {reason}")
     
-    return True
+    return None
+
+
+def _run_test(name, fn):
+    try:
+        fn()
+        return True
+    except AssertionError as exc:
+        print(f"❌ {name} assertion failed: {exc}")
+        return False
+    except Exception as exc:
+        print(f"❌ {name} error: {exc}")
+        return False
 
 
 def main():
@@ -183,23 +195,9 @@ def main():
     results = {}
     
     # Run tests
-    try:
-        results['risk_integration'] = test_risk_integration()
-    except Exception as e:
-        print(f"❌ risk_integration failed: {e}")
-        results['risk_integration'] = False
-    
-    try:
-        results['stop_loss'] = test_stop_loss_integration()
-    except Exception as e:
-        print(f"❌ stop_loss failed: {e}")
-        results['stop_loss'] = False
-    
-    try:
-        results['take_profit'] = test_take_profit_integration()
-    except Exception as e:
-        print(f"❌ take_profit failed: {e}")
-        results['take_profit'] = False
+    results['risk_integration'] = _run_test("risk_integration", test_risk_integration)
+    results['stop_loss'] = _run_test("stop_loss", test_stop_loss_integration)
+    results['take_profit'] = _run_test("take_profit", test_take_profit_integration)
     
     # Summary
     print(f"\n{'='*60}")
