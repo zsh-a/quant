@@ -122,6 +122,29 @@ class BaoStockProcessor:
     def __init__(self):
         self.client = create_clickhouse_client()
 
+    @staticmethod
+    def _coerce_date(value):
+        if value is None:
+            return None
+        if isinstance(value, datetime.datetime):
+            return value.date()
+        if isinstance(value, datetime.date):
+            return value
+        try:
+            return datetime.date.fromisoformat(str(value))
+        except ValueError:
+            return None
+
+    def _query_scalar(self, sql: str):
+        try:
+            result = self.client.query(sql)
+        except Exception as exc:
+            logger.warning(f"Scalar query failed: {exc}")
+            return None
+        if not result.result_rows:
+            return None
+        return result.result_rows[0][0]
+
     def fetch_bao_data(self, code, start_date):
         bs.login()
         rs = bs.query_history_k_data_plus(
@@ -335,3 +358,118 @@ class BaoStockProcessor:
                 except Exception as exc:
                     print(f"Error updating industry data for {start_date}: {exc}")
             start_date += datetime.timedelta(days=1)
+
+    def update_trade_dates(self, start_date=None, end_date=None):
+        if end_date is None:
+            end_date = datetime.date.today().strftime("%Y-%m-%d")
+
+        if start_date is None:
+            latest = self._coerce_date(
+                self._query_scalar("SELECT max(calendar_date) FROM stock_data.trade_dates")
+            )
+            if latest is None:
+                start_date = "1990-01-01"
+            else:
+                start_date = (latest + datetime.timedelta(days=1)).strftime("%Y-%m-%d")
+
+        if start_date > end_date:
+            return {"message": "trade dates already up-to-date", "rows": 0}
+
+        lg = bs.login()
+        if lg.error_code != "0":
+            raise RuntimeError(f"BaoStock login failed: {lg.error_code} {lg.error_msg}")
+
+        try:
+            rs = bs.query_trade_dates(start_date=start_date, end_date=end_date)
+            if rs.error_code != "0":
+                raise RuntimeError(
+                    f"query_trade_dates failed: {rs.error_code} {rs.error_msg}"
+                )
+
+            data_list = []
+            while rs.next():
+                data_list.append(rs.get_row_data())
+
+            df = pd.DataFrame(data_list, columns=rs.fields)
+            if df.empty:
+                return {"message": "no trade dates returned", "rows": 0}
+
+            df["calendar_date"] = pd.to_datetime(df["calendar_date"])
+            df["is_trading_day"] = pd.to_numeric(
+                df["is_trading_day"], errors="coerce"
+            ).fillna(0).astype(int)
+            df = df[["calendar_date", "is_trading_day"]]
+
+            self.client.insert_df("stock_data.trade_dates", df)
+            self.client.command("OPTIMIZE TABLE stock_data.trade_dates FINAL")
+            return {
+                "start_date": start_date,
+                "end_date": end_date,
+                "rows": len(df),
+            }
+        finally:
+            try:
+                bs.logout()
+            except Exception as exc:
+                logger.warning(f"BaoStock logout failed: {exc}")
+
+    def update_all_stock(self, day=None, force=False):
+        if day is None:
+            latest_trading = self._coerce_date(
+                self._query_scalar(
+                    "SELECT max(calendar_date) FROM stock_data.trade_dates WHERE is_trading_day = 1"
+                )
+            )
+            if latest_trading is None:
+                latest_trading = self._coerce_date(
+                    self._query_scalar("SELECT max(date) FROM stock_data.stock_daily")
+                )
+            if latest_trading is None:
+                latest_trading = datetime.date.today()
+            day = latest_trading.strftime("%Y-%m-%d")
+
+        if not force:
+            existing = self._query_scalar(
+                f"SELECT count() FROM stock_data.all_stock WHERE day = '{day}'"
+            )
+            if existing and int(existing) > 0:
+                return {"day": day, "rows": 0, "message": "already ingested"}
+
+        lg = bs.login()
+        if lg.error_code != "0":
+            raise RuntimeError(f"BaoStock login failed: {lg.error_code} {lg.error_msg}")
+
+        try:
+            rs = bs.query_all_stock(day=day)
+            if rs.error_code != "0":
+                raise RuntimeError(
+                    f"query_all_stock failed: {rs.error_code} {rs.error_msg}"
+                )
+
+            data_list = []
+            while rs.next():
+                data_list.append(rs.get_row_data())
+
+            df = pd.DataFrame(data_list, columns=rs.fields)
+            if df.empty:
+                raise RuntimeError(f"query_all_stock returned empty for day={day}")
+
+            df["day"] = pd.to_datetime(day)
+            if "tradeStatus" in df.columns:
+                df["tradeStatus"] = pd.to_numeric(
+                    df["tradeStatus"], errors="coerce"
+                ).fillna(0).astype(int)
+            if "code_name" in df.columns:
+                df["code_name"] = df["code_name"].fillna("").astype(str)
+
+            cols = ["day", "code", "tradeStatus", "code_name"]
+            df = df[cols]
+
+            self.client.insert_df("stock_data.all_stock", df)
+            self.client.command("OPTIMIZE TABLE stock_data.all_stock FINAL")
+            return {"day": day, "rows": len(df)}
+        finally:
+            try:
+                bs.logout()
+            except Exception as exc:
+                logger.warning(f"BaoStock logout failed: {exc}")

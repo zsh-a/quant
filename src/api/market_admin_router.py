@@ -139,6 +139,16 @@ class MarketDbOverviewService:
             running_run = None
 
         table_summaries = {
+            "trade_dates": self._table_summary(
+                table="stock_data.trade_dates",
+                date_column="calendar_date",
+                distinct_column="calendar_date",
+            ),
+            "all_stock": self._table_summary(
+                table="stock_data.all_stock",
+                date_column="day",
+                distinct_column="code",
+            ),
             "stock_daily": self._table_summary(
                 table="stock_data.stock_daily",
                 date_column="date",

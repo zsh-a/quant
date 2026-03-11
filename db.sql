@@ -31,6 +31,20 @@ ORDER BY (code)
 
 -- OPTIMIZE TABLE stock_data.stock_daily_meta FINAL;
 
+CREATE TABLE stock_data.trade_dates
+(   `calendar_date` Date,
+    `is_trading_day` UInt8
+) ENGINE = ReplacingMergeTree()
+ORDER BY (calendar_date)
+
+CREATE TABLE stock_data.all_stock
+(   `day` Date,
+    `code` String,
+    `tradeStatus` UInt8,
+    `code_name` String
+) ENGINE = ReplacingMergeTree()
+ORDER BY (day, code)
+
 
 CREATE TABLE stock_data.finicial_data
 (   `date` Date,

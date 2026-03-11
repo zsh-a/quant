@@ -63,6 +63,20 @@ def update_kline_daily(progress_callback: Optional[Callable[[Dict[str, object]],
     return {"message": "daily kline updated"}
 
 
+def update_trade_dates(
+    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
+) -> Dict:
+    proc = BaoStockProcessor()
+    return proc.update_trade_dates()
+
+
+def update_all_stock(
+    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
+) -> Dict:
+    proc = BaoStockProcessor()
+    return proc.update_all_stock()
+
+
 def update_index_stocks_weekly(
     progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
 ) -> Dict:
@@ -131,6 +145,20 @@ def update_etf_kline(
 
 
 UPDATE_STEP_DEFINITIONS = [
+    {
+        "key": "trade_dates",
+        "label": "交易日历",
+        "description": "同步交易日历到 ClickHouse",
+        "default_selected": True,
+        "builder": update_trade_dates,
+    },
+    {
+        "key": "all_stock",
+        "label": "证券清单",
+        "description": "同步指定交易日的证券清单到 ClickHouse",
+        "default_selected": True,
+        "builder": update_all_stock,
+    },
     {
         "key": "financial",
         "label": "财务数据",
