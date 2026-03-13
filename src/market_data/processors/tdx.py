@@ -5,8 +5,17 @@ from datetime import datetime
 import pandas as pd
 from loguru import logger
 from mootdx.affair import Affair
+from mootdx.financial.base import BaseFinancial
 
 from src.market_data.clickhouse import create_clickhouse_client
+
+# Known working TDX financial data servers
+TDX_SERVERS = [
+    ("119.147.212.81", 7709),
+    ("120.76.152.87", 7709),
+    ("47.107.75.159", 7727),
+    ("106.14.95.149", 7727),
+]
 
 
 def convert_to_date(num):
@@ -44,6 +53,27 @@ class TDXProcess:
         except Exception as exc:
             logger.error(f"Failed to save state file: {exc}")
 
+    def _get_remote_files(self):
+        """Get remote files list with server failover."""
+        for server_ip, server_port in TDX_SERVERS:
+            try:
+                logger.info(f"Connecting to TDX server: {server_ip}:{server_port}")
+                BaseFinancial.bestip = (server_ip, server_port)
+                remote_files = Affair.files()
+                if remote_files:
+                    return remote_files, (server_ip, server_port)
+            except Exception as exc:
+                logger.warning(f"Failed to connect to {server_ip}:{server_port}: {exc}")
+                continue
+        
+        # Last resort: try default mootdx behavior
+        try:
+            logger.info("Trying default mootdx connection...")
+            return Affair.files(), None
+        except Exception as exc:
+            logger.error(f"All TDX servers failed: {exc}")
+            return [], None
+
     def fetch_tdx(self):
         local_hash = self.state.get("file_hashes", {})
 
@@ -53,7 +83,10 @@ class TDXProcess:
             del local_hash[f]
 
         updated_files = []
-        remote_files = Affair.files()
+        remote_files, best_server = self._get_remote_files()
+
+        if best_server:
+            BaseFinancial.bestip = best_server
 
         for item in remote_files:
             filename = item["filename"]
