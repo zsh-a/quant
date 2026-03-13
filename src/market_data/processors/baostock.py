@@ -127,13 +127,18 @@ class BaoStockProcessor:
         if value is None:
             return None
         if isinstance(value, datetime.datetime):
-            return value.date()
-        if isinstance(value, datetime.date):
-            return value
-        try:
-            return datetime.date.fromisoformat(str(value))
-        except ValueError:
+            dt = value.date()
+        elif isinstance(value, datetime.date):
+            dt = value
+        else:
+            try:
+                dt = datetime.date.fromisoformat(str(value))
+            except (ValueError, TypeError):
+                return None
+        
+        if dt and dt.year < 1990:
             return None
+        return dt
 
     def _query_scalar(self, sql: str):
         try:

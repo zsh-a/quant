@@ -1,49 +1,64 @@
 CREATE TABLE stock_data.stock_daily
-(   `date` Date,
-    `code` String,
-    `open` Float64,
-    `high` Float64,
-    `low` Float64,
-    `close` Float64,
-    `preclose` Float64,
-    `volume` UInt64,
-    `amount` Float64,
-    `turn` Float64,
-    `pctChg` Float64,
-    `peTTM` Float64,
-    `pbMRQ` Float64,
+(
+    `date` Date CODEC(Delta, LZ4),
+    `code` LowCardinality(String),
+    `open` Float64 CODEC(Gorilla, LZ4),
+    `high` Float64 CODEC(Gorilla, LZ4),
+    `low` Float64 CODEC(Gorilla, LZ4),
+    `close` Float64 CODEC(Gorilla, LZ4),
+    `preclose` Float64 CODEC(Gorilla, LZ4),
+    `volume` UInt64 CODEC(T64, LZ4),
+    `amount` Float64 CODEC(Gorilla, LZ4),
+    `turn` Float64 CODEC(Gorilla, LZ4),
+    `pctChg` Float64 CODEC(Gorilla, LZ4),
+    `peTTM` Float64 CODEC(Gorilla, LZ4),
+    `pbMRQ` Float64 CODEC(Gorilla, LZ4),
     `tradestatus` Int16,
     `isST` Int16,
-    `adjfactor` Float64,
-) ENGINE = ReplacingMergeTree() 
-ORDER BY (code, date)
+    `adjfactor` Float64 CODEC(Gorilla, LZ4)
+) ENGINE = ReplacingMergeTree()
+ORDER BY (code, date);
 
 -- OPTIMIZE TABLE stock_data.stock_daily FINAL;
 
 CREATE TABLE stock_data.stock_daily_meta
-(  `code` String,
-   `name` String,
-   `last_update_date` Date,
-   `last_adjfactor` Float64,
-   `error_update_count` UInt32
+(
+    `code` LowCardinality(String),
+    `name` LowCardinality(String),
+    `last_update_date` Date,
+    `last_adjfactor` Float64 CODEC(Gorilla, LZ4),
+    `error_update_count` UInt32
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (code)
+ORDER BY (code);
 
 -- OPTIMIZE TABLE stock_data.stock_daily_meta FINAL;
 
 CREATE TABLE stock_data.trade_dates
-(   `calendar_date` Date,
+(   `calendar_date` Date CODEC(Delta, LZ4),
     `is_trading_day` UInt8
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (calendar_date)
+ORDER BY (calendar_date);
 
 CREATE TABLE stock_data.all_stock
-(   `day` Date,
-    `code` String,
-    `tradeStatus` UInt8,
-    `code_name` String
+(
+    `day` Date CODEC(Delta, LZ4),
+    `code` LowCardinality(String),
+    `tradeStatus` UInt8, -- 0: suspended, 1: trading
+    `code_name` LowCardinality(String)
 ) ENGINE = ReplacingMergeTree()
-ORDER BY (day, code)
+ORDER BY (day, code);
+
+-- View to track stock name history (Slowly Changing Dimension)
+-- It extracts unique name periods from the daily all_stock snapshots.
+CREATE VIEW IF NOT EXISTS stock_data.v_stock_names_history AS
+SELECT 
+    code,
+    code_name as name,
+    min(day) as start_date,
+    max(day) as end_date
+FROM stock_data.all_stock
+GROUP BY code, code_name
+ORDER BY code, start_date;
 
 
 CREATE TABLE stock_data.finicial_data
