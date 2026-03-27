@@ -47,10 +47,17 @@ class BacktestResult:
         sharpe = mean / (std + 1e-12)
         total_return = float(np.nansum(self.net_returns))
         avg_turnover = float(np.nanmean(self.turnover)) if self.turnover.size else 0.0
+        drawdown = 1.0 - np.divide(
+            self.equity_curve,
+            np.maximum.accumulate(self.equity_curve),
+        )
         return {
             "sharpe": sharpe,
             "total_return": total_return,
             "avg_turnover": avg_turnover,
+            "volatility": std,
+            "max_drawdown": float(np.nanmax(drawdown)) if drawdown.size else 0.0,
+            "final_equity": float(self.equity_curve[-1]) if self.equity_curve.size else 1.0,
         }
 
 

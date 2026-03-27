@@ -94,6 +94,20 @@ python -m src.market_data.crypto_cli overview
 python -m src.market_data.crypto_cli coverage --interval 1m --limit 20
 ```
 
+### 7. 本地执行 Alpha Lab 闭环测试
+
+基于 ClickHouse 里的分钟数据直接做公式编译、评估和简单搜索：
+
+```bash
+python -m src.alpha_lab.cli evaluate-db --formula "CSRank(ts_mean(close,5)-close)" --provider bitget --symbols BTCUSDT,ETHUSDT --start 2026-03-27T00:00:00+00:00 --end 2026-03-28T00:00:00+00:00
+python -m src.alpha_lab.cli search-db --provider bitget --symbols BTCUSDT,ETHUSDT,SOLUSDT --start 2026-03-27T00:00:00+00:00 --end 2026-03-28T00:00:00+00:00 --generations 3 --novelty-threshold 0.99 --seed "CSRank(ts_mean(close,5)-close)"
+python -m src.alpha_lab.cli list-runs --limit 10
+python -m src.alpha_lab.cli list-zoo --limit 20
+python -m src.alpha_lab.cli lineage --run-id <run_id>
+```
+
+`search-db` 默认会把 run 结果和 top alpha 写到 `data/alpha_lab/runs/` 与 `data/alpha_lab/zoo/`。
+
 ---
 
 ## 🧪 运行测试
