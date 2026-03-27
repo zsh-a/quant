@@ -105,6 +105,39 @@ class NotificationsConfig(BaseModel):
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
 
 
+class AlphaLabConfig(BaseModel):
+    """Configuration for the alpha lab research pipeline."""
+
+    population_size: int = 64
+    train_ratio: float = 0.5
+    valid_ratio: float = 0.2
+    test_ratio: float = 0.2
+    llm_backend: str = "remote_api"
+    max_ast_nodes: int = 24
+
+
+class BitgetConfig(BaseModel):
+    """Bitget market data defaults."""
+
+    base_url: str = "https://api.bitget.com"
+    product_type: str = "USDT-FUTURES"
+    default_symbols: List[str] = Field(default_factory=lambda: ["BTCUSDT", "ETHUSDT"])
+    request_timeout_seconds: int = 10
+
+
+class CryptoMarketConfig(BaseModel):
+    """Unified crypto minute-data ingestion defaults."""
+
+    default_provider: str = "bitget"
+    default_interval: str = "1m"
+    default_symbols: List[str] = Field(
+        default_factory=lambda: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+    )
+    default_lookback_hours: int = 24
+    full_history_start: str = "2020-01-01T00:00:00+00:00"
+    state_file: str = "data/crypto_sync_state.json"
+
+
 class Settings(BaseSettings):
     """Application settings with environment variable support"""
 
@@ -122,6 +155,9 @@ class Settings(BaseSettings):
     api: APIConfig = Field(default_factory=APIConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
+    alpha_lab: AlphaLabConfig = Field(default_factory=AlphaLabConfig)
+    bitget: BitgetConfig = Field(default_factory=BitgetConfig)
+    crypto_market: CryptoMarketConfig = Field(default_factory=CryptoMarketConfig)
 
 
 def _load_yaml_settings() -> Dict[str, Any]:
@@ -203,3 +239,18 @@ def get_logging_config() -> LoggingConfig:
 def get_notifications_config() -> NotificationsConfig:
     """Get notification configuration"""
     return get_settings().notifications
+
+
+def get_alpha_lab_config() -> AlphaLabConfig:
+    """Get alpha lab configuration."""
+    return get_settings().alpha_lab
+
+
+def get_bitget_config() -> BitgetConfig:
+    """Get Bitget configuration."""
+    return get_settings().bitget
+
+
+def get_crypto_market_config() -> CryptoMarketConfig:
+    """Get unified crypto market data configuration."""
+    return get_settings().crypto_market

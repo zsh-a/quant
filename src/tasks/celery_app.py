@@ -49,6 +49,7 @@ app.conf.update(
         'src.tasks.analysis.*': {'queue': 'analysis'},
         'src.tasks.data_tasks.*': {'queue': 'default'},
         'src.tasks.automation.*': {'queue': 'automation'},
+        'src.tasks.crypto_tasks.*': {'queue': 'automation'},
     },
     
     # Queues
@@ -68,7 +69,7 @@ app.conf.update(
     },
 
     # Explicit imports for task discovery
-    imports=['src.tasks.backtest', 'src.tasks.data_tasks', 'src.tasks.automation'],
+    imports=['src.tasks.backtest', 'src.tasks.data_tasks', 'src.tasks.automation', 'src.tasks.crypto_tasks'],
 )
 
 if __name__ == '__main__':

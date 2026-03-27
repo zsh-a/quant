@@ -147,3 +147,41 @@ ORDER BY (publish_date, code)
 -- BACKUP DATABASE stock_data TO Disk('backups', '1.zip')
 
 -- RESTORE DATABASE stock_data FROM Disk('backups', '1.zip')
+
+
+CREATE DATABASE IF NOT EXISTS crypto_data;
+
+CREATE TABLE IF NOT EXISTS crypto_data.minute_bars
+(
+    `provider` LowCardinality(String),
+    `market_type` LowCardinality(String),
+    `symbol` LowCardinality(String),
+    `exchange_symbol` LowCardinality(String),
+    `interval` LowCardinality(String),
+    `open_time` DateTime64(3, 'UTC'),
+    `close_time` DateTime64(3, 'UTC'),
+    `open` Float64,
+    `high` Float64,
+    `low` Float64,
+    `close` Float64,
+    `volume_base` Float64,
+    `volume_quote` Float64,
+    `trade_count` UInt32,
+    `ingest_source` LowCardinality(String),
+    `ingested_at` DateTime64(3, 'UTC')
+) ENGINE = ReplacingMergeTree(ingested_at)
+PARTITION BY toYYYYMM(open_time)
+ORDER BY (provider, market_type, symbol, interval, open_time);
+
+CREATE TABLE IF NOT EXISTS crypto_data.instruments
+(
+    `provider` LowCardinality(String),
+    `market_type` LowCardinality(String),
+    `symbol` LowCardinality(String),
+    `exchange_symbol` LowCardinality(String),
+    `base_asset` LowCardinality(String),
+    `quote_asset` LowCardinality(String),
+    `is_active` UInt8,
+    `updated_at` DateTime64(3, 'UTC')
+) ENGINE = ReplacingMergeTree(updated_at)
+ORDER BY (provider, market_type, symbol);

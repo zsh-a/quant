@@ -35,3 +35,25 @@ logging:
   console:
     enabled: true
     colorize: true
+
+alpha_lab:
+  population_size: 64
+  train_ratio: 0.5
+  valid_ratio: 0.2
+  test_ratio: 0.2
+  llm_backend: "remote_api"
+  max_ast_nodes: 24
+
+bitget:
+  base_url: "https://api.bitget.com"
+  product_type: "USDT-FUTURES"
+  default_symbols: ["BTCUSDT", "ETHUSDT"]
+  request_timeout_seconds: 10
+
+crypto_market:
+  default_provider: "bitget"
+  default_interval: "1m"
+  default_symbols: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
+  default_lookback_hours: 24
+  full_history_start: "2020-01-01T00:00:00+00:00"
+  state_file: "data/crypto_sync_state.json"

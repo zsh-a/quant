@@ -81,6 +81,19 @@ cd ui && npm run dev
 
 访问 http://localhost:5173
 
+### 6. 本地触发加密分钟数据初始化/同步
+
+无需先起 API，可直接本地执行：
+
+```bash
+python -m src.market_data.crypto_cli init-db
+python -m src.market_data.crypto_cli bootstrap --provider bitget --symbols BTCUSDT,ETHUSDT
+python -m src.market_data.crypto_cli backfill --provider bitget --symbols BTCUSDT,ETHUSDT --start 2020-01-01T00:00:00+00:00
+python -m src.market_data.crypto_cli sync --provider bitget --symbols BTCUSDT --interval 1m --start 2026-03-27T00:00:00+00:00 --end 2026-03-28T00:00:00+00:00
+python -m src.market_data.crypto_cli overview
+python -m src.market_data.crypto_cli coverage --interval 1m --limit 20
+```
+
 ---
 
 ## 🧪 运行测试
