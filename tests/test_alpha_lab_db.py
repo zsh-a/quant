@@ -49,6 +49,59 @@ def test_alpha_lab_service_evaluates_formula_from_db():
     assert "rank_ic" in result["metrics"]
 
 
+def test_alpha_lab_service_evaluates_formula_from_db_summary_only():
+    service = AlphaLabService()
+    service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    result = service.evaluate_formula_from_db(
+        formula="CSRank(ts_mean(close, 2) - close)",
+        provider="bitget",
+        symbols=["BTCUSDT", "ETHUSDT"],
+        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
+        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        summary_only=True,
+    )
+
+    assert "metrics" in result
+    assert "alpha_signature" not in result
+    assert result["expr_hash"]
+
+
+def test_alpha_lab_service_batch_evaluates_formulas_from_db():
+    service = AlphaLabService()
+    service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    result = service.evaluate_formulas_from_db(
+        formulas=[
+            "CSRank(ts_mean(close, 2) - close)",
+            "CSRank(ts_std(close, 2))",
+        ],
+        provider="bitget",
+        symbols=["BTCUSDT", "ETHUSDT"],
+        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
+        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+    )
+
+    assert len(result) == 2
+    assert "CSRank(ts_mean(close, 2) - close)" in result
+    assert result["CSRank(ts_std(close, 2))"]["dataset"]["shape"] == (3, 2)
+
+
+def test_alpha_lab_service_benchmark_db():
+    service = AlphaLabService()
+    service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    result = service.benchmark_db(
+        provider="bitget",
+        symbols=["BTCUSDT", "ETHUSDT"],
+        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
+        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        formulas=["CSRank(ts_mean(close, 2) - close)"],
+        repeat=1,
+    )
+
+    assert result["formula_count"] == 1
+    assert result["dataset"]["shape"] == (3, 2)
+    assert "formula_summaries" in result
+
+
 def test_alpha_lab_cli_search_db():
     service = AlphaLabService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
@@ -76,6 +129,85 @@ def test_alpha_lab_cli_search_db():
     assert "top_results" in result
     assert len(result["top_results"]) >= 1
     assert "splits" in result
+
+
+def test_alpha_lab_cli_batch_evaluate_db():
+    service = AlphaLabService()
+    service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "batch-evaluate-db",
+            "--formula",
+            "CSRank(ts_mean(close, 2) - close)",
+            "--formula",
+            "CSRank(ts_std(close, 2))",
+            "--provider",
+            "bitget",
+            "--symbols",
+            "BTCUSDT,ETHUSDT",
+            "--start",
+            "2026-03-27T00:00:00+00:00",
+            "--end",
+            "2026-03-27T00:03:00+00:00",
+            "--summary-only",
+        ]
+    )
+    result = run_command(args, service)
+
+    assert len(result) == 2
+    assert "CSRank(ts_std(close, 2))" in result
+    assert "alpha_signature" not in result["CSRank(ts_std(close, 2))"]
+
+
+def test_alpha_lab_cli_benchmark_vm():
+    service = AlphaLabService()
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "benchmark-vm",
+            "--formula",
+            "CSRank(ts_mean(close, 2) - close)",
+            "--rows",
+            "16",
+            "--cols",
+            "3",
+            "--repeat",
+            "1",
+        ]
+    )
+    result = run_command(args, service)
+
+    assert result["rows"] == 16
+    assert result["cols"] == 3
+    assert result["formula_count"] == 1
+
+
+def test_alpha_lab_cli_benchmark_db():
+    service = AlphaLabService()
+    service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "benchmark-db",
+            "--provider",
+            "bitget",
+            "--symbols",
+            "BTCUSDT,ETHUSDT",
+            "--start",
+            "2026-03-27T00:00:00+00:00",
+            "--end",
+            "2026-03-27T00:03:00+00:00",
+            "--formula",
+            "CSRank(ts_mean(close, 2) - close)",
+            "--repeat",
+            "1",
+        ]
+    )
+    result = run_command(args, service)
+
+    assert result["formula_count"] == 1
+    assert result["dataset"]["shape"] == (3, 2)
 
 
 def test_alpha_lab_search_persistence(tmp_path):

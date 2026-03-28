@@ -34,6 +34,36 @@ def test_formula_compile_and_vm_run():
     assert not np.isnan(output[3]).all()
 
 
+def test_formula_compile_and_vm_run_batch():
+    compiler = FormulaCompiler()
+    programs = [
+        compiler.compile("CSRank(ts_mean(close, 2) - close)"),
+        compiler.compile("CSRank(ts_std(close, 2))"),
+    ]
+    store = TensorStore(
+        {
+            "high": np.array([[10, 12], [11, 13], [15, 12], [14, 16]], dtype=float),
+            "close": np.array([[9, 11], [10, 12], [14, 11], [13, 15]], dtype=float),
+            "open": np.array([[9, 11], [10, 12], [14, 11], [13, 15]], dtype=float),
+            "low": np.array([[8, 10], [9, 11], [13, 10], [12, 14]], dtype=float),
+            "volume": np.array([[100, 110], [120, 140], [150, 160], [180, 190]], dtype=float),
+            "turnover": np.array([[900, 1210], [1200, 1680], [2100, 1760], [2340, 2850]], dtype=float),
+            "vwap": np.array([[9, 11], [10, 12], [14, 11], [13, 15]], dtype=float),
+            "funding_rate": np.zeros((4, 2), dtype=float),
+            "open_interest": np.ones((4, 2), dtype=float),
+            "bid_ask_spread": np.ones((4, 2), dtype=float) * 0.5,
+        }
+    )
+
+    vm = StackVM()
+    outputs = vm.run_batch(programs, store)
+
+    assert len(outputs) == 2
+    assert outputs[0].shape == (4, 2)
+    assert outputs[1].shape == (4, 2)
+    assert np.allclose(outputs[0], vm.run(programs[0], store), equal_nan=True)
+
+
 def test_alpha_lab_service_evaluate_formula():
     service = AlphaLabService()
     fields = {
@@ -54,6 +84,23 @@ def test_alpha_lab_service_evaluate_formula():
     assert "metrics" in result
     assert "alpha" in result
     assert len(result["weights"]) == 4
+
+
+def test_alpha_lab_service_benchmark_vm():
+    service = AlphaLabService()
+    result = service.benchmark_vm(
+        formulas=["CSRank(ts_mean(close, 2) - close)"],
+        rows=32,
+        cols=4,
+        repeat=2,
+    )
+
+    assert result["formula_count"] == 1
+    assert result["rows"] == 32
+    assert result["cols"] == 4
+    assert result["backend"] in {"numpy", "torch"}
+    assert "batch_avg_seconds" in result
+    assert "serial_avg_seconds" in result
 
 
 def test_population_seed_and_breed():

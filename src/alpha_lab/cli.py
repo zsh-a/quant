@@ -45,6 +45,33 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--end", required=True, help="ISO8601 end time")
     evaluate.add_argument("--interval", default="1m")
     evaluate.add_argument("--min-quote-volume", type=float, default=0.0)
+    evaluate.add_argument("--summary-only", action="store_true")
+
+    batch_evaluate = subparsers.add_parser("batch-evaluate-db", help="Evaluate multiple formulas on ClickHouse minute data")
+    batch_evaluate.add_argument("--formula", action="append", required=True)
+    batch_evaluate.add_argument("--provider", required=True)
+    batch_evaluate.add_argument("--symbols", required=True, help="Comma-separated symbols")
+    batch_evaluate.add_argument("--start", required=True, help="ISO8601 start time")
+    batch_evaluate.add_argument("--end", required=True, help="ISO8601 end time")
+    batch_evaluate.add_argument("--interval", default="1m")
+    batch_evaluate.add_argument("--min-quote-volume", type=float, default=0.0)
+    batch_evaluate.add_argument("--summary-only", action="store_true")
+
+    benchmark = subparsers.add_parser("benchmark-vm", help="Benchmark the local Stack VM with synthetic tensors")
+    benchmark.add_argument("--formula", action="append", default=[])
+    benchmark.add_argument("--rows", type=int, default=2048)
+    benchmark.add_argument("--cols", type=int, default=16)
+    benchmark.add_argument("--repeat", type=int, default=5)
+
+    benchmark_db = subparsers.add_parser("benchmark-db", help="Benchmark the database-backed alpha evaluation pipeline")
+    benchmark_db.add_argument("--provider", required=True)
+    benchmark_db.add_argument("--symbols", required=True, help="Comma-separated symbols")
+    benchmark_db.add_argument("--start", required=True, help="ISO8601 start time")
+    benchmark_db.add_argument("--end", required=True, help="ISO8601 end time")
+    benchmark_db.add_argument("--interval", default="1m")
+    benchmark_db.add_argument("--min-quote-volume", type=float, default=0.0)
+    benchmark_db.add_argument("--formula", action="append", default=[])
+    benchmark_db.add_argument("--repeat", type=int, default=3)
 
     search = subparsers.add_parser("search-db", help="Run a simple population -> evaluate -> breed loop on ClickHouse minute data")
     search.add_argument("--provider", required=True)
@@ -91,6 +118,36 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
             end_time=_parse_iso(args.end),
             interval=args.interval,
             min_quote_volume=args.min_quote_volume,
+            summary_only=args.summary_only,
+        )
+    if args.command == "batch-evaluate-db":
+        return service.evaluate_formulas_from_db(
+            formulas=args.formula,
+            provider=args.provider,
+            symbols=_parse_symbols(args.symbols),
+            start_time=_parse_iso(args.start),
+            end_time=_parse_iso(args.end),
+            interval=args.interval,
+            min_quote_volume=args.min_quote_volume,
+            summary_only=args.summary_only,
+        )
+    if args.command == "benchmark-vm":
+        return service.benchmark_vm(
+            formulas=args.formula,
+            rows=args.rows,
+            cols=args.cols,
+            repeat=args.repeat,
+        )
+    if args.command == "benchmark-db":
+        return service.benchmark_db(
+            provider=args.provider,
+            symbols=_parse_symbols(args.symbols),
+            start_time=_parse_iso(args.start),
+            end_time=_parse_iso(args.end),
+            interval=args.interval,
+            min_quote_volume=args.min_quote_volume,
+            formulas=args.formula,
+            repeat=args.repeat,
         )
     if args.command == "search-db":
         return service.search_formulas_on_db(
