@@ -3,6 +3,7 @@ import sys
 from datetime import UTC, datetime
 
 import numpy as np
+import pandas as pd
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
@@ -10,15 +11,42 @@ from src.alpha_lab.cli import build_parser, run_command
 from src.alpha_lab.dataset import CryptoMinuteDatasetLoader
 from src.alpha_lab.service import AlphaLabService
 
+START = datetime(2026, 3, 27, 0, 0, tzinfo=UTC)
+END = datetime(2026, 3, 27, 0, 19, tzinfo=UTC)
+
 
 class FakeCryptoStore:
     def query_bars(self, provider, symbol, start_time, end_time, interval="1m"):
-        base = [
-            {"open_time": "2026-03-27T00:00:00+00:00", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume_base": 10.0, "volume_quote": 1000.0, "trade_count": 10, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:00:59+00:00"},
-            {"open_time": "2026-03-27T00:01:00+00:00", "open": 100.0, "high": 102.0, "low": 99.5, "close": 101.0, "volume_base": 11.0, "volume_quote": 1111.0, "trade_count": 11, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:01:59+00:00"},
-            {"open_time": "2026-03-27T00:02:00+00:00", "open": 101.0, "high": 103.0, "low": 100.0, "close": 102.0 if symbol == "BTCUSDT" else 99.0, "volume_base": 12.0, "volume_quote": 1224.0, "trade_count": 12, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:02:59+00:00"},
-        ]
-        return base
+        rows = []
+        start = pd.Timestamp("2026-03-27T00:00:00+00:00")
+        for idx in range(20):
+            open_time = start + pd.Timedelta(minutes=idx)
+            close_base = 100.0 + idx if symbol == "BTCUSDT" else 100.0 - (idx * 0.5)
+            open_price = close_base - 0.25
+            high_price = close_base + 0.75
+            low_price = close_base - 1.0
+            volume_base = 10.0 + idx
+            rows.append(
+                {
+                    "open_time": open_time.isoformat(),
+                    "open": open_price,
+                    "high": high_price,
+                    "low": low_price,
+                    "close": close_base,
+                    "volume_base": volume_base,
+                    "volume_quote": close_base * volume_base,
+                    "trade_count": 10 + idx,
+                    "provider": provider,
+                    "market_type": "perpetual",
+                    "symbol": symbol,
+                    "exchange_symbol": symbol,
+                    "interval": interval,
+                    "close_time": (open_time + pd.Timedelta(minutes=1) - pd.Timedelta(milliseconds=1)).isoformat(),
+                }
+            )
+        start_ts = pd.Timestamp(start_time).tz_convert("UTC") if pd.Timestamp(start_time).tzinfo else pd.Timestamp(start_time, tz="UTC")
+        end_ts = pd.Timestamp(end_time).tz_convert("UTC") if pd.Timestamp(end_time).tzinfo else pd.Timestamp(end_time, tz="UTC")
+        return [row for row in rows if start_ts <= pd.Timestamp(row["open_time"]) <= end_ts]
 
 
 def test_dataset_loader_builds_tensor_matrices():
@@ -26,8 +54,8 @@ def test_dataset_loader_builds_tensor_matrices():
     dataset = loader.load(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=datetime(2026, 3, 27, 0, 2, tzinfo=UTC),
     )
 
     assert dataset.shape() == (3, 2)
@@ -36,13 +64,27 @@ def test_dataset_loader_builds_tensor_matrices():
     assert np.all(dataset.session_mask)
 
 
+def test_dataset_loader_resamples_to_5m():
+    loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    dataset = loader.load(
+        provider="bitget",
+        symbols=["BTCUSDT", "ETHUSDT"],
+        start_time=START,
+        end_time=END,
+        interval="5m",
+    )
+
+    assert dataset.shape() == (4, 2)
+    assert dataset.interval == "5m"
+
+
 def test_dataset_loader_applies_blocked_utc_hours():
     loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     dataset = loader.load(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=datetime(2026, 3, 27, 0, 2, tzinfo=UTC),
         blocked_utc_hours=[0],
     )
 
@@ -56,12 +98,12 @@ def test_alpha_lab_service_evaluates_formula_from_db():
         formula="CSRank(ts_mean(close, 2) - close)",
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=END,
     )
 
     assert "metrics" in result
-    assert result["dataset"]["shape"] == (3, 2)
+    assert result["dataset"]["shape"] == (4, 2)
     assert "rank_ic" in result["metrics"]
 
 
@@ -72,8 +114,8 @@ def test_alpha_lab_service_evaluates_formula_from_db_summary_only():
         formula="CSRank(ts_mean(close, 2) - close)",
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=END,
         summary_only=True,
     )
 
@@ -92,13 +134,13 @@ def test_alpha_lab_service_batch_evaluates_formulas_from_db():
         ],
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=END,
     )
 
     assert len(result) == 2
     assert "CSRank(ts_mean(close, 2) - close)" in result
-    assert result["CSRank(ts_std(close, 2))"]["dataset"]["shape"] == (3, 2)
+    assert result["CSRank(ts_std(close, 2))"]["dataset"]["shape"] == (4, 2)
 
 
 def test_alpha_lab_service_benchmark_db():
@@ -107,14 +149,14 @@ def test_alpha_lab_service_benchmark_db():
     result = service.benchmark_db(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=END,
         formulas=["CSRank(ts_mean(close, 2) - close)"],
         repeat=1,
     )
 
     assert result["formula_count"] == 1
-    assert result["dataset"]["shape"] == (3, 2)
+    assert result["dataset"]["shape"] == (4, 2)
     assert "formula_summaries" in result
 
 
@@ -130,9 +172,9 @@ def test_alpha_lab_cli_search_db():
             "--symbols",
             "BTCUSDT,ETHUSDT",
             "--start",
-            "2026-03-27T00:00:00+00:00",
+            START.isoformat(),
             "--end",
-            "2026-03-27T00:03:00+00:00",
+            END.isoformat(),
             "--generations",
             "2",
             "--no-persist",
@@ -146,6 +188,12 @@ def test_alpha_lab_cli_search_db():
     assert len(result["top_results"]) >= 1
     assert result["validation"]["mode"] in {"cpcv", "holdout"}
     assert result["validation"]["fold_count"] >= 1
+    assert "timing" in result
+    assert "overall_seconds" in result["timing"]
+    assert result["timing"]["per_generation"]
+    assert "vm_run_seconds" in result["timing"]["per_generation"][0]
+    assert "backtest_seconds" in result["timing"]["per_generation"][0]
+    assert "fitness_seconds" in result["timing"]["per_generation"][0]
 
 
 def test_alpha_lab_cli_batch_evaluate_db():
@@ -164,9 +212,9 @@ def test_alpha_lab_cli_batch_evaluate_db():
             "--symbols",
             "BTCUSDT,ETHUSDT",
             "--start",
-            "2026-03-27T00:00:00+00:00",
+            START.isoformat(),
             "--end",
-            "2026-03-27T00:03:00+00:00",
+            END.isoformat(),
             "--summary-only",
         ]
     )
@@ -212,9 +260,9 @@ def test_alpha_lab_cli_benchmark_db():
             "--symbols",
             "BTCUSDT,ETHUSDT",
             "--start",
-            "2026-03-27T00:00:00+00:00",
+            START.isoformat(),
             "--end",
-            "2026-03-27T00:03:00+00:00",
+            END.isoformat(),
             "--formula",
             "CSRank(ts_mean(close, 2) - close)",
             "--repeat",
@@ -224,7 +272,7 @@ def test_alpha_lab_cli_benchmark_db():
     result = run_command(args, service)
 
     assert result["formula_count"] == 1
-    assert result["dataset"]["shape"] == (3, 2)
+    assert result["dataset"]["shape"] == (4, 2)
 
 
 def test_alpha_lab_search_persistence(tmp_path):
@@ -234,8 +282,8 @@ def test_alpha_lab_search_persistence(tmp_path):
     result = service.search_formulas_on_db(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=END,
         seeds=["CSRank(ts_mean(close, 2) - close)"],
         generations=1,
         persist=True,
@@ -246,6 +294,9 @@ def test_alpha_lab_search_persistence(tmp_path):
     assert len(result["persistence"]["zoo_paths"]) >= 1
     assert "lineage" in result
     assert "validation" in result
+    assert result["timing"]["dataset_load_seconds"] >= 0.0
+    persisted = service.persistence.load_run(result["persistence"]["run_id"])
+    assert persisted["timing"]["overall_seconds"] > 0.0
 
 
 def test_alpha_lab_run_and_zoo_inspection(tmp_path):
@@ -255,8 +306,8 @@ def test_alpha_lab_run_and_zoo_inspection(tmp_path):
     result = service.search_formulas_on_db(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=END,
         seeds=["CSRank(ts_mean(close, 2) - close)"],
         generations=2,
         persist=True,
@@ -279,8 +330,8 @@ def test_alpha_lab_search_top_results_are_scored():
     result = service.search_formulas_on_db(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        start_time=START,
+        end_time=END,
         seeds=["CSRank(ts_mean(close, 2) - close)"],
         generations=2,
         offspring_count=2,
@@ -289,3 +340,4 @@ def test_alpha_lab_search_top_results_are_scored():
 
     assert result["top_results"]
     assert all("sharpe" in item["metrics"] for item in result["top_results"])
+    assert "call_stats" in result["llm"]

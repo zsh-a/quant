@@ -5,6 +5,7 @@ Examples:
     python -m src.market_data.crypto_cli init-db
     python -m src.market_data.crypto_cli bootstrap --provider bitget --symbols BTCUSDT,ETHUSDT
     python -m src.market_data.crypto_cli sync --provider binance --symbols BTCUSDT --start 2026-03-27T00:00:00+00:00 --end 2026-03-28T00:00:00+00:00
+    python -m src.market_data.crypto_cli sync-history-2020 --provider bitget --verbose
     python -m src.market_data.crypto_cli overview
     python -m src.market_data.crypto_cli coverage --interval 1m --limit 50
 """
@@ -17,6 +18,9 @@ from datetime import UTC, datetime
 from typing import Any
 
 from src.market_data.crypto_pipeline import CryptoMinuteSyncService
+
+DEFAULT_HISTORY_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT"]
+DEFAULT_HISTORY_START = "2020-01-01T00:00:00+00:00"
 
 
 def _parse_iso(value: str | None) -> datetime | None:
@@ -54,7 +58,27 @@ def build_parser() -> argparse.ArgumentParser:
     backfill_parser.add_argument("--interval", default=None, help="Bar interval, default from config")
     backfill_parser.add_argument("--start", default=None, help="ISO8601 start time, defaults to crypto_market.full_history_start")
     backfill_parser.add_argument("--end", default=None, help="ISO8601 end time")
-    backfill_parser.add_argument("--verbose", action="store_true", help="Print per-batch sync progress")
+    backfill_parser.add_argument("--verbose", action="store_true", help="Print per-window sync progress")
+
+    history_parser = subparsers.add_parser(
+        "sync-history-2020",
+        aliases=["sync-2020"],
+        help="Sync BTC/ETH/SOL/DOGE from 2020 and only fetch missing local ranges",
+    )
+    history_parser.add_argument("--provider", default=None, help="Provider name, e.g. bitget/binance")
+    history_parser.add_argument(
+        "--symbols",
+        default=",".join(DEFAULT_HISTORY_SYMBOLS),
+        help="Comma-separated symbols, default BTCUSDT,ETHUSDT,SOLUSDT,DOGEUSDT",
+    )
+    history_parser.add_argument("--interval", default=None, help="Bar interval, default from config")
+    history_parser.add_argument(
+        "--start",
+        default=DEFAULT_HISTORY_START,
+        help="ISO8601 history start time, defaults to 2020-01-01T00:00:00+00:00",
+    )
+    history_parser.add_argument("--end", default=None, help="ISO8601 end time")
+    history_parser.add_argument("--verbose", action="store_true", help="Print per-window sync progress")
 
     sync_parser = subparsers.add_parser("sync", help="Trigger minute-bar synchronization")
     sync_parser.add_argument("--provider", required=True, help="Provider name, e.g. bitget/binance")
@@ -62,7 +86,7 @@ def build_parser() -> argparse.ArgumentParser:
     sync_parser.add_argument("--interval", default="1m", help="Bar interval")
     sync_parser.add_argument("--start", default=None, help="ISO8601 start time")
     sync_parser.add_argument("--end", default=None, help="ISO8601 end time")
-    sync_parser.add_argument("--verbose", action="store_true", help="Print per-batch sync progress")
+    sync_parser.add_argument("--verbose", action="store_true", help="Print per-window sync progress")
 
     subparsers.add_parser("overview", help="Show crypto data overview in ClickHouse")
 
@@ -95,6 +119,15 @@ def run_command(args: argparse.Namespace, service: CryptoMinuteSyncService) -> A
             end_time=_parse_iso(args.end),
             progress_callback=progress_callback,
         )
+    if args.command in {"sync-history-2020", "sync-2020"}:
+        return service.backfill_history(
+            provider=args.provider,
+            symbols=_parse_symbols(args.symbols) or DEFAULT_HISTORY_SYMBOLS,
+            interval=args.interval,
+            start_time=_parse_iso(args.start) or _parse_iso(DEFAULT_HISTORY_START),
+            end_time=_parse_iso(args.end),
+            progress_callback=progress_callback,
+        )
     if args.command == "sync":
         return service.sync_minute_bars(
             provider=args.provider,
@@ -120,7 +153,8 @@ def _build_progress_callback(verbose: bool):
             "[sync] "
             f"{event['provider']}:{event['symbol']} {event['interval']} "
             f"cursor={event['cursor']} batch_end={event['batch_end']} "
-            f"last_open={event['last_open_time']} fetched={event['fetched']} inserted={event['inserted']}"
+            f"last_open={event['last_open_time']} fetched={event['fetched']} "
+            f"inserted={event['inserted']} note={event.get('note', '')}"
         )
 
     return callback

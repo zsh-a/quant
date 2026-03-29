@@ -6,6 +6,7 @@ from typing import Any
 
 import numpy as np
 import pandas as pd
+from loguru import logger
 
 from src.market_data.crypto_store import CryptoMinuteBarStore
 
@@ -72,19 +73,38 @@ class CryptoMinuteDatasetLoader:
         blocked_utc_hours: list[int] | set[int] | tuple[int, ...] | None = None,
     ) -> AlphaDataset:
         frames = []
+        requested_interval = interval
+        source_interval = "1m" if self._should_resample_interval(interval) else interval
         for symbol in symbols:
             rows = self._store().query_bars(
                 provider=provider,
                 symbol=symbol.upper(),
                 start_time=start_time,
                 end_time=end_time,
-                interval=interval,
+                interval=source_interval,
             )
+            if not rows and source_interval != requested_interval:
+                logger.warning(
+                    "alpha_lab.dataset resample_source_missing provider={} symbol={} source_interval={} fallback_interval={}",
+                    provider,
+                    symbol.upper(),
+                    source_interval,
+                    requested_interval,
+                )
+                rows = self._store().query_bars(
+                    provider=provider,
+                    symbol=symbol.upper(),
+                    start_time=start_time,
+                    end_time=end_time,
+                    interval=requested_interval,
+                )
             if not rows:
                 continue
             frame = pd.DataFrame(rows)
             frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
             frame["symbol"] = symbol.upper()
+            if self._should_resample_interval(requested_interval) and source_interval == "1m":
+                frame = self._resample_symbol_frame(frame, requested_interval)
             frames.append(frame)
 
         if not frames:
@@ -132,7 +152,7 @@ class CryptoMinuteDatasetLoader:
 
         return AlphaDataset(
             provider=provider,
-            interval=interval,
+            interval=requested_interval,
             symbols=resolved_symbols,
             timestamps=[ts.astimezone(UTC).isoformat() for ts in timestamps],
             fields=fields,
@@ -153,3 +173,60 @@ class CryptoMinuteDatasetLoader:
             .to_numpy(dtype=float)
         )
         return matrix
+
+    def _should_resample_interval(self, interval: str) -> bool:
+        minutes = self._interval_minutes(interval)
+        return minutes is not None and minutes > 1
+
+    def _interval_minutes(self, interval: str) -> int | None:
+        normalized = str(interval).strip().lower()
+        if not normalized.endswith("m"):
+            return None
+        try:
+            return int(normalized[:-1])
+        except ValueError:
+            return None
+
+    def _resample_symbol_frame(self, frame: pd.DataFrame, interval: str) -> pd.DataFrame:
+        minutes = self._interval_minutes(interval)
+        if minutes is None or minutes <= 1:
+            return frame
+        if frame.empty:
+            return frame
+
+        symbol = str(frame["symbol"].iloc[0]).upper()
+        rule = f"{minutes}min"
+        ordered = frame.sort_values("open_time").copy()
+        ordered = ordered.set_index("open_time")
+        aggregated = ordered.resample(rule, label="left", closed="left").agg(
+            {
+                "provider": "first",
+                "market_type": "first",
+                "symbol": "first",
+                "exchange_symbol": "first",
+                "close_time": "last",
+                "open": "first",
+                "high": "max",
+                "low": "min",
+                "close": "last",
+                "volume_base": "sum",
+                "volume_quote": "sum",
+                "trade_count": "sum",
+            }
+        )
+        aggregated = aggregated.dropna(subset=["open", "high", "low", "close"], how="any").reset_index()
+        aggregated["symbol"] = symbol
+        aggregated["interval"] = interval
+        if "exchange_symbol" in aggregated.columns:
+            aggregated["exchange_symbol"] = aggregated["exchange_symbol"].fillna(symbol)
+        if "close_time" in aggregated.columns:
+            fallback_close = aggregated["open_time"] + pd.to_timedelta(minutes, unit="min") - pd.to_timedelta(1, unit="ms")
+            aggregated["close_time"] = aggregated["close_time"].fillna(fallback_close)
+        logger.info(
+            "alpha_lab.dataset resampled symbol={} from_interval=1m to_interval={} rows_in={} rows_out={}",
+            symbol,
+            interval,
+            len(frame),
+            len(aggregated),
+        )
+        return aggregated

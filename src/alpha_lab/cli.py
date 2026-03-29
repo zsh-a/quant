@@ -49,7 +49,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--symbols", required=True, help="Comma-separated symbols")
     evaluate.add_argument("--start", required=True, help="ISO8601 start time")
     evaluate.add_argument("--end", required=True, help="ISO8601 end time")
-    evaluate.add_argument("--interval", default="1m")
+    evaluate.add_argument("--interval", default="5m")
     evaluate.add_argument("--min-quote-volume", type=float, default=0.0)
     evaluate.add_argument("--blocked-utc-hours", default="")
     evaluate.add_argument("--summary-only", action="store_true")
@@ -60,7 +60,7 @@ def build_parser() -> argparse.ArgumentParser:
     batch_evaluate.add_argument("--symbols", required=True, help="Comma-separated symbols")
     batch_evaluate.add_argument("--start", required=True, help="ISO8601 start time")
     batch_evaluate.add_argument("--end", required=True, help="ISO8601 end time")
-    batch_evaluate.add_argument("--interval", default="1m")
+    batch_evaluate.add_argument("--interval", default="5m")
     batch_evaluate.add_argument("--min-quote-volume", type=float, default=0.0)
     batch_evaluate.add_argument("--blocked-utc-hours", default="")
     batch_evaluate.add_argument("--summary-only", action="store_true")
@@ -76,7 +76,7 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_db.add_argument("--symbols", required=True, help="Comma-separated symbols")
     benchmark_db.add_argument("--start", required=True, help="ISO8601 start time")
     benchmark_db.add_argument("--end", required=True, help="ISO8601 end time")
-    benchmark_db.add_argument("--interval", default="1m")
+    benchmark_db.add_argument("--interval", default="5m")
     benchmark_db.add_argument("--min-quote-volume", type=float, default=0.0)
     benchmark_db.add_argument("--blocked-utc-hours", default="")
     benchmark_db.add_argument("--formula", action="append", default=[])
@@ -87,7 +87,7 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--symbols", required=True, help="Comma-separated symbols")
     search.add_argument("--start", required=True, help="ISO8601 start time")
     search.add_argument("--end", required=True, help="ISO8601 end time")
-    search.add_argument("--interval", default="1m")
+    search.add_argument("--interval", default="5m")
     search.add_argument("--min-quote-volume", type=float, default=0.0)
     search.add_argument("--population-size", type=int, default=4)
     search.add_argument("--offspring-count", type=int, default=2)
@@ -100,6 +100,10 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--purge-window", type=int, default=0)
     search.add_argument("--embargo-window", type=int, default=0)
     search.add_argument("--blocked-utc-hours", default="")
+    search.add_argument("--llm-backend", default="auto", choices=["auto", "heuristic", "openai"])
+    search.add_argument("--llm-model", default=None)
+    search.add_argument("--llm-base-url", default=None)
+    search.add_argument("--llm-api-key", default=None)
     search.add_argument("--seed", action="append", default=[])
 
     list_runs = subparsers.add_parser("list-runs", help="List persisted alpha_lab runs")
@@ -200,7 +204,13 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
 def main(argv: list[str] | None = None, service: AlphaLabService | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    result = run_command(args, service or AlphaLabService())
+    default_service = service or AlphaLabService(
+        llm_backend_name=getattr(args, "llm_backend", "auto"),
+        llm_model=getattr(args, "llm_model", None),
+        llm_base_url=getattr(args, "llm_base_url", None),
+        llm_api_key=getattr(args, "llm_api_key", None),
+    )
+    result = run_command(args, default_service)
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     return 0
 

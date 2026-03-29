@@ -67,10 +67,7 @@ class CryptoBackfillRequest(BaseModel):
 @router.get("/providers")
 async def list_crypto_providers():
     return {
-        "providers": [
-            {"provider": "bitget", "market_type": "perpetual", "intervals": ["1m"]},
-            {"provider": "binance", "market_type": "spot", "intervals": ["1m"]},
-        ],
+        "providers": service.list_providers(),
         "defaults": config.model_dump(),
     }
 

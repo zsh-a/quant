@@ -6,10 +6,11 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.alpha_lab import AlphaLabService, FormulaCompiler, StackVM, TensorStore
-from src.alpha_lab.evolution import BreedingSpec, HeuristicLLMBackend
-from src.alpha_lab.risk import CostModel, ExecutionSimulator
+from src.alpha_lab.evolution import BreedingSpec, FitnessEngine, HeuristicLLMBackend
+from src.alpha_lab.llm_backend import OpenAILLMBackend
+from src.alpha_lab.risk import CostModel, ExecutionSimulator, MarketContext, RuleOverlay
 from src.alpha_lab.validation import CPCVValidator
-from src.datahub.bitget import BitgetDataAdapter
+from src.market_data.ccxt_adapter import CcxtCryptoDataAdapter, PROVIDER_SPECS
 
 
 def test_formula_compile_and_vm_run():
@@ -216,6 +217,105 @@ def test_heuristic_backend_generates_diverse_compilable_offspring():
         assert program.expr_hash
 
 
+class _FakeMessage:
+    def __init__(self, content: str):
+        self.content = content
+
+
+class _FakeChoice:
+    def __init__(self, content: str):
+        self.message = _FakeMessage(content)
+
+
+class _FakeResponse:
+    def __init__(self, content: str):
+        self.choices = [_FakeChoice(content)]
+
+
+class _FakeChatCompletions:
+    def __init__(self, responses: list[str]):
+        self._responses = list(responses)
+
+    def create(self, **kwargs):
+        return _FakeResponse(self._responses.pop(0))
+
+
+class _FakeClient:
+    def __init__(self, responses: list[str]):
+        self.chat = type("Chat", (), {"completions": _FakeChatCompletions(responses)})()
+
+
+def test_openai_backend_parses_and_filters_formulas():
+    backend = OpenAILLMBackend(
+        client=_FakeClient(
+            [
+                """```json
+                [
+                  {"rationale": "oi + spread", "formula": "CSRank(OIDelta(OI, 1) - SpreadRatio(BidAskSpread, Close))"},
+                  {"rationale": "too deep", "formula": "Ts_Mean(Ts_Mean(Ts_Mean(Ts_Mean(Ts_Mean(Ts_Mean(Close, 2), 2), 2), 2), 2), 2)"}
+                ]
+                ```"""
+            ]
+        ),
+        max_ast_depth=5,
+    )
+
+    formulas = backend.generate_initial_population(2)
+
+    assert len(formulas) == 2
+    assert "OIDelta" in formulas[0] or "oi_delta" in formulas[0]
+
+
+def test_alpha_lab_service_search_uses_openai_backend_without_manual_seeds():
+    service = AlphaLabService(
+        llm_backend=OpenAILLMBackend(
+            client=_FakeClient(
+                [
+                    """[
+                      {"rationale": "seed a", "formula": "CSRank(OIDelta(OI, 1) - SpreadRatio(BidAskSpread, Close))"},
+                      {"rationale": "seed b", "formula": "CSRank(ATR_N(High, Low, Close, 5) + FundingDelta(FundingRate, 1))"}
+                    ]""",
+                    """[
+                      {"mutation_type": "x", "rationale": "child", "formula": "CSRank(CSRank(OIDelta(OI, 1) - SpreadRatio(BidAskSpread, Close)) + ATR_N(High, Low, Close, 5))"}
+                    ]""",
+                ]
+            )
+        )
+    )
+    service.dataset_loader = __import__("src.alpha_lab.dataset", fromlist=["CryptoMinuteDatasetLoader"]).CryptoMinuteDatasetLoader(
+        store=type(
+            "Store",
+            (),
+            {
+                "query_bars": lambda self, provider, symbol, start_time, end_time, interval="1m": [
+                    {"open_time": "2026-03-27T00:00:00+00:00", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume_base": 10.0, "volume_quote": 1000.0, "trade_count": 10, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:00:59+00:00"},
+                    {"open_time": "2026-03-27T00:01:00+00:00", "open": 100.0, "high": 102.0, "low": 99.5, "close": 101.0, "volume_base": 11.0, "volume_quote": 1111.0, "trade_count": 11, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:01:59+00:00"},
+                    {"open_time": "2026-03-27T00:02:00+00:00", "open": 101.0, "high": 103.0, "low": 100.0, "close": 102.0 if symbol == "BTCUSDT" else 99.0, "volume_base": 12.0, "volume_quote": 1224.0, "trade_count": 12, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:02:59+00:00"},
+                ]
+            },
+        )()
+    )
+
+    from datetime import UTC, datetime
+
+    result = service.search_formulas_on_db(
+        provider="bitget",
+        symbols=["BTCUSDT", "ETHUSDT"],
+        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
+        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        interval="1m",
+        generations=1,
+        persist=False,
+    )
+
+    assert result["llm"]["backend"] == "openai"
+    assert result["top_results"]
+    assert any(
+        ("OIDelta" in item["formula"]) or ("oi_delta" in item["formula"]) or ("ATR_N" in item["formula"]) or ("atr_n" in item["formula"])
+        for item in result["top_results"]
+    )
+
+
 def test_cpcv_validator_generates_purged_folds():
     validator = CPCVValidator(purge_window=1, embargo_window=1, min_train_size=2)
     folds = validator.generate_purged_splits(total_time_steps=12, n_splits=4)
@@ -258,12 +358,120 @@ def test_execution_simulator_penalizes_wider_spread():
     assert wide.summary()["total_return"] < tight.summary()["total_return"]
 
 
-def test_bitget_adapter_normalization():
-    adapter = BitgetDataAdapter()
-    records = [
-        adapter._parse_candle(["1700000000000", "1", "2", "0.5", "1.5", "10", "15"])
-    ]
-    normalized = adapter.normalize_candles(records, "BTCUSDT")
+def test_rule_overlay_respects_turnover_limit():
+    overlay = RuleOverlay()
+    target = np.array(
+        [
+            [0.0, 0.0],
+            [1.0, -1.0],
+            [-1.0, 1.0],
+        ],
+        dtype=float,
+    )
 
-    assert normalized[0]["symbol"] == "BTCUSDT"
-    assert normalized[0]["close"] == 1.5
+    limited = overlay.apply(target, MarketContext(max_turnover_per_bar=0.25))
+
+    expected = np.array(
+        [
+            [0.0, 0.0],
+            [0.25, -0.25],
+            [0.0, 0.0],
+        ],
+        dtype=float,
+    )
+    assert np.allclose(limited, expected)
+
+
+def test_mean_cross_sectional_correlation_matches_reference_loop():
+    service = AlphaLabService()
+    alpha = np.array(
+        [
+            [1.0, 2.0, np.nan, 4.0],
+            [2.0, 1.0, 3.0, 0.0],
+            [5.0, 5.0, 5.0, 5.0],
+        ],
+        dtype=float,
+    )
+    returns = np.array(
+        [
+            [1.5, 1.0, 0.0, 4.5],
+            [0.0, 1.0, 2.0, 3.0],
+            [1.0, 1.0, 1.0, 1.0],
+        ],
+        dtype=float,
+    )
+
+    valid_rows = []
+    for alpha_row, return_row in zip(alpha, returns):
+        mask = ~np.isnan(alpha_row) & ~np.isnan(return_row)
+        if mask.sum() < 2:
+            continue
+        left = alpha_row[mask]
+        right = return_row[mask]
+        if np.std(left) < 1e-12 or np.std(right) < 1e-12:
+            continue
+        valid_rows.append(float(np.corrcoef(left, right)[0, 1]))
+    expected = float(np.mean(valid_rows)) if valid_rows else 0.0
+
+    observed = service._mean_cross_sectional_correlation(alpha, returns)
+
+    assert np.isclose(observed, expected)
+
+
+def test_build_fitness_metrics_marks_inactive_flat_strategy():
+    service = AlphaLabService()
+    alpha = np.full((4, 2), np.nan, dtype=float)
+    weights = np.zeros((4, 2), dtype=float)
+    close = np.array(
+        [
+            [100.0, 101.0],
+            [101.0, 102.0],
+            [102.0, 103.0],
+            [103.0, 104.0],
+        ],
+        dtype=float,
+    )
+    summary = {
+        "avg_turnover": 0.0,
+        "total_return": 0.0,
+        "volatility": 0.0,
+        "max_drawdown": 0.0,
+        "final_equity": 1.0,
+        "sharpe": 0.0,
+    }
+
+    metrics = service._build_fitness_metrics(alpha, weights, close, summary)
+
+    assert metrics["inactive"] == 1.0
+    assert metrics["stability"] == 0.0
+    assert metrics["pnl_per_turnover"] == 0.0
+
+
+def test_fitness_engine_penalizes_inactive_strategies():
+    fitness = FitnessEngine().score(
+        {
+            "inactive": 1.0,
+            "sharpe": 0.0,
+            "pnl_per_turnover": 0.0,
+            "rank_ic": 0.0,
+            "stability": 1e12,
+            "tail_penalty_adjusted_return": 0.0,
+            "turnover_penalty": 0.0,
+            "complexity_penalty": 0.0,
+            "train_valid_gap_penalty": 0.0,
+        }
+    )
+
+    assert fitness == -1.0
+
+
+def test_ccxt_adapter_storage_symbol_normalization():
+    adapter = CcxtCryptoDataAdapter(PROVIDER_SPECS["bitget"])
+    market = {
+        "base": "BTC",
+        "quote": "USDT",
+        "symbol": "BTC/USDT:USDT",
+        "id": "BTCUSDT",
+    }
+
+    assert adapter.to_storage_symbol(market) == "BTCUSDT"

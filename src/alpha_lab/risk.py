@@ -6,12 +6,41 @@ from typing import Any
 import numpy as np
 
 try:
+    import numba
+except Exception:  # pragma: no cover - numba is optional for acceleration
+    numba = None
+
+try:
     import torch
 except Exception:  # pragma: no cover - torch is optional for this scaffold
     torch = None
 
 
 ArrayLike = Any
+
+
+if numba is not None:
+
+    @numba.njit(cache=True)
+    def _apply_turnover_limit_numba(target_weights: np.ndarray, max_turnover_per_bar: float) -> np.ndarray:
+        rows, cols = target_weights.shape
+        out = np.empty_like(target_weights)
+        if rows == 0:
+            return out
+        for col in range(cols):
+            out[0, col] = target_weights[0, col]
+        upper = max_turnover_per_bar
+        lower = -max_turnover_per_bar
+        for row in range(1, rows):
+            for col in range(cols):
+                prev = out[row - 1, col]
+                delta = target_weights[row, col] - prev
+                if delta > upper:
+                    delta = upper
+                elif delta < lower:
+                    delta = lower
+                out[row, col] = prev + delta
+        return out
 
 
 @dataclass
@@ -166,7 +195,20 @@ class RuleOverlay:
         return self._apply_numpy(target_weights, market_ctx)
 
     def _apply_numpy(self, target_weights: ArrayLike, market_ctx: MarketContext) -> np.ndarray:
-        weights = np.asarray(target_weights, dtype=float).copy()
+        weights = np.asarray(target_weights, dtype=float)
+        original_shape = weights.shape
+        if weights.ndim == 1:
+            weights = weights.reshape(-1, 1)
+            reshaped = True
+        else:
+            reshaped = False
+        if numba is not None and weights.ndim == 2:
+            limited = _apply_turnover_limit_numba(
+                np.ascontiguousarray(weights),
+                float(market_ctx.max_turnover_per_bar),
+            )
+            return limited.reshape(original_shape) if reshaped else limited
+        weights = weights.copy()
         for idx in range(1, weights.shape[0]):
             prev = weights[idx - 1]
             delta = np.clip(
@@ -175,7 +217,7 @@ class RuleOverlay:
                 market_ctx.max_turnover_per_bar,
             )
             weights[idx] = prev + delta
-        return weights
+        return weights.reshape(original_shape) if reshaped else weights
 
     def _apply_torch(self, target_weights: Any, market_ctx: MarketContext) -> Any:
         weights = target_weights.clone()

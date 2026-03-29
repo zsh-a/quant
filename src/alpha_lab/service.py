@@ -6,6 +6,7 @@ from time import perf_counter
 from typing import Any
 
 import numpy as np
+from loguru import logger
 
 from .compiler import BytecodeProgram, FormulaCompiler
 from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
@@ -24,12 +25,29 @@ DEFAULT_DB_SEEDS = [
 
 
 class AlphaLabService:
-    def __init__(self, schema: TensorSchema | None = None):
+    def __init__(
+        self,
+        schema: TensorSchema | None = None,
+        llm_backend: Any | None = None,
+        llm_backend_name: str = "auto",
+        llm_model: str | None = None,
+        llm_base_url: str | None = None,
+        llm_api_key: str | None = None,
+    ):
         self.registry = DSLRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
         self.compiler = FormulaCompiler(self.registry)
         self.vm = StackVM()
-        self.evolution = EvolutionEngine(registry=self.registry, compiler=self.compiler, schema=self.schema)
+        self.evolution = EvolutionEngine(
+            registry=self.registry,
+            compiler=self.compiler,
+            schema=self.schema,
+            llm_backend=llm_backend,
+            backend_name=llm_backend_name,
+            model_name=llm_model,
+            base_url=llm_base_url,
+            api_key=llm_api_key,
+        )
         self.signal_transformer = SignalTransformer()
         self.rule_overlay = RuleOverlay()
         self.execution = ExecutionSimulator()
@@ -128,7 +146,7 @@ class AlphaLabService:
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
-        interval: str = "1m",
+        interval: str = "5m",
         min_quote_volume: float = 0.0,
         blocked_utc_hours: list[int] | None = None,
         summary_only: bool = False,
@@ -151,7 +169,7 @@ class AlphaLabService:
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
-        interval: str = "1m",
+        interval: str = "5m",
         min_quote_volume: float = 0.0,
         blocked_utc_hours: list[int] | None = None,
         summary_only: bool = False,
@@ -259,7 +277,7 @@ class AlphaLabService:
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
-        interval: str = "1m",
+        interval: str = "5m",
         min_quote_volume: float = 0.0,
         blocked_utc_hours: list[int] | None = None,
         formulas: list[str] | None = None,
@@ -325,7 +343,7 @@ class AlphaLabService:
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
-        interval: str = "1m",
+        interval: str = "5m",
         min_quote_volume: float = 0.0,
         seeds: list[str] | None = None,
         population_size: int = 4,
@@ -340,6 +358,25 @@ class AlphaLabService:
         embargo_window: int = 0,
         blocked_utc_hours: list[int] | None = None,
     ) -> dict[str, Any]:
+        overall_start = perf_counter()
+        timing: dict[str, Any] = {
+            "overall_seconds": 0.0,
+            "dataset_load_seconds": 0.0,
+            "validation_plan_seconds": 0.0,
+            "population_init_seconds": 0.0,
+            "persistence_seconds": 0.0,
+            "per_generation": [],
+        }
+        logger.info(
+            "alpha_lab.search start provider={} symbols={} generations={} population_size={} offspring_count={} llm_backend={}",
+            provider,
+            ",".join(symbols),
+            generations,
+            population_size,
+            offspring_count,
+            getattr(self.evolution.llm_backend, "backend_name", self.evolution.llm_backend.__class__.__name__),
+        )
+        dataset_start = perf_counter()
         dataset = self.dataset_loader.load(
             provider=provider,
             symbols=symbols,
@@ -349,14 +386,36 @@ class AlphaLabService:
             min_quote_volume=min_quote_volume,
             blocked_utc_hours=blocked_utc_hours,
         )
+        timing["dataset_load_seconds"] = perf_counter() - dataset_start
+        logger.info(
+            "alpha_lab.search dataset_loaded shape={} load_seconds={:.4f}",
+            dataset.shape(),
+            timing["dataset_load_seconds"],
+        )
+        validation_start = perf_counter()
         validation_plan = self._build_validation_plan(
             dataset,
             n_splits=n_splits,
             purge_window=purge_window,
             embargo_window=embargo_window,
         )
-        seeds = seeds or DEFAULT_DB_SEEDS
+        timing["validation_plan_seconds"] = perf_counter() - validation_start
+        logger.info(
+            "alpha_lab.search validation_ready mode={} fold_count={} plan_seconds={:.4f}",
+            validation_plan["summary"]["mode"],
+            validation_plan["summary"]["fold_count"],
+            timing["validation_plan_seconds"],
+        )
+        seeds = list(seeds or [])
+        init_start = perf_counter()
         population = self._deduplicate_population(self.evolution.initialize(seeds, population_size))
+        timing["population_init_seconds"] = perf_counter() - init_start
+        logger.info(
+            "alpha_lab.search population_initialized requested_seeds={} actual_population={} init_seconds={:.4f}",
+            len(seeds),
+            len(population),
+            timing["population_init_seconds"],
+        )
         generation_summaries = []
         details_by_hash: dict[str, dict[str, Any]] = {}
         lineage_edges: list[dict[str, Any]] = []
@@ -364,10 +423,20 @@ class AlphaLabService:
         final_population: list[Any] = population
 
         for generation in range(generations):
+            generation_start = perf_counter()
+            logger.info(
+                "alpha_lab.search generation_start generation={} population_size={}",
+                generation,
+                len(population),
+            )
+            evaluation_start = perf_counter()
             split_results = self.evaluate_population_on_validation_plan(population, validation_plan["folds"])
+            evaluation_seconds = perf_counter() - evaluation_start
+            evaluation_timing = dict(split_results.get("timing", {}))
             metrics_by_hash = split_results["metrics_by_hash"]
             signatures_by_hash = split_results["signatures_by_hash"]
             details_by_hash.update(split_results["details_by_hash"])
+            scoring_start = perf_counter()
             scored_population = self.evolution.attach_metrics(population, metrics_by_hash)
             scored_population = self._filter_by_novelty(
                 scored_population,
@@ -378,8 +447,11 @@ class AlphaLabService:
                 scored_population,
                 top_k=max(1, min(top_k, len(scored_population))),
             )
+            scoring_seconds = perf_counter() - scoring_start
             last_metrics_by_hash = metrics_by_hash
             final_population = survivors
+            offspring_count_actual = 0
+            breeding_seconds = 0.0
             generation_summaries.append(
                 {
                     "generation": generation,
@@ -398,9 +470,49 @@ class AlphaLabService:
                     ],
                 }
             )
+            generation_timing = {
+                "generation": generation,
+                "evaluation_seconds": evaluation_seconds,
+                "compile_seconds": float(evaluation_timing.get("compile_seconds", 0.0)),
+                "tensor_store_seconds": float(evaluation_timing.get("tensor_store_seconds", 0.0)),
+                "vm_run_seconds": float(evaluation_timing.get("vm_run_seconds", 0.0)),
+                "signal_transform_seconds": float(evaluation_timing.get("signal_transform_seconds", 0.0)),
+                "rule_overlay_seconds": float(evaluation_timing.get("rule_overlay_seconds", 0.0)),
+                "backtest_seconds": float(evaluation_timing.get("backtest_seconds", 0.0)),
+                "fitness_seconds": float(evaluation_timing.get("fitness_seconds", 0.0)),
+                "signature_seconds": float(evaluation_timing.get("signature_seconds", 0.0)),
+                "aggregation_seconds": float(evaluation_timing.get("aggregation_seconds", 0.0)),
+                "fold_loop_seconds": float(evaluation_timing.get("fold_loop_seconds", 0.0)),
+                "selection_seconds": scoring_seconds,
+                "breeding_seconds": breeding_seconds,
+                "total_seconds": 0.0,
+                "population_size": len(population),
+                "survivor_count": len(survivors),
+                "offspring_count": offspring_count_actual,
+                "fold_count": int(evaluation_timing.get("fold_count", 0)),
+                "split_count": int(evaluation_timing.get("split_count", 0)),
+                "dataset_eval_calls": int(evaluation_timing.get("dataset_eval_calls", 0)),
+                "formula_evaluations": int(evaluation_timing.get("formula_evaluations", 0)),
+            }
             if generation == generations - 1:
+                generation_timing["total_seconds"] = perf_counter() - generation_start
+                timing["per_generation"].append(generation_timing)
+                logger.info(
+                    "alpha_lab.search generation_complete generation={} survivors={} eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} total_seconds={:.4f}",
+                    generation,
+                    len(survivors),
+                    evaluation_seconds,
+                    generation_timing["vm_run_seconds"],
+                    generation_timing["backtest_seconds"],
+                    generation_timing["fitness_seconds"],
+                    scoring_seconds,
+                    generation_timing["total_seconds"],
+                )
                 break
+            breeding_start = perf_counter()
             offspring = self._deduplicate_population(self.evolution.breed(survivors, offspring_count))
+            breeding_seconds = perf_counter() - breeding_start
+            offspring_count_actual = len(offspring)
             for child in offspring:
                 lineage_edges.append(
                     {
@@ -411,10 +523,41 @@ class AlphaLabService:
                         "generation": generation + 1,
                     }
                 )
+            generation_timing["breeding_seconds"] = breeding_seconds
+            generation_timing["offspring_count"] = offspring_count_actual
             if not offspring:
                 final_population = survivors
+                generation_timing["total_seconds"] = perf_counter() - generation_start
+                timing["per_generation"].append(generation_timing)
+                logger.info(
+                    "alpha_lab.search generation_complete generation={} survivors={} offspring=0 eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} breed_seconds={:.4f} total_seconds={:.4f}",
+                    generation,
+                    len(survivors),
+                    evaluation_seconds,
+                    generation_timing["vm_run_seconds"],
+                    generation_timing["backtest_seconds"],
+                    generation_timing["fitness_seconds"],
+                    scoring_seconds,
+                    breeding_seconds,
+                    generation_timing["total_seconds"],
+                )
                 break
             population = survivors + offspring
+            generation_timing["total_seconds"] = perf_counter() - generation_start
+            timing["per_generation"].append(generation_timing)
+            logger.info(
+                "alpha_lab.search generation_complete generation={} survivors={} offspring={} eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} breed_seconds={:.4f} total_seconds={:.4f}",
+                generation,
+                len(survivors),
+                offspring_count_actual,
+                evaluation_seconds,
+                generation_timing["vm_run_seconds"],
+                generation_timing["backtest_seconds"],
+                generation_timing["fitness_seconds"],
+                scoring_seconds,
+                breeding_seconds,
+                generation_timing["total_seconds"],
+            )
 
         ranked_population = sorted(final_population, key=lambda item: item.fitness, reverse=True)
         result = {
@@ -424,6 +567,8 @@ class AlphaLabService:
                 "symbols": dataset.symbols,
                 "shape": dataset.shape(),
             },
+            "llm": self._llm_backend_summary(),
+            "timing": timing,
             "validation": validation_plan["summary"],
             "generations": generation_summaries,
             "lineage": lineage_edges,
@@ -447,14 +592,31 @@ class AlphaLabService:
                 for expr_hash, details in details_by_hash.items()
             },
         }
+        persisted_run_id: str | None = None
         if persist:
+            persistence_start = perf_counter()
             run = self.persistence.save_run(result, run_name=run_name or "search_db")
             zoo_paths = self.persistence.save_zoo_entries(result["top_results"], run.run_id)
+            timing["persistence_seconds"] = perf_counter() - persistence_start
+            persisted_run_id = run.run_id
             result["persistence"] = {
                 "run_id": run.run_id,
                 "run_path": run.run_path,
                 "zoo_paths": zoo_paths,
             }
+            logger.info(
+                "alpha_lab.search persistence_complete run_id={} persistence_seconds={:.4f}",
+                run.run_id,
+                timing["persistence_seconds"],
+            )
+        timing["overall_seconds"] = perf_counter() - overall_start
+        logger.info(
+            "alpha_lab.search complete top_results={} overall_seconds={:.4f}",
+            len(result["top_results"]),
+            timing["overall_seconds"],
+        )
+        if persisted_run_id is not None:
+            self.persistence.update_run(persisted_run_id, result)
         return result
 
     def evaluate_formula_across_splits(
@@ -495,6 +657,7 @@ class AlphaLabService:
         self,
         population: list[Any],
         dataset: AlphaDataset,
+        timing_breakdown: dict[str, Any] | None = None,
     ) -> dict[str, dict[str, Any]]:
         if not population:
             return {
@@ -503,9 +666,28 @@ class AlphaLabService:
                 "details_by_hash": {},
             }
 
+        if timing_breakdown is None:
+            timing_breakdown = self._new_evaluation_timing()
+
+        store_start = perf_counter()
         store = TensorStore(dataset.fields)
-        programs = [individual.program for individual in population]
+        timing_breakdown["tensor_store_seconds"] += perf_counter() - store_start
+
+        compile_start = perf_counter()
+        programs = []
+        for individual in population:
+            program = individual.program
+            if program is None:
+                program = self._compile_cached(individual.formula)
+                individual.program = program
+            programs.append(program)
+        timing_breakdown["compile_seconds"] += perf_counter() - compile_start
+
+        vm_start = perf_counter()
         alphas = self.vm.run_batch(programs, store)
+        timing_breakdown["vm_run_seconds"] += perf_counter() - vm_start
+        timing_breakdown["dataset_eval_calls"] += 1
+        timing_breakdown["formula_evaluations"] += len(population)
         metrics_by_hash: dict[str, dict[str, float]] = {}
         signatures_by_hash: dict[str, list[float]] = {}
         details_by_hash: dict[str, dict[str, Any]] = {}
@@ -516,6 +698,7 @@ class AlphaLabService:
                 alpha,
                 dataset,
                 store,
+                timing_breakdown=timing_breakdown,
             )
             metrics_by_hash[individual.expr_hash] = evaluation["metrics"]
             signatures_by_hash[individual.expr_hash] = evaluation["alpha_signature"]
@@ -537,15 +720,24 @@ class AlphaLabService:
         population: list[Any],
         validation_folds: list[dict[str, Any]],
     ) -> dict[str, dict[str, Any]]:
+        timing_breakdown = self._new_evaluation_timing()
         split_metrics_by_hash: dict[str, dict[str, list[dict[str, float]]]] = {}
         split_signatures_by_hash: dict[str, dict[str, list[list[float]]]] = {}
         details_by_hash: dict[str, dict[str, Any]] = {}
 
         for fold_entry in validation_folds:
+            timing_breakdown["fold_count"] += 1
             fold = fold_entry["fold"]
             fold_results: dict[str, dict[str, dict[str, Any]]] = {}
             for split_name, split_dataset in fold_entry["datasets"].items():
-                split_results = self.evaluate_population_from_dataset(population, split_dataset)
+                split_start = perf_counter()
+                split_results = self.evaluate_population_from_dataset(
+                    population,
+                    split_dataset,
+                    timing_breakdown=timing_breakdown,
+                )
+                timing_breakdown["fold_loop_seconds"] += perf_counter() - split_start
+                timing_breakdown["split_count"] += 1
                 fold_results[split_name] = split_results
                 for expr_hash, metrics in split_results["metrics_by_hash"].items():
                     split_metrics_by_hash.setdefault(expr_hash, {}).setdefault(split_name, []).append(metrics)
@@ -572,6 +764,7 @@ class AlphaLabService:
                     }
                 )
 
+        aggregation_start = perf_counter()
         metrics_by_hash: dict[str, dict[str, float]] = {}
         signatures_by_hash: dict[str, list[float] | None] = {}
         for expr_hash, split_metrics in split_metrics_by_hash.items():
@@ -615,11 +808,13 @@ class AlphaLabService:
             }
             details_by_hash[expr_hash]["fitness_metrics"] = fitness_metrics
             details_by_hash[expr_hash]["alpha_signature"] = signatures_by_hash[expr_hash]
+        timing_breakdown["aggregation_seconds"] += perf_counter() - aggregation_start
 
         return {
             "metrics_by_hash": metrics_by_hash,
             "signatures_by_hash": signatures_by_hash,
             "details_by_hash": details_by_hash,
+            "timing": timing_breakdown,
         }
 
     def _build_validation_plan(
@@ -678,10 +873,12 @@ class AlphaLabService:
     def _build_fitness_metrics(
         self,
         alpha: Any,
+        weights: Any,
         close: Any,
         summary: dict[str, float],
     ) -> dict[str, float]:
         alpha_np = self._to_numpy(alpha)
+        weights_np = self._to_numpy(weights)
         close_np = self._to_numpy(close)
         forward_returns = np.zeros_like(close_np)
         forward_returns[:-1] = close_np[1:] / (close_np[:-1] + 1e-12) - 1.0
@@ -689,16 +886,29 @@ class AlphaLabService:
         avg_turnover = float(summary.get("avg_turnover", 0.0))
         total_return = float(summary.get("total_return", 0.0))
         volatility = float(summary.get("volatility", 0.0))
+        signal_coverage = float(np.mean(np.isfinite(alpha_np))) if alpha_np.size else 0.0
+        active_rows = np.sum(np.abs(weights_np), axis=1) > 1e-9 if weights_np.size else np.array([], dtype=bool)
+        active_bar_ratio = float(np.mean(active_rows)) if active_rows.size else 0.0
+        effective_bars = float(np.sum(active_rows)) if active_rows.size else 0.0
+        is_inactive = active_bar_ratio <= 1e-6 or avg_turnover <= 1e-12
         metrics = dict(summary)
+        pnl_per_turnover = total_return / (avg_turnover + 1e-12) if not is_inactive else 0.0
+        stability = 0.0
+        if not is_inactive and volatility > 1e-12:
+            stability = min(1.0 / volatility, 10.0)
         metrics.update(
             {
                 "rank_ic": rank_ic,
-                "pnl_per_turnover": total_return / (avg_turnover + 1e-12),
-                "stability": 1.0 / (volatility + 1e-12),
+                "pnl_per_turnover": pnl_per_turnover,
+                "stability": stability,
                 "tail_penalty_adjusted_return": total_return - float(summary.get("max_drawdown", 0.0)),
                 "turnover_penalty": avg_turnover,
                 "complexity_penalty": 0.0,
                 "train_valid_gap_penalty": 0.0,
+                "signal_coverage": signal_coverage,
+                "active_bar_ratio": active_bar_ratio,
+                "effective_bars": effective_bars,
+                "inactive": 1.0 if is_inactive else 0.0,
             }
         )
         return metrics
@@ -741,19 +951,38 @@ class AlphaLabService:
             "shape": dataset.shape(),
         }
 
+    def _llm_backend_summary(self) -> dict[str, Any]:
+        backend = self.evolution.llm_backend
+        return {
+            "backend": getattr(backend, "backend_name", backend.__class__.__name__),
+            "model": getattr(backend, "model_name", None),
+            "base_url": getattr(backend, "base_url", None),
+            "call_stats": dict(getattr(backend, "call_stats", {})),
+        }
+
     def _build_dataset_evaluation(
         self,
         program: BytecodeProgram,
         alpha: Any,
         dataset: AlphaDataset,
         store: TensorStore,
+        timing_breakdown: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         market_ctx = MarketContext(
             liquidity_mask=dataset.liquidity_mask,
             session_mask=dataset.session_mask,
         )
+        signal_start = perf_counter()
         target_weights = self.signal_transformer.to_target_weights(alpha, market_ctx)
+        if timing_breakdown is not None:
+            timing_breakdown["signal_transform_seconds"] += perf_counter() - signal_start
+
+        overlay_start = perf_counter()
         wrapped_weights = self.rule_overlay.apply(target_weights, market_ctx)
+        if timing_breakdown is not None:
+            timing_breakdown["rule_overlay_seconds"] += perf_counter() - overlay_start
+
+        backtest_start = perf_counter()
         result = self.execution.simulate(
             wrapped_weights,
             {
@@ -763,16 +992,45 @@ class AlphaLabService:
             CostModel(),
             funding_rate=store.get_field("funding_rate"),
         )
-        metrics = self._build_fitness_metrics(alpha, store.get_field("close"), result.summary())
+        if timing_breakdown is not None:
+            timing_breakdown["backtest_seconds"] += perf_counter() - backtest_start
+
+        fitness_start = perf_counter()
+        metrics = self._build_fitness_metrics(alpha, wrapped_weights, store.get_field("close"), result.summary())
+        if timing_breakdown is not None:
+            timing_breakdown["fitness_seconds"] += perf_counter() - fitness_start
+
+        signature_start = perf_counter()
+        alpha_signature = self._build_alpha_signature(alpha)
+        if timing_breakdown is not None:
+            timing_breakdown["signature_seconds"] += perf_counter() - signature_start
         return {
             "program": program.to_dict(),
             "metrics": metrics,
-            "alpha_signature": self._build_alpha_signature(alpha),
+            "alpha_signature": alpha_signature,
             "alpha_tail": self._to_serializable_list(alpha[-5:]),
             "weights_tail": self._to_serializable_list(wrapped_weights[-5:]),
             "equity_tail": self._to_serializable_list(result.equity_curve[-5:]),
             "backend": self.vm.backend,
             "device": str(self.vm.device) if self.vm.device is not None else "numpy",
+        }
+
+    def _new_evaluation_timing(self) -> dict[str, Any]:
+        return {
+            "compile_seconds": 0.0,
+            "tensor_store_seconds": 0.0,
+            "vm_run_seconds": 0.0,
+            "signal_transform_seconds": 0.0,
+            "rule_overlay_seconds": 0.0,
+            "backtest_seconds": 0.0,
+            "fitness_seconds": 0.0,
+            "signature_seconds": 0.0,
+            "aggregation_seconds": 0.0,
+            "fold_loop_seconds": 0.0,
+            "fold_count": 0,
+            "split_count": 0,
+            "dataset_eval_calls": 0,
+            "formula_evaluations": 0,
         }
 
     def _summarize_evaluation_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
@@ -807,17 +1065,30 @@ class AlphaLabService:
         }
 
     def _mean_cross_sectional_correlation(self, alpha: np.ndarray, returns: np.ndarray) -> float:
-        valid_rows = []
-        for alpha_row, return_row in zip(alpha, returns):
-            mask = ~np.isnan(alpha_row) & ~np.isnan(return_row)
-            if mask.sum() < 2:
-                continue
-            a = alpha_row[mask]
-            r = return_row[mask]
-            if np.std(a) < 1e-12 or np.std(r) < 1e-12:
-                continue
-            valid_rows.append(float(np.corrcoef(a, r)[0, 1]))
-        return float(np.mean(valid_rows)) if valid_rows else 0.0
+        alpha_np = np.asarray(alpha, dtype=float)
+        returns_np = np.asarray(returns, dtype=float)
+        mask = ~np.isnan(alpha_np) & ~np.isnan(returns_np)
+        valid_counts = np.sum(mask, axis=1)
+        if not np.any(valid_counts >= 2):
+            return 0.0
+
+        safe_alpha = np.where(mask, alpha_np, 0.0)
+        safe_returns = np.where(mask, returns_np, 0.0)
+        denom = np.maximum(valid_counts, 1)
+        mean_alpha = np.sum(safe_alpha, axis=1) / denom
+        mean_returns = np.sum(safe_returns, axis=1) / denom
+        centered_alpha = np.where(mask, alpha_np - mean_alpha[:, None], 0.0)
+        centered_returns = np.where(mask, returns_np - mean_returns[:, None], 0.0)
+
+        cov = np.sum(centered_alpha * centered_returns, axis=1)
+        var_alpha = np.sum(centered_alpha * centered_alpha, axis=1)
+        var_returns = np.sum(centered_returns * centered_returns, axis=1)
+        valid_rows = (valid_counts >= 2) & (var_alpha > 1e-24) & (var_returns > 1e-24)
+        if not np.any(valid_rows):
+            return 0.0
+
+        correlations = cov[valid_rows] / np.sqrt(var_alpha[valid_rows] * var_returns[valid_rows])
+        return float(np.mean(correlations)) if correlations.size else 0.0
 
     def _deduplicate_population(self, population: list[Any]) -> list[Any]:
         seen: set[str] = set()

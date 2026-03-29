@@ -2,22 +2,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
-from typing import Iterable
+from typing import Any, Iterable
 
 from loguru import logger
 
-from src.datahub.binance import BinanceSpotDataAdapter
-from src.datahub.bitget import BitgetDataAdapter
 from src.config.settings import get_crypto_market_config
-from src.market_data.crypto_store import CryptoMinuteBarStore, UnifiedMinuteBar
+from src.market_data.ccxt_adapter import DEFAULT_CRYPTO_SYMBOLS, build_default_providers
+from src.market_data.crypto_store import CryptoMinuteBarStore
 from src.market_data.crypto_sync_state import CryptoSyncStateStore
-
-
-DEFAULT_CRYPTO_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
-MINUTE_MS = 60_000
-MAX_BATCH_LIMIT = 1000
-BITGET_HISTORY_BATCH_LIMIT = 200
-EMPTY_WINDOW_ADVANCE_DAYS = 30
 
 
 @dataclass
@@ -36,42 +28,101 @@ class CryptoMinuteSyncService:
         self.store = store
         self.config = get_crypto_market_config()
         self.state_store = CryptoSyncStateStore(self.config.state_file)
-        self.providers = {
-            "bitget": BitgetDataAdapter(),
-            "binance": BinanceSpotDataAdapter(),
-        }
+        self.providers = build_default_providers()
 
     def _store(self) -> CryptoMinuteBarStore:
         if self.store is None:
             self.store = CryptoMinuteBarStore()
         return self.store
 
+    def _get_provider(self, provider: str):
+        adapter = self.providers.get(provider.lower())
+        if adapter is None:
+            raise ValueError(f"Unsupported provider: {provider}")
+        return adapter
+
+    def _normalize_time(self, value: datetime | None) -> datetime | None:
+        if value is None:
+            return None
+        if value.tzinfo is None:
+            return value.replace(tzinfo=UTC)
+        return value.astimezone(UTC)
+
+    def _interval_delta(self, interval: str) -> timedelta:
+        normalized = str(interval).strip().lower()
+        if not normalized.endswith("m"):
+            raise ValueError(f"Unsupported interval: {interval}")
+        return timedelta(minutes=max(int(normalized[:-1]), 1))
+
+    def _get_state_latest(self, provider: str, market_type: str, symbol: str, interval: str) -> datetime | None:
+        state_point = self.state_store.get_sync_point(
+            provider=provider,
+            market_type=market_type,
+            symbol=symbol,
+            interval=interval,
+        )
+        if not state_point or not state_point.get("last_open_time"):
+            return None
+        return datetime.fromisoformat(state_point["last_open_time"]).astimezone(UTC)
+
+    def _resolve_sync_start(
+        self,
+        provider: str,
+        market_type: str,
+        symbol: str,
+        interval: str,
+        requested_start: datetime | None,
+        end_time: datetime,
+    ) -> datetime:
+        normalized_start = self._normalize_time(requested_start)
+        if normalized_start is not None:
+            return normalized_start
+
+        step = self._interval_delta(interval)
+        latest = self._store().get_latest_open_time(
+            provider=provider,
+            symbol=symbol,
+            interval=interval,
+            market_type=market_type,
+        )
+        if latest is not None:
+            return latest + step
+
+        state_latest = self._get_state_latest(provider, market_type, symbol, interval)
+        if state_latest is not None:
+            return state_latest + step
+
+        return end_time - timedelta(days=1)
+
     def ensure_schema(self) -> None:
         self._store().ensure_schema()
+
+    def list_providers(self) -> list[dict[str, Any]]:
+        return [adapter.describe() for adapter in self.providers.values()]
 
     def initialize_database(
         self,
         provider: str | None = None,
         symbols: Iterable[str] | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         self.ensure_schema()
         providers = [provider] if provider else list(self.providers.keys())
         instrument_count = 0
         initialized = []
+        provider_symbols = list(symbols or self.config.default_symbols or DEFAULT_CRYPTO_SYMBOLS)
+
         for provider_name in providers:
-            adapter = self.providers.get(provider_name.lower())
-            if adapter is None:
-                raise ValueError(f"Unsupported provider: {provider_name}")
-            provider_symbols = list(symbols or self.config.default_symbols or DEFAULT_CRYPTO_SYMBOLS)
-            rows = self._build_instruments(adapter, provider_symbols)
+            adapter = self._get_provider(provider_name)
+            rows = adapter.build_instruments(provider_symbols)
             instrument_count += self._store().upsert_instruments(rows)
             initialized.append(
                 {
                     "provider": adapter.provider_name,
                     "market_type": adapter.market_type,
-                    "symbols": provider_symbols,
+                    "symbols": [row["symbol"] for row in rows],
                 }
             )
+
         return {
             "status": "initialized",
             "providers": initialized,
@@ -88,54 +139,55 @@ class CryptoMinuteSyncService:
         end_time: datetime | None = None,
         progress_callback=None,
         use_historical_endpoint: bool = False,
-    ) -> list[dict]:
-        adapter = self.providers.get(provider.lower())
-        if adapter is None:
-            raise ValueError(f"Unsupported provider: {provider}")
+    ) -> list[dict[str, Any]]:
+        del use_historical_endpoint
 
+        adapter = self._get_provider(provider)
         self.ensure_schema()
-        end_time = end_time or datetime.now(UTC).replace(second=0, microsecond=0)
-        symbols = list(symbols or self.config.default_symbols or DEFAULT_CRYPTO_SYMBOLS)
-        self._store().upsert_instruments(self._build_instruments(adapter, symbols))
-        summaries: list[dict] = []
+        resolved_end_time = self._normalize_time(end_time) or datetime.now(UTC).replace(second=0, microsecond=0)
+        resolved_symbols = list(symbols or self.config.default_symbols or DEFAULT_CRYPTO_SYMBOLS)
+        self._store().upsert_instruments(adapter.build_instruments(resolved_symbols))
+        summaries: list[dict[str, Any]] = []
 
-        for symbol in symbols:
+        for requested_symbol in resolved_symbols:
+            normalized_symbol = adapter.normalize_symbol(requested_symbol)
+            effective_start = self._resolve_sync_start(
+                provider=adapter.provider_name,
+                market_type=adapter.market_type,
+                symbol=normalized_symbol,
+                interval=interval,
+                requested_start=start_time,
+                end_time=resolved_end_time,
+            )
             latest = self._store().get_latest_open_time(
                 provider=adapter.provider_name,
-                symbol=symbol.upper(),
+                symbol=normalized_symbol,
                 interval=interval,
                 market_type=adapter.market_type,
             )
-            state_point = self.state_store.get_sync_point(
+            state_latest = self._get_state_latest(
                 provider=adapter.provider_name,
                 market_type=adapter.market_type,
-                symbol=symbol.upper(),
+                symbol=normalized_symbol,
                 interval=interval,
             )
-            state_latest = None
-            if state_point and state_point.get("last_open_time"):
-                state_latest = datetime.fromisoformat(state_point["last_open_time"]).astimezone(UTC)
-            effective_start = start_time or (
-                latest + timedelta(minutes=1)
-                if latest
-                else state_latest + timedelta(minutes=1)
-                if state_latest
-                else end_time - timedelta(days=1)
-            )
+            last_open_time = latest or state_latest
+
             self.state_store.mark_started(
                 provider=adapter.provider_name,
                 market_type=adapter.market_type,
-                symbol=symbol.upper(),
+                symbol=normalized_symbol,
                 interval=interval,
                 start_time=effective_start,
             )
-            if effective_start >= end_time:
+
+            if effective_start > resolved_end_time:
                 self.state_store.mark_completed(
                     provider=adapter.provider_name,
                     market_type=adapter.market_type,
-                    symbol=symbol.upper(),
+                    symbol=normalized_symbol,
                     interval=interval,
-                    last_open_time=latest or state_latest,
+                    last_open_time=last_open_time,
                     fetched=0,
                     inserted=0,
                 )
@@ -143,112 +195,81 @@ class CryptoMinuteSyncService:
                     SyncSummary(
                         provider=adapter.provider_name,
                         market_type=adapter.market_type,
-                        symbol=symbol.upper(),
+                        symbol=normalized_symbol,
                         fetched=0,
                         inserted=0,
                         start_time=effective_start.isoformat(),
-                        end_time=end_time.isoformat(),
+                        end_time=resolved_end_time.isoformat(),
                     ).__dict__
                 )
                 continue
 
+            windows = list(
+                self._store().iter_missing_windows(
+                    provider=adapter.provider_name,
+                    symbol=normalized_symbol,
+                    start_time=effective_start,
+                    end_time=resolved_end_time,
+                    interval=interval,
+                    market_type=adapter.market_type,
+                    batch_size=adapter.batch_limit,
+                )
+            )
             fetched_total = 0
             inserted_total = 0
-            cursor = effective_start
-            last_open_time = latest or state_latest
-            batch_limit = (
-                BITGET_HISTORY_BATCH_LIMIT
-                if use_historical_endpoint and adapter.provider_name == "bitget"
-                else MAX_BATCH_LIMIT
-            )
-            while cursor < end_time:
-                batch_end = min(
-                    cursor + timedelta(minutes=batch_limit - 1),
-                    end_time,
-                )
-                try:
-                    if use_historical_endpoint and hasattr(adapter, "fetch_history_candles"):
-                        records = adapter.fetch_history_candles(
-                            symbol=symbol.upper(),
-                            interval=interval,
-                            start_time_ms=int(cursor.timestamp() * 1000),
-                            end_time_ms=int(batch_end.timestamp() * 1000),
-                            limit=batch_limit,
-                        )
-                    else:
-                        records = adapter.fetch_candles(
-                            symbol=symbol.upper(),
-                            interval=interval,
-                            start_time_ms=int(cursor.timestamp() * 1000),
-                            end_time_ms=int(batch_end.timestamp() * 1000),
-                            limit=batch_limit,
-                        )
-                except Exception as exc:
-                    self.state_store.mark_failed(
+
+            try:
+                for window in windows:
+                    bars = adapter.fetch_bars(
+                        symbol=requested_symbol,
+                        interval=interval,
+                        start_time=window.start_time,
+                        end_time=window.end_time,
+                        limit=window.expected_points,
+                    )
+                    fetched_total += len(bars)
+                    inserted_total += self._store().insert_bars(bars)
+                    window_last = bars[-1].open_time if bars else window.end_time
+                    if last_open_time is None or window_last > last_open_time:
+                        last_open_time = window_last
+                    self.state_store.mark_progress(
                         provider=adapter.provider_name,
                         market_type=adapter.market_type,
-                        symbol=symbol.upper(),
+                        symbol=normalized_symbol,
                         interval=interval,
-                        error=str(exc),
+                        last_open_time=last_open_time,
+                        fetched=fetched_total,
+                        inserted=inserted_total,
                     )
-                    raise
-                if not records:
-                    if use_historical_endpoint:
-                        cursor = min(cursor + timedelta(days=EMPTY_WINDOW_ADVANCE_DAYS), end_time)
-                        if progress_callback:
-                            progress_callback(
-                                {
-                                    "provider": adapter.provider_name,
-                                    "market_type": adapter.market_type,
-                                    "symbol": symbol.upper(),
-                                    "interval": interval,
-                                    "cursor": cursor.isoformat(),
-                                    "batch_end": batch_end.isoformat(),
-                                    "last_open_time": last_open_time.isoformat() if last_open_time else "",
-                                    "fetched": fetched_total,
-                                    "inserted": inserted_total,
-                                    "note": "empty_window_advanced",
-                                }
-                            )
-                        continue
-                    break
-                normalized = self._normalize_records(adapter, symbol.upper(), interval, records)
-                fetched_total += len(normalized)
-                inserted_total += self._store().insert_bars(normalized)
-
-                last_open_time = normalized[-1].open_time
-                self.state_store.mark_progress(
+                    if progress_callback:
+                        progress_callback(
+                            {
+                                "provider": adapter.provider_name,
+                                "market_type": adapter.market_type,
+                                "symbol": normalized_symbol,
+                                "interval": interval,
+                                "cursor": window.start_time.isoformat(),
+                                "batch_end": window.end_time.isoformat(),
+                                "last_open_time": last_open_time.isoformat(),
+                                "fetched": fetched_total,
+                                "inserted": inserted_total,
+                                "note": "window_synced" if bars else "window_empty",
+                            }
+                        )
+            except Exception as exc:
+                self.state_store.mark_failed(
                     provider=adapter.provider_name,
                     market_type=adapter.market_type,
-                    symbol=symbol.upper(),
+                    symbol=normalized_symbol,
                     interval=interval,
-                    last_open_time=last_open_time,
-                    fetched=fetched_total,
-                    inserted=inserted_total,
+                    error=str(exc),
                 )
-                if progress_callback:
-                    progress_callback(
-                        {
-                            "provider": adapter.provider_name,
-                            "market_type": adapter.market_type,
-                            "symbol": symbol.upper(),
-                            "interval": interval,
-                            "cursor": cursor.isoformat(),
-                            "batch_end": batch_end.isoformat(),
-                            "last_open_time": last_open_time.isoformat(),
-                            "fetched": fetched_total,
-                            "inserted": inserted_total,
-                        }
-                    )
-                next_cursor = last_open_time + timedelta(minutes=1)
-                if next_cursor <= cursor:
-                    break
-                cursor = next_cursor
+                raise
 
             self.state_store.mark_completed(
                 provider=adapter.provider_name,
                 market_type=adapter.market_type,
-                symbol=symbol.upper(),
+                symbol=normalized_symbol,
                 interval=interval,
                 last_open_time=last_open_time,
                 fetched=fetched_total,
@@ -258,15 +279,21 @@ class CryptoMinuteSyncService:
             summary = SyncSummary(
                 provider=adapter.provider_name,
                 market_type=adapter.market_type,
-                symbol=symbol.upper(),
+                symbol=normalized_symbol,
                 fetched=fetched_total,
                 inserted=inserted_total,
                 start_time=effective_start.isoformat(),
-                end_time=end_time.isoformat(),
+                end_time=resolved_end_time.isoformat(),
             )
             summaries.append(summary.__dict__)
             logger.info(
-                f"Synced {provider}:{symbol} {interval} fetched={fetched_total} inserted={inserted_total}"
+                "Synced {}:{} {} fetched={} inserted={} windows={}",
+                adapter.provider_name,
+                normalized_symbol,
+                interval,
+                fetched_total,
+                inserted_total,
+                len(windows),
             )
 
         return summaries
@@ -277,18 +304,17 @@ class CryptoMinuteSyncService:
         symbols: Iterable[str] | None = None,
         interval: str | None = None,
         end_time: datetime | None = None,
-    ) -> list[dict]:
-        provider = provider or self.config.default_provider
-        interval = interval or self.config.default_interval
+    ) -> list[dict[str, Any]]:
+        resolved_provider = provider or self.config.default_provider
+        resolved_interval = interval or self.config.default_interval
         lookback = timedelta(hours=max(self.config.default_lookback_hours, 1))
-        end_time = end_time or datetime.now(UTC).replace(second=0, microsecond=0)
-        start_time = end_time - lookback
+        resolved_end_time = self._normalize_time(end_time) or datetime.now(UTC).replace(second=0, microsecond=0)
         return self.sync_minute_bars(
-            provider=provider,
+            provider=resolved_provider,
             symbols=list(symbols or self.config.default_symbols or DEFAULT_CRYPTO_SYMBOLS),
-            interval=interval,
-            start_time=start_time,
-            end_time=end_time,
+            interval=resolved_interval,
+            start_time=resolved_end_time - lookback,
+            end_time=resolved_end_time,
         )
 
     def bootstrap_default_dataset(
@@ -297,7 +323,7 @@ class CryptoMinuteSyncService:
         symbols: Iterable[str] | None = None,
         interval: str | None = None,
         end_time: datetime | None = None,
-    ) -> dict:
+    ) -> dict[str, Any]:
         init_result = self.initialize_database(provider=provider, symbols=symbols)
         sync_result = self.sync_default_minute_bars(
             provider=provider,
@@ -320,61 +346,32 @@ class CryptoMinuteSyncService:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         progress_callback=None,
-    ) -> dict:
-        provider = provider or self.config.default_provider
-        interval = interval or self.config.default_interval
-        configured_start = start_time or datetime.fromisoformat(self.config.full_history_start)
-        if configured_start.tzinfo is None:
-            configured_start = configured_start.replace(tzinfo=UTC)
-        else:
-            configured_start = configured_start.astimezone(UTC)
+    ) -> dict[str, Any]:
+        resolved_provider = provider or self.config.default_provider
+        resolved_interval = interval or self.config.default_interval
+        configured_start = self._normalize_time(start_time)
+        if configured_start is None:
+            configured_start = datetime.fromisoformat(self.config.full_history_start)
+            configured_start = self._normalize_time(configured_start)
 
-        init_result = self.initialize_database(provider=provider, symbols=symbols)
+        init_result = self.initialize_database(provider=resolved_provider, symbols=symbols)
         sync_result = self.sync_minute_bars(
-            provider=provider,
+            provider=resolved_provider,
             symbols=list(symbols or self.config.default_symbols or DEFAULT_CRYPTO_SYMBOLS),
-            interval=interval,
+            interval=resolved_interval,
             start_time=configured_start,
             end_time=end_time,
             progress_callback=progress_callback,
-            use_historical_endpoint=True,
         )
+        resolved_end_time = self._normalize_time(end_time) or datetime.now(UTC).replace(second=0, microsecond=0)
         return {
             "status": "backfilled",
             "start_time": configured_start.isoformat(),
-            "end_time": (end_time or datetime.now(UTC).replace(second=0, microsecond=0)).isoformat(),
+            "end_time": resolved_end_time.isoformat(),
             "initialization": init_result,
             "sync_results": sync_result,
             "overview": self.get_overview(),
         }
-
-    def _normalize_records(self, adapter, symbol: str, interval: str, records) -> list[UnifiedMinuteBar]:
-        rows = []
-        for record in records:
-            open_time_ms = getattr(record, "open_time_ms", None) or getattr(record, "timestamp_ms", None)
-            close_time_ms = getattr(record, "close_time_ms", None) or (
-                int(open_time_ms) + MINUTE_MS - 1
-            )
-            exchange_symbol = getattr(record, "exchange_symbol", None) or symbol
-            rows.append(
-                UnifiedMinuteBar(
-                    provider=adapter.provider_name,
-                    market_type=adapter.market_type,
-                    symbol=symbol,
-                    exchange_symbol=exchange_symbol,
-                    interval=interval,
-                    open_time=datetime.fromtimestamp(int(open_time_ms) / 1000, tz=UTC),
-                    close_time=datetime.fromtimestamp(int(close_time_ms) / 1000, tz=UTC),
-                    open=float(record.open),
-                    high=float(record.high),
-                    low=float(record.low),
-                    close=float(record.close),
-                    volume_base=float(record.volume_base),
-                    volume_quote=float(record.volume_quote),
-                    trade_count=int(getattr(record, "trade_count", 0) or 0),
-                )
-            )
-        return rows
 
     def query_bars(
         self,
@@ -383,7 +380,7 @@ class CryptoMinuteSyncService:
         start_time: datetime,
         end_time: datetime,
         interval: str = "1m",
-    ) -> list[dict]:
+    ) -> list[dict[str, Any]]:
         self.ensure_schema()
         return self._store().query_bars(
             provider=provider,
@@ -393,35 +390,10 @@ class CryptoMinuteSyncService:
             interval=interval,
         )
 
-    def get_overview(self) -> dict:
+    def get_overview(self) -> dict[str, Any]:
         self.ensure_schema()
         return self._store().get_overview()
 
-    def get_coverage(self, interval: str = "1m", limit: int = 100) -> list[dict]:
+    def get_coverage(self, interval: str = "1m", limit: int = 100) -> list[dict[str, Any]]:
         self.ensure_schema()
         return self._store().get_coverage(interval=interval, limit=limit)
-
-    def _build_instruments(self, adapter, symbols: Iterable[str]) -> list[dict]:
-        now = datetime.now(UTC)
-        instruments = []
-        for symbol in symbols:
-            base_asset, quote_asset = self._split_symbol(symbol.upper())
-            instruments.append(
-                {
-                    "provider": adapter.provider_name,
-                    "market_type": adapter.market_type,
-                    "symbol": symbol.upper(),
-                    "exchange_symbol": symbol.upper(),
-                    "base_asset": base_asset,
-                    "quote_asset": quote_asset,
-                    "is_active": 1,
-                    "updated_at": now,
-                }
-            )
-        return instruments
-
-    def _split_symbol(self, symbol: str) -> tuple[str, str]:
-        for quote in ("USDT", "USDC", "BUSD", "USD"):
-            if symbol.endswith(quote) and len(symbol) > len(quote):
-                return symbol[: -len(quote)], quote
-        return symbol, ""

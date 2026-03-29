@@ -37,6 +37,24 @@ class AlphaLabPersistence:
         )
         return PersistedRun(run_id=run_id, run_path=str(run_path), zoo_dir=str(self.zoo_dir))
 
+    def update_run(self, run_id: str, payload: dict[str, Any]) -> None:
+        path = self.runs_dir / f"{run_id}.json"
+        if not path.exists():
+            raise FileNotFoundError(f"Run not found: {run_id}")
+        saved_at = None
+        try:
+            existing = json.loads(path.read_text(encoding="utf-8"))
+            saved_at = existing.get("saved_at")
+        except Exception:
+            saved_at = None
+        run_payload = dict(payload)
+        run_payload["run_id"] = run_id
+        run_payload["saved_at"] = saved_at or datetime.now(UTC).isoformat()
+        path.write_text(
+            json.dumps(run_payload, ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8",
+        )
+
     def list_runs(self, limit: int = 20) -> list[dict[str, Any]]:
         runs = []
         for path in sorted(self.runs_dir.glob("*.json"), reverse=True):

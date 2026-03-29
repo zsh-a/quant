@@ -9,6 +9,7 @@ from .compiler import BytecodeProgram, FormulaCompiler, Instruction
 from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
 from .dsl import DSLRegistry, FormulaParser, TensorSchema, TypeChecker
 from .evolution import EvolutionEngine, FitnessEngine, HeuristicLLMBackend, Individual
+from .llm_backend import OpenAILLMBackend
 from .persistence import AlphaLabPersistence, PersistedRun
 from .risk import BacktestResult, CostModel, ExecutionSimulator, MarketContext, RuleOverlay, SignalTransformer
 from .service import AlphaLabService
@@ -32,6 +33,7 @@ __all__ = [
     "Individual",
     "Instruction",
     "MarketContext",
+    "OpenAILLMBackend",
     "RuleOverlay",
     "SignalTransformer",
     "StackVM",

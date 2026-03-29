@@ -181,6 +181,9 @@ class DSLRegistry:
                 "truerange": "true_range",
                 "atr": "atr_n",
                 "atrn": "atr_n",
+                "corr": "ts_corr",
+                "cov": "ts_cov",
+                "stddev": "ts_std",
             }
         )
         return aliases
@@ -287,9 +290,18 @@ class FormulaParser:
 class TypeChecker:
     def __init__(self, registry: DSLRegistry):
         self.registry = registry
+        self.field_aliases = {
+            "oi": "open_interest",
+            "openinterest": "open_interest",
+            "fundingrate": "funding_rate",
+            "bidaskspread": "bid_ask_spread",
+            "bid_ask_spread": "bid_ask_spread",
+        }
 
     def infer(self, ast_node: ASTNode, schema: TensorSchema) -> ASTNode:
         if ast_node.kind == "name":
+            compact = str(ast_node.value).replace("_", "")
+            ast_node.value = self.field_aliases.get(compact, ast_node.value)
             if ast_node.value in schema.fields:
                 ast_node.inferred_kind = "tensor"
                 return ast_node

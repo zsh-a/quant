@@ -9,6 +9,7 @@ dependencies = [
     "akshare>=1.18.12",
     "baostock>=0.8.9",
     "clickhouse-connect>=0.10.0",
+    "ccxt>=4.5.45",
     "fastapi>=0.128.0",
     "gymnasium>=1.2.3",
     "loguru>=0.7.3",
