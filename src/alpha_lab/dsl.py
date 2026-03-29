@@ -79,6 +79,7 @@ class DSLRegistry:
             OperatorSpec("sqrt", 1, 1, "tensor", "unary"),
             OperatorSpec("sigmoid", 1, 1, "tensor", "unary"),
             OperatorSpec("neg", 1, 1, "tensor", "unary"),
+            OperatorSpec("not", 1, 1, "mask", "logical"),
             OperatorSpec("add", 2, 2, "tensor", "binary"),
             OperatorSpec("sub", 2, 2, "tensor", "binary"),
             OperatorSpec("mul", 2, 2, "tensor", "binary"),
@@ -86,23 +87,46 @@ class DSLRegistry:
             OperatorSpec("max", 2, 2, "tensor", "binary"),
             OperatorSpec("min", 2, 2, "tensor", "binary"),
             OperatorSpec("pow", 2, 2, "tensor", "binary"),
+            OperatorSpec("clip", 3, 3, "tensor", "conditional"),
+            OperatorSpec("fillna", 2, 2, "tensor", "conditional"),
             OperatorSpec("where", 3, 3, "tensor", "conditional"),
             OperatorSpec("gt", 2, 2, "mask", "comparison"),
             OperatorSpec("ge", 2, 2, "mask", "comparison"),
             OperatorSpec("lt", 2, 2, "mask", "comparison"),
             OperatorSpec("le", 2, 2, "mask", "comparison"),
+            OperatorSpec("eq", 2, 2, "mask", "comparison"),
+            OperatorSpec("ne", 2, 2, "mask", "comparison"),
             OperatorSpec("and", 2, 2, "mask", "logical"),
             OperatorSpec("or", 2, 2, "mask", "logical"),
             OperatorSpec("delay", 2, 2, "tensor", "time_series"),
             OperatorSpec("delta", 2, 2, "tensor", "time_series"),
+            OperatorSpec("returns_n", 2, 2, "tensor", "time_series"),
+            OperatorSpec("log_return", 2, 2, "tensor", "time_series"),
             OperatorSpec("ts_mean", 2, 2, "tensor", "time_series"),
             OperatorSpec("ts_std", 2, 2, "tensor", "time_series"),
             OperatorSpec("ts_sum", 2, 2, "tensor", "time_series"),
             OperatorSpec("ts_max", 2, 2, "tensor", "time_series"),
             OperatorSpec("ts_min", 2, 2, "tensor", "time_series"),
             OperatorSpec("ts_rank", 2, 2, "tensor", "time_series"),
+            OperatorSpec("ts_zscore", 2, 2, "tensor", "time_series"),
+            OperatorSpec("ts_corr", 3, 3, "tensor", "time_series"),
+            OperatorSpec("ts_cov", 3, 3, "tensor", "time_series"),
+            OperatorSpec("decay_linear", 2, 2, "tensor", "time_series"),
+            OperatorSpec("ts_argmax", 2, 2, "tensor", "time_series"),
+            OperatorSpec("ts_argmin", 2, 2, "tensor", "time_series"),
             OperatorSpec("cs_rank", 1, 1, "tensor", "cross_sectional"),
             OperatorSpec("cs_scale", 1, 1, "tensor", "cross_sectional"),
+            OperatorSpec("cs_zscore", 1, 1, "tensor", "cross_sectional"),
+            OperatorSpec("cs_demean", 1, 1, "tensor", "cross_sectional"),
+            OperatorSpec("oi_delta", 2, 2, "tensor", "domain"),
+            OperatorSpec("funding_delta", 2, 2, "tensor", "domain"),
+            OperatorSpec("spread_ratio", 2, 2, "tensor", "domain"),
+            OperatorSpec("adv_n", 2, 2, "tensor", "domain"),
+            OperatorSpec("amihud", 3, 3, "tensor", "domain"),
+            OperatorSpec("hlc3", 3, 3, "tensor", "domain"),
+            OperatorSpec("ohlc4", 4, 4, "tensor", "domain"),
+            OperatorSpec("true_range", 3, 3, "tensor", "domain"),
+            OperatorSpec("atr_n", 4, 4, "tensor", "domain"),
             OperatorSpec("volatility_n", 2, 2, "tensor", "domain"),
         ]
         return {spec.name: spec for spec in specs}
@@ -138,6 +162,25 @@ class DSLRegistry:
                 "tsstd": "ts_std",
                 "tssum": "ts_sum",
                 "tsrank": "ts_rank",
+                "tszscore": "ts_zscore",
+                "tscorr": "ts_corr",
+                "tscov": "ts_cov",
+                "returnsn": "returns_n",
+                "logreturn": "log_return",
+                "decaylinear": "decay_linear",
+                "tsargmax": "ts_argmax",
+                "tsargmin": "ts_argmin",
+                "cszscore": "cs_zscore",
+                "csdemean": "cs_demean",
+                "fillna": "fillna",
+                "oidelta": "oi_delta",
+                "fundingdelta": "funding_delta",
+                "spreadratio": "spread_ratio",
+                "adv": "adv_n",
+                "advn": "adv_n",
+                "truerange": "true_range",
+                "atr": "atr_n",
+                "atrn": "atr_n",
             }
         )
         return aliases
@@ -207,6 +250,7 @@ class FormulaParser:
         if isinstance(node, ast.UnaryOp):
             opcode = {
                 ast.USub: "neg",
+                ast.Not: "not",
             }.get(type(node.op))
             if not opcode:
                 raise ValueError(f"Unsupported unary operator: {type(node.op).__name__}")
@@ -219,6 +263,8 @@ class FormulaParser:
                 ast.GtE: "ge",
                 ast.Lt: "lt",
                 ast.LtE: "le",
+                ast.Eq: "eq",
+                ast.NotEq: "ne",
             }.get(type(node.ops[0]))
             if not opcode:
                 raise ValueError(f"Unsupported comparison operator: {type(node.ops[0]).__name__}")
@@ -276,21 +322,68 @@ class TypeChecker:
         if name in {"add", "sub", "mul", "div", "max", "min", "pow"}:
             if not all(kind in {"tensor", "scalar"} for kind in kinds):
                 raise ValueError(f"Operator {name} only accepts tensor/scalar inputs")
-        elif name in {"gt", "ge", "lt", "le"}:
+        elif name in {"gt", "ge", "lt", "le", "eq", "ne"}:
             if not all(kind in {"tensor", "scalar"} for kind in kinds):
                 raise ValueError(f"Comparison {name} only accepts tensor/scalar inputs")
         elif name in {"and", "or"}:
             if not all(kind == "mask" for kind in kinds):
                 raise ValueError(f"Logical operator {name} only accepts mask inputs")
+        elif name == "not":
+            if kinds[0] != "mask":
+                raise ValueError("Logical operator not only accepts a mask input")
         elif name == "where":
             if kinds[0] != "mask":
                 raise ValueError("where(condition, x, y) requires a mask as the first argument")
             if kinds[1] not in {"tensor", "scalar"} or kinds[2] not in {"tensor", "scalar"}:
                 raise ValueError("where(condition, x, y) requires tensor/scalar branches")
-        elif name in {"delay", "delta", "ts_mean", "ts_std", "ts_sum", "ts_max", "ts_min", "ts_rank", "volatility_n"}:
+        elif name in {"clip"}:
+            if not all(kind in {"tensor", "scalar"} for kind in kinds):
+                raise ValueError("clip(x, lo, hi) requires tensor/scalar inputs")
+        elif name in {"fillna"}:
+            if kinds[0] not in {"tensor", "scalar"} or kinds[1] not in {"tensor", "scalar"}:
+                raise ValueError("fillna(x, value) requires tensor/scalar inputs")
+        elif name in {
+            "delay",
+            "delta",
+            "returns_n",
+            "log_return",
+            "ts_mean",
+            "ts_std",
+            "ts_sum",
+            "ts_max",
+            "ts_min",
+            "ts_rank",
+            "ts_zscore",
+            "decay_linear",
+            "ts_argmax",
+            "ts_argmin",
+            "oi_delta",
+            "funding_delta",
+            "adv_n",
+            "volatility_n",
+        }:
             if kinds[0] != "tensor" or kinds[1] != "scalar":
                 raise ValueError(f"Operator {name} requires (tensor, scalar_window)")
-        elif name in {"cs_rank", "cs_scale", "abs", "log", "sign", "sqrt", "sigmoid", "neg"}:
+        elif name in {"ts_corr", "ts_cov"}:
+            if kinds[0] != "tensor" or kinds[1] != "tensor" or kinds[2] != "scalar":
+                raise ValueError(f"Operator {name} requires (tensor, tensor, scalar_window)")
+        elif name in {"spread_ratio"}:
+            if kinds[0] != "tensor" or kinds[1] != "tensor":
+                raise ValueError("spread_ratio(spread, mid_price) requires (tensor, tensor)")
+        elif name in {"amihud"}:
+            if kinds[0] != "tensor" or kinds[1] != "tensor" or kinds[2] != "scalar":
+                raise ValueError("amihud(close, turnover, n) requires (tensor, tensor, scalar_window)")
+        elif name in {"hlc3", "true_range"}:
+            if any(kind != "tensor" for kind in kinds):
+                raise ValueError(f"Operator {name} requires tensor inputs")
+        elif name in {"ohlc4", "atr_n"}:
+            if name == "ohlc4":
+                if any(kind != "tensor" for kind in kinds):
+                    raise ValueError("ohlc4(open, high, low, close) requires tensor inputs")
+            else:
+                if kinds[0] != "tensor" or kinds[1] != "tensor" or kinds[2] != "tensor" or kinds[3] != "scalar":
+                    raise ValueError("atr_n(high, low, close, n) requires (tensor, tensor, tensor, scalar_window)")
+        elif name in {"cs_rank", "cs_scale", "cs_zscore", "cs_demean", "abs", "log", "sign", "sqrt", "sigmoid", "neg"}:
             if kinds[0] not in {"tensor", "scalar"}:
                 raise ValueError(f"Operator {name} requires tensor/scalar input")
 

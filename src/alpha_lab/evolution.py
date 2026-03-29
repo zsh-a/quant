@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import hashlib
 import random
 from dataclasses import dataclass, field
 from typing import Any, Protocol
@@ -33,23 +34,40 @@ class LLMBackend(Protocol):
 
 class HeuristicLLMBackend:
     """
-    Local placeholder backend.
+    Local structured backend.
 
-    This keeps the interface stable while the real remote/local LLM backend is
-    integrated later.
+    It is still deterministic and lightweight, but it now generates formulas via
+    mutation, crossover, and objective-aware template wrapping so the closed
+    loop can explore a meaningfully larger operator space.
     """
 
+    def __init__(self, registry: DSLRegistry | None = None, schema: TensorSchema | None = None):
+        self.registry = registry or DSLRegistry()
+        self.schema = schema or TensorSchema.default_market_schema()
+
     def generate_offspring(self, spec: BreedingSpec, count: int) -> list[str]:
-        offspring = []
+        offspring: list[str] = []
         bases = [spec.parent_a]
         if spec.parent_b:
             bases.append(spec.parent_b)
-        for idx in range(count):
-            base = bases[idx % len(bases)]
-            offspring.append(self._mutate_formula(base))
+        attempts = 0
+        max_attempts = max(count * 8, 8)
+        while len(offspring) < count and attempts < max_attempts:
+            base = bases[attempts % len(bases)]
+            if spec.parent_b and attempts % 3 == 0:
+                candidate = self._crossover_formula(spec.parent_a, spec.parent_b, attempts)
+            elif attempts % 3 == 1:
+                candidate = self._mutate_formula(base, attempts)
+            else:
+                candidate = self._wrap_formula(base, spec.objective, attempts)
+            if candidate not in offspring:
+                offspring.append(candidate)
+            attempts += 1
+        if not offspring:
+            offspring.append(self._mutate_formula(spec.parent_a, 0))
         return offspring
 
-    def _mutate_formula(self, formula: str) -> str:
+    def _mutate_formula(self, formula: str, variant: int = 0) -> str:
         replacements = [
             ("ts_mean(", "ts_std("),
             ("ts_std(", "ts_mean("),
@@ -57,11 +75,60 @@ class HeuristicLLMBackend:
             ("ts_rank(", "ts_mean("),
             ("close", "vwap"),
             ("volume", "turnover"),
+            ("close", "hlc3(high, low, close)"),
+            ("turnover", "adv_n(turnover, 5)"),
+            ("close", "ohlc4(open, high, low, close)"),
+            ("volatility_n(close, 20)", "atr_n(high, low, close, 14)"),
         ]
-        for source, target in replacements:
+        offset = self._stable_index(formula, len(replacements), salt=f"mutate:{variant}")
+        for idx in range(len(replacements)):
+            source, target = replacements[(offset + idx) % len(replacements)]
             if source in formula:
                 return formula.replace(source, target, 1)
-        return f"cs_rank({formula})"
+        return self._wrap_formula(formula, "mutation fallback", variant)
+
+    def _wrap_formula(self, formula: str, objective: str, variant: int = 0) -> str:
+        wrappers = [
+            f"cs_rank(({formula}) + oi_delta(open_interest, 1))",
+            f"cs_rank(({formula}) - funding_delta(funding_rate, 1))",
+            f"cs_rank(({formula}) - spread_ratio(bid_ask_spread, close))",
+            f"cs_zscore(decay_linear(({formula}), 3))",
+            f"cs_rank(({formula}) - amihud(close, turnover, 5))",
+            f"cs_rank(({formula}) + atr_n(high, low, close, 5))",
+            f"cs_rank(fillna(({formula}), 0) + cs_demean(vwap))",
+            f"cs_zscore(clip(({formula}), -3, 3) + adv_n(turnover, 10))",
+            f"cs_rank(ts_zscore(({formula}), 5) + oi_delta(open_interest, 3) - funding_delta(funding_rate, 1))",
+        ]
+        if "turnover" in objective.lower():
+            wrappers.extend(
+                [
+                    f"cs_rank(decay_linear(({formula}), 5) - spread_ratio(bid_ask_spread, close))",
+                    f"cs_rank(fillna(({formula}), 0) - amihud(close, turnover, 10))",
+                ]
+            )
+        idx = self._stable_index(formula, len(wrappers), salt=f"wrap:{objective}:{variant}")
+        return wrappers[idx]
+
+    def _crossover_formula(self, parent_a: str, parent_b: str, variant: int = 0) -> str:
+        templates = [
+            f"cs_rank(({parent_a}) + ({parent_b}))",
+            f"cs_rank(({parent_a}) - ({parent_b}))",
+            f"cs_zscore(decay_linear((({parent_a}) + ({parent_b})), 3))",
+            f"where(spread_ratio(bid_ask_spread, close) < 0.002, ({parent_a}), ({parent_b}))",
+            f"cs_rank(max(({parent_a}), ({parent_b})) - funding_delta(funding_rate, 1))",
+            f"cs_rank(min(({parent_a}), ({parent_b})) + oi_delta(open_interest, 1))",
+            f"cs_rank((({parent_a}) + atr_n(high, low, close, 5)) - (({parent_b}) + amihud(close, turnover, 5)))",
+        ]
+        idx = self._stable_index(
+            f"{parent_a}|{parent_b}",
+            len(templates),
+            salt=f"cross:{variant}",
+        )
+        return templates[idx]
+
+    def _stable_index(self, value: str, modulo: int, salt: str = "") -> int:
+        digest = hashlib.sha256(f"{salt}|{value}".encode("utf-8")).hexdigest()
+        return int(digest[:12], 16) % max(modulo, 1)
 
 
 class FitnessEngine:
@@ -98,7 +165,7 @@ class EvolutionEngine:
         self.registry = registry or DSLRegistry()
         self.compiler = compiler or FormulaCompiler(self.registry)
         self.schema = schema or TensorSchema.default_market_schema()
-        self.llm_backend = llm_backend or HeuristicLLMBackend()
+        self.llm_backend = llm_backend or HeuristicLLMBackend(registry=self.registry, schema=self.schema)
         self.fitness_engine = FitnessEngine()
 
     def initialize(self, seeds: list[str], population_size: int) -> list[Individual]:

@@ -38,6 +38,19 @@ class AlphaDataset:
             session_mask=self.session_mask[start_idx:end_idx],
         )
 
+    def take_indices(self, indices: list[int] | np.ndarray | tuple[int, ...]) -> "AlphaDataset":
+        selected = np.asarray(indices, dtype=int)
+        sliced_fields = {name: values[selected] for name, values in self.fields.items()}
+        return AlphaDataset(
+            provider=self.provider,
+            interval=self.interval,
+            symbols=list(self.symbols),
+            timestamps=[self.timestamps[int(idx)] for idx in selected.tolist()],
+            fields=sliced_fields,
+            liquidity_mask=self.liquidity_mask[selected],
+            session_mask=self.session_mask[selected],
+        )
+
 
 class CryptoMinuteDatasetLoader:
     def __init__(self, store: CryptoMinuteBarStore | None = None):
@@ -56,6 +69,7 @@ class CryptoMinuteDatasetLoader:
         end_time: datetime,
         interval: str = "1m",
         min_quote_volume: float = 0.0,
+        blocked_utc_hours: list[int] | set[int] | tuple[int, ...] | None = None,
     ) -> AlphaDataset:
         frames = []
         for symbol in symbols:
@@ -97,15 +111,24 @@ class CryptoMinuteDatasetLoader:
             "turnover": self._pivot_field(aligned, "volume_quote", timestamps, resolved_symbols),
             "funding_rate": np.zeros((len(timestamps), len(resolved_symbols)), dtype=float),
             "open_interest": np.zeros((len(timestamps), len(resolved_symbols)), dtype=float),
-            "bid_ask_spread": np.zeros((len(timestamps), len(resolved_symbols)), dtype=float),
         }
         fields["vwap"] = np.divide(
             fields["turnover"],
             fields["volume"] + 1e-12,
         )
+        close_ref = np.nan_to_num(np.abs(fields["close"]), nan=0.0, posinf=0.0, neginf=0.0)
+        raw_spread = np.nan_to_num(np.abs(fields["high"] - fields["low"]) * 0.02, nan=0.0, posinf=0.0, neginf=0.0)
+        min_spread = np.maximum(close_ref * 0.0001, 1e-6)
+        max_spread = np.maximum(close_ref * 0.0025, min_spread)
+        fields["bid_ask_spread"] = np.clip(raw_spread, min_spread, max_spread)
 
         liquidity_mask = fields["turnover"] > float(min_quote_volume)
-        session_mask = np.ones_like(liquidity_mask, dtype=bool)
+        blocked_hours = {int(hour) % 24 for hour in (blocked_utc_hours or [])}
+        tradable_by_row = np.array(
+            [ts.tz_convert(UTC).hour not in blocked_hours for ts in timestamps],
+            dtype=bool,
+        )
+        session_mask = np.broadcast_to(tradable_by_row[:, None], liquidity_mask.shape).copy()
 
         return AlphaDataset(
             provider=provider,

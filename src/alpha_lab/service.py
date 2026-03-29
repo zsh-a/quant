@@ -13,6 +13,7 @@ from .dsl import DSLRegistry, TensorSchema
 from .evolution import EvolutionEngine
 from .persistence import AlphaLabPersistence
 from .risk import CostModel, ExecutionSimulator, MarketContext, RuleOverlay, SignalTransformer
+from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
 
 DEFAULT_DB_SEEDS = [
@@ -34,6 +35,7 @@ class AlphaLabService:
         self.execution = ExecutionSimulator()
         self.dataset_loader = CryptoMinuteDatasetLoader()
         self.persistence = AlphaLabPersistence()
+        self.validator = CPCVValidator()
         self._program_cache: dict[str, BytecodeProgram] = {}
 
     def list_operators(self) -> list[dict[str, Any]]:
@@ -68,7 +70,14 @@ class AlphaLabService:
         )
         target_weights = self.signal_transformer.to_target_weights(alpha, market_ctx)
         wrapped_weights = self.rule_overlay.apply(target_weights, market_ctx)
-        result = self.execution.simulate(wrapped_weights, {"close": store.get_field("close")}, CostModel())
+        result = self.execution.simulate(
+            wrapped_weights,
+            {
+                "close": store.get_field("close"),
+                "bid_ask_spread": store.get_field("bid_ask_spread"),
+            },
+            CostModel(),
+        )
         return {
             "program": program.to_dict(),
             "alpha": self._to_serializable_list(alpha),
@@ -121,6 +130,7 @@ class AlphaLabService:
         end_time: datetime,
         interval: str = "1m",
         min_quote_volume: float = 0.0,
+        blocked_utc_hours: list[int] | None = None,
         summary_only: bool = False,
     ) -> dict[str, Any]:
         dataset = self.dataset_loader.load(
@@ -130,6 +140,7 @@ class AlphaLabService:
             end_time=end_time,
             interval=interval,
             min_quote_volume=min_quote_volume,
+            blocked_utc_hours=blocked_utc_hours,
         )
         return self.evaluate_formula_from_dataset(formula=formula, dataset=dataset, summary_only=summary_only)
 
@@ -142,6 +153,7 @@ class AlphaLabService:
         end_time: datetime,
         interval: str = "1m",
         min_quote_volume: float = 0.0,
+        blocked_utc_hours: list[int] | None = None,
         summary_only: bool = False,
     ) -> dict[str, dict[str, Any]]:
         dataset = self.dataset_loader.load(
@@ -151,6 +163,7 @@ class AlphaLabService:
             end_time=end_time,
             interval=interval,
             min_quote_volume=min_quote_volume,
+            blocked_utc_hours=blocked_utc_hours,
         )
         return self.evaluate_formulas_from_dataset(formulas=formulas, dataset=dataset, summary_only=summary_only)
 
@@ -248,6 +261,7 @@ class AlphaLabService:
         end_time: datetime,
         interval: str = "1m",
         min_quote_volume: float = 0.0,
+        blocked_utc_hours: list[int] | None = None,
         formulas: list[str] | None = None,
         repeat: int = 3,
     ) -> dict[str, Any]:
@@ -261,6 +275,7 @@ class AlphaLabService:
             end_time=end_time,
             interval=interval,
             min_quote_volume=min_quote_volume,
+            blocked_utc_hours=blocked_utc_hours,
         )
         load_seconds = perf_counter() - load_start
 
@@ -320,6 +335,10 @@ class AlphaLabService:
         run_name: str | None = None,
         persist: bool = True,
         novelty_threshold: float = 0.995,
+        n_splits: int = 5,
+        purge_window: int = 0,
+        embargo_window: int = 0,
+        blocked_utc_hours: list[int] | None = None,
     ) -> dict[str, Any]:
         dataset = self.dataset_loader.load(
             provider=provider,
@@ -328,17 +347,24 @@ class AlphaLabService:
             end_time=end_time,
             interval=interval,
             min_quote_volume=min_quote_volume,
+            blocked_utc_hours=blocked_utc_hours,
         )
-        dataset_splits = self._split_dataset(dataset)
+        validation_plan = self._build_validation_plan(
+            dataset,
+            n_splits=n_splits,
+            purge_window=purge_window,
+            embargo_window=embargo_window,
+        )
         seeds = seeds or DEFAULT_DB_SEEDS
         population = self._deduplicate_population(self.evolution.initialize(seeds, population_size))
         generation_summaries = []
         details_by_hash: dict[str, dict[str, Any]] = {}
-        combined: list[Any] = []
         lineage_edges: list[dict[str, Any]] = []
+        last_metrics_by_hash: dict[str, dict[str, float]] = {}
+        final_population: list[Any] = population
 
         for generation in range(generations):
-            split_results = self.evaluate_population_across_splits(population, dataset_splits)
+            split_results = self.evaluate_population_on_validation_plan(population, validation_plan["folds"])
             metrics_by_hash = split_results["metrics_by_hash"]
             signatures_by_hash = split_results["signatures_by_hash"]
             details_by_hash.update(split_results["details_by_hash"])
@@ -352,11 +378,15 @@ class AlphaLabService:
                 scored_population,
                 top_k=max(1, min(top_k, len(scored_population))),
             )
+            last_metrics_by_hash = metrics_by_hash
+            final_population = survivors
             generation_summaries.append(
                 {
                     "generation": generation,
                     "population_size": len(scored_population),
                     "novelty_threshold": novelty_threshold,
+                    "validation_mode": validation_plan["summary"]["mode"],
+                    "fold_count": validation_plan["summary"]["fold_count"],
                     "survivors": [
                         {
                             "formula": individual.formula,
@@ -368,6 +398,8 @@ class AlphaLabService:
                     ],
                 }
             )
+            if generation == generations - 1:
+                break
             offspring = self._deduplicate_population(self.evolution.breed(survivors, offspring_count))
             for child in offspring:
                 lineage_edges.append(
@@ -380,12 +412,11 @@ class AlphaLabService:
                     }
                 )
             if not offspring:
-                combined = survivors
+                final_population = survivors
                 break
             population = survivors + offspring
-            combined = population
 
-        combined = sorted(combined, key=lambda item: item.fitness, reverse=True)
+        ranked_population = sorted(final_population, key=lambda item: item.fitness, reverse=True)
         result = {
             "dataset": {
                 "provider": dataset.provider,
@@ -393,7 +424,7 @@ class AlphaLabService:
                 "symbols": dataset.symbols,
                 "shape": dataset.shape(),
             },
-            "splits": {name: split.shape() for name, split in dataset_splits.items()},
+            "validation": validation_plan["summary"],
             "generations": generation_summaries,
             "lineage": lineage_edges,
             "top_results": [
@@ -402,15 +433,16 @@ class AlphaLabService:
                     "expr_hash": individual.expr_hash,
                     "fitness": individual.fitness,
                     "lineage": individual.lineage,
-                    "metrics": metrics_by_hash.get(individual.expr_hash, {}),
+                    "metrics": last_metrics_by_hash.get(individual.expr_hash, {}),
                 }
-                for individual in combined[:top_k]
+                for individual in ranked_population[:top_k]
             ],
             "evaluations": {
                 expr_hash: {
-                    "formula": next((item.formula for item in combined if item.expr_hash == expr_hash), None),
+                    "formula": next((item.formula for item in ranked_population if item.expr_hash == expr_hash), None),
                     "metrics": details["fitness_metrics"],
                     "split_metrics": details["split_metrics"],
+                    "fold_metrics": details.get("fold_metrics", []),
                 }
                 for expr_hash, details in details_by_hash.items()
             },
@@ -444,57 +476,20 @@ class AlphaLabService:
         population: list[Any],
         dataset_splits: dict[str, AlphaDataset],
     ) -> dict[str, dict[str, Any]]:
-        split_metrics_by_hash: dict[str, dict[str, dict[str, float]]] = {}
-        split_signatures_by_hash: dict[str, dict[str, list[float]]] = {}
-        details_by_hash: dict[str, dict[str, Any]] = {}
-
-        for split_name, split_dataset in dataset_splits.items():
-            split_results = self.evaluate_population_from_dataset(population, split_dataset)
-            for expr_hash, metrics in split_results["metrics_by_hash"].items():
-                split_metrics_by_hash.setdefault(expr_hash, {})[split_name] = metrics
-            for expr_hash, signature in split_results["signatures_by_hash"].items():
-                split_signatures_by_hash.setdefault(expr_hash, {})[split_name] = signature
-            for expr_hash, detail in split_results["details_by_hash"].items():
-                details_by_hash.setdefault(expr_hash, {"split_metrics": {}})
-                details_by_hash[expr_hash]["split_metrics"][split_name] = detail["metrics"]
-                details_by_hash[expr_hash]["formula"] = detail["formula"]
-
-        metrics_by_hash: dict[str, dict[str, float]] = {}
-        signatures_by_hash: dict[str, list[float] | None] = {}
-        for expr_hash, split_metrics in split_metrics_by_hash.items():
-            train = split_metrics.get("train", {})
-            valid = split_metrics.get("valid", {})
-            test = split_metrics.get("test", {})
-            fitness_metrics = dict(valid)
-            fitness_metrics.update(
-                {
-                    "rank_ic": float(valid.get("rank_ic", 0.0)),
-                    "sharpe": float(valid.get("sharpe", 0.0)),
-                    "pnl_per_turnover": float(valid.get("pnl_per_turnover", 0.0)),
-                    "stability": float(valid.get("stability", 0.0)),
-                    "tail_penalty_adjusted_return": float(valid.get("tail_penalty_adjusted_return", 0.0)),
-                    "turnover_penalty": float(valid.get("turnover_penalty", 0.0)),
-                    "complexity_penalty": 0.0,
-                    "train_valid_gap_penalty": abs(float(train.get("sharpe", 0.0)) - float(valid.get("sharpe", 0.0))),
-                    "test_sharpe": float(test.get("sharpe", 0.0)),
-                    "train_sharpe": float(train.get("sharpe", 0.0)),
-                    "valid_sharpe": float(valid.get("sharpe", 0.0)),
-                }
-            )
-            metrics_by_hash[expr_hash] = fitness_metrics
-            signatures_by_hash[expr_hash] = (
-                split_signatures_by_hash.get(expr_hash, {}).get("valid")
-                or split_signatures_by_hash.get(expr_hash, {}).get("train")
-            )
-            details_by_hash.setdefault(expr_hash, {})
-            details_by_hash[expr_hash]["fitness_metrics"] = fitness_metrics
-            details_by_hash[expr_hash]["alpha_signature"] = signatures_by_hash[expr_hash]
-
-        return {
-            "metrics_by_hash": metrics_by_hash,
-            "signatures_by_hash": signatures_by_hash,
-            "details_by_hash": details_by_hash,
+        fold = {
+            "fold": ValidationFold(
+                fold_id=0,
+                train_indices=tuple(range(dataset_splits["train"].shape()[0])),
+                valid_indices=tuple(range(dataset_splits["valid"].shape()[0])),
+                test_indices=tuple(range(dataset_splits["test"].shape()[0])),
+                valid_group=0,
+                test_group=1,
+                purge_window=0,
+                embargo_window=0,
+            ),
+            "datasets": dataset_splits,
         }
+        return self.evaluate_population_on_validation_plan(population, [fold])
 
     def evaluate_population_from_dataset(
         self,
@@ -537,26 +532,147 @@ class AlphaLabService:
             "details_by_hash": details_by_hash,
         }
 
-    def _split_dataset(
+    def evaluate_population_on_validation_plan(
+        self,
+        population: list[Any],
+        validation_folds: list[dict[str, Any]],
+    ) -> dict[str, dict[str, Any]]:
+        split_metrics_by_hash: dict[str, dict[str, list[dict[str, float]]]] = {}
+        split_signatures_by_hash: dict[str, dict[str, list[list[float]]]] = {}
+        details_by_hash: dict[str, dict[str, Any]] = {}
+
+        for fold_entry in validation_folds:
+            fold = fold_entry["fold"]
+            fold_results: dict[str, dict[str, dict[str, Any]]] = {}
+            for split_name, split_dataset in fold_entry["datasets"].items():
+                split_results = self.evaluate_population_from_dataset(population, split_dataset)
+                fold_results[split_name] = split_results
+                for expr_hash, metrics in split_results["metrics_by_hash"].items():
+                    split_metrics_by_hash.setdefault(expr_hash, {}).setdefault(split_name, []).append(metrics)
+                for expr_hash, signature in split_results["signatures_by_hash"].items():
+                    split_signatures_by_hash.setdefault(expr_hash, {}).setdefault(split_name, []).append(signature)
+
+            for individual in population:
+                expr_hash = individual.expr_hash
+                details_by_hash.setdefault(
+                    expr_hash,
+                    {
+                        "formula": individual.formula,
+                        "split_metrics": {},
+                        "fold_metrics": [],
+                    },
+                )
+                details_by_hash[expr_hash]["fold_metrics"].append(
+                    {
+                        "fold": fold.to_dict(),
+                        "metrics": {
+                            split_name: fold_results[split_name]["metrics_by_hash"].get(expr_hash, {})
+                            for split_name in ("train", "valid", "test")
+                        },
+                    }
+                )
+
+        metrics_by_hash: dict[str, dict[str, float]] = {}
+        signatures_by_hash: dict[str, list[float] | None] = {}
+        for expr_hash, split_metrics in split_metrics_by_hash.items():
+            train_records = split_metrics.get("train", [])
+            valid_records = split_metrics.get("valid", [])
+            test_records = split_metrics.get("test", [])
+            train = self._aggregate_metric_records(train_records)
+            valid = self._aggregate_metric_records(valid_records)
+            test = self._aggregate_metric_records(test_records)
+            gap_penalties = [
+                abs(float(train_record.get("sharpe", 0.0)) - float(valid_record.get("sharpe", 0.0)))
+                for train_record, valid_record in zip(train_records, valid_records)
+            ]
+            fitness_metrics = dict(valid)
+            fitness_metrics.update(
+                {
+                    "rank_ic": float(valid.get("rank_ic", 0.0)),
+                    "sharpe": float(valid.get("sharpe", 0.0)),
+                    "pnl_per_turnover": float(valid.get("pnl_per_turnover", 0.0)),
+                    "stability": float(valid.get("stability", 0.0)),
+                    "tail_penalty_adjusted_return": float(valid.get("tail_penalty_adjusted_return", 0.0)),
+                    "turnover_penalty": float(valid.get("turnover_penalty", 0.0)),
+                    "complexity_penalty": 0.0,
+                    "train_valid_gap_penalty": float(np.mean(gap_penalties)) if gap_penalties else 0.0,
+                    "test_sharpe": float(test.get("sharpe", 0.0)),
+                    "train_sharpe": float(train.get("sharpe", 0.0)),
+                    "valid_sharpe": float(valid.get("sharpe", 0.0)),
+                    "fold_count": float(len(valid_records)),
+                }
+            )
+            metrics_by_hash[expr_hash] = fitness_metrics
+            signatures_by_hash[expr_hash] = (
+                self._aggregate_signatures(split_signatures_by_hash.get(expr_hash, {}).get("valid", []))
+                or self._aggregate_signatures(split_signatures_by_hash.get(expr_hash, {}).get("train", []))
+            )
+            details_by_hash.setdefault(expr_hash, {})
+            details_by_hash[expr_hash]["split_metrics"] = {
+                "train": train,
+                "valid": valid,
+                "test": test,
+            }
+            details_by_hash[expr_hash]["fitness_metrics"] = fitness_metrics
+            details_by_hash[expr_hash]["alpha_signature"] = signatures_by_hash[expr_hash]
+
+        return {
+            "metrics_by_hash": metrics_by_hash,
+            "signatures_by_hash": signatures_by_hash,
+            "details_by_hash": details_by_hash,
+        }
+
+    def _build_validation_plan(
         self,
         dataset: AlphaDataset,
-        train_ratio: float = 0.6,
-        valid_ratio: float = 0.2,
-    ) -> dict[str, AlphaDataset]:
-        total = len(dataset.timestamps)
-        if total < 6:
-            return {
-                "train": dataset,
-                "valid": dataset,
-                "test": dataset,
+        n_splits: int = 5,
+        purge_window: int = 0,
+        embargo_window: int = 0,
+    ) -> dict[str, Any]:
+        validator = CPCVValidator(
+            purge_window=purge_window,
+            embargo_window=embargo_window,
+            min_train_size=3,
+        )
+        raw_folds = validator.generate_purged_splits(len(dataset.timestamps), n_splits=n_splits)
+        mode = "cpcv"
+        if not raw_folds:
+            fallback = validator.generate_holdout_split(len(dataset.timestamps))
+            if fallback is None:
+                fallback = ValidationFold(
+                    fold_id=0,
+                    train_indices=tuple(range(len(dataset.timestamps))),
+                    valid_indices=tuple(range(len(dataset.timestamps))),
+                    test_indices=tuple(range(len(dataset.timestamps))),
+                    valid_group=0,
+                    test_group=0,
+                    purge_window=0,
+                    embargo_window=0,
+                )
+            raw_folds = [fallback]
+            mode = "holdout"
+
+        folds = [
+            {
+                "fold": fold,
+                "datasets": {
+                    "train": dataset.take_indices(fold.train_indices),
+                    "valid": dataset.take_indices(fold.valid_indices),
+                    "test": dataset.take_indices(fold.test_indices),
+                },
             }
-        train_end = max(int(total * train_ratio), 1)
-        valid_end = max(int(total * (train_ratio + valid_ratio)), train_end + 1)
-        valid_end = min(valid_end, total)
+            for fold in raw_folds
+        ]
         return {
-            "train": dataset.slice_by_index(0, train_end),
-            "valid": dataset.slice_by_index(train_end, valid_end),
-            "test": dataset.slice_by_index(valid_end, total),
+            "folds": folds,
+            "summary": {
+                "mode": mode,
+                "n_splits": n_splits,
+                "purge_window": purge_window,
+                "embargo_window": embargo_window,
+                "fold_count": len(raw_folds),
+                "folds": [fold.to_dict() for fold in raw_folds],
+            },
         }
 
     def _build_fitness_metrics(
@@ -586,6 +702,28 @@ class AlphaLabService:
             }
         )
         return metrics
+
+    def _aggregate_metric_records(self, records: list[dict[str, float]]) -> dict[str, float]:
+        if not records:
+            return {}
+        keys = sorted({key for record in records for key in record})
+        aggregated: dict[str, float] = {}
+        for key in keys:
+            values = [float(record[key]) for record in records if key in record]
+            aggregated[key] = float(np.mean(values)) if values else 0.0
+        return aggregated
+
+    def _aggregate_signatures(self, signatures: list[list[float]]) -> list[float] | None:
+        if not signatures:
+            return None
+        arrays = [np.asarray(signature, dtype=float) for signature in signatures if signature]
+        if not arrays:
+            return None
+        min_len = min(array.size for array in arrays)
+        if min_len == 0:
+            return None
+        stacked = np.stack([array[:min_len] for array in arrays], axis=0)
+        return np.mean(stacked, axis=0).astype(float).tolist()
 
     def _compile_cached(self, formula: str) -> BytecodeProgram:
         program = self._program_cache.get(formula)
@@ -618,7 +756,10 @@ class AlphaLabService:
         wrapped_weights = self.rule_overlay.apply(target_weights, market_ctx)
         result = self.execution.simulate(
             wrapped_weights,
-            {"close": store.get_field("close")},
+            {
+                "close": store.get_field("close"),
+                "bid_ask_spread": store.get_field("bid_ask_spread"),
+            },
             CostModel(),
             funding_rate=store.get_field("funding_rate"),
         )

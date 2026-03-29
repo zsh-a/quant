@@ -12,12 +12,14 @@ from .evolution import EvolutionEngine, FitnessEngine, HeuristicLLMBackend, Indi
 from .persistence import AlphaLabPersistence, PersistedRun
 from .risk import BacktestResult, CostModel, ExecutionSimulator, MarketContext, RuleOverlay, SignalTransformer
 from .service import AlphaLabService
+from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
 
 __all__ = [
     "AlphaLabService",
     "BacktestResult",
     "BytecodeProgram",
+    "CPCVValidator",
     "CostModel",
     "CryptoMinuteDatasetLoader",
     "DSLRegistry",
@@ -38,5 +40,6 @@ __all__ = [
     "TensorSchema",
     "TensorStore",
     "TypeChecker",
+    "ValidationFold",
     "PersistedRun",
 ]

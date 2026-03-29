@@ -28,12 +28,26 @@ class CostModel:
     taker_fee_bps: float = 5.0
     slippage_bps: float = 3.0
     funding_bps_per_event: float = 1.0
+    spread_weight: float = 0.5
+    impact_coefficient_bps: float = 1.5
 
     def estimate_fee(self, turnover: ArrayLike) -> ArrayLike:
         return self._abs(turnover) * (self.taker_fee_bps / 10000.0)
 
-    def estimate_slippage(self, turnover: ArrayLike) -> ArrayLike:
-        return self._abs(turnover) * (self.slippage_bps / 10000.0)
+    def estimate_slippage(
+        self,
+        turnover: ArrayLike,
+        spread: ArrayLike | None = None,
+        mid_price: ArrayLike | None = None,
+    ) -> ArrayLike:
+        total_cost = self._abs(turnover) * (self.slippage_bps / 10000.0)
+        if spread is not None and mid_price is not None:
+            spread_ratio = self._abs(spread) / (self._abs(mid_price) + 1e-12)
+            total_cost = total_cost + (self._abs(turnover) * spread_ratio * self.spread_weight)
+            total_cost = total_cost + (self._square(self._abs(turnover)) * (self.impact_coefficient_bps / 10000.0))
+        if self._ndim(total_cost) > 1:
+            return self._sum(total_cost, axis=1)
+        return total_cost
 
     def estimate_funding(self, weights: ArrayLike, funding_rate: ArrayLike | None = None) -> ArrayLike:
         if funding_rate is None:
@@ -44,6 +58,21 @@ class CostModel:
         if torch is not None and isinstance(value, torch.Tensor):
             return torch.abs(value)
         return np.abs(value)
+
+    def _square(self, value: ArrayLike) -> ArrayLike:
+        if torch is not None and isinstance(value, torch.Tensor):
+            return torch.square(value)
+        return np.square(value)
+
+    def _sum(self, value: ArrayLike, axis: int) -> ArrayLike:
+        if torch is not None and isinstance(value, torch.Tensor):
+            return torch.nansum(value, dim=axis)
+        return np.nansum(value, axis=axis)
+
+    def _ndim(self, value: ArrayLike) -> int:
+        if torch is not None and isinstance(value, torch.Tensor):
+            return int(value.ndim)
+        return int(np.ndim(value))
 
 
 @dataclass
@@ -186,9 +215,11 @@ class ExecutionSimulator:
         forward_returns[:-1] = close[1:] / (close[:-1] + 1e-12) - 1.0
 
         position_returns = np.nansum(weights_np * forward_returns, axis=1)
-        turnover = np.nansum(np.abs(np.diff(weights_np, axis=0, prepend=np.zeros_like(weights_np[:1]))), axis=1)
+        trade_sizes = np.abs(np.diff(weights_np, axis=0, prepend=np.zeros_like(weights_np[:1])))
+        turnover = np.nansum(trade_sizes, axis=1)
         fees = cost_model.estimate_fee(turnover)
-        slippage = cost_model.estimate_slippage(turnover)
+        spread = None if "bid_ask_spread" not in prices else np.asarray(prices["bid_ask_spread"], dtype=float)
+        slippage = cost_model.estimate_slippage(trade_sizes, spread=spread, mid_price=close)
         funding = np.nansum(cost_model.estimate_funding(weights_np, funding_rate), axis=1)
         net_returns = position_returns - fees - slippage - funding
         equity_curve = np.cumprod(1.0 + np.nan_to_num(net_returns, nan=0.0))
@@ -214,12 +245,11 @@ class ExecutionSimulator:
         forward_returns[:-1] = close[1:] / (close[:-1] + 1e-12) - 1.0
 
         position_returns = torch.nansum(weights_t * forward_returns, dim=1)
-        turnover = torch.nansum(
-            torch.abs(weights_t - torch.cat([torch.zeros_like(weights_t[:1]), weights_t[:-1]], dim=0)),
-            dim=1,
-        )
+        trade_sizes = torch.abs(weights_t - torch.cat([torch.zeros_like(weights_t[:1]), weights_t[:-1]], dim=0))
+        turnover = torch.nansum(trade_sizes, dim=1)
         fees = cost_model.estimate_fee(turnover)
-        slippage = cost_model.estimate_slippage(turnover)
+        spread_tensor = None if "bid_ask_spread" not in prices else _as_torch(prices["bid_ask_spread"], like=weights_t)
+        slippage = cost_model.estimate_slippage(trade_sizes, spread=spread_tensor, mid_price=close)
         funding_tensor = None if funding_rate is None else _as_torch(funding_rate, like=weights_t)
         funding = torch.nansum(cost_model.estimate_funding(weights_t, funding_tensor), dim=1)
         net_returns = position_returns - fees - slippage - funding

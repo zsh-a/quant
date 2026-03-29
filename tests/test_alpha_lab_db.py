@@ -2,6 +2,8 @@ import os
 import sys
 from datetime import UTC, datetime
 
+import numpy as np
+
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.alpha_lab.cli import build_parser, run_command
@@ -31,6 +33,20 @@ def test_dataset_loader_builds_tensor_matrices():
     assert dataset.shape() == (3, 2)
     assert dataset.fields["close"].shape == (3, 2)
     assert dataset.symbols == ["BTCUSDT", "ETHUSDT"]
+    assert np.all(dataset.session_mask)
+
+
+def test_dataset_loader_applies_blocked_utc_hours():
+    loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    dataset = loader.load(
+        provider="bitget",
+        symbols=["BTCUSDT", "ETHUSDT"],
+        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
+        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        blocked_utc_hours=[0],
+    )
+
+    assert not dataset.session_mask.any()
 
 
 def test_alpha_lab_service_evaluates_formula_from_db():
@@ -128,7 +144,8 @@ def test_alpha_lab_cli_search_db():
 
     assert "top_results" in result
     assert len(result["top_results"]) >= 1
-    assert "splits" in result
+    assert result["validation"]["mode"] in {"cpcv", "holdout"}
+    assert result["validation"]["fold_count"] >= 1
 
 
 def test_alpha_lab_cli_batch_evaluate_db():
@@ -228,6 +245,7 @@ def test_alpha_lab_search_persistence(tmp_path):
     assert os.path.exists(result["persistence"]["run_path"])
     assert len(result["persistence"]["zoo_paths"]) >= 1
     assert "lineage" in result
+    assert "validation" in result
 
 
 def test_alpha_lab_run_and_zoo_inspection(tmp_path):
@@ -253,3 +271,21 @@ def test_alpha_lab_run_and_zoo_inspection(tmp_path):
     assert loaded["run_id"] == result["persistence"]["run_id"]
     assert len(zoo["zoo"]) >= 1
     assert lineage["run_id"] == result["persistence"]["run_id"]
+
+
+def test_alpha_lab_search_top_results_are_scored():
+    service = AlphaLabService()
+    service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    result = service.search_formulas_on_db(
+        provider="bitget",
+        symbols=["BTCUSDT", "ETHUSDT"],
+        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
+        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
+        seeds=["CSRank(ts_mean(close, 2) - close)"],
+        generations=2,
+        offspring_count=2,
+        persist=False,
+    )
+
+    assert result["top_results"]
+    assert all("sharpe" in item["metrics"] for item in result["top_results"])

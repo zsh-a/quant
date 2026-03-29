@@ -8,6 +8,45 @@
 
 **版本号**: v1.0 | **目标环境**: RTX 5090 + PRO 6000 | **标的资产**: Crypto (永续合约/现货)
 
+## 当前代码落地状态
+
+`src/alpha_lab/` 已经不再只是草图，当前实现已经具备一条可运行的数据库闭环：
+
+1. `CryptoMinuteDatasetLoader`
+   从分钟 K 数据构造成 `[time, asset]` 张量，补齐 `liquidity_mask / session_mask / bid_ask_spread`。
+2. `FormulaCompiler + StackVM`
+   将 DSL 公式编译为字节码并批量执行。
+3. `SignalTransformer + RuleOverlay + ExecutionSimulator`
+   将 alpha 分数转换为目标权重，叠加换手约束，并在回测时显式计入手续费、funding、spread 与冲击成本。
+4. `CPCVValidator + AlphaLabService.search_formulas_on_db`
+   用组合净化切分驱动 `seed -> evaluate -> select -> breed -> persist` 的完整搜索闭环。
+5. `AlphaLabPersistence + CLI`
+   支持 run/zoo 持久化、lineage 查询，以及通过 CLI 直接触发搜索。
+
+当前推荐的闭环入口：
+
+```bash
+python -m src.alpha_lab.cli search-db \
+  --provider bitget \
+  --symbols BTCUSDT,ETHUSDT,SOLUSDT \
+  --start 2026-03-27T00:00:00+00:00 \
+  --end 2026-03-28T00:00:00+00:00 \
+  --generations 3 \
+  --population-size 8 \
+  --offspring-count 4 \
+  --n-splits 5 \
+  --purge-window 2 \
+  --embargo-window 2
+```
+
+返回结果现在会包含：
+
+* `validation`: 当前验证计划（`cpcv/holdout`、fold 数、purge/embargo 参数）
+* `generations`: 每一代 survivor 摘要
+* `top_results`: 最后一代中已经完成评分的最优公式
+* `evaluations`: 聚合后的 train/valid/test 指标与逐 fold 明细
+* `persistence`: run 与 zoo 的落盘路径（未禁用持久化时）
+
 ## 一、 系统整体架构与技术栈选型 (Architecture & Tech Stack)
 
 ### 1. 技术栈选型 (Tech Stack)

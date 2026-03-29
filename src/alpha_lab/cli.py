@@ -27,6 +27,12 @@ def _parse_symbols(value: str) -> list[str]:
     return [item.strip().upper() for item in value.split(",") if item.strip()]
 
 
+def _parse_int_list(value: str | None) -> list[int]:
+    if not value:
+        return []
+    return [int(item.strip()) for item in value.split(",") if item.strip()]
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Database-backed alpha_lab CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
@@ -45,6 +51,7 @@ def build_parser() -> argparse.ArgumentParser:
     evaluate.add_argument("--end", required=True, help="ISO8601 end time")
     evaluate.add_argument("--interval", default="1m")
     evaluate.add_argument("--min-quote-volume", type=float, default=0.0)
+    evaluate.add_argument("--blocked-utc-hours", default="")
     evaluate.add_argument("--summary-only", action="store_true")
 
     batch_evaluate = subparsers.add_parser("batch-evaluate-db", help="Evaluate multiple formulas on ClickHouse minute data")
@@ -55,6 +62,7 @@ def build_parser() -> argparse.ArgumentParser:
     batch_evaluate.add_argument("--end", required=True, help="ISO8601 end time")
     batch_evaluate.add_argument("--interval", default="1m")
     batch_evaluate.add_argument("--min-quote-volume", type=float, default=0.0)
+    batch_evaluate.add_argument("--blocked-utc-hours", default="")
     batch_evaluate.add_argument("--summary-only", action="store_true")
 
     benchmark = subparsers.add_parser("benchmark-vm", help="Benchmark the local Stack VM with synthetic tensors")
@@ -70,6 +78,7 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_db.add_argument("--end", required=True, help="ISO8601 end time")
     benchmark_db.add_argument("--interval", default="1m")
     benchmark_db.add_argument("--min-quote-volume", type=float, default=0.0)
+    benchmark_db.add_argument("--blocked-utc-hours", default="")
     benchmark_db.add_argument("--formula", action="append", default=[])
     benchmark_db.add_argument("--repeat", type=int, default=3)
 
@@ -87,6 +96,10 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--run-name", default=None)
     search.add_argument("--no-persist", action="store_true")
     search.add_argument("--novelty-threshold", type=float, default=0.995)
+    search.add_argument("--n-splits", type=int, default=5)
+    search.add_argument("--purge-window", type=int, default=0)
+    search.add_argument("--embargo-window", type=int, default=0)
+    search.add_argument("--blocked-utc-hours", default="")
     search.add_argument("--seed", action="append", default=[])
 
     list_runs = subparsers.add_parser("list-runs", help="List persisted alpha_lab runs")
@@ -118,6 +131,7 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
             end_time=_parse_iso(args.end),
             interval=args.interval,
             min_quote_volume=args.min_quote_volume,
+            blocked_utc_hours=_parse_int_list(args.blocked_utc_hours),
             summary_only=args.summary_only,
         )
     if args.command == "batch-evaluate-db":
@@ -129,6 +143,7 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
             end_time=_parse_iso(args.end),
             interval=args.interval,
             min_quote_volume=args.min_quote_volume,
+            blocked_utc_hours=_parse_int_list(args.blocked_utc_hours),
             summary_only=args.summary_only,
         )
     if args.command == "benchmark-vm":
@@ -146,6 +161,7 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
             end_time=_parse_iso(args.end),
             interval=args.interval,
             min_quote_volume=args.min_quote_volume,
+            blocked_utc_hours=_parse_int_list(args.blocked_utc_hours),
             formulas=args.formula,
             repeat=args.repeat,
         )
@@ -165,6 +181,10 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
             run_name=args.run_name,
             persist=not args.no_persist,
             novelty_threshold=args.novelty_threshold,
+            n_splits=args.n_splits,
+            purge_window=args.purge_window,
+            embargo_window=args.embargo_window,
+            blocked_utc_hours=_parse_int_list(args.blocked_utc_hours),
         )
     if args.command == "list-runs":
         return {"runs": service.list_runs(limit=args.limit)}

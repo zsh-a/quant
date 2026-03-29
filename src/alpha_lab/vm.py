@@ -172,6 +172,8 @@ class StackVM:
             return 1.0 / (1.0 + np.exp(-np.clip(args[0], -20, 20)))
         if opcode == "neg":
             return -args[0]
+        if opcode == "not":
+            return np.logical_not(args[0])
         if opcode == "gt":
             return args[0] > args[1]
         if opcode == "ge":
@@ -180,10 +182,18 @@ class StackVM:
             return args[0] < args[1]
         if opcode == "le":
             return args[0] <= args[1]
+        if opcode == "eq":
+            return args[0] == args[1]
+        if opcode == "ne":
+            return args[0] != args[1]
         if opcode == "and":
             return np.logical_and(args[0], args[1])
         if opcode == "or":
             return np.logical_or(args[0], args[1])
+        if opcode == "clip":
+            return np.clip(args[0], self._scalar(args[1]), self._scalar(args[2]))
+        if opcode == "fillna":
+            return np.where(np.isnan(args[0]), args[1], args[0])
         if opcode == "where":
             return np.where(args[0], args[1], args[2])
         if opcode == "delay":
@@ -191,6 +201,12 @@ class StackVM:
         if opcode == "delta":
             delayed = self._delay_numpy(args[0], int(self._scalar(args[1])))
             return args[0] - delayed
+        if opcode == "returns_n":
+            delayed = self._delay_numpy(args[0], int(self._scalar(args[1])))
+            return args[0] / (delayed + 1e-12) - 1.0
+        if opcode == "log_return":
+            delayed = self._delay_numpy(args[0], int(self._scalar(args[1])))
+            return np.log((np.abs(args[0]) + 1e-12) / (np.abs(delayed) + 1e-12))
         if opcode == "ts_mean":
             return self._rolling_numpy(args[0], int(self._scalar(args[1])), np.nanmean)
         if opcode == "ts_std":
@@ -203,11 +219,59 @@ class StackVM:
             return self._rolling_numpy(args[0], int(self._scalar(args[1])), np.nanmin)
         if opcode == "ts_rank":
             return self._ts_rank_numpy(args[0], int(self._scalar(args[1])))
+        if opcode == "ts_zscore":
+            window = int(self._scalar(args[1]))
+            mean = self._rolling_numpy(args[0], window, np.nanmean)
+            std = self._rolling_numpy(args[0], window, np.nanstd)
+            return (args[0] - mean) / (std + 1e-12)
+        if opcode == "ts_corr":
+            return self._rolling_pair_numpy(args[0], args[1], int(self._scalar(args[2])), reducer="corr")
+        if opcode == "ts_cov":
+            return self._rolling_pair_numpy(args[0], args[1], int(self._scalar(args[2])), reducer="cov")
+        if opcode == "decay_linear":
+            return self._decay_linear_numpy(args[0], int(self._scalar(args[1])))
+        if opcode == "ts_argmax":
+            return self._ts_argextreme_numpy(args[0], int(self._scalar(args[1])), mode="max")
+        if opcode == "ts_argmin":
+            return self._ts_argextreme_numpy(args[0], int(self._scalar(args[1])), mode="min")
         if opcode == "cs_rank":
             return self._cs_rank_numpy(args[0])
         if opcode == "cs_scale":
             denom = np.nansum(np.abs(args[0]), axis=1, keepdims=True)
             return args[0] / (denom + 1e-12)
+        if opcode == "cs_zscore":
+            mean = np.nanmean(args[0], axis=1, keepdims=True)
+            std = np.nanstd(args[0], axis=1, keepdims=True)
+            return (args[0] - mean) / (std + 1e-12)
+        if opcode == "cs_demean":
+            mean = np.nanmean(args[0], axis=1, keepdims=True)
+            return args[0] - mean
+        if opcode == "oi_delta":
+            delayed = self._delay_numpy(args[0], int(self._scalar(args[1])))
+            return args[0] - delayed
+        if opcode == "funding_delta":
+            delayed = self._delay_numpy(args[0], int(self._scalar(args[1])))
+            return args[0] - delayed
+        if opcode == "spread_ratio":
+            return args[0] / (np.abs(args[1]) + 1e-12)
+        if opcode == "adv_n":
+            return self._rolling_numpy(args[0], int(self._scalar(args[1])), np.nanmean)
+        if opcode == "amihud":
+            illiquidity = np.abs(self._execute_numpy("log_return", [args[0], args[2]])) / (np.abs(args[1]) + 1e-12)
+            return self._rolling_numpy(illiquidity, int(self._scalar(args[2])), np.nanmean)
+        if opcode == "hlc3":
+            return (args[0] + args[1] + args[2]) / 3.0
+        if opcode == "ohlc4":
+            return (args[0] + args[1] + args[2] + args[3]) / 4.0
+        if opcode == "true_range":
+            prev_close = self._delay_numpy(args[2], 1)
+            return np.maximum(
+                np.maximum(args[0] - args[1], np.abs(args[0] - prev_close)),
+                np.abs(args[1] - prev_close),
+            )
+        if opcode == "atr_n":
+            true_range = self._execute_numpy("true_range", [args[0], args[1], args[2]])
+            return self._rolling_numpy(true_range, int(self._scalar(args[3])), np.nanmean)
         if opcode == "volatility_n":
             returns = args[0] / (self._delay_numpy(args[0], 1) + 1e-12) - 1.0
             return self._rolling_numpy(returns, int(self._scalar(args[1])), np.nanstd)
@@ -240,6 +304,8 @@ class StackVM:
             return torch.sigmoid(torch.clamp(args[0], -20, 20))
         if opcode == "neg":
             return -args[0]
+        if opcode == "not":
+            return torch.logical_not(args[0])
         if opcode == "gt":
             return args[0] > args[1]
         if opcode == "ge":
@@ -248,10 +314,18 @@ class StackVM:
             return args[0] < args[1]
         if opcode == "le":
             return args[0] <= args[1]
+        if opcode == "eq":
+            return args[0] == args[1]
+        if opcode == "ne":
+            return args[0] != args[1]
         if opcode == "and":
             return torch.logical_and(args[0], args[1])
         if opcode == "or":
             return torch.logical_or(args[0], args[1])
+        if opcode == "clip":
+            return torch.clamp(args[0], min=self._scalar(args[1]), max=self._scalar(args[2]))
+        if opcode == "fillna":
+            return torch.where(torch.isnan(args[0]), args[1], args[0])
         if opcode == "where":
             return torch.where(args[0], args[1], args[2])
         if opcode == "delay":
@@ -259,6 +333,12 @@ class StackVM:
         if opcode == "delta":
             delayed = self._delay_torch(args[0], int(self._scalar(args[1])))
             return args[0] - delayed
+        if opcode == "returns_n":
+            delayed = self._delay_torch(args[0], int(self._scalar(args[1])))
+            return args[0] / (delayed + 1e-12) - 1.0
+        if opcode == "log_return":
+            delayed = self._delay_torch(args[0], int(self._scalar(args[1])))
+            return torch.log((torch.abs(args[0]) + 1e-12) / (torch.abs(delayed) + 1e-12))
         if opcode == "ts_mean":
             return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="mean")
         if opcode == "ts_std":
@@ -271,11 +351,59 @@ class StackVM:
             return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="min")
         if opcode == "ts_rank":
             return self._ts_rank_torch(args[0], int(self._scalar(args[1])))
+        if opcode == "ts_zscore":
+            window = int(self._scalar(args[1]))
+            mean = self._rolling_torch(args[0], window, reducer="mean")
+            std = self._rolling_torch(args[0], window, reducer="std")
+            return (args[0] - mean) / (std + 1e-12)
+        if opcode == "ts_corr":
+            return self._rolling_pair_torch(args[0], args[1], int(self._scalar(args[2])), reducer="corr")
+        if opcode == "ts_cov":
+            return self._rolling_pair_torch(args[0], args[1], int(self._scalar(args[2])), reducer="cov")
+        if opcode == "decay_linear":
+            return self._decay_linear_torch(args[0], int(self._scalar(args[1])))
+        if opcode == "ts_argmax":
+            return self._ts_argextreme_torch(args[0], int(self._scalar(args[1])), mode="max")
+        if opcode == "ts_argmin":
+            return self._ts_argextreme_torch(args[0], int(self._scalar(args[1])), mode="min")
         if opcode == "cs_rank":
             return self._cs_rank_torch(args[0])
         if opcode == "cs_scale":
             denom = self._torch_nansum(torch.abs(args[0]), dim=1, keepdim=True)
             return args[0] / (denom + 1e-12)
+        if opcode == "cs_zscore":
+            mean = self._torch_nanmean(args[0], dim=1, keepdim=True)
+            std = self._torch_nanstd(args[0], dim=1, keepdim=True)
+            return (args[0] - mean) / (std + 1e-12)
+        if opcode == "cs_demean":
+            mean = self._torch_nanmean(args[0], dim=1, keepdim=True)
+            return args[0] - mean
+        if opcode == "oi_delta":
+            delayed = self._delay_torch(args[0], int(self._scalar(args[1])))
+            return args[0] - delayed
+        if opcode == "funding_delta":
+            delayed = self._delay_torch(args[0], int(self._scalar(args[1])))
+            return args[0] - delayed
+        if opcode == "spread_ratio":
+            return args[0] / (torch.abs(args[1]) + 1e-12)
+        if opcode == "adv_n":
+            return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="mean")
+        if opcode == "amihud":
+            illiquidity = torch.abs(self._execute_torch("log_return", [args[0], args[2]])) / (torch.abs(args[1]) + 1e-12)
+            return self._rolling_torch(illiquidity, int(self._scalar(args[2])), reducer="mean")
+        if opcode == "hlc3":
+            return (args[0] + args[1] + args[2]) / 3.0
+        if opcode == "ohlc4":
+            return (args[0] + args[1] + args[2] + args[3]) / 4.0
+        if opcode == "true_range":
+            prev_close = self._delay_torch(args[2], 1)
+            return torch.maximum(
+                torch.maximum(args[0] - args[1], torch.abs(args[0] - prev_close)),
+                torch.abs(args[1] - prev_close),
+            )
+        if opcode == "atr_n":
+            true_range = self._execute_torch("true_range", [args[0], args[1], args[2]])
+            return self._rolling_torch(true_range, int(self._scalar(args[3])), reducer="mean")
         if opcode == "volatility_n":
             returns = args[0] / (self._delay_torch(args[0], 1) + 1e-12) - 1.0
             return self._rolling_torch(returns, int(self._scalar(args[1])), reducer="std")
@@ -350,6 +478,135 @@ class StackVM:
         else:
             raise ValueError(f"Unsupported rolling reducer: {reducer}")
         result[window - 1 :] = reduced
+        return result
+
+    def _rolling_pair_numpy(self, left: ArrayLike, right: ArrayLike, window: int, reducer: str) -> ArrayLike:
+        x = np.asarray(left, dtype=float)
+        y = np.asarray(right, dtype=float)
+        result = np.full_like(x, np.nan, dtype=float)
+        if window <= 1 or x.shape[0] < window:
+            return result
+        x_windows = np.lib.stride_tricks.sliding_window_view(x, window_shape=window, axis=0)
+        y_windows = np.lib.stride_tricks.sliding_window_view(y, window_shape=window, axis=0)
+        valid = ~np.isnan(x_windows) & ~np.isnan(y_windows)
+        count = valid.sum(axis=-1)
+        x_safe = np.where(valid, x_windows, 0.0)
+        y_safe = np.where(valid, y_windows, 0.0)
+        x_mean = x_safe.sum(axis=-1) / np.maximum(count, 1)
+        y_mean = y_safe.sum(axis=-1) / np.maximum(count, 1)
+        centered_x = np.where(valid, x_windows - x_mean[..., None], 0.0)
+        centered_y = np.where(valid, y_windows - y_mean[..., None], 0.0)
+        cov = (centered_x * centered_y).sum(axis=-1) / np.maximum(count, 1)
+        if reducer == "cov":
+            reduced = cov
+        elif reducer == "corr":
+            x_std = np.sqrt((centered_x * centered_x).sum(axis=-1) / np.maximum(count, 1))
+            y_std = np.sqrt((centered_y * centered_y).sum(axis=-1) / np.maximum(count, 1))
+            reduced = cov / (x_std * y_std + 1e-12)
+        else:
+            raise ValueError(f"Unsupported rolling pair reducer: {reducer}")
+        reduced[count == 0] = np.nan
+        result[window - 1 :] = reduced
+        return result
+
+    def _rolling_pair_torch(self, left: ArrayLike, right: ArrayLike, window: int, reducer: str) -> ArrayLike:
+        x = left if isinstance(left, torch.Tensor) else self._as_torch_tensor(left)
+        y = right if isinstance(right, torch.Tensor) else self._as_torch_tensor(right)
+        result = torch.full_like(x, torch.nan)
+        if window <= 1 or x.shape[0] < window:
+            return result
+        x_windows = x.unfold(0, window, 1)
+        y_windows = y.unfold(0, window, 1)
+        valid = (~torch.isnan(x_windows)) & (~torch.isnan(y_windows))
+        count = valid.sum(dim=-1)
+        x_safe = torch.where(valid, x_windows, torch.zeros_like(x_windows))
+        y_safe = torch.where(valid, y_windows, torch.zeros_like(y_windows))
+        x_mean = x_safe.sum(dim=-1) / count.clamp(min=1).to(dtype=x.dtype)
+        y_mean = y_safe.sum(dim=-1) / count.clamp(min=1).to(dtype=y.dtype)
+        centered_x = torch.where(valid, x_windows - x_mean.unsqueeze(-1), torch.zeros_like(x_windows))
+        centered_y = torch.where(valid, y_windows - y_mean.unsqueeze(-1), torch.zeros_like(y_windows))
+        cov = (centered_x * centered_y).sum(dim=-1) / count.clamp(min=1).to(dtype=x.dtype)
+        if reducer == "cov":
+            reduced = cov
+        elif reducer == "corr":
+            x_std = torch.sqrt((centered_x * centered_x).sum(dim=-1) / count.clamp(min=1).to(dtype=x.dtype))
+            y_std = torch.sqrt((centered_y * centered_y).sum(dim=-1) / count.clamp(min=1).to(dtype=y.dtype))
+            reduced = cov / (x_std * y_std + 1e-12)
+        else:
+            raise ValueError(f"Unsupported rolling pair reducer: {reducer}")
+        reduced = torch.where(count > 0, reduced, torch.full_like(reduced, torch.nan))
+        result[window - 1 :] = reduced
+        return result
+
+    def _decay_linear_numpy(self, arr: ArrayLike, window: int) -> ArrayLike:
+        data = np.asarray(arr, dtype=float)
+        result = np.full_like(data, np.nan, dtype=float)
+        if window <= 0 or data.shape[0] < window:
+            return result
+        windows = np.lib.stride_tricks.sliding_window_view(data, window_shape=window, axis=0)
+        weights = np.arange(1, window + 1, dtype=float)
+        valid = ~np.isnan(windows)
+        weighted = np.where(valid, windows * weights, 0.0)
+        denom = np.where(valid, weights, 0.0).sum(axis=-1)
+        reduced = weighted.sum(axis=-1) / np.maximum(denom, 1e-12)
+        reduced[denom <= 0] = np.nan
+        result[window - 1 :] = reduced
+        return result
+
+    def _decay_linear_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
+        data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
+        result = torch.full_like(data, torch.nan)
+        if window <= 0 or data.shape[0] < window:
+            return result
+        windows = data.unfold(0, window, 1)
+        weights = torch.arange(1, window + 1, device=data.device, dtype=data.dtype)
+        valid = ~torch.isnan(windows)
+        weighted = torch.where(valid, windows * weights, torch.zeros_like(windows))
+        denom = torch.where(valid, weights, torch.zeros_like(windows)).sum(dim=-1)
+        reduced = weighted.sum(dim=-1) / denom.clamp(min=1e-12)
+        reduced = torch.where(denom > 0, reduced, torch.full_like(reduced, torch.nan))
+        result[window - 1 :] = reduced
+        return result
+
+    def _ts_argextreme_numpy(self, arr: ArrayLike, window: int, mode: str) -> ArrayLike:
+        data = np.asarray(arr, dtype=float)
+        result = np.full_like(data, np.nan, dtype=float)
+        if window <= 0 or data.shape[0] < window:
+            return result
+        windows = np.lib.stride_tricks.sliding_window_view(data, window_shape=window, axis=0)
+        valid = ~np.isnan(windows)
+        if mode == "max":
+            safe = np.where(valid, windows, -np.inf)
+        elif mode == "min":
+            safe = np.where(valid, windows, np.inf)
+        else:
+            raise ValueError(f"Unsupported argextreme mode: {mode}")
+        indices = np.argmax(safe, axis=-1) if mode == "max" else np.argmin(safe, axis=-1)
+        counts = valid.sum(axis=-1)
+        scaled = indices.astype(float) / max(window - 1, 1)
+        scaled[counts == 0] = np.nan
+        result[window - 1 :] = scaled
+        return result
+
+    def _ts_argextreme_torch(self, arr: ArrayLike, window: int, mode: str) -> ArrayLike:
+        data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
+        result = torch.full_like(data, torch.nan)
+        if window <= 0 or data.shape[0] < window:
+            return result
+        windows = data.unfold(0, window, 1)
+        valid = ~torch.isnan(windows)
+        if mode == "max":
+            safe = torch.where(valid, windows, torch.full_like(windows, -torch.inf))
+            indices = torch.argmax(safe, dim=-1)
+        elif mode == "min":
+            safe = torch.where(valid, windows, torch.full_like(windows, torch.inf))
+            indices = torch.argmin(safe, dim=-1)
+        else:
+            raise ValueError(f"Unsupported argextreme mode: {mode}")
+        counts = valid.sum(dim=-1)
+        scaled = indices.to(dtype=data.dtype) / max(window - 1, 1)
+        scaled = torch.where(counts > 0, scaled, torch.full_like(scaled, torch.nan))
+        result[window - 1 :] = scaled
         return result
 
     def _ts_rank_numpy(self, arr: ArrayLike, window: int) -> ArrayLike:
