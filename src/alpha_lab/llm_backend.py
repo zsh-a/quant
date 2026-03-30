@@ -224,18 +224,13 @@ class OpenAILLMBackend:
         lines = []
         for idx, parent in enumerate([item for item in parent_feedback if item], start=1):
             metrics = parent.get("metrics", {})
-            metrics_text = ", ".join(
-                [
-                    f"Sharpe={metrics.get('sharpe', 0.0):.4f}",
-                    f"RankIC={metrics.get('rank_ic', 0.0):.4f}",
-                    f"Turnover={metrics.get('avg_turnover', metrics.get('turnover_penalty', 0.0)):.4f}",
-                    f"GapPenalty={metrics.get('train_valid_gap_penalty', 0.0):.4f}",
-                ]
-            )
+            metrics_text = self._format_parent_metrics(metrics)
+            diagnosis_text = self._diagnose_parent_metrics(metrics)
             lines.append(
                 f"[Parent {idx}]\n"
                 f"- Formula: `{parent.get('formula', '')}`\n"
                 f"- Performance: {metrics_text}\n"
+                f"- Diagnostics: {diagnosis_text}\n"
                 f"- Rationale: {parent.get('rationale', 'Use available metrics to refine the factor.')}"
             )
         parent_block = "\n\n".join(lines) if lines else f"[Parent]\n- Formula: `{spec.parent_a}`"
@@ -247,6 +242,20 @@ class OpenAILLMBackend:
 
 # Task
 基于以上父代公式，进行交叉（Crossover）和变异（Mutation），生成 {count} 个新的子代公式。
+
+# Evaluation Priorities
+优先保留并强化以下特征：
+1. valid/test 维度都稳健，而不只是 train 内表现好。
+2. RankIC、Sharpe、PnL/Turnover、Tail-adjusted return 同时改善。
+3. 避免 inactive、低覆盖、极高换手、train-valid gap 过大。
+4. 如果父代 test_sharpe 弱于 valid_sharpe，优先做稳健化和降复杂度，而不是放大原信号。
+
+# Batch Diversity Requirements
+1. 这次是批量生成任务，请一次性给出 {count} 个候选。
+2. 候选之间必须尽量分散到不同机制，避免只做微小参数改动。
+3. 至少覆盖以下几类中的多类：动量、均值回复、波动率压缩、资金费率/OI、流动性/冲击成本、趋势过滤。
+4. 如果某个父代存在明显缺陷，请只保留其有价值的局部结构，不要整段照抄。
+5. 不要输出重复公式，不要输出仅窗口参数不同但结构几乎相同的一组公式。
 
 # Mutation Rules
 1. 参数变异：修改周期 d（如 3, 5, 10, 20, 30）。
@@ -271,6 +280,42 @@ class OpenAILLMBackend:
   }}
 ]
 """.strip()
+
+    def _format_parent_metrics(self, metrics: dict[str, Any]) -> str:
+        items = [
+            ("Sharpe", metrics.get("sharpe", 0.0)),
+            ("TestSharpe", metrics.get("test_sharpe", 0.0)),
+            ("RankIC", metrics.get("rank_ic", 0.0)),
+            ("PnLPerTurnover", metrics.get("pnl_per_turnover", 0.0)),
+            ("Turnover", metrics.get("avg_turnover", metrics.get("turnover_penalty", 0.0))),
+            ("Stability", metrics.get("stability", 0.0)),
+            ("TailAdjReturn", metrics.get("tail_penalty_adjusted_return", 0.0)),
+            ("SignalCoverage", metrics.get("signal_coverage", 0.0)),
+            ("ActiveBarRatio", metrics.get("active_bar_ratio", 0.0)),
+            ("GapPenalty", metrics.get("train_valid_gap_penalty", 0.0)),
+            ("Inactive", metrics.get("inactive", 0.0)),
+        ]
+        return ", ".join(f"{name}={float(value):.4f}" for name, value in items)
+
+    def _diagnose_parent_metrics(self, metrics: dict[str, Any]) -> str:
+        issues: list[str] = []
+        if float(metrics.get("inactive", 0.0)) >= 1.0:
+            issues.append("inactive factor")
+        if float(metrics.get("train_valid_gap_penalty", 0.0)) > 0.5:
+            issues.append("large train-valid gap")
+        if float(metrics.get("test_sharpe", 0.0)) + 0.25 < float(metrics.get("sharpe", 0.0)):
+            issues.append("test underperforms valid")
+        if float(metrics.get("turnover_penalty", metrics.get("avg_turnover", 0.0))) > 0.5:
+            issues.append("turnover too high")
+        if float(metrics.get("signal_coverage", 1.0)) < 0.5:
+            issues.append("signal coverage too low")
+        if float(metrics.get("active_bar_ratio", 1.0)) < 0.2:
+            issues.append("active bar ratio too low")
+        if float(metrics.get("tail_penalty_adjusted_return", 0.0)) < 0.0:
+            issues.append("tail-adjusted return negative")
+        if not issues:
+            return "no major weakness detected"
+        return "; ".join(issues)
 
     def _extract_formulas(self, raw_text: str) -> list[str]:
         formulas: list[str] = []

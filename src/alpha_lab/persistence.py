@@ -108,3 +108,37 @@ class AlphaLabPersistence:
             entries.append(payload)
         entries.sort(key=lambda item: float(item.get("fitness", 0.0)), reverse=True)
         return entries[:limit]
+
+    def prune_runs(self, keep_latest: int) -> dict[str, Any]:
+        paths = sorted(self.runs_dir.glob("*.json"), reverse=True)
+        removed: list[str] = []
+        for path in paths[max(keep_latest, 0) :]:
+            path.unlink(missing_ok=True)
+            removed.append(str(path))
+        return {
+            "kept": min(len(paths), max(keep_latest, 0)),
+            "removed": len(removed),
+            "removed_paths": removed,
+        }
+
+    def prune_zoo_entries(self, keep_top: int) -> dict[str, Any]:
+        entries: list[tuple[float, Path]] = []
+        for path in self.zoo_dir.glob("alpha_*.json"):
+            fitness = 0.0
+            try:
+                payload = json.loads(path.read_text(encoding="utf-8"))
+                fitness = float(payload.get("fitness", 0.0))
+            except Exception:
+                fitness = float("-inf")
+            entries.append((fitness, path))
+
+        entries.sort(key=lambda item: item[0], reverse=True)
+        removed: list[str] = []
+        for _, path in entries[max(keep_top, 0) :]:
+            path.unlink(missing_ok=True)
+            removed.append(str(path))
+        return {
+            "kept": min(len(entries), max(keep_top, 0)),
+            "removed": len(removed),
+            "removed_paths": removed,
+        }

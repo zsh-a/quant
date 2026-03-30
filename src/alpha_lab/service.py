@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import OrderedDict
 from dataclasses import asdict
 from datetime import datetime
 from time import perf_counter
@@ -33,6 +34,7 @@ class AlphaLabService:
         llm_model: str | None = None,
         llm_base_url: str | None = None,
         llm_api_key: str | None = None,
+        program_cache_size: int = 512,
     ):
         self.registry = DSLRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
@@ -54,7 +56,8 @@ class AlphaLabService:
         self.dataset_loader = CryptoMinuteDatasetLoader()
         self.persistence = AlphaLabPersistence()
         self.validator = CPCVValidator()
-        self._program_cache: dict[str, BytecodeProgram] = {}
+        self._program_cache_size = max(int(program_cache_size), 0)
+        self._program_cache: OrderedDict[str, BytecodeProgram] = OrderedDict()
 
     def list_operators(self) -> list[dict[str, Any]]:
         return [asdict(spec) for spec in self.registry.list_operators()]
@@ -937,10 +940,24 @@ class AlphaLabService:
 
     def _compile_cached(self, formula: str) -> BytecodeProgram:
         program = self._program_cache.get(formula)
-        if program is None:
-            program = self.compiler.compile(formula, self.schema)
-            self._program_cache[formula] = program
+        if program is not None:
+            self._program_cache.move_to_end(formula)
+            return program
+
+        program = self.compiler.compile(formula, self.schema)
+        if self._program_cache_size <= 0:
+            return program
+        self._program_cache[formula] = program
+        self._program_cache.move_to_end(formula)
+        while len(self._program_cache) > self._program_cache_size:
+            self._program_cache.popitem(last=False)
         return program
+
+    def program_cache_stats(self) -> dict[str, int]:
+        return {
+            "size": len(self._program_cache),
+            "capacity": self._program_cache_size,
+        }
 
     def _dataset_summary(self, dataset: AlphaDataset) -> dict[str, Any]:
         return {
@@ -1055,6 +1072,55 @@ class AlphaLabService:
 
     def list_zoo(self, limit: int = 50) -> list[dict[str, Any]]:
         return self.persistence.list_zoo_entries(limit=limit)
+
+    def save_formula_to_zoo(
+        self,
+        formula: str,
+        fitness: float | None = None,
+        metrics: dict[str, Any] | None = None,
+        lineage: dict[str, Any] | None = None,
+        note: str | None = None,
+        tags: list[str] | None = None,
+        source: str = "manual",
+    ) -> dict[str, Any]:
+        validation = self.validate_formula(formula)
+        if not validation.get("ok", False):
+            errors = validation.get("errors") or ["Formula validation failed"]
+            raise ValueError("; ".join(str(item) for item in errors))
+
+        metrics_payload = dict(metrics or {})
+        resolved_fitness = fitness
+        if resolved_fitness is None:
+            for key in (
+                "sharpe",
+                "rank_ic",
+                "pnl_per_turnover",
+                "tail_penalty_adjusted_return",
+            ):
+                candidate = metrics_payload.get(key)
+                if candidate is None:
+                    continue
+                try:
+                    resolved_fitness = float(candidate)
+                    break
+                except (TypeError, ValueError):
+                    continue
+
+        program = self._compile_cached(formula)
+        payload = {
+            "formula": formula,
+            "expr_hash": program.expr_hash,
+            "fitness": float(resolved_fitness) if resolved_fitness is not None else 0.0,
+            "metrics": metrics_payload,
+            "lineage": dict(lineage or {"origin": source}),
+            "note": note,
+            "tags": list(tags or []),
+            "source": source,
+            "validation": validation,
+        }
+        paths = self.persistence.save_zoo_entries([payload], run_id=source)
+        payload["path"] = paths[0] if paths else None
+        return payload
 
     def get_lineage(self, run_id: str) -> dict[str, Any]:
         run = self.persistence.load_run(run_id)

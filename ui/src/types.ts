@@ -177,3 +177,88 @@ export interface MarketDbOverview {
     running_update?: DataUpdateRun | null;
     generated_at: string;
 }
+
+export interface AlphaLabOperator {
+    name: string;
+    category?: string;
+    arity?: number;
+    description?: string;
+    output_type?: string;
+}
+
+export interface AlphaLabValidationReport {
+    ok: boolean;
+    normalized_formula?: string;
+    errors?: string[];
+    warnings?: string[];
+}
+
+export interface AlphaLabDatasetSummary {
+    provider: string;
+    interval: string;
+    symbols: string[];
+    shape: [number, number];
+    timestamps?: string[];
+}
+
+export interface AlphaLabRunSummary {
+    run_id: string;
+    saved_at?: string;
+    path?: string;
+    dataset?: Record<string, unknown>;
+    top_results?: number;
+}
+
+export interface AlphaLabZooEntry {
+    formula: string;
+    expr_hash?: string;
+    fitness?: number;
+    metrics?: Record<string, number>;
+    lineage?: Record<string, unknown>;
+    note?: string | null;
+    tags?: string[];
+    source?: string;
+    saved_at?: string;
+    run_id?: string;
+    path?: string;
+    validation?: AlphaLabValidationReport;
+}
+
+export interface AlphaLabRunDetail {
+    run_id: string;
+    dataset?: AlphaLabDatasetSummary;
+    validation?: Record<string, unknown>;
+    timing?: Record<string, unknown>;
+    generations?: Array<Record<string, unknown>>;
+    top_results?: AlphaLabZooEntry[];
+    lineage?: Array<Record<string, unknown>>;
+    evaluations?: Record<string, unknown>;
+}
+
+export interface AlphaLabEvaluationSummary {
+    dataset?: AlphaLabDatasetSummary;
+    backend?: string;
+    device?: string;
+    expr_hash?: string;
+    normalized_formula?: string;
+    metrics: Record<string, number>;
+    alpha_tail?: number[][];
+    weights_tail?: number[][];
+    equity_tail?: number[];
+}
+
+export interface AlphaLabWorkspaceDefaults {
+    alpha_lab: Record<string, unknown>;
+    bitget: Record<string, unknown>;
+    crypto_market: Record<string, unknown>;
+    providers: string[];
+    intervals: string[];
+    sample_formulas: string[];
+}
+
+export interface AlphaLabWorkspace {
+    operators: AlphaLabOperator[];
+    defaults: AlphaLabWorkspaceDefaults;
+    runs: AlphaLabRunSummary[];
+    zoo: AlphaLabZooEntry[];
+}

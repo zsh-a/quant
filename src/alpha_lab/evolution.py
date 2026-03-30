@@ -221,6 +221,64 @@ class EvolutionEngine:
         self.llm_backend = llm_backend
         self.fitness_engine = FitnessEngine()
 
+    def generate_feedback_seed_formulas(
+        self,
+        entries: list[dict[str, Any]],
+        count: int,
+        objective: str = "improve robustness and reduce turnover",
+    ) -> list[str]:
+        if count <= 0:
+            return []
+
+        ranked_entries = sorted(
+            [entry for entry in entries if entry.get("formula")],
+            key=lambda item: float(item.get("fitness", item.get("metrics", {}).get("sharpe", 0.0)) or 0.0),
+            reverse=True,
+        )
+        if not ranked_entries:
+            return []
+
+        parent_a = ranked_entries[0]
+        parent_b = ranked_entries[1] if len(ranked_entries) > 1 else None
+        parent_feedback = [
+            {
+                "formula": parent_a.get("formula", ""),
+                "metrics": dict(parent_a.get("metrics") or {}),
+                "rationale": "Carryover elite from previous evaluated cycle.",
+            }
+        ]
+        if parent_b:
+            parent_feedback.append(
+                {
+                    "formula": parent_b.get("formula", ""),
+                    "metrics": dict(parent_b.get("metrics") or {}),
+                    "rationale": "Secondary carryover elite for crossover diversity.",
+                }
+            )
+
+        generated = self.llm_backend.generate_offspring(
+            BreedingSpec(
+                parent_a=parent_a.get("formula", ""),
+                parent_b=parent_b.get("formula", "") if parent_b else None,
+                objective=objective,
+                parent_feedback=parent_feedback,
+            ),
+            count=count,
+        )
+
+        validated: list[str] = []
+        seen: set[str] = set()
+        for formula in generated:
+            if not formula or formula in seen:
+                continue
+            if self._build_individual(formula, {"origin": "feedback_seed"}) is None:
+                continue
+            seen.add(formula)
+            validated.append(formula)
+            if len(validated) >= count:
+                break
+        return validated
+
     def initialize(self, seeds: list[str], population_size: int) -> list[Individual]:
         population: list[Individual] = []
         resolved_seeds = list(seeds)
@@ -247,12 +305,11 @@ class EvolutionEngine:
         return ranked[:top_k]
 
     def breed(self, survivors: list[Individual], n_offspring: int) -> list[Individual]:
-        if not survivors:
+        if not survivors or n_offspring <= 0:
             return []
         offspring: list[Individual] = []
-        for idx in range(n_offspring):
-            parent_a = survivors[idx % len(survivors)]
-            parent_b = survivors[(idx + 1) % len(survivors)] if len(survivors) > 1 else None
+        jobs = self._build_breeding_jobs(survivors, n_offspring)
+        for parent_a, parent_b, requested_count in jobs:
             formulas = self.llm_backend.generate_offspring(
                 BreedingSpec(
                     parent_a=parent_a.formula,
@@ -277,16 +334,83 @@ class EvolutionEngine:
                         ),
                     ],
                 ),
-                count=1,
+                count=requested_count,
             )
             lineage = {
                 "parent_a": parent_a.expr_hash,
                 "parent_b": parent_b.expr_hash if parent_b else None,
             }
-            child = self._build_individual(formulas[0], lineage)
+            for formula in formulas:
+                child = self._build_individual(formula, lineage)
+                if child:
+                    offspring.append(child)
+                if len(offspring) >= n_offspring:
+                    return offspring[:n_offspring]
+
+        if len(offspring) >= n_offspring:
+            return offspring[:n_offspring]
+
+        for idx in range(n_offspring - len(offspring)):
+            parent_a = survivors[idx % len(survivors)]
+            parent_b = survivors[(idx + 1) % len(survivors)] if len(survivors) > 1 else None
+            formulas = self.llm_backend.generate_offspring(
+                BreedingSpec(
+                    parent_a=parent_a.formula,
+                    parent_b=parent_b.formula if parent_b else None,
+                    objective="improve robustness and reduce turnover",
+                    parent_feedback=[
+                        {
+                            "formula": parent_a.formula,
+                            "metrics": parent_a.metrics,
+                            "rationale": "Fallback primary parent selected from previous generation elites.",
+                        },
+                        *(
+                            [
+                                {
+                                    "formula": parent_b.formula,
+                                    "metrics": parent_b.metrics,
+                                    "rationale": "Fallback secondary parent selected for crossover diversity.",
+                                }
+                            ]
+                            if parent_b
+                            else []
+                        ),
+                    ],
+                ),
+                count=1,
+            )
+            if not formulas:
+                continue
+            child = self._build_individual(
+                formulas[0],
+                {
+                    "parent_a": parent_a.expr_hash,
+                    "parent_b": parent_b.expr_hash if parent_b else None,
+                },
+            )
             if child:
                 offspring.append(child)
         return offspring
+
+    def _build_breeding_jobs(
+        self,
+        survivors: list[Individual],
+        n_offspring: int,
+    ) -> list[tuple[Individual, Individual | None, int]]:
+        if not survivors or n_offspring <= 0:
+            return []
+        pair_count = min(len(survivors), n_offspring)
+        jobs: list[tuple[Individual, Individual | None, int]] = []
+        base_count = n_offspring // pair_count
+        remainder = n_offspring % pair_count
+        for idx in range(pair_count):
+            parent_a = survivors[idx % len(survivors)]
+            parent_b = survivors[(idx + 1) % len(survivors)] if len(survivors) > 1 else None
+            requested_count = base_count + (1 if idx < remainder else 0)
+            if requested_count <= 0:
+                continue
+            jobs.append((parent_a, parent_b, requested_count))
+        return jobs
 
     def attach_metrics(self, pop: list[Individual], metrics_by_hash: dict[str, dict[str, float]]) -> list[Individual]:
         for individual in pop:

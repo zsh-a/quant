@@ -1,0 +1,50 @@
+window:
+  lookback_minutes: 10080
+  lag_minutes: 10
+  step_minutes: 60
+
+search:
+  provider: bitget
+  symbols:
+    - BTCUSDT
+    - ETHUSDT
+    - SOLUSDT
+    - BNBUSDT
+    - XRPUSDT
+  interval: 5m
+  min_quote_volume: 1000000
+  blocked_utc_hours: []
+  population_size: 8
+  offspring_count: 4
+  top_k: 5
+  generations: 3
+  novelty_threshold: 0.995
+  n_splits: 5
+  purge_window: 0
+  embargo_window: 0
+  persist: true
+  run_name: auto_search_db
+  seeds:
+    - CSRank(ts_mean(close, 5) - close)
+    - CSRank(ts_std(close, 10))
+    - CSRank(volatility_n(close, 20))
+  seed_zoo_limit: 5
+  feedback_seed_count: 2
+  feedback_objective: improve robustness and reduce turnover
+  carryover_top_k: 3
+  llm_backend: auto
+  llm_model:
+  llm_base_url:
+  llm_api_key:
+
+runtime:
+  poll_interval_seconds: 300
+  sleep_after_success_seconds: 60
+  max_cycles:
+  continue_on_error: true
+  failure_backoff_seconds: 30
+  max_failure_backoff_seconds: 900
+  require_new_window: true
+  state_path: data/alpha_lab/auto_search_state.json
+  max_run_files: 200
+  max_zoo_entries: 500

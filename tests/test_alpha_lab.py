@@ -6,8 +6,9 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.alpha_lab import AlphaLabService, FormulaCompiler, StackVM, TensorStore
-from src.alpha_lab.evolution import BreedingSpec, FitnessEngine, HeuristicLLMBackend
+from src.alpha_lab.evolution import BreedingSpec, EvolutionEngine, FitnessEngine, HeuristicLLMBackend
 from src.alpha_lab.llm_backend import OpenAILLMBackend
+from src.alpha_lab.persistence import AlphaLabPersistence
 from src.alpha_lab.risk import CostModel, ExecutionSimulator, MarketContext, RuleOverlay
 from src.alpha_lab.validation import CPCVValidator
 from src.market_data.ccxt_adapter import CcxtCryptoDataAdapter, PROVIDER_SPECS
@@ -184,6 +185,19 @@ def test_alpha_lab_service_benchmark_vm():
     assert "serial_avg_seconds" in result
 
 
+def test_alpha_lab_service_program_cache_uses_lru_eviction():
+    service = AlphaLabService(program_cache_size=2)
+
+    service.compile_formula("CSRank(ts_mean(close, 2) - close)")
+    service.compile_formula("CSRank(ts_std(close, 2))")
+    service.compile_formula("CSRank(volatility_n(close, 3))")
+
+    stats = service.program_cache_stats()
+    assert stats["size"] == 2
+    assert stats["capacity"] == 2
+    assert "CSRank(ts_mean(close, 2) - close)" not in service._program_cache
+
+
 def test_population_seed_and_breed():
     service = AlphaLabService()
     seeds = [
@@ -196,6 +210,79 @@ def test_population_seed_and_breed():
     assert len(population) == 2
     assert len(offspring) >= 1
     assert all(item["formula"] for item in offspring)
+
+
+class _BatchCountingBackend:
+    def __init__(self):
+        self.calls: list[int] = []
+        self.counter = 0
+
+    def generate_initial_population(self, count: int):
+        return [f"CSRank(ts_mean(close, {idx + 2}) - close)" for idx in range(count)]
+
+    def generate_offspring(self, spec: BreedingSpec, count: int):
+        self.calls.append(count)
+        formulas = []
+        for _ in range(count):
+            self.counter += 1
+            formulas.append(f"CSRank(ts_mean(close, {self.counter + 2}) - close)")
+        return formulas
+
+
+def test_evolution_breed_batches_llm_calls():
+    backend = _BatchCountingBackend()
+    engine = EvolutionEngine(llm_backend=backend)
+    survivors = engine.initialize(
+        [
+            "CSRank(ts_mean(close, 5) - close)",
+            "CSRank(ts_std(close, 5))",
+            "CSRank(volatility_n(close, 5))",
+        ],
+        population_size=3,
+    )
+    for idx, survivor in enumerate(survivors, start=1):
+        survivor.metrics = {"sharpe": float(idx)}
+
+    offspring = engine.breed(survivors, n_offspring=7)
+
+    assert len(offspring) == 7
+    assert sum(backend.calls) >= 7
+    assert len(backend.calls) <= 3
+    assert max(backend.calls) >= 2
+
+
+def test_save_formula_to_zoo_persists_manual_entry(tmp_path):
+    service = AlphaLabService()
+    service.persistence = AlphaLabPersistence(root_dir=str(tmp_path / "alpha_lab"))
+
+    entry = service.save_formula_to_zoo(
+        formula="CSRank(ts_mean(close, 5) - close)",
+        metrics={"sharpe": 1.25, "rank_ic": 0.08},
+        note="mean reversion baseline",
+        tags=["baseline", "mr"],
+    )
+
+    assert entry["expr_hash"]
+    assert entry["fitness"] == 1.25
+    assert entry["validation"]["ok"] is True
+
+    zoo_entries = service.list_zoo(limit=10)
+    assert len(zoo_entries) == 1
+    assert zoo_entries[0]["formula"] == "CSRank(ts_mean(close, 5) - close)"
+    assert zoo_entries[0]["tags"] == ["baseline", "mr"]
+    assert zoo_entries[0]["note"] == "mean reversion baseline"
+
+
+def test_save_formula_to_zoo_rejects_invalid_formula(tmp_path):
+    service = AlphaLabService()
+    service.persistence = AlphaLabPersistence(root_dir=str(tmp_path / "alpha_lab"))
+
+    try:
+        service.save_formula_to_zoo("close +")
+    except ValueError as exc:
+        assert "syntax" in str(exc).lower() or "failed" in str(exc).lower() or "unexpected" in str(exc).lower()
+    else:
+        raise AssertionError("Expected invalid formula to raise ValueError")
 
 
 def test_heuristic_backend_generates_diverse_compilable_offspring():
@@ -215,6 +302,45 @@ def test_heuristic_backend_generates_diverse_compilable_offspring():
     for formula in offspring:
         program = compiler.compile(formula)
         assert program.expr_hash
+
+
+class _FeedbackBackend:
+    def __init__(self):
+        self.last_spec = None
+
+    def generate_initial_population(self, count: int):
+        return []
+
+    def generate_offspring(self, spec: BreedingSpec, count: int):
+        self.last_spec = spec
+        return ["CSRank(ts_mean(close, 3) - close)"][:count]
+
+
+def test_evolution_feedback_seed_generation_uses_metrics_in_parent_feedback():
+    backend = _FeedbackBackend()
+    engine = EvolutionEngine(llm_backend=backend)
+
+    formulas = engine.generate_feedback_seed_formulas(
+        entries=[
+            {
+                "formula": "CSRank(ts_mean(close, 5) - close)",
+                "fitness": 1.5,
+                "metrics": {"sharpe": 1.5, "rank_ic": 0.1},
+            },
+            {
+                "formula": "CSRank(ts_std(close, 5))",
+                "fitness": 0.8,
+                "metrics": {"sharpe": 0.8, "rank_ic": 0.02},
+            },
+        ],
+        count=1,
+        objective="improve robustness and reduce turnover",
+    )
+
+    assert formulas == ["CSRank(ts_mean(close, 3) - close)"]
+    assert backend.last_spec is not None
+    assert backend.last_spec.parent_feedback[0]["metrics"]["sharpe"] == 1.5
+    assert backend.last_spec.parent_feedback[1]["metrics"]["rank_ic"] == 0.02
 
 
 class _FakeMessage:
@@ -264,6 +390,50 @@ def test_openai_backend_parses_and_filters_formulas():
 
     assert len(formulas) == 2
     assert "OIDelta" in formulas[0] or "oi_delta" in formulas[0]
+
+
+def test_openai_evolution_prompt_includes_extended_metrics_and_diagnostics():
+    backend = OpenAILLMBackend(client=_FakeClient(['[{"formula": "CSRank(ts_mean(close, 3) - close)"}]']))
+
+    prompt = backend._build_evolution_prompt(
+        BreedingSpec(
+            parent_a="CSRank(ts_mean(close, 5) - close)",
+            parent_b="CSRank(ts_std(close, 5))",
+            objective="improve robustness and reduce turnover",
+            parent_feedback=[
+                {
+                    "formula": "CSRank(ts_mean(close, 5) - close)",
+                    "metrics": {
+                        "sharpe": 1.2,
+                        "test_sharpe": 0.4,
+                        "rank_ic": 0.08,
+                        "pnl_per_turnover": 0.3,
+                        "turnover_penalty": 0.7,
+                        "stability": 2.0,
+                        "tail_penalty_adjusted_return": -0.1,
+                        "signal_coverage": 0.4,
+                        "active_bar_ratio": 0.1,
+                        "train_valid_gap_penalty": 0.8,
+                        "inactive": 0.0,
+                    },
+                    "rationale": "Parent A",
+                }
+            ],
+        ),
+        count=2,
+    )
+
+    assert "TestSharpe=0.4000" in prompt
+    assert "PnLPerTurnover=0.3000" in prompt
+    assert "SignalCoverage=0.4000" in prompt
+    assert "ActiveBarRatio=0.1000" in prompt
+    assert "large train-valid gap" in prompt
+    assert "test underperforms valid" in prompt
+    assert "turnover too high" in prompt
+    assert "signal coverage too low" in prompt
+    assert "Evaluation Priorities" in prompt
+    assert "Batch Diversity Requirements" in prompt
+    assert "一次性给出 2 个候选" in prompt
 
 
 def test_alpha_lab_service_search_uses_openai_backend_without_manual_seeds():

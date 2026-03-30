@@ -4,11 +4,14 @@ from datetime import UTC, datetime
 
 import numpy as np
 import pandas as pd
+import yaml
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
+from src.alpha_lab.auto_runner import load_auto_search_config
 from src.alpha_lab.cli import build_parser, run_command
 from src.alpha_lab.dataset import CryptoMinuteDatasetLoader
+from src.alpha_lab.persistence import AlphaLabPersistence
 from src.alpha_lab.service import AlphaLabService
 
 START = datetime(2026, 3, 27, 0, 0, tzinfo=UTC)
@@ -341,3 +344,119 @@ def test_alpha_lab_search_top_results_are_scored():
     assert result["top_results"]
     assert all("sharpe" in item["metrics"] for item in result["top_results"])
     assert "call_stats" in result["llm"]
+
+
+def test_auto_search_config_normalizes_symbols_and_blocked_hours(tmp_path):
+    config_path = tmp_path / "auto_search.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "window": {
+                    "lookback_minutes": 60,
+                    "lag_minutes": 5,
+                    "step_minutes": 5,
+                },
+                "search": {
+                    "provider": "bitget",
+                    "symbols": "btcusdt, ethusdt",
+                    "blocked_utc_hours": "0, 1, 23",
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    config = load_auto_search_config(config_path)
+
+    assert config.search.symbols == ["BTCUSDT", "ETHUSDT"]
+    assert config.search.blocked_utc_hours == [0, 1, 23]
+
+
+def test_alpha_lab_cli_auto_search_db_once(tmp_path):
+    service = AlphaLabService()
+    service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
+    service.persistence = AlphaLabPersistence(root_dir=str(tmp_path / "alpha_lab"))
+    state_path = tmp_path / "auto_search_state.json"
+    config_path = tmp_path / "auto_search.yaml"
+    config_path.write_text(
+        yaml.safe_dump(
+            {
+                "window": {
+                    "lookback_minutes": 20,
+                    "lag_minutes": 0,
+                    "step_minutes": 1,
+                    "anchor_time": "2026-03-27T00:19:00+00:00",
+                },
+                "search": {
+                    "provider": "bitget",
+                    "symbols": ["BTCUSDT", "ETHUSDT"],
+                    "interval": "5m",
+                    "population_size": 2,
+                    "offspring_count": 1,
+                    "top_k": 1,
+                    "generations": 1,
+                    "persist": True,
+                    "run_name": "test_auto_search",
+                    "seeds": ["CSRank(ts_mean(close, 2) - close)"],
+                    "seed_zoo_limit": 0,
+                },
+                "runtime": {
+                    "state_path": str(state_path),
+                    "poll_interval_seconds": 1,
+                    "continue_on_error": False,
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    parser = build_parser()
+    args = parser.parse_args(
+        [
+            "auto-search-db",
+            "--config",
+            str(config_path),
+            "--once",
+        ]
+    )
+    result = run_command(args, service)
+
+    assert result["successful_cycles"] == 1
+    assert result["failed_cycles"] == 0
+    assert result["stopped_reason"] == "once_completed"
+    assert result["last_run_id"]
+    assert state_path.exists()
+    persisted = service.persistence.load_run(result["last_run_id"])
+    assert persisted["run_id"] == result["last_run_id"]
+
+
+def test_alpha_lab_persistence_prunes_runs_and_zoo(tmp_path):
+    service = AlphaLabService()
+    service.persistence = AlphaLabPersistence(root_dir=str(tmp_path / "alpha_lab"))
+
+    for idx in range(3):
+        run = service.persistence.save_run(
+            {
+                "dataset": {"shape": [1, 1]},
+                "top_results": [{"formula": f"f{idx}", "fitness": float(idx)}],
+            },
+            run_name=f"run_{idx}",
+        )
+        service.persistence.save_zoo_entries(
+            [
+                {
+                    "formula": f"CSRank(ts_mean(close, {idx + 2}) - close)",
+                    "expr_hash": f"hash_{idx}",
+                    "fitness": float(idx),
+                }
+            ],
+            run.run_id,
+        )
+
+    runs_summary = service.persistence.prune_runs(keep_latest=2)
+    zoo_summary = service.persistence.prune_zoo_entries(keep_top=2)
+
+    assert runs_summary["removed"] == 1
+    assert zoo_summary["removed"] == 1
+    assert len(service.list_runs(limit=10)) == 2
+    assert len(service.list_zoo(limit=10)) == 2

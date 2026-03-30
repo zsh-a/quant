@@ -3,6 +3,7 @@ import type { SessionSummary, StrategyMeta } from '../types';
 import NewSessionForm from './NewSessionForm';
 import SessionList from './SessionList';
 import SimulationPanel from './SimulationPanel';
+import AlphaLabWorkspace from './AlphaLabWorkspace';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { PageHeader } from './layout/PageHeader';
 
@@ -31,8 +32,11 @@ const LabPanel: React.FC<LabPanelProps> = ({
   onOpenMarketAdmin,
   error,
 }) => {
-  const [labSubtab, setLabSubtab] = useState<'manual' | 'simulation'>(() => {
+  const [labSubtab, setLabSubtab] = useState<'manual' | 'simulation' | 'alpha'>(() => {
     const stored = window.localStorage.getItem('quent.lab.subtab');
+    if (stored === 'alpha') {
+      return 'alpha';
+    }
     return stored === 'simulation' ? 'simulation' : 'manual';
   });
 
@@ -55,13 +59,14 @@ const LabPanel: React.FC<LabPanelProps> = ({
       <PageHeader
         eyebrow="Execution Workspace"
         title="策略实验室"
-        description="手动任务仅保留回测与实盘，所有模拟流程统一收纳在模拟视图中。"
+        description="策略执行、模拟编排和 Alpha 因子研究统一收纳在同一个实验室工作区。"
       />
 
-      <Tabs value={labSubtab} onValueChange={(value) => setLabSubtab(value as 'manual' | 'simulation')}>
+      <Tabs value={labSubtab} onValueChange={(value) => setLabSubtab(value as 'manual' | 'simulation' | 'alpha')}>
         <TabsList>
           <TabsTrigger value="manual">手动任务</TabsTrigger>
           <TabsTrigger value="simulation">模拟任务</TabsTrigger>
+          <TabsTrigger value="alpha">Alpha Lab</TabsTrigger>
         </TabsList>
 
         <TabsContent value="manual">
@@ -98,6 +103,10 @@ const LabPanel: React.FC<LabPanelProps> = ({
               onDeleteSession={onDeleteSession}
             />
           </div>
+        </TabsContent>
+
+        <TabsContent value="alpha">
+          <AlphaLabWorkspace />
         </TabsContent>
       </Tabs>
     </div>

@@ -13,6 +13,11 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
+from src.alpha_lab.auto_runner import (
+    build_service_from_auto_search_config,
+    load_auto_search_config,
+    run_auto_search_loop,
+)
 from src.alpha_lab.service import AlphaLabService
 
 
@@ -106,6 +111,14 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--llm-api-key", default=None)
     search.add_argument("--seed", action="append", default=[])
 
+    auto_search = subparsers.add_parser(
+        "auto-search-db",
+        help="Run a long-lived rolling alpha mining loop from a YAML/JSON config",
+    )
+    auto_search.add_argument("--config", required=True, help="Path to auto-search YAML/JSON config")
+    auto_search.add_argument("--once", action="store_true", help="Run a single cycle and exit")
+    auto_search.add_argument("--max-cycles", type=int, default=None, help="Override config runtime.max_cycles")
+
     list_runs = subparsers.add_parser("list-runs", help="List persisted alpha_lab runs")
     list_runs.add_argument("--limit", type=int, default=20)
 
@@ -190,6 +203,14 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
             embargo_window=args.embargo_window,
             blocked_utc_hours=_parse_int_list(args.blocked_utc_hours),
         )
+    if args.command == "auto-search-db":
+        config = load_auto_search_config(args.config)
+        return run_auto_search_loop(
+            service=service,
+            config=config,
+            once=args.once,
+            max_cycles=args.max_cycles,
+        )
     if args.command == "list-runs":
         return {"runs": service.list_runs(limit=args.limit)}
     if args.command == "show-run":
@@ -204,12 +225,17 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
 def main(argv: list[str] | None = None, service: AlphaLabService | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
-    default_service = service or AlphaLabService(
-        llm_backend_name=getattr(args, "llm_backend", "auto"),
-        llm_model=getattr(args, "llm_model", None),
-        llm_base_url=getattr(args, "llm_base_url", None),
-        llm_api_key=getattr(args, "llm_api_key", None),
-    )
+    default_service = service
+    if default_service is None and args.command == "auto-search-db":
+        auto_search_config = load_auto_search_config(args.config)
+        default_service = build_service_from_auto_search_config(auto_search_config)
+    if default_service is None:
+        default_service = AlphaLabService(
+            llm_backend_name=getattr(args, "llm_backend", "auto"),
+            llm_model=getattr(args, "llm_model", None),
+            llm_base_url=getattr(args, "llm_base_url", None),
+            llm_api_key=getattr(args, "llm_api_key", None),
+        )
     result = run_command(args, default_service)
     print(json.dumps(result, ensure_ascii=False, indent=2, default=str))
     return 0
