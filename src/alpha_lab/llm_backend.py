@@ -246,9 +246,9 @@ class OpenAILLMBackend:
 # Evaluation Priorities
 优先保留并强化以下特征：
 1. valid/test 维度都稳健，而不只是 train 内表现好。
-2. RankIC、Sharpe、PnL/Turnover、Tail-adjusted return 同时改善。
-3. 避免 inactive、低覆盖、极高换手、train-valid gap 过大。
-4. 如果父代 test_sharpe 弱于 valid_sharpe，优先做稳健化和降复杂度，而不是放大原信号。
+2. Abs(RankIC)、Sharpe、TestSharpe、Tail-adjusted return 同时改善。
+3. 追求“健康活跃度”而不是极低换手；避免 inactive、低覆盖、过低换手、极高换手、train-valid/test 衰减过大。
+4. 如果父代 test_sharpe 弱于 valid_sharpe，优先做稳健化、降复杂度和增强泛化，而不是放大原信号。
 
 # Batch Diversity Requirements
 1. 这次是批量生成任务，请一次性给出 {count} 个候选。
@@ -261,8 +261,8 @@ class OpenAILLMBackend:
 1. 参数变异：修改周期 d（如 3, 5, 10, 20, 30）。
 2. 算子替换：在 Ts_Mean / Ts_Rank / StdDev / Ts_Zscore / Decay_Linear 之间切换。
 3. 逻辑交叉：将动量、波动率、Funding/OI、Spread、ATR、Amihud 等不同基因拼接。
-4. 平滑降噪：对高换手因子优先使用 Decay_Linear 或 Ts_Mean。
-5. 成本感知：鼓励显式使用 SpreadRatio、Amihud、ATR_N。
+4. 平滑降噪：对高换手因子优先使用 Decay_Linear 或 Ts_Mean；对过低活跃度因子优先增加触发频率和信号覆盖。
+5. 成本感知：鼓励显式使用 SpreadRatio、Amihud、ATR_N，但不要为了刷 PnL/Turnover 而把换手压到接近 0。
 
 # Hard Rules
 1. 只能使用当前字段和算子库。
@@ -285,14 +285,17 @@ class OpenAILLMBackend:
         items = [
             ("Sharpe", metrics.get("sharpe", 0.0)),
             ("TestSharpe", metrics.get("test_sharpe", 0.0)),
-            ("RankIC", metrics.get("rank_ic", 0.0)),
+            ("AbsRankIC", metrics.get("rank_ic_abs", abs(float(metrics.get("rank_ic", 0.0) or 0.0)))),
             ("PnLPerTurnover", metrics.get("pnl_per_turnover", 0.0)),
             ("Turnover", metrics.get("avg_turnover", metrics.get("turnover_penalty", 0.0))),
-            ("Stability", metrics.get("stability", 0.0)),
+            ("ActivityScore", metrics.get("activity_score", 0.0)),
+            ("TailRatio", metrics.get("tail_ratio", 0.0)),
             ("TailAdjReturn", metrics.get("tail_penalty_adjusted_return", 0.0)),
             ("SignalCoverage", metrics.get("signal_coverage", 0.0)),
             ("ActiveBarRatio", metrics.get("active_bar_ratio", 0.0)),
-            ("GapPenalty", metrics.get("train_valid_gap_penalty", 0.0)),
+            ("TrainValidGap", metrics.get("train_valid_gap_penalty", 0.0)),
+            ("ValidTestGap", metrics.get("valid_test_gap_penalty", 0.0)),
+            ("Complexity", metrics.get("complexity_penalty", 0.0)),
             ("Inactive", metrics.get("inactive", 0.0)),
         ]
         return ", ".join(f"{name}={float(value):.4f}" for name, value in items)
@@ -301,18 +304,28 @@ class OpenAILLMBackend:
         issues: list[str] = []
         if float(metrics.get("inactive", 0.0)) >= 1.0:
             issues.append("inactive factor")
+        if float(metrics.get("avg_turnover", 0.0)) < 0.005:
+            issues.append("turnover too low")
         if float(metrics.get("train_valid_gap_penalty", 0.0)) > 0.5:
             issues.append("large train-valid gap")
         if float(metrics.get("test_sharpe", 0.0)) + 0.25 < float(metrics.get("sharpe", 0.0)):
             issues.append("test underperforms valid")
-        if float(metrics.get("turnover_penalty", metrics.get("avg_turnover", 0.0))) > 0.5:
+        if float(metrics.get("valid_test_gap_penalty", 0.0)) > 0.5:
+            issues.append("large valid-test decay")
+        if float(metrics.get("test_sharpe", 0.0)) < 0.0:
+            issues.append("test sharpe negative")
+        if float(metrics.get("turnover_penalty", 0.0)) > 0.5:
             issues.append("turnover too high")
         if float(metrics.get("signal_coverage", 1.0)) < 0.5:
             issues.append("signal coverage too low")
         if float(metrics.get("active_bar_ratio", 1.0)) < 0.2:
             issues.append("active bar ratio too low")
+        if float(metrics.get("complexity_penalty", 0.0)) > 0.6:
+            issues.append("formula too complex")
         if float(metrics.get("tail_penalty_adjusted_return", 0.0)) < 0.0:
             issues.append("tail-adjusted return negative")
+        if float(metrics.get("rank_ic_abs", abs(float(metrics.get("rank_ic", 0.0) or 0.0)))) < 0.01:
+            issues.append("cross-sectional IC too weak")
         if not issues:
             return "no major weakness detected"
         return "; ".join(issues)

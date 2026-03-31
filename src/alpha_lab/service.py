@@ -58,6 +58,7 @@ class AlphaLabService:
         self.validator = CPCVValidator()
         self._program_cache_size = max(int(program_cache_size), 0)
         self._program_cache: OrderedDict[str, BytecodeProgram] = OrderedDict()
+        self._complexity_cache: dict[str, dict[str, float]] = {}
 
     def list_operators(self) -> list[dict[str, Any]]:
         return [asdict(spec) for spec in self.registry.list_operators()]
@@ -778,23 +779,45 @@ class AlphaLabService:
             valid = self._aggregate_metric_records(valid_records)
             test = self._aggregate_metric_records(test_records)
             gap_penalties = [
-                abs(float(train_record.get("sharpe", 0.0)) - float(valid_record.get("sharpe", 0.0)))
+                self._train_valid_gap_penalty(train_record, valid_record)
                 for train_record, valid_record in zip(train_records, valid_records)
             ]
+            valid_test_gap_penalties = [
+                self._valid_test_gap_penalty(valid_record, test_record)
+                for valid_record, test_record in zip(valid_records, test_records)
+            ]
+            negative_test_ratio = float(
+                np.mean([1.0 if float(record.get("sharpe", 0.0)) < 0.0 else 0.0 for record in test_records])
+            ) if test_records else 0.0
+            inactive_valid_ratio = float(
+                np.mean([1.0 if float(record.get("inactive", 0.0)) >= 1.0 else 0.0 for record in valid_records])
+            ) if valid_records else 0.0
             fitness_metrics = dict(valid)
             fitness_metrics.update(
                 {
                     "rank_ic": float(valid.get("rank_ic", 0.0)),
+                    "rank_ic_abs": float(valid.get("rank_ic_abs", abs(float(valid.get("rank_ic", 0.0))))),
                     "sharpe": float(valid.get("sharpe", 0.0)),
                     "pnl_per_turnover": float(valid.get("pnl_per_turnover", 0.0)),
-                    "stability": float(valid.get("stability", 0.0)),
+                    "activity_score": float(valid.get("activity_score", 0.0)),
+                    "tail_ratio": float(valid.get("tail_ratio", 0.0)),
                     "tail_penalty_adjusted_return": float(valid.get("tail_penalty_adjusted_return", 0.0)),
                     "turnover_penalty": float(valid.get("turnover_penalty", 0.0)),
-                    "complexity_penalty": 0.0,
+                    "coverage_penalty": float(valid.get("coverage_penalty", 0.0)),
+                    "complexity_penalty": float(valid.get("complexity_penalty", 0.0)),
                     "train_valid_gap_penalty": float(np.mean(gap_penalties)) if gap_penalties else 0.0,
+                    "valid_test_gap_penalty": float(np.mean(valid_test_gap_penalties)) if valid_test_gap_penalties else 0.0,
                     "test_sharpe": float(test.get("sharpe", 0.0)),
                     "train_sharpe": float(train.get("sharpe", 0.0)),
                     "valid_sharpe": float(valid.get("sharpe", 0.0)),
+                    "train_rank_ic": float(train.get("rank_ic", 0.0)),
+                    "valid_rank_ic": float(valid.get("rank_ic", 0.0)),
+                    "test_rank_ic": float(test.get("rank_ic", 0.0)),
+                    "train_rank_ic_abs": float(train.get("rank_ic_abs", abs(float(train.get("rank_ic", 0.0))))),
+                    "valid_rank_ic_abs": float(valid.get("rank_ic_abs", abs(float(valid.get("rank_ic", 0.0))))),
+                    "test_rank_ic_abs": float(test.get("rank_ic_abs", abs(float(test.get("rank_ic", 0.0))))),
+                    "negative_test_ratio": negative_test_ratio,
+                    "inactive_valid_ratio": inactive_valid_ratio,
                     "fold_count": float(len(valid_records)),
                 }
             )
@@ -873,47 +896,176 @@ class AlphaLabService:
             },
         }
 
+    def _clip_unit(self, value: float) -> float:
+        return float(np.clip(value, 0.0, 1.0))
+
+    def _formula_complexity_metrics(self, program: BytecodeProgram | None) -> dict[str, float]:
+        if program is None:
+            return {
+                "ast_depth": 0.0,
+                "node_count": 0.0,
+                "operator_count": 0.0,
+                "time_series_ops": 0.0,
+                "cross_sectional_ops": 0.0,
+                "domain_ops": 0.0,
+                "branching_ops": 0.0,
+                "complexity_penalty": 0.0,
+            }
+        cached = self._complexity_cache.get(program.expr_hash)
+        if cached is not None:
+            return dict(cached)
+
+        report = self.registry.validate_formula(program.normalized_formula, self.schema)
+        ast_tree = report.ast_tree or {}
+        counts = {
+            "time_series_ops": 0.0,
+            "cross_sectional_ops": 0.0,
+            "domain_ops": 0.0,
+            "branching_ops": 0.0,
+            "operator_count": 0.0,
+        }
+        node_count = 0
+        ast_depth = 0
+
+        def walk(node: dict[str, Any], depth: int = 1) -> None:
+            nonlocal node_count, ast_depth
+            if not node:
+                return
+            node_count += 1
+            ast_depth = max(ast_depth, depth)
+            if node.get("kind") == "call":
+                counts["operator_count"] += 1.0
+                op_name = str(node.get("value", ""))
+                if self.registry.has(op_name):
+                    category = self.registry.get(op_name).category
+                    key = f"{category}_ops"
+                    if key in counts:
+                        counts[key] += 1.0
+                    if category in {"conditional", "logical", "comparison"}:
+                        counts["branching_ops"] += 1.0
+            for child in node.get("children", []):
+                if isinstance(child, dict):
+                    walk(child, depth + 1)
+
+        if isinstance(ast_tree, dict):
+            walk(ast_tree)
+
+        depth_excess = max(float(ast_depth) - 4.0, 0.0) / 3.0
+        op_excess = max(counts["operator_count"] - 10.0, 0.0) / 10.0
+        time_series_excess = max(counts["time_series_ops"] - 3.0, 0.0) / 3.0
+        branching_excess = max(counts["branching_ops"] - 1.0, 0.0) / 2.0
+        complexity_penalty = self._clip_unit(
+            0.45 * depth_excess
+            + 0.35 * op_excess
+            + 0.15 * time_series_excess
+            + 0.05 * branching_excess
+        )
+        metrics = {
+            "ast_depth": float(ast_depth),
+            "node_count": float(node_count),
+            "operator_count": float(counts["operator_count"]),
+            "time_series_ops": float(counts["time_series_ops"]),
+            "cross_sectional_ops": float(counts["cross_sectional_ops"]),
+            "domain_ops": float(counts["domain_ops"]),
+            "branching_ops": float(counts["branching_ops"]),
+            "complexity_penalty": complexity_penalty,
+        }
+        self._complexity_cache[program.expr_hash] = dict(metrics)
+        return metrics
+
+    def _train_valid_gap_penalty(self, train_record: dict[str, float], valid_record: dict[str, float]) -> float:
+        sharpe_gap = self._clip_unit(abs(float(train_record.get("sharpe", 0.0)) - float(valid_record.get("sharpe", 0.0))) / 1.5)
+        ic_gap = self._clip_unit(
+            abs(float(train_record.get("rank_ic_abs", 0.0)) - float(valid_record.get("rank_ic_abs", 0.0))) / 0.05
+        )
+        activity_gap = self._clip_unit(
+            abs(float(train_record.get("active_bar_ratio", 0.0)) - float(valid_record.get("active_bar_ratio", 0.0))) / 0.25
+        )
+        return 0.50 * sharpe_gap + 0.35 * ic_gap + 0.15 * activity_gap
+
+    def _valid_test_gap_penalty(self, valid_record: dict[str, float], test_record: dict[str, float]) -> float:
+        sharpe_decay = self._clip_unit(
+            max(float(valid_record.get("sharpe", 0.0)) - float(test_record.get("sharpe", 0.0)), 0.0) / 1.0
+        )
+        ic_decay = self._clip_unit(
+            max(float(valid_record.get("rank_ic_abs", 0.0)) - float(test_record.get("rank_ic_abs", 0.0)), 0.0) / 0.05
+        )
+        activity_decay = self._clip_unit(
+            max(float(valid_record.get("activity_score", 0.0)) - float(test_record.get("activity_score", 0.0)), 0.0) / 0.5
+        )
+        return 0.55 * sharpe_decay + 0.30 * ic_decay + 0.15 * activity_decay
+
     def _build_fitness_metrics(
         self,
+        program: BytecodeProgram | Any,
         alpha: Any,
         weights: Any,
         close: Any,
-        summary: dict[str, float],
+        summary: dict[str, float] | None = None,
     ) -> dict[str, float]:
-        alpha_np = self._to_numpy(alpha)
-        weights_np = self._to_numpy(weights)
-        close_np = self._to_numpy(close)
+        resolved_program: BytecodeProgram | None
+        resolved_alpha: Any
+        resolved_weights: Any
+        resolved_close: Any
+        resolved_summary: dict[str, float]
+
+        if isinstance(program, BytecodeProgram):
+            resolved_program = program
+            resolved_alpha = alpha
+            resolved_weights = weights
+            resolved_close = close
+            resolved_summary = dict(summary or {})
+        else:
+            resolved_program = None
+            resolved_alpha = program
+            resolved_weights = alpha
+            resolved_close = weights
+            resolved_summary = dict(close if isinstance(close, dict) else summary or {})
+
+        alpha_np = self._to_numpy(resolved_alpha)
+        weights_np = self._to_numpy(resolved_weights)
+        close_np = self._to_numpy(resolved_close)
         forward_returns = np.zeros_like(close_np)
         forward_returns[:-1] = close_np[1:] / (close_np[:-1] + 1e-12) - 1.0
         rank_ic = self._mean_cross_sectional_correlation(alpha_np[:-1], forward_returns[:-1])
-        avg_turnover = float(summary.get("avg_turnover", 0.0))
-        total_return = float(summary.get("total_return", 0.0))
-        volatility = float(summary.get("volatility", 0.0))
+        rank_ic_abs = abs(rank_ic)
+        avg_turnover = float(resolved_summary.get("avg_turnover", 0.0))
+        total_return = float(resolved_summary.get("total_return", 0.0))
+        volatility = float(resolved_summary.get("volatility", 0.0))
         signal_coverage = float(np.mean(np.isfinite(alpha_np))) if alpha_np.size else 0.0
         active_rows = np.sum(np.abs(weights_np), axis=1) > 1e-9 if weights_np.size else np.array([], dtype=bool)
         active_bar_ratio = float(np.mean(active_rows)) if active_rows.size else 0.0
         effective_bars = float(np.sum(active_rows)) if active_rows.size else 0.0
-        is_inactive = active_bar_ratio <= 1e-6 or avg_turnover <= 1e-12
-        metrics = dict(summary)
+        is_inactive = active_bar_ratio < 0.10 or avg_turnover < 0.005
+        metrics = dict(resolved_summary)
         pnl_per_turnover = total_return / (avg_turnover + 1e-12) if not is_inactive else 0.0
-        stability = 0.0
-        if not is_inactive and volatility > 1e-12:
-            stability = min(1.0 / volatility, 10.0)
+        tail_adjusted_return = total_return - float(resolved_summary.get("max_drawdown", 0.0))
+        tail_ratio = tail_adjusted_return / max(volatility, 1e-6)
+        activity_score = self._clip_unit(min(active_bar_ratio / 0.60, 1.0) * min(avg_turnover / 0.05, 1.0))
+        turnover_penalty = self._clip_unit((avg_turnover - 0.60) / 0.40)
+        coverage_penalty = self._clip_unit((0.50 - signal_coverage) / 0.50)
+        pnl_efficiency_score = self._clip_unit(np.log1p(max(pnl_per_turnover, 0.0)) / np.log1p(10.0))
+        complexity_metrics = self._formula_complexity_metrics(resolved_program)
         metrics.update(
             {
                 "rank_ic": rank_ic,
+                "rank_ic_abs": rank_ic_abs,
                 "pnl_per_turnover": pnl_per_turnover,
-                "stability": stability,
-                "tail_penalty_adjusted_return": total_return - float(summary.get("max_drawdown", 0.0)),
-                "turnover_penalty": avg_turnover,
-                "complexity_penalty": 0.0,
+                "pnl_efficiency_score": pnl_efficiency_score,
+                "activity_score": activity_score,
+                "tail_ratio": tail_ratio,
+                "tail_penalty_adjusted_return": tail_adjusted_return,
+                "turnover_penalty": turnover_penalty,
+                "coverage_penalty": coverage_penalty,
                 "train_valid_gap_penalty": 0.0,
+                "valid_test_gap_penalty": 0.0,
                 "signal_coverage": signal_coverage,
                 "active_bar_ratio": active_bar_ratio,
                 "effective_bars": effective_bars,
                 "inactive": 1.0 if is_inactive else 0.0,
             }
         )
+        metrics.update(complexity_metrics)
         return metrics
 
     def _aggregate_metric_records(self, records: list[dict[str, float]]) -> dict[str, float]:
@@ -1013,7 +1165,7 @@ class AlphaLabService:
             timing_breakdown["backtest_seconds"] += perf_counter() - backtest_start
 
         fitness_start = perf_counter()
-        metrics = self._build_fitness_metrics(alpha, wrapped_weights, store.get_field("close"), result.summary())
+        metrics = self._build_fitness_metrics(program, alpha, wrapped_weights, store.get_field("close"), result.summary())
         if timing_breakdown is not None:
             timing_breakdown["fitness_seconds"] += perf_counter() - fitness_start
 

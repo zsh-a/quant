@@ -30,6 +30,21 @@ class BreedingSpec:
     parent_feedback: list[dict[str, Any]] = field(default_factory=list)
 
 
+@dataclass(frozen=True)
+class FitnessPolicy:
+    min_active_bar_ratio: float = 0.10
+    min_signal_coverage: float = 0.50
+    min_avg_turnover: float = 0.005
+    min_test_sharpe: float = 0.0
+    max_negative_test_ratio: float = 0.50
+    reject_score: float = -5.0
+    sharpe_scale: float = 2.0
+    test_sharpe_scale: float = 1.5
+    rank_ic_scale: float = 0.05
+    pnl_efficiency_cap: float = 10.0
+    tail_ratio_scale: float = 2.0
+
+
 class LLMBackend(Protocol):
     def generate_initial_population(self, count: int) -> list[str]:
         ...
@@ -167,28 +182,77 @@ class HeuristicLLMBackend:
 
 
 class FitnessEngine:
-    def score(self, metrics: dict[str, float]) -> float:
-        if float(metrics.get("inactive", 0.0)) >= 1.0:
-            return -1.0
+    def __init__(self, policy: FitnessPolicy | None = None):
+        self.policy = policy or FitnessPolicy()
 
-        sharpe = float(np.clip(metrics.get("sharpe", 0.0), -10.0, 10.0))
-        pnl_per_turnover = float(np.clip(metrics.get("pnl_per_turnover", 0.0), -10.0, 10.0))
-        rank_ic = float(np.clip(metrics.get("rank_ic", 0.0), -1.0, 1.0))
-        stability = float(np.clip(metrics.get("stability", 0.0), 0.0, 10.0))
-        tail = float(np.clip(metrics.get("tail_penalty_adjusted_return", 0.0), -10.0, 10.0))
-        turnover_penalty = float(np.clip(metrics.get("turnover_penalty", 0.0), 0.0, 10.0))
-        complexity_penalty = float(np.clip(metrics.get("complexity_penalty", 0.0), 0.0, 10.0))
-        gap_penalty = float(np.clip(metrics.get("train_valid_gap_penalty", 0.0), 0.0, 10.0))
+    def _clip(self, value: float, lo: float, hi: float) -> float:
+        return float(np.clip(value, lo, hi))
+
+    def _safe(self, metrics: dict[str, float], key: str, default: float = 0.0) -> float:
+        try:
+            return float(metrics.get(key, default))
+        except (TypeError, ValueError):
+            return float(default)
+
+    def score(self, metrics: dict[str, float]) -> float:
+        active_bar_ratio = self._safe(metrics, "active_bar_ratio")
+        signal_coverage = self._safe(metrics, "signal_coverage", 1.0)
+        avg_turnover = self._safe(metrics, "avg_turnover")
+        test_sharpe = self._safe(metrics, "test_sharpe")
+        negative_test_ratio = self._safe(metrics, "negative_test_ratio")
+        inactive = self._safe(metrics, "inactive")
+
+        reject_reasons = 0
+        if inactive >= 1.0 or active_bar_ratio < self.policy.min_active_bar_ratio:
+            reject_reasons += 1
+        if signal_coverage < self.policy.min_signal_coverage:
+            reject_reasons += 1
+        if avg_turnover < self.policy.min_avg_turnover:
+            reject_reasons += 1
+        if test_sharpe < self.policy.min_test_sharpe:
+            reject_reasons += 1
+        if negative_test_ratio > self.policy.max_negative_test_ratio:
+            reject_reasons += 1
+        if reject_reasons:
+            return self.policy.reject_score - 0.25 * float(reject_reasons - 1)
+
+        sharpe_score = self._clip(self._safe(metrics, "sharpe") / self.policy.sharpe_scale, -1.0, 1.0)
+        test_score = self._clip(test_sharpe / self.policy.test_sharpe_scale, -1.0, 1.0)
+        ic_score = self._clip(
+            self._safe(metrics, "rank_ic_abs") / self.policy.rank_ic_scale,
+            0.0,
+            1.0,
+        )
+        pnl_efficiency = max(self._safe(metrics, "pnl_per_turnover"), 0.0)
+        efficiency_score = self._clip(
+            np.log1p(pnl_efficiency) / np.log1p(self.policy.pnl_efficiency_cap),
+            0.0,
+            1.0,
+        )
+        tail_score = self._clip(
+            self._safe(metrics, "tail_ratio") / self.policy.tail_ratio_scale,
+            -1.0,
+            1.0,
+        )
+        activity_score = self._clip(self._safe(metrics, "activity_score"), 0.0, 1.0)
+        turnover_penalty = self._clip(self._safe(metrics, "turnover_penalty"), 0.0, 1.0)
+        complexity_penalty = self._clip(self._safe(metrics, "complexity_penalty"), 0.0, 1.0)
+        train_valid_gap_penalty = self._clip(self._safe(metrics, "train_valid_gap_penalty"), 0.0, 1.0)
+        valid_test_gap_penalty = self._clip(self._safe(metrics, "valid_test_gap_penalty"), 0.0, 1.0)
+        coverage_penalty = self._clip(self._safe(metrics, "coverage_penalty"), 0.0, 1.0)
 
         return (
-            0.30 * sharpe
-            + 0.20 * pnl_per_turnover
-            + 0.15 * rank_ic
-            + 0.10 * stability
-            + 0.10 * tail
+            0.28 * sharpe_score
+            + 0.20 * test_score
+            + 0.17 * ic_score
+            + 0.12 * efficiency_score
+            + 0.10 * tail_score
+            + 0.08 * activity_score
             - 0.10 * turnover_penalty
-            - 0.10 * complexity_penalty
-            - 0.15 * gap_penalty
+            - 0.07 * complexity_penalty
+            - 0.08 * train_valid_gap_penalty
+            - 0.10 * valid_test_gap_penalty
+            - 0.05 * coverage_penalty
         )
 
 

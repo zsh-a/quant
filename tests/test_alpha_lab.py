@@ -613,8 +613,9 @@ def test_build_fitness_metrics_marks_inactive_flat_strategy():
     metrics = service._build_fitness_metrics(alpha, weights, close, summary)
 
     assert metrics["inactive"] == 1.0
-    assert metrics["stability"] == 0.0
+    assert metrics["activity_score"] == 0.0
     assert metrics["pnl_per_turnover"] == 0.0
+    assert metrics["coverage_penalty"] == 1.0
 
 
 def test_fitness_engine_penalizes_inactive_strategies():
@@ -632,7 +633,53 @@ def test_fitness_engine_penalizes_inactive_strategies():
         }
     )
 
-    assert fitness == -1.0
+    assert fitness <= -5.0
+
+
+def test_fitness_engine_prefers_active_predictive_factor_over_zombie_factor():
+    engine = FitnessEngine()
+    zombie = engine.score(
+        {
+            "inactive": 0.0,
+            "active_bar_ratio": 0.12,
+            "signal_coverage": 0.95,
+            "avg_turnover": 0.006,
+            "test_sharpe": 0.05,
+            "negative_test_ratio": 0.0,
+            "sharpe": 0.10,
+            "rank_ic_abs": 0.002,
+            "pnl_per_turnover": 50.0,
+            "tail_ratio": 0.20,
+            "activity_score": 0.05,
+            "turnover_penalty": 0.0,
+            "complexity_penalty": 0.0,
+            "train_valid_gap_penalty": 0.0,
+            "valid_test_gap_penalty": 0.0,
+            "coverage_penalty": 0.0,
+        }
+    )
+    active = engine.score(
+        {
+            "inactive": 0.0,
+            "active_bar_ratio": 0.65,
+            "signal_coverage": 0.98,
+            "avg_turnover": 0.12,
+            "test_sharpe": 0.90,
+            "negative_test_ratio": 0.0,
+            "sharpe": 1.10,
+            "rank_ic_abs": 0.04,
+            "pnl_per_turnover": 2.0,
+            "tail_ratio": 1.20,
+            "activity_score": 0.95,
+            "turnover_penalty": 0.0,
+            "complexity_penalty": 0.10,
+            "train_valid_gap_penalty": 0.10,
+            "valid_test_gap_penalty": 0.10,
+            "coverage_penalty": 0.0,
+        }
+    )
+
+    assert active > zombie
 
 
 def test_ccxt_adapter_storage_symbol_normalization():
