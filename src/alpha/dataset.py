@@ -85,7 +85,7 @@ class CryptoMinuteDatasetLoader:
             )
             if not rows and source_interval != requested_interval:
                 logger.warning(
-                    "alpha_lab.dataset resample_source_missing provider={} symbol={} source_interval={} fallback_interval={}",
+                    "alpha.dataset resample_source_missing provider={} symbol={} source_interval={} fallback_interval={}",
                     provider,
                     symbol.upper(),
                     source_interval,
@@ -223,10 +223,84 @@ class CryptoMinuteDatasetLoader:
             fallback_close = aggregated["open_time"] + pd.to_timedelta(minutes, unit="min") - pd.to_timedelta(1, unit="ms")
             aggregated["close_time"] = aggregated["close_time"].fillna(fallback_close)
         logger.info(
-            "alpha_lab.dataset resampled symbol={} from_interval=1m to_interval={} rows_in={} rows_out={}",
+            "alpha.dataset resampled symbol={} from_interval=1m to_interval={} rows_in={} rows_out={}",
             symbol,
             interval,
             len(frame),
             len(aggregated),
         )
         return aggregated
+
+
+class StockDailyDatasetLoader:
+    """Load A-share daily bar data and return as AlphaDataset (time x symbols numpy arrays)."""
+
+    def __init__(self, db=None):
+        self._db = db
+
+    def _get_db(self):
+        if self._db is None:
+            from src.market_data.db import DB
+            self._db = DB()
+        return self._db
+
+    def load(
+        self,
+        index_code: str = "000852",
+        start_date: str = "2019-01-01",
+        end_date: str = "2025-01-01",
+        count: int = 1500,
+    ) -> AlphaDataset:
+        db = self._get_db()
+        stocks = db.get_index_stocks(index_code, start_date)
+        if not stocks:
+            stocks = db.get_index_stocks(f"sh.{index_code}", start_date)
+        if not stocks:
+            raise ValueError(f"Could not find component stocks for index {index_code}")
+
+        df = db.get_price(
+            stocks,
+            end_date,
+            fields=["open", "high", "low", "close", "volume", "amount"],
+            count=count,
+            start_date=start_date,
+        )
+        if df.empty:
+            raise ValueError("Data fetching returned empty DataFrame")
+
+        df = df.reset_index()
+        df.rename(columns={"code": "symbol"}, inplace=True)
+        df["date"] = pd.to_datetime(df["date"])
+
+        dates = sorted(df["date"].unique())
+        symbols = sorted(df["symbol"].unique())
+
+        fields: dict[str, np.ndarray] = {}
+        for col in ["open", "high", "low", "close", "volume", "amount"]:
+            if col in df.columns:
+                pivot = df.pivot(index="date", columns="symbol", values=col)
+                fields[col] = pivot.reindex(index=dates, columns=symbols).to_numpy(dtype=float)
+
+        if "amount" in fields and "volume" in fields:
+            fields["vwap"] = fields["amount"] / (fields["volume"] + 1e-12)
+
+        # Stock data doesn't have crypto-specific fields; provide zero placeholders
+        n_t, n_s = len(dates), len(symbols)
+        liquidity_mask = np.ones((n_t, n_s), dtype=bool)
+        session_mask = np.ones((n_t, n_s), dtype=bool)
+
+        logger.info(
+            "alpha.dataset.stock loaded index={} symbols={} dates={}",
+            index_code,
+            n_s,
+            n_t,
+        )
+        return AlphaDataset(
+            provider="stock",
+            interval="1d",
+            symbols=list(symbols),
+            timestamps=[str(d) for d in dates],
+            fields=fields,
+            liquidity_mask=liquidity_mask,
+            session_mask=session_mask,
+        )

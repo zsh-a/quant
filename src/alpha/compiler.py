@@ -4,7 +4,8 @@ import hashlib
 from dataclasses import dataclass, field
 from typing import Any
 
-from .dsl import ASTNode, DSLRegistry, TensorSchema, TypeChecker, FormulaParser, normalize_formula
+from .dsl import ASTNode, FormulaParser, TensorSchema, TypeChecker, normalize_formula
+from .operators import OperatorRegistry
 
 
 @dataclass
@@ -44,11 +45,11 @@ class BytecodeProgram:
 class FormulaCompiler:
     def __init__(
         self,
-        registry: DSLRegistry | None = None,
+        registry: OperatorRegistry | None = None,
         parser: FormulaParser | None = None,
         checker: TypeChecker | None = None,
     ):
-        self.registry = registry or DSLRegistry()
+        self.registry = registry or OperatorRegistry()
         self.parser = parser or FormulaParser(self.registry)
         self.checker = checker or TypeChecker(self.registry)
         self._next_register = 0

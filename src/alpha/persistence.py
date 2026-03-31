@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict, List
+
+from loguru import logger
 
 
 @dataclass
@@ -15,13 +18,17 @@ class PersistedRun:
     zoo_dir: str
 
 
-class AlphaLabPersistence:
-    def __init__(self, root_dir: str = "data/alpha_lab"):
+class AlphaPersistence:
+    def __init__(self, root_dir: str = "data/alpha"):
         self.root_dir = Path(root_dir)
         self.runs_dir = self.root_dir / "runs"
         self.zoo_dir = self.root_dir / "zoo"
         self.runs_dir.mkdir(parents=True, exist_ok=True)
         self.zoo_dir.mkdir(parents=True, exist_ok=True)
+
+    # -----------------------------------------------------------------------
+    # Run management (from AlphaLabPersistence)
+    # -----------------------------------------------------------------------
 
     def save_run(self, payload: dict[str, Any], run_name: str | None = None) -> PersistedRun:
         timestamp = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
@@ -142,3 +149,93 @@ class AlphaLabPersistence:
             "removed": len(removed),
             "removed_paths": removed,
         }
+
+    # -----------------------------------------------------------------------
+    # Node / Zoo operations (from AlphaZooPersistence)
+    # -----------------------------------------------------------------------
+
+    def save_node(self, node: Any, metadata: Dict[str, Any] = None) -> None:
+        """
+        Save an AlphaNode to a JSON file.
+        """
+        formula = node.formula
+        # Generate a unique ID based on the formula
+        formula_id = hashlib.md5(formula.encode()).hexdigest()[:12]
+
+        data = {
+            "id": formula_id,
+            "formula": formula,
+            "metrics": node.metrics,
+            "timestamp": datetime.now().isoformat(),
+            "name": getattr(node, 'name', 'unknown'),
+            "description": getattr(node, 'description', ''),
+            "metadata": metadata or {}
+        }
+
+        file_path = self.zoo_dir / f"alpha_{formula_id}.json"
+
+        try:
+            file_path.write_text(
+                json.dumps(data, indent=4, ensure_ascii=False),
+                encoding="utf-8",
+            )
+            logger.debug(f"Saved alpha factor {formula_id} to {file_path}")
+        except Exception as e:
+            logger.error(f"Failed to save alpha {formula_id}: {e}")
+
+    def save_zoo(self, zoo: List[Any], task_name: str = "default") -> None:
+        """
+        Save the entire Alpha Zoo.
+        """
+        logger.info(f"Saving {len(zoo)} factors to Zoo...")
+        for node in zoo:
+            self.save_node(node, {"task": task_name})
+
+    def load_all(self) -> List[Dict[str, Any]]:
+        """
+        Load all discovered alphas from the storage directory.
+        """
+        alphas = []
+        zoo_str = str(self.zoo_dir)
+        for filename in os.listdir(zoo_str):
+            if filename.endswith(".json") and filename.startswith("alpha_"):
+                path = os.path.join(zoo_str, filename)
+                try:
+                    with open(path, "r", encoding="utf-8") as f:
+                        alphas.append(json.load(f))
+                except Exception as e:
+                    logger.warning(f"Failed to load {path}: {e}")
+
+        # Sort by RankIC by default
+        alphas.sort(key=lambda x: abs(x.get('metrics', {}).get('rank_ic', 0)), reverse=True)
+        return alphas
+
+    def export_to_csv(self, output_path: str = "data/alpha_zoo_summary.csv") -> None:
+        """
+        Export factor summary to CSV for easy spreadsheet viewing.
+        """
+        import pandas as pd
+        alphas = self.load_all()
+        if not alphas:
+            return
+
+        flat_data = []
+        for a in alphas:
+            row = {
+                "id": a.get('id'),
+                "formula": a.get('formula'),
+                "rank_ic": a.get('metrics', {}).get('rank_ic'),
+                "ic_ir": a.get('metrics', {}).get('ic_ir'),
+                "fitness": a.get('metrics', {}).get('fitness'),
+                "timestamp": a.get('timestamp')
+            }
+            flat_data.append(row)
+
+        df = pd.DataFrame(flat_data)
+        df.to_csv(output_path, index=False)
+        logger.info(f"Exported zoo summary to {output_path}")
+
+
+# Backward-compatible aliases
+AlphaLabPersistence = AlphaPersistence
+AlphaZooPersistence = AlphaPersistence

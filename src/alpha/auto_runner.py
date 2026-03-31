@@ -10,7 +10,7 @@ import yaml
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from .service import AlphaLabService
+from .service import AlphaService
 
 
 def _parse_iso(value: str) -> datetime:
@@ -94,8 +94,8 @@ def load_auto_search_config(path: str | Path) -> AutoSearchConfig:
     return AutoSearchConfig.model_validate(payload)
 
 
-def build_service_from_auto_search_config(config: AutoSearchConfig) -> AlphaLabService:
-    return AlphaLabService(
+def build_service_from_auto_search_config(config: AutoSearchConfig) -> AlphaService:
+    return AlphaService(
         llm_backend_name=config.search.llm_backend,
         llm_model=config.search.llm_model,
         llm_base_url=config.search.llm_base_url,
@@ -104,7 +104,7 @@ def build_service_from_auto_search_config(config: AutoSearchConfig) -> AlphaLabS
 
 
 def run_auto_search_loop(
-    service: AlphaLabService,
+    service: AlphaService,
     config: AutoSearchConfig,
     *,
     once: bool = False,
@@ -124,7 +124,7 @@ def run_auto_search_loop(
     stopped_reason = "completed"
 
     logger.info(
-        "alpha_lab.auto_search start provider={} symbols={} interval={} once={} max_cycles={}",
+        "alpha.auto_search start provider={} symbols={} interval={} once={} max_cycles={}",
         config.search.provider,
         ",".join(config.search.symbols),
         config.search.interval,
@@ -144,7 +144,7 @@ def run_auto_search_loop(
             if config.runtime.require_new_window and last_window_end == window["end"]:
                 skipped_cycles += 1
                 logger.info(
-                    "alpha_lab.auto_search wait_for_new_window current_end={} poll_interval_seconds={}",
+                    "alpha.auto_search wait_for_new_window current_end={} poll_interval_seconds={}",
                     window["end"],
                     config.runtime.poll_interval_seconds,
                 )
@@ -158,7 +158,7 @@ def run_auto_search_loop(
             cycle_started_at = datetime.now(UTC)
             seeds, feedback_entries = _resolve_cycle_seed_bundle(config, service, state)
             logger.info(
-                "alpha_lab.auto_search cycle_start cycle={} start={} end={} seed_count={} feedback_entry_count={} seed_zoo_limit={} feedback_seed_count={}",
+                "alpha.auto_search cycle_start cycle={} start={} end={} seed_count={} feedback_entry_count={} seed_zoo_limit={} feedback_seed_count={}",
                 attempted_cycles,
                 window["start"],
                 window["end"],
@@ -214,7 +214,7 @@ def run_auto_search_loop(
                 "retention": retention,
             }
             logger.info(
-                "alpha_lab.auto_search cycle_complete cycle={} run_id={} top_result_count={}",
+                "alpha.auto_search cycle_complete cycle={} run_id={} top_result_count={}",
                 attempted_cycles,
                 last_result["run_id"],
                 last_result["top_result_count"],
@@ -229,7 +229,7 @@ def run_auto_search_loop(
                 sleep_fn(delay_seconds)
         except KeyboardInterrupt:
             stopped_reason = "keyboard_interrupt"
-            logger.warning("alpha_lab.auto_search interrupted by user")
+            logger.warning("alpha.auto_search interrupted by user")
             break
         except Exception as exc:
             failed_cycles += 1
@@ -238,7 +238,7 @@ def run_auto_search_loop(
             state["last_error"] = str(exc)
             state["updated_at"] = datetime.now(UTC).isoformat()
             _save_state(state_path, state)
-            logger.exception("alpha_lab.auto_search cycle_failed error={}", exc)
+            logger.exception("alpha.auto_search cycle_failed error={}", exc)
             if once or not config.runtime.continue_on_error:
                 raise
             backoff_seconds = min(
@@ -260,7 +260,7 @@ def run_auto_search_loop(
         "updated_at": datetime.now(UTC).isoformat(),
     }
     logger.info(
-        "alpha_lab.auto_search stop attempted_cycles={} successful_cycles={} failed_cycles={} stopped_reason={}",
+        "alpha.auto_search stop attempted_cycles={} successful_cycles={} failed_cycles={} stopped_reason={}",
         attempted_cycles,
         successful_cycles,
         failed_cycles,
@@ -321,7 +321,7 @@ def _floor_time(value: datetime, step_minutes: int) -> datetime:
 
 def _resolve_cycle_seed_bundle(
     config: AutoSearchConfig,
-    service: AlphaLabService,
+    service: AlphaService,
     state: dict[str, Any],
 ) -> tuple[list[str], list[dict[str, Any]]]:
     seeds: list[str] = []
@@ -379,7 +379,7 @@ def _build_carryover_entries(result: dict[str, Any], carryover_top_k: int) -> li
     return carryover_entries
 
 
-def _apply_retention(config: AutoSearchConfig, service: AlphaLabService) -> dict[str, Any]:
+def _apply_retention(config: AutoSearchConfig, service: AlphaService) -> dict[str, Any]:
     summary: dict[str, Any] = {}
     if config.runtime.max_run_files is not None:
         summary["runs"] = service.persistence.prune_runs(config.runtime.max_run_files)

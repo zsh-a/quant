@@ -5,12 +5,12 @@ import numpy as np
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.alpha_lab import AlphaLabService, FormulaCompiler, StackVM, TensorStore
-from src.alpha_lab.evolution import BreedingSpec, EvolutionEngine, FitnessEngine, HeuristicLLMBackend
-from src.alpha_lab.llm_backend import OpenAILLMBackend
-from src.alpha_lab.persistence import AlphaLabPersistence
-from src.alpha_lab.risk import CostModel, ExecutionSimulator, MarketContext, RuleOverlay
-from src.alpha_lab.validation import CPCVValidator
+from src.alpha import AlphaLabService, FormulaCompiler, StackVM, TensorStore
+from src.alpha.evolution import BreedingSpec, EvolutionEngine, FitnessEngine, HeuristicLLMBackend
+from src.alpha.llm import OpenAILLMBackend
+from src.alpha.persistence import AlphaLabPersistence
+from src.alpha.risk import CostModel, ExecutionSimulator, MarketContext, RuleOverlay
+from src.alpha.validation import CPCVValidator
 from src.market_data.ccxt_adapter import CcxtCryptoDataAdapter, PROVIDER_SPECS
 
 

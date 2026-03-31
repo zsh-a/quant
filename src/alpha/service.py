@@ -11,9 +11,10 @@ from loguru import logger
 
 from .compiler import BytecodeProgram, FormulaCompiler
 from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
-from .dsl import DSLRegistry, TensorSchema
+from .dsl import TensorSchema
 from .evolution import EvolutionEngine
-from .persistence import AlphaLabPersistence
+from .operators import OperatorRegistry
+from .persistence import AlphaPersistence
 from .risk import CostModel, ExecutionSimulator, MarketContext, RuleOverlay, SignalTransformer
 from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
@@ -25,7 +26,7 @@ DEFAULT_DB_SEEDS = [
 ]
 
 
-class AlphaLabService:
+class AlphaService:
     def __init__(
         self,
         schema: TensorSchema | None = None,
@@ -36,7 +37,7 @@ class AlphaLabService:
         llm_api_key: str | None = None,
         program_cache_size: int = 512,
     ):
-        self.registry = DSLRegistry()
+        self.registry = OperatorRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
         self.compiler = FormulaCompiler(self.registry)
         self.vm = StackVM()
@@ -54,7 +55,7 @@ class AlphaLabService:
         self.rule_overlay = RuleOverlay()
         self.execution = ExecutionSimulator()
         self.dataset_loader = CryptoMinuteDatasetLoader()
-        self.persistence = AlphaLabPersistence()
+        self.persistence = AlphaPersistence()
         self.validator = CPCVValidator()
         self._program_cache_size = max(int(program_cache_size), 0)
         self._program_cache: OrderedDict[str, BytecodeProgram] = OrderedDict()
@@ -372,7 +373,7 @@ class AlphaLabService:
             "per_generation": [],
         }
         logger.info(
-            "alpha_lab.search start provider={} symbols={} generations={} population_size={} offspring_count={} llm_backend={}",
+            "alpha.search start provider={} symbols={} generations={} population_size={} offspring_count={} llm_backend={}",
             provider,
             ",".join(symbols),
             generations,
@@ -392,7 +393,7 @@ class AlphaLabService:
         )
         timing["dataset_load_seconds"] = perf_counter() - dataset_start
         logger.info(
-            "alpha_lab.search dataset_loaded shape={} load_seconds={:.4f}",
+            "alpha.search dataset_loaded shape={} load_seconds={:.4f}",
             dataset.shape(),
             timing["dataset_load_seconds"],
         )
@@ -405,7 +406,7 @@ class AlphaLabService:
         )
         timing["validation_plan_seconds"] = perf_counter() - validation_start
         logger.info(
-            "alpha_lab.search validation_ready mode={} fold_count={} plan_seconds={:.4f}",
+            "alpha.search validation_ready mode={} fold_count={} plan_seconds={:.4f}",
             validation_plan["summary"]["mode"],
             validation_plan["summary"]["fold_count"],
             timing["validation_plan_seconds"],
@@ -415,7 +416,7 @@ class AlphaLabService:
         population = self._deduplicate_population(self.evolution.initialize(seeds, population_size))
         timing["population_init_seconds"] = perf_counter() - init_start
         logger.info(
-            "alpha_lab.search population_initialized requested_seeds={} actual_population={} init_seconds={:.4f}",
+            "alpha.search population_initialized requested_seeds={} actual_population={} init_seconds={:.4f}",
             len(seeds),
             len(population),
             timing["population_init_seconds"],
@@ -429,7 +430,7 @@ class AlphaLabService:
         for generation in range(generations):
             generation_start = perf_counter()
             logger.info(
-                "alpha_lab.search generation_start generation={} population_size={}",
+                "alpha.search generation_start generation={} population_size={}",
                 generation,
                 len(population),
             )
@@ -502,7 +503,7 @@ class AlphaLabService:
                 generation_timing["total_seconds"] = perf_counter() - generation_start
                 timing["per_generation"].append(generation_timing)
                 logger.info(
-                    "alpha_lab.search generation_complete generation={} survivors={} eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} total_seconds={:.4f}",
+                    "alpha.search generation_complete generation={} survivors={} eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} total_seconds={:.4f}",
                     generation,
                     len(survivors),
                     evaluation_seconds,
@@ -534,7 +535,7 @@ class AlphaLabService:
                 generation_timing["total_seconds"] = perf_counter() - generation_start
                 timing["per_generation"].append(generation_timing)
                 logger.info(
-                    "alpha_lab.search generation_complete generation={} survivors={} offspring=0 eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} breed_seconds={:.4f} total_seconds={:.4f}",
+                    "alpha.search generation_complete generation={} survivors={} offspring=0 eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} breed_seconds={:.4f} total_seconds={:.4f}",
                     generation,
                     len(survivors),
                     evaluation_seconds,
@@ -550,7 +551,7 @@ class AlphaLabService:
             generation_timing["total_seconds"] = perf_counter() - generation_start
             timing["per_generation"].append(generation_timing)
             logger.info(
-                "alpha_lab.search generation_complete generation={} survivors={} offspring={} eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} breed_seconds={:.4f} total_seconds={:.4f}",
+                "alpha.search generation_complete generation={} survivors={} offspring={} eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} breed_seconds={:.4f} total_seconds={:.4f}",
                 generation,
                 len(survivors),
                 offspring_count_actual,
@@ -609,13 +610,13 @@ class AlphaLabService:
                 "zoo_paths": zoo_paths,
             }
             logger.info(
-                "alpha_lab.search persistence_complete run_id={} persistence_seconds={:.4f}",
+                "alpha.search persistence_complete run_id={} persistence_seconds={:.4f}",
                 run.run_id,
                 timing["persistence_seconds"],
             )
         timing["overall_seconds"] = perf_counter() - overall_start
         logger.info(
-            "alpha_lab.search complete top_results={} overall_seconds={:.4f}",
+            "alpha.search complete top_results={} overall_seconds={:.4f}",
             len(result["top_results"]),
             timing["overall_seconds"],
         )
@@ -1376,3 +1377,7 @@ class AlphaLabService:
 
     def _to_serializable_list(self, value: Any) -> list[Any]:
         return self._to_numpy(value).tolist()
+
+
+# Backward-compatible alias
+AlphaLabService = AlphaService

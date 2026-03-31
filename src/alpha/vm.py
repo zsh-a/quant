@@ -105,12 +105,6 @@ class StackVM:
     def _prepare_store(self, store: TensorStore) -> TensorStore:
         if self.backend != "torch":
             return store
-        if store.uses_torch():
-            fields = {
-                name: self._as_torch_tensor(value)
-                for name, value in store.fields.items()
-            }
-            return TensorStore(fields)
         fields = {
             name: self._as_torch_tensor(value)
             for name, value in store.fields.items()
@@ -144,6 +138,10 @@ class StackVM:
         if self.backend == "torch":
             return self._execute_torch(opcode, args)
         return self._execute_numpy(opcode, args)
+
+    # ------------------------------------------------------------------
+    # numpy backend
+    # ------------------------------------------------------------------
 
     def _execute_numpy(self, opcode: str, args: list[ArrayLike]) -> ArrayLike:
         if opcode == "add":
@@ -196,6 +194,9 @@ class StackVM:
             return np.where(np.isnan(args[0]), args[1], args[0])
         if opcode == "where":
             return np.where(args[0], args[1], args[2])
+        if opcode == "power":
+            p = self._scalar(args[1])
+            return np.sign(args[0]) * np.power(np.abs(args[0]) + 1e-12, p)
         if opcode == "delay":
             return self._delay_numpy(args[0], int(self._scalar(args[1])))
         if opcode == "delta":
@@ -234,6 +235,10 @@ class StackVM:
             return self._ts_argextreme_numpy(args[0], int(self._scalar(args[1])), mode="max")
         if opcode == "ts_argmin":
             return self._ts_argextreme_numpy(args[0], int(self._scalar(args[1])), mode="min")
+        if opcode == "ts_ema":
+            return self._ts_ema_numpy(args[0], int(self._scalar(args[1])))
+        if opcode == "ts_winsorize":
+            return self._ts_winsorize_numpy(args[0], int(self._scalar(args[1])), self._scalar(args[2]))
         if opcode == "cs_rank":
             return self._cs_rank_numpy(args[0])
         if opcode == "cs_scale":
@@ -276,6 +281,10 @@ class StackVM:
             returns = args[0] / (self._delay_numpy(args[0], 1) + 1e-12) - 1.0
             return self._rolling_numpy(returns, int(self._scalar(args[1])), np.nanstd)
         raise ValueError(f"Unsupported opcode: {opcode}")
+
+    # ------------------------------------------------------------------
+    # torch backend
+    # ------------------------------------------------------------------
 
     def _execute_torch(self, opcode: str, args: list[ArrayLike]) -> ArrayLike:
         if opcode == "add":
@@ -328,6 +337,9 @@ class StackVM:
             return torch.where(torch.isnan(args[0]), args[1], args[0])
         if opcode == "where":
             return torch.where(args[0], args[1], args[2])
+        if opcode == "power":
+            p = self._scalar(args[1])
+            return torch.sign(args[0]) * torch.pow(torch.abs(args[0]) + 1e-12, p)
         if opcode == "delay":
             return self._delay_torch(args[0], int(self._scalar(args[1])))
         if opcode == "delta":
@@ -366,6 +378,10 @@ class StackVM:
             return self._ts_argextreme_torch(args[0], int(self._scalar(args[1])), mode="max")
         if opcode == "ts_argmin":
             return self._ts_argextreme_torch(args[0], int(self._scalar(args[1])), mode="min")
+        if opcode == "ts_ema":
+            return self._ts_ema_torch(args[0], int(self._scalar(args[1])))
+        if opcode == "ts_winsorize":
+            return self._ts_winsorize_torch(args[0], int(self._scalar(args[1])), self._scalar(args[2]))
         if opcode == "cs_rank":
             return self._cs_rank_torch(args[0])
         if opcode == "cs_scale":
@@ -409,6 +425,10 @@ class StackVM:
             return self._rolling_torch(returns, int(self._scalar(args[1])), reducer="std")
         raise ValueError(f"Unsupported opcode: {opcode}")
 
+    # ------------------------------------------------------------------
+    # helpers
+    # ------------------------------------------------------------------
+
     def _scalar(self, value: ArrayLike) -> float:
         if torch is not None and isinstance(value, torch.Tensor):
             return float(value.reshape(-1)[0].item())
@@ -430,6 +450,8 @@ class StackVM:
             return torch.as_tensor(array, device=self.device, dtype=torch.bool)
         return torch.as_tensor(array, device=self.device, dtype=torch.float32)
 
+    # --- delay ---
+
     def _delay_numpy(self, arr: ArrayLike, periods: int) -> ArrayLike:
         result = np.full_like(arr, np.nan, dtype=float)
         if periods <= 0:
@@ -449,6 +471,8 @@ class StackVM:
         result[periods:] = data[:-periods]
         return result
 
+    # --- rolling ---
+
     def _rolling_numpy(self, arr: ArrayLike, window: int, reducer) -> ArrayLike:
         data = np.asarray(arr, dtype=float)
         result = np.full_like(data, np.nan, dtype=float)
@@ -456,7 +480,7 @@ class StackVM:
             return result
         windows = np.lib.stride_tricks.sliding_window_view(data, window_shape=window, axis=0)
         reduced = reducer(windows, axis=-1)
-        result[window - 1 :] = reduced
+        result[window - 1:] = reduced
         return result
 
     def _rolling_torch(self, arr: ArrayLike, window: int, reducer: str) -> ArrayLike:
@@ -477,8 +501,10 @@ class StackVM:
             reduced = self._torch_nanmin(windows, dim=-1)
         else:
             raise ValueError(f"Unsupported rolling reducer: {reducer}")
-        result[window - 1 :] = reduced
+        result[window - 1:] = reduced
         return result
+
+    # --- rolling pair ---
 
     def _rolling_pair_numpy(self, left: ArrayLike, right: ArrayLike, window: int, reducer: str) -> ArrayLike:
         x = np.asarray(left, dtype=float)
@@ -506,7 +532,7 @@ class StackVM:
         else:
             raise ValueError(f"Unsupported rolling pair reducer: {reducer}")
         reduced[count == 0] = np.nan
-        result[window - 1 :] = reduced
+        result[window - 1:] = reduced
         return result
 
     def _rolling_pair_torch(self, left: ArrayLike, right: ArrayLike, window: int, reducer: str) -> ArrayLike:
@@ -535,8 +561,10 @@ class StackVM:
         else:
             raise ValueError(f"Unsupported rolling pair reducer: {reducer}")
         reduced = torch.where(count > 0, reduced, torch.full_like(reduced, torch.nan))
-        result[window - 1 :] = reduced
+        result[window - 1:] = reduced
         return result
+
+    # --- decay linear ---
 
     def _decay_linear_numpy(self, arr: ArrayLike, window: int) -> ArrayLike:
         data = np.asarray(arr, dtype=float)
@@ -550,7 +578,7 @@ class StackVM:
         denom = np.where(valid, weights, 0.0).sum(axis=-1)
         reduced = weighted.sum(axis=-1) / np.maximum(denom, 1e-12)
         reduced[denom <= 0] = np.nan
-        result[window - 1 :] = reduced
+        result[window - 1:] = reduced
         return result
 
     def _decay_linear_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
@@ -565,8 +593,68 @@ class StackVM:
         denom = torch.where(valid, weights, torch.zeros_like(windows)).sum(dim=-1)
         reduced = weighted.sum(dim=-1) / denom.clamp(min=1e-12)
         reduced = torch.where(denom > 0, reduced, torch.full_like(reduced, torch.nan))
-        result[window - 1 :] = reduced
+        result[window - 1:] = reduced
         return result
+
+    # --- ts_ema (NEW) ---
+
+    def _ts_ema_numpy(self, arr: ArrayLike, window: int) -> ArrayLike:
+        data = np.asarray(arr, dtype=float)
+        alpha = 2.0 / (window + 1)
+        result = np.full_like(data, np.nan, dtype=float)
+        if data.shape[0] == 0:
+            return result
+        result[0] = data[0]
+        for i in range(1, data.shape[0]):
+            prev = result[i - 1]
+            cur = data[i]
+            nan_prev = np.isnan(prev)
+            nan_cur = np.isnan(cur)
+            result[i] = np.where(
+                nan_cur,
+                prev,
+                np.where(nan_prev, cur, alpha * cur + (1 - alpha) * prev),
+            )
+        return result
+
+    def _ts_ema_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
+        data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
+        alpha = 2.0 / (window + 1)
+        result = torch.full_like(data, torch.nan)
+        if data.shape[0] == 0:
+            return result
+        result[0] = data[0]
+        for i in range(1, data.shape[0]):
+            prev = result[i - 1]
+            cur = data[i]
+            nan_prev = torch.isnan(prev)
+            nan_cur = torch.isnan(cur)
+            result[i] = torch.where(
+                nan_cur,
+                prev,
+                torch.where(nan_prev, cur, alpha * cur + (1 - alpha) * prev),
+            )
+        return result
+
+    # --- ts_winsorize (NEW) ---
+
+    def _ts_winsorize_numpy(self, arr: ArrayLike, window: int, n_std: float) -> ArrayLike:
+        data = np.asarray(arr, dtype=float)
+        mean = self._rolling_numpy(data, window, np.nanmean)
+        std = self._rolling_numpy(data, window, np.nanstd)
+        upper = mean + n_std * std
+        lower = mean - n_std * std
+        return np.clip(data, lower, upper)
+
+    def _ts_winsorize_torch(self, arr: ArrayLike, window: int, n_std: float) -> ArrayLike:
+        data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
+        mean = self._rolling_torch(data, window, reducer="mean")
+        std = self._rolling_torch(data, window, reducer="std")
+        upper = mean + n_std * std
+        lower = mean - n_std * std
+        return torch.clamp(torch.clamp(data, min=lower), max=upper)
+
+    # --- ts_argextreme ---
 
     def _ts_argextreme_numpy(self, arr: ArrayLike, window: int, mode: str) -> ArrayLike:
         data = np.asarray(arr, dtype=float)
@@ -585,7 +673,7 @@ class StackVM:
         counts = valid.sum(axis=-1)
         scaled = indices.astype(float) / max(window - 1, 1)
         scaled[counts == 0] = np.nan
-        result[window - 1 :] = scaled
+        result[window - 1:] = scaled
         return result
 
     def _ts_argextreme_torch(self, arr: ArrayLike, window: int, mode: str) -> ArrayLike:
@@ -606,8 +694,10 @@ class StackVM:
         counts = valid.sum(dim=-1)
         scaled = indices.to(dtype=data.dtype) / max(window - 1, 1)
         scaled = torch.where(counts > 0, scaled, torch.full_like(scaled, torch.nan))
-        result[window - 1 :] = scaled
+        result[window - 1:] = scaled
         return result
+
+    # --- ts_rank ---
 
     def _ts_rank_numpy(self, arr: ArrayLike, window: int) -> ArrayLike:
         data = np.asarray(arr, dtype=float)
@@ -621,7 +711,7 @@ class StackVM:
         better = np.where(valid[..., :-1], last > windows[..., :-1], False).sum(axis=-1)
         ranked = better / np.maximum(counts, 1)
         ranked[counts == 0] = np.nan
-        result[window - 1 :] = ranked
+        result[window - 1:] = ranked
         return result
 
     def _ts_rank_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
@@ -636,13 +726,11 @@ class StackVM:
         counts = valid.sum(dim=-1)
         better = (valid & (last > history)).sum(dim=-1)
         ranked = better.to(dtype=data.dtype) / counts.clamp(min=1).to(dtype=data.dtype)
-        ranked = torch.where(
-            counts > 0,
-            ranked,
-            torch.full_like(ranked, torch.nan),
-        )
-        result[window - 1 :] = ranked
+        ranked = torch.where(counts > 0, ranked, torch.full_like(ranked, torch.nan))
+        result[window - 1:] = ranked
         return result
+
+    # --- cs_rank ---
 
     def _cs_rank_numpy(self, arr: ArrayLike) -> ArrayLike:
         data = np.asarray(arr, dtype=float)
@@ -665,6 +753,8 @@ class StackVM:
         scaled = ranks / denom.clamp(min=1.0)
         scaled = torch.where(nan_mask, torch.full_like(scaled, torch.nan), scaled)
         return scaled
+
+    # --- torch nan-safe helpers ---
 
     def _torch_nansum(self, tensor: Any, dim: int, keepdim: bool = False) -> Any:
         mask = ~torch.isnan(tensor)

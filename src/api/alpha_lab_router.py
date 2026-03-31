@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.alpha_lab import AlphaLabService
+from src.alpha import AlphaService as AlphaLabService
 from src.config.settings import (
     get_alpha_lab_config,
     get_bitget_config,

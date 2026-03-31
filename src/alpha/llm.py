@@ -4,16 +4,18 @@ import ast
 import json
 import os
 import re
+import time
 from time import perf_counter
-from typing import Any
+from typing import Any, Dict, List
 
 import httpx
 from loguru import logger
 from openai import OpenAI
 
 from .compiler import FormulaCompiler
-from .dsl import DSLRegistry, TensorSchema
+from .dsl import TensorSchema
 from .evolution import BreedingSpec, HeuristicLLMBackend
+from .operators import OperatorRegistry
 
 
 GENESIS_SYSTEM_PROMPT = """You are a senior quantitative researcher specializing in crypto alpha discovery.
@@ -26,7 +28,7 @@ Strictly obey the provided field and operator library. Output JSON only."""
 class OpenAILLMBackend:
     def __init__(
         self,
-        registry: DSLRegistry | None = None,
+        registry: OperatorRegistry | None = None,
         schema: TensorSchema | None = None,
         model_name: str | None = None,
         base_url: str | None = None,
@@ -37,7 +39,7 @@ class OpenAILLMBackend:
         client: Any | None = None,
         fallback_backend: HeuristicLLMBackend | None = None,
     ):
-        self.registry = registry or DSLRegistry()
+        self.registry = registry or OperatorRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
         self.compiler = FormulaCompiler(self.registry)
         self.model_name = model_name or os.getenv("ALPHA_LAB_LLM_MODEL", "gpt-4.1-mini")
@@ -72,7 +74,7 @@ class OpenAILLMBackend:
 
     def generate_initial_population(self, count: int) -> list[str]:
         logger.info(
-            "alpha_lab.llm genesis start backend={} model={} target_count={}",
+            "alpha.llm genesis start backend={} model={} target_count={}",
             self.backend_name,
             self.model_name,
             count,
@@ -91,7 +93,7 @@ class OpenAILLMBackend:
             fallback=lambda needed: self.fallback_backend.generate_initial_population(needed),
         )
         logger.info(
-            "alpha_lab.llm genesis complete backend={} extracted={} finalized={}",
+            "alpha.llm genesis complete backend={} extracted={} finalized={}",
             self.backend_name,
             len(formulas),
             len(finalized),
@@ -100,7 +102,7 @@ class OpenAILLMBackend:
 
     def generate_offspring(self, spec: BreedingSpec, count: int) -> list[str]:
         logger.info(
-            "alpha_lab.llm evolution start backend={} model={} target_count={} has_parent_b={}",
+            "alpha.llm evolution start backend={} model={} target_count={} has_parent_b={}",
             self.backend_name,
             self.model_name,
             count,
@@ -120,7 +122,7 @@ class OpenAILLMBackend:
             fallback=lambda needed: self.fallback_backend.generate_offspring(spec, needed),
         )
         logger.info(
-            "alpha_lab.llm evolution complete backend={} extracted={} finalized={}",
+            "alpha.llm evolution complete backend={} extracted={} finalized={}",
             self.backend_name,
             len(formulas),
             len(finalized),
@@ -129,7 +131,7 @@ class OpenAILLMBackend:
 
     def _call_llm(self, system_prompt: str, user_prompt: str, temperature: float, call_kind: str) -> str:
         logger.info(
-            "alpha_lab.llm request backend={} model={} kind={} temperature={} prompt_chars={}",
+            "alpha.llm request backend={} model={} kind={} temperature={} prompt_chars={}",
             self.backend_name,
             self.model_name,
             call_kind,
@@ -153,7 +155,7 @@ class OpenAILLMBackend:
         self.call_stats["total_seconds"] += latency
         self.call_stats["last_latency_seconds"] = latency
         logger.info(
-            "alpha_lab.llm response backend={} model={} kind={} latency_seconds={:.4f}",
+            "alpha.llm response backend={} model={} kind={} latency_seconds={:.4f}",
             self.backend_name,
             self.model_name,
             call_kind,
@@ -236,7 +238,7 @@ class OpenAILLMBackend:
         parent_block = "\n\n".join(lines) if lines else f"[Parent]\n- Formula: `{spec.parent_a}`"
         return f"""
 # Context
-上一代回测中，以下父代公式表现最好，它们是你的“父代基因”：
+上一代回测中，以下父代公式表现最好，它们是你的"父代基因"：
 
 {parent_block}
 
@@ -247,7 +249,7 @@ class OpenAILLMBackend:
 优先保留并强化以下特征：
 1. valid/test 维度都稳健，而不只是 train 内表现好。
 2. Abs(RankIC)、Sharpe、TestSharpe、Tail-adjusted return 同时改善。
-3. 追求“健康活跃度”而不是极低换手；避免 inactive、低覆盖、过低换手、极高换手、train-valid/test 衰减过大。
+3. 追求"健康活跃度"而不是极低换手；避免 inactive、低覆盖、过低换手、极高换手、train-valid/test 衰减过大。
 4. 如果父代 test_sharpe 弱于 valid_sharpe，优先做稳健化、降复杂度和增强泛化，而不是放大原信号。
 
 # Batch Diversity Requirements
@@ -456,7 +458,7 @@ class OpenAILLMBackend:
 
 
 def build_default_llm_backend(
-    registry: DSLRegistry,
+    registry: OperatorRegistry,
     schema: TensorSchema,
     backend_name: str = "auto",
     model_name: str | None = None,
@@ -476,3 +478,141 @@ def build_default_llm_backend(
             api_key=api_key,
         )
     return HeuristicLLMBackend(registry=registry, schema=schema)
+
+
+# ---------------------------------------------------------------------------
+# LLMAgent (from alpha_mining) -- A-share / CSI-1000 focused agent
+# ---------------------------------------------------------------------------
+
+PROMPT_PORTRAIT_GENERATION = """
+Task Description:
+Design a high-performance alpha factor for CSI 1000 index.
+
+MANDATORY Operator List (ONLY USE THESE):
+- Unary: Abs(x), Log(x), Sign(x), Sqrt(x)
+- Time-series: Ts_Mean(x, d), Ts_Std(x, d), Ts_Max(x, d), Ts_Min(x, d), Ts_Rank(x, d), Ts_Zscore(x, d), Ts_EMA(x, d), Ts_DecayLinear(x, d), Ts_Winsorize(x, d, n_std)
+- Diff: Delta(x, d), Delay(x, d), Ts_Returns(x, d)
+- Binary: Correlation(x, y, d), Covariance(x, y, d), Max(x, y), Min(x, y)
+- Logic: Where(condition, x, y)  <-- Use this instead of If
+- Cross-sectional: CSRank(x), Scale(x), Power(x, p), Sigmoid(x)
+- Available fields: open, high, low, close, volume, amount, vwap
+
+CRITICAL RULES:
+1. Syntax MUST be valid Python with BALANCED parentheses.
+2. Use '&' for AND, '|' for OR inside Where condition (e.g., Where((close > open) & (volume > 100), 1, 0)).
+3. DO NOT use '&&' or 'AND' or 'If' or any undefined functions.
+4. Ensure all Ts_* operators have a window 'd' parameter.
+5. Always wrap the final result in CSRank().
+6. Keep formula complexity reasonable (max 3-4 nested levels).
+7. CSRank() takes EXACTLY 1 argument, not 2.
+
+Output JSON: {"name": "...", "description": "...", "formula": "..."}
+"""
+
+PROMPT_REFINE_ALPHA = """
+Improve this alpha: {formula}
+Feedback: {suggestion}
+{error_feedback}
+
+MANDATORY SIGNATURES (ONLY USE THESE):
+- Ts_Mean(x, d), Ts_Std(x, d), Ts_Rank(x, d), Ts_Zscore(x, d), Ts_EMA(x, d), Ts_DecayLinear(x, d), Ts_Winsorize(x, d, n_std)
+- Delta(x, d), Delay(x, d), Correlation(x, y, d), Covariance(x, y, d)
+- CSRank(x) - takes EXACTLY 1 argument
+- Where(condition, x, y), Max(x, y), Min(x, y)
+- Power(x, p), Sigmoid(x), Abs(x), Log(x), Sign(x), Sqrt(x)
+
+CRITICAL SYNTAX RULES:
+1. BALANCE all parentheses - count opening '(' and closing ')' must match.
+2. Use '&' instead of 'AND' or '&&'.
+3. Use '|' instead of 'OR' or '||'.
+4. No 'If' statements, use Where().
+5. CSRank(x) takes 1 argument, not 2 or more.
+6. Keep complexity under control - MAX 3 nested levels, window size 5-60 days.
+7. Only use functions listed above - no undefined functions.
+8. AVOID excessive smoothing - don't combine Ts_DecayLinear + Ts_Mean together.
+9. Prefer simple formulas over complex ones for better generalization.
+
+Provide ONLY the improved formula string (no explanation, no markdown).
+"""
+
+
+class LLMAgent:
+    def __init__(
+        self,
+        model_name: str = None,
+        base_url: str = None,
+        api_key: str = None
+    ):
+        self.model_name = model_name or os.getenv("ALPHA_MINING_MODEL", "deepseek-ai/DeepSeek-V3.2")
+        base_url = base_url or os.getenv("ALPHA_MINING_BASE_URL", "https://api-inference.modelscope.cn/v1")
+        api_key = api_key or os.getenv("ALPHA_MINING_API_KEY")
+
+        if not api_key:
+            raise ValueError("API key not found. Please set ALPHA_MINING_API_KEY in .env file")
+
+        # Configure client with explicit timeouts
+        self.client = OpenAI(
+            base_url=base_url,
+            api_key=api_key,
+            timeout=httpx.Timeout(
+                connect=10.0,   # 连接超时10秒
+                read=60.0,      # 读取超时60秒
+                write=10.0,     # 写入超时10秒
+                pool=5.0        # 连接池超时5秒
+            ),
+            max_retries=2       # 最多重试2次
+        )
+
+    def generate_alpha(self, forbidden_structures: List[str] = []) -> Dict[str, str]:
+        response = self._call_llm(PROMPT_PORTRAIT_GENERATION)
+        return self._parse_json_response(response)
+
+    def refine_alpha(self, formula: str, suggestion: str, error_msg: str = None) -> str:
+        error_feedback = f"\nERROR IN PREVIOUS FORMULA: {error_msg}\nPlease fix the syntax or undefined name." if error_msg else ""
+        prompt = PROMPT_REFINE_ALPHA.format(
+            formula=formula,
+            suggestion=suggestion,
+            error_feedback=error_feedback
+        )
+        response = self._call_llm(prompt)
+        # Robust cleaning
+        res = response.strip().split('\n')[0].replace('`', '').replace('formula=', '')
+        return res
+
+    def get_refinement_suggestion(self, formula: str, dimension: str, metrics: dict) -> str:
+        prompt = f"Alpha: {formula}\nMetrics: RankIC={metrics.get('rank_ic',0):.4f}, IR={metrics.get('ic_ir',0):.4f}\nImprove {dimension}. Give 1 short logic tip."
+        return self._call_llm(prompt)
+
+    def _call_llm(self, prompt: str) -> str:
+        try:
+            logger.info(f"      [LLM] Sending request to {self.model_name}...")
+            logger.debug(f"      [LLM] Prompt length: {len(prompt)} chars")
+
+            start_time = time.time()
+
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=[{'role': 'user', 'content': prompt}],
+                temperature=0.1,  # Minimum randomness
+                stream=False,     # 明确禁用流式响应
+                timeout=60        # API调用级别超时
+            )
+
+            elapsed = time.time() - start_time
+            result = response.choices[0].message.content
+
+            logger.info(f"      [LLM] Response received in {elapsed:.2f}s, length: {len(result)} chars")
+            return result
+
+        except Exception as e:
+            logger.error(f"      [LLM] Call failed: {type(e).__name__}: {e}")
+            return ""
+
+    def _parse_json_response(self, response: str) -> Dict[str, str]:
+        try:
+            clean_res = re.sub(r'```json\s*|\s*```', '', response).strip()
+            start = clean_res.find('{')
+            end = clean_res.rfind('}') + 1
+            return json.loads(clean_res[start:end])
+        except Exception:
+            return {"name": "error", "description": "error", "formula": "CSRank(close)"}

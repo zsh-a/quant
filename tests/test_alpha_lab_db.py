@@ -8,11 +8,11 @@ import yaml
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.alpha_lab.auto_runner import load_auto_search_config
-from src.alpha_lab.cli import build_parser, run_command
-from src.alpha_lab.dataset import CryptoMinuteDatasetLoader
-from src.alpha_lab.persistence import AlphaLabPersistence
-from src.alpha_lab.service import AlphaLabService
+from src.alpha.auto_runner import load_auto_search_config
+from src.alpha.cli import build_parser, run_command
+from src.alpha.dataset import CryptoMinuteDatasetLoader
+from src.alpha.persistence import AlphaLabPersistence
+from src.alpha.service import AlphaLabService
 
 START = datetime(2026, 3, 27, 0, 0, tzinfo=UTC)
 END = datetime(2026, 3, 27, 0, 19, tzinfo=UTC)

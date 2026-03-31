@@ -1,18 +1,11 @@
 from __future__ import annotations
 
 import ast
-import hashlib
 from dataclasses import dataclass, field
-from typing import Any, Iterable
+from typing import TYPE_CHECKING, Any, Iterable
 
-
-@dataclass(frozen=True)
-class OperatorSpec:
-    name: str
-    min_args: int
-    max_args: int
-    output_kind: str
-    category: str
+if TYPE_CHECKING:
+    from .operators import OperatorRegistry
 
 
 @dataclass
@@ -56,6 +49,22 @@ class TensorSchema:
             masks=frozenset({"liquidity_mask", "session_mask"}),
         )
 
+    @classmethod
+    def default_stock_schema(cls) -> "TensorSchema":
+        return cls(
+            fields=frozenset(
+                {
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "amount",
+                    "vwap",
+                }
+            ),
+        )
+
 
 @dataclass
 class ValidationReport:
@@ -66,157 +75,8 @@ class ValidationReport:
     ast_tree: dict[str, Any] | None = None
 
 
-class DSLRegistry:
-    def __init__(self):
-        self._operators = self._build_defaults()
-        self._aliases = self._build_aliases()
-
-    def _build_defaults(self) -> dict[str, OperatorSpec]:
-        specs = [
-            OperatorSpec("abs", 1, 1, "tensor", "unary"),
-            OperatorSpec("log", 1, 1, "tensor", "unary"),
-            OperatorSpec("sign", 1, 1, "tensor", "unary"),
-            OperatorSpec("sqrt", 1, 1, "tensor", "unary"),
-            OperatorSpec("sigmoid", 1, 1, "tensor", "unary"),
-            OperatorSpec("neg", 1, 1, "tensor", "unary"),
-            OperatorSpec("not", 1, 1, "mask", "logical"),
-            OperatorSpec("add", 2, 2, "tensor", "binary"),
-            OperatorSpec("sub", 2, 2, "tensor", "binary"),
-            OperatorSpec("mul", 2, 2, "tensor", "binary"),
-            OperatorSpec("div", 2, 2, "tensor", "binary"),
-            OperatorSpec("max", 2, 2, "tensor", "binary"),
-            OperatorSpec("min", 2, 2, "tensor", "binary"),
-            OperatorSpec("pow", 2, 2, "tensor", "binary"),
-            OperatorSpec("clip", 3, 3, "tensor", "conditional"),
-            OperatorSpec("fillna", 2, 2, "tensor", "conditional"),
-            OperatorSpec("where", 3, 3, "tensor", "conditional"),
-            OperatorSpec("gt", 2, 2, "mask", "comparison"),
-            OperatorSpec("ge", 2, 2, "mask", "comparison"),
-            OperatorSpec("lt", 2, 2, "mask", "comparison"),
-            OperatorSpec("le", 2, 2, "mask", "comparison"),
-            OperatorSpec("eq", 2, 2, "mask", "comparison"),
-            OperatorSpec("ne", 2, 2, "mask", "comparison"),
-            OperatorSpec("and", 2, 2, "mask", "logical"),
-            OperatorSpec("or", 2, 2, "mask", "logical"),
-            OperatorSpec("delay", 2, 2, "tensor", "time_series"),
-            OperatorSpec("delta", 2, 2, "tensor", "time_series"),
-            OperatorSpec("returns_n", 2, 2, "tensor", "time_series"),
-            OperatorSpec("log_return", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_mean", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_std", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_sum", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_max", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_min", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_rank", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_zscore", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_corr", 3, 3, "tensor", "time_series"),
-            OperatorSpec("ts_cov", 3, 3, "tensor", "time_series"),
-            OperatorSpec("decay_linear", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_argmax", 2, 2, "tensor", "time_series"),
-            OperatorSpec("ts_argmin", 2, 2, "tensor", "time_series"),
-            OperatorSpec("cs_rank", 1, 1, "tensor", "cross_sectional"),
-            OperatorSpec("cs_scale", 1, 1, "tensor", "cross_sectional"),
-            OperatorSpec("cs_zscore", 1, 1, "tensor", "cross_sectional"),
-            OperatorSpec("cs_demean", 1, 1, "tensor", "cross_sectional"),
-            OperatorSpec("oi_delta", 2, 2, "tensor", "domain"),
-            OperatorSpec("funding_delta", 2, 2, "tensor", "domain"),
-            OperatorSpec("spread_ratio", 2, 2, "tensor", "domain"),
-            OperatorSpec("adv_n", 2, 2, "tensor", "domain"),
-            OperatorSpec("amihud", 3, 3, "tensor", "domain"),
-            OperatorSpec("hlc3", 3, 3, "tensor", "domain"),
-            OperatorSpec("ohlc4", 4, 4, "tensor", "domain"),
-            OperatorSpec("true_range", 3, 3, "tensor", "domain"),
-            OperatorSpec("atr_n", 4, 4, "tensor", "domain"),
-            OperatorSpec("volatility_n", 2, 2, "tensor", "domain"),
-        ]
-        return {spec.name: spec for spec in specs}
-
-    def list_operators(self) -> list[OperatorSpec]:
-        return sorted(self._operators.values(), key=lambda spec: spec.name)
-
-    def has(self, name: str) -> bool:
-        return self.normalize_name(name) in self._operators
-
-    def get(self, name: str) -> OperatorSpec:
-        return self._operators[self.normalize_name(name)]
-
-    def normalize_name(self, name: str) -> str:
-        lowered = name.lower()
-        if lowered in self._operators:
-            return lowered
-        compact = lowered.replace("_", "")
-        return self._aliases.get(compact, lowered)
-
-    def _build_aliases(self) -> dict[str, str]:
-        aliases: dict[str, str] = {}
-        for canonical in self._operators:
-            aliases[canonical.replace("_", "")] = canonical
-        aliases.update(
-            {
-                "csrank": "cs_rank",
-                "csscale": "cs_scale",
-                "volatility": "volatility_n",
-                "tsmax": "ts_max",
-                "tsmin": "ts_min",
-                "tsmean": "ts_mean",
-                "tsstd": "ts_std",
-                "tssum": "ts_sum",
-                "tsrank": "ts_rank",
-                "tszscore": "ts_zscore",
-                "tscorr": "ts_corr",
-                "tscov": "ts_cov",
-                "returnsn": "returns_n",
-                "logreturn": "log_return",
-                "decaylinear": "decay_linear",
-                "tsargmax": "ts_argmax",
-                "tsargmin": "ts_argmin",
-                "cszscore": "cs_zscore",
-                "csdemean": "cs_demean",
-                "fillna": "fillna",
-                "oidelta": "oi_delta",
-                "fundingdelta": "funding_delta",
-                "spreadratio": "spread_ratio",
-                "adv": "adv_n",
-                "advn": "adv_n",
-                "truerange": "true_range",
-                "atr": "atr_n",
-                "atrn": "atr_n",
-                "corr": "ts_corr",
-                "cov": "ts_cov",
-                "stddev": "ts_std",
-            }
-        )
-        return aliases
-
-    def validate_formula(
-        self,
-        formula: str,
-        schema: TensorSchema | None = None,
-    ) -> ValidationReport:
-        parser = FormulaParser(self)
-        checker = TypeChecker(self)
-        try:
-            parsed = parser.parse(formula)
-            typed = checker.infer(parsed, schema or TensorSchema.default_market_schema())
-            normalized = normalize_formula(parsed)
-            ast_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-            return ValidationReport(
-                ok=True,
-                normalized_formula=normalized,
-                errors=[],
-                ast_hash=ast_hash,
-                ast_tree=typed.to_dict(),
-            )
-        except ValueError as exc:
-            return ValidationReport(
-                ok=False,
-                normalized_formula=formula.strip(),
-                errors=[str(exc)],
-            )
-
-
 class FormulaParser:
-    def __init__(self, registry: DSLRegistry):
+    def __init__(self, registry: "OperatorRegistry"):
         self.registry = registry
 
     def parse(self, formula: str) -> ASTNode:
@@ -288,7 +148,7 @@ class FormulaParser:
 
 
 class TypeChecker:
-    def __init__(self, registry: DSLRegistry):
+    def __init__(self, registry: "OperatorRegistry"):
         self.registry = registry
         self.field_aliases = {
             "oi": "open_interest",
@@ -354,6 +214,9 @@ class TypeChecker:
         elif name in {"fillna"}:
             if kinds[0] not in {"tensor", "scalar"} or kinds[1] not in {"tensor", "scalar"}:
                 raise ValueError("fillna(x, value) requires tensor/scalar inputs")
+        elif name == "power":
+            if kinds[0] not in {"tensor", "scalar"} or kinds[1] != "scalar":
+                raise ValueError("power(x, p) requires (tensor/scalar, scalar)")
         elif name in {
             "delay",
             "delta",
@@ -369,6 +232,7 @@ class TypeChecker:
             "decay_linear",
             "ts_argmax",
             "ts_argmin",
+            "ts_ema",
             "oi_delta",
             "funding_delta",
             "adv_n",
@@ -376,6 +240,9 @@ class TypeChecker:
         }:
             if kinds[0] != "tensor" or kinds[1] != "scalar":
                 raise ValueError(f"Operator {name} requires (tensor, scalar_window)")
+        elif name == "ts_winsorize":
+            if kinds[0] != "tensor" or kinds[1] != "scalar" or kinds[2] != "scalar":
+                raise ValueError("ts_winsorize(x, window, n_std) requires (tensor, scalar, scalar)")
         elif name in {"ts_corr", "ts_cov"}:
             if kinds[0] != "tensor" or kinds[1] != "tensor" or kinds[2] != "scalar":
                 raise ValueError(f"Operator {name} requires (tensor, tensor, scalar_window)")

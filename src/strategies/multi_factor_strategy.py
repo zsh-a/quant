@@ -11,31 +11,44 @@ import numpy as np
 from typing import Dict, List, Optional, Any
 from src.core.base import Strategy, Bar
 from src.strategies.registry import StrategyRegistry
-from src.alpha_mining.operators import SAFE_LOCALS
-from src.alpha_mining.persistence import AlphaZooPersistence
+from src.alpha.persistence import AlphaPersistence as AlphaZooPersistence
+from src.alpha.operators import OperatorRegistry as _OperatorRegistry
+from src.alpha.compiler import FormulaCompiler as _FormulaCompiler
+from src.alpha.dsl import TensorSchema as _TensorSchema
+from src.alpha.vm import StackVM as _StackVM, TensorStore as _TensorStore
 from loguru import logger
 
 
 # --------------- Factor computation helpers ---------------
 
+_registry = _OperatorRegistry()
+_compiler = _FormulaCompiler(_registry)
+_vm = _StackVM(prefer_torch=False)
+_stock_schema = _TensorSchema.default_stock_schema()
+
+
 def _compute_factor(formula: str, price_data: Dict[str, pd.DataFrame]) -> pd.DataFrame:
     """
-    Evaluate a formula string against a price context built from *price_data*.
+    Evaluate a formula string via the compiled DSL/VM pipeline.
     Returns a Date × Symbol matrix of factor values.
     """
-    context: Dict[str, Any] = {}
+    dates = price_data["close"].index
+    symbols = price_data["close"].columns
+
+    fields: Dict[str, np.ndarray] = {}
     for col in ["open", "high", "low", "close", "volume", "amount"]:
         if col in price_data:
-            context[col] = price_data[col]
+            fields[col] = price_data[col].to_numpy(dtype=float)
 
-    if "amount" in context and "volume" in context:
-        context["vwap"] = context["amount"] / (context["volume"] + 1e-9)
+    if "amount" in fields and "volume" in fields:
+        fields["vwap"] = fields["amount"] / (fields["volume"] + 1e-9)
 
-    context.update(SAFE_LOCALS)
-
-    factor_matrix = eval(formula, {"__builtins__": {}}, context)
-    factor_matrix = factor_matrix.replace([np.inf, -np.inf], np.nan)
-    return factor_matrix
+    store = _TensorStore(fields)
+    program = _compiler.compile(formula, _stock_schema)
+    result = _vm.run(program, store)
+    result_np = np.asarray(result, dtype=float)
+    result_np = np.where(np.isinf(result_np), np.nan, result_np)
+    return pd.DataFrame(result_np, index=dates, columns=symbols)
 
 
 def _rank_cross_section(factor: pd.DataFrame) -> pd.DataFrame:

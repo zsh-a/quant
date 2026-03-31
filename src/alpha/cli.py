@@ -1,9 +1,9 @@
 """
-CLI for the database-backed alpha_lab closed loop.
+CLI for the database-backed alpha closed loop.
 
 Examples:
-    python -m src.alpha_lab.cli evaluate-db --formula "CSRank(ts_mean(close,5)-close)" --provider bitget --symbols BTCUSDT,ETHUSDT --start 2026-03-27T00:00:00+00:00 --end 2026-03-28T00:00:00+00:00
-    python -m src.alpha_lab.cli search-db --provider bitget --symbols BTCUSDT,ETHUSDT,SOLUSDT --start 2026-03-27T00:00:00+00:00 --end 2026-03-28T00:00:00+00:00 --seed "CSRank(ts_mean(close,5)-close)" --seed "CSRank(ts_std(close,5))"
+    python -m src.alpha.cli evaluate-db --formula "CSRank(ts_mean(close,5)-close)" --provider bitget --symbols BTCUSDT,ETHUSDT --start 2026-03-27T00:00:00+00:00 --end 2026-03-28T00:00:00+00:00
+    python -m src.alpha.cli search-db --provider bitget --symbols BTCUSDT,ETHUSDT,SOLUSDT --start 2026-03-27T00:00:00+00:00 --end 2026-03-28T00:00:00+00:00 --seed "CSRank(ts_mean(close,5)-close)" --seed "CSRank(ts_std(close,5))"
 """
 
 from __future__ import annotations
@@ -13,12 +13,12 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from src.alpha_lab.auto_runner import (
+from src.alpha.auto_runner import (
     build_service_from_auto_search_config,
     load_auto_search_config,
     run_auto_search_loop,
 )
-from src.alpha_lab.service import AlphaLabService
+from src.alpha.service import AlphaService
 
 
 def _parse_iso(value: str) -> datetime:
@@ -39,7 +39,7 @@ def _parse_int_list(value: str | None) -> list[int]:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Database-backed alpha_lab CLI")
+    parser = argparse.ArgumentParser(description="Database-backed alpha CLI")
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     validate = subparsers.add_parser("validate", help="Validate a formula")
@@ -119,10 +119,10 @@ def build_parser() -> argparse.ArgumentParser:
     auto_search.add_argument("--once", action="store_true", help="Run a single cycle and exit")
     auto_search.add_argument("--max-cycles", type=int, default=None, help="Override config runtime.max_cycles")
 
-    list_runs = subparsers.add_parser("list-runs", help="List persisted alpha_lab runs")
+    list_runs = subparsers.add_parser("list-runs", help="List persisted alpha runs")
     list_runs.add_argument("--limit", type=int, default=20)
 
-    show_run = subparsers.add_parser("show-run", help="Show one persisted alpha_lab run")
+    show_run = subparsers.add_parser("show-run", help="Show one persisted alpha run")
     show_run.add_argument("--run-id", required=True)
 
     list_zoo = subparsers.add_parser("list-zoo", help="List persisted alpha zoo entries")
@@ -134,7 +134,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
+def run_command(args: argparse.Namespace, service: AlphaService) -> Any:
     if args.command == "validate":
         return service.validate_formula(args.formula)
     if args.command == "compile":
@@ -222,7 +222,7 @@ def run_command(args: argparse.Namespace, service: AlphaLabService) -> Any:
     raise ValueError(f"Unsupported command: {args.command}")
 
 
-def main(argv: list[str] | None = None, service: AlphaLabService | None = None) -> int:
+def main(argv: list[str] | None = None, service: AlphaService | None = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
     default_service = service
@@ -230,7 +230,7 @@ def main(argv: list[str] | None = None, service: AlphaLabService | None = None) 
         auto_search_config = load_auto_search_config(args.config)
         default_service = build_service_from_auto_search_config(auto_search_config)
     if default_service is None:
-        default_service = AlphaLabService(
+        default_service = AlphaService(
             llm_backend_name=getattr(args, "llm_backend", "auto"),
             llm_model=getattr(args, "llm_model", None),
             llm_base_url=getattr(args, "llm_base_url", None),

@@ -8,7 +8,8 @@ from typing import Any, Protocol
 import numpy as np
 
 from .compiler import BytecodeProgram, FormulaCompiler
-from .dsl import DSLRegistry, TensorSchema
+from .dsl import TensorSchema
+from .operators import OperatorRegistry
 
 
 @dataclass
@@ -62,8 +63,8 @@ class HeuristicLLMBackend:
     loop can explore a meaningfully larger operator space.
     """
 
-    def __init__(self, registry: DSLRegistry | None = None, schema: TensorSchema | None = None):
-        self.registry = registry or DSLRegistry()
+    def __init__(self, registry: OperatorRegistry | None = None, schema: TensorSchema | None = None):
+        self.registry = registry or OperatorRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
         self.call_stats = {
             "initial_population_calls": 0,
@@ -261,18 +262,18 @@ class EvolutionEngine:
         self,
         llm_backend: LLMBackend | None = None,
         compiler: FormulaCompiler | None = None,
-        registry: DSLRegistry | None = None,
+        registry: OperatorRegistry | None = None,
         schema: TensorSchema | None = None,
         backend_name: str = "auto",
         model_name: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
     ):
-        self.registry = registry or DSLRegistry()
+        self.registry = registry or OperatorRegistry()
         self.compiler = compiler or FormulaCompiler(self.registry)
         self.schema = schema or TensorSchema.default_market_schema()
         if llm_backend is None:
-            from .llm_backend import build_default_llm_backend
+            from .llm import build_default_llm_backend
 
             llm_backend = build_default_llm_backend(
                 registry=self.registry,
