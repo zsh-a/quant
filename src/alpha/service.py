@@ -363,6 +363,8 @@ class AlphaService:
         embargo_window: int = 0,
         blocked_utc_hours: list[int] | None = None,
     ) -> dict[str, Any]:
+        from .tracing import tracer
+
         overall_start = perf_counter()
         timing: dict[str, Any] = {
             "overall_seconds": 0.0,
@@ -372,14 +374,26 @@ class AlphaService:
             "persistence_seconds": 0.0,
             "per_generation": [],
         }
+        _search_span_ctx = tracer.start_span(
+            "ga_search", kind="search",
+            provider=provider,
+            symbols=",".join(symbols),
+            generations=generations,
+            population_size=population_size,
+            offspring_count=offspring_count,
+            llm_backend=getattr(self.evolution.llm_backend, "backend_name",
+                                self.evolution.llm_backend.__class__.__name__),
+        )
+        _search_span = _search_span_ctx.__enter__()
         logger.info(
-            "alpha.search start provider={} symbols={} generations={} population_size={} offspring_count={} llm_backend={}",
+            "alpha.search start provider={} symbols={} generations={} population_size={} offspring_count={} llm_backend={} trace_id={}",
             provider,
             ",".join(symbols),
             generations,
             population_size,
             offspring_count,
             getattr(self.evolution.llm_backend, "backend_name", self.evolution.llm_backend.__class__.__name__),
+            _search_span.trace_id[:8],
         )
         dataset_start = perf_counter()
         dataset = self.dataset_loader.load(
@@ -615,10 +629,27 @@ class AlphaService:
                 timing["persistence_seconds"],
             )
         timing["overall_seconds"] = perf_counter() - overall_start
+
+        # Close search span and attach summary
+        _search_span.set("top_results", len(result["top_results"]))
+        _search_span.set("overall_seconds", timing["overall_seconds"])
+        if result["top_results"]:
+            best = result["top_results"][0]
+            _search_span.set("best_fitness", best.get("fitness", 0))
+            _search_span.set("best_formula", best.get("formula", "")[:60])
+        # Attach LLM usage summary from backend
+        llm_backend = self.evolution.llm_backend
+        _search_span.set("llm_call_stats", dict(getattr(llm_backend, "call_stats", {})))
+        _search_span_ctx.__exit__(None, None, None)
+        tracer.flush()  # ensure Langfuse data is sent
+
+        result["trace_id"] = _search_span.trace_id
+
         logger.info(
-            "alpha.search complete top_results={} overall_seconds={:.4f}",
+            "alpha.search complete top_results={} overall_seconds={:.4f} trace_id={}",
             len(result["top_results"]),
             timing["overall_seconds"],
+            _search_span.trace_id[:8],
         )
         if persisted_run_id is not None:
             self.persistence.update_run(persisted_run_id, result)

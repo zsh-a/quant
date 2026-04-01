@@ -28,6 +28,7 @@ from .risk import (
     SignalTransformer,
 )
 from .service import AlphaService
+from .tracing import InMemoryCollector, LangfuseCollector, Span, SpanCollector, tracer
 from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
 
@@ -77,4 +78,9 @@ __all__ = [
     "TypeChecker",
     "ValidationFold",
     "ValidationReport",
+    "tracer",
+    "Span",
+    "SpanCollector",
+    "InMemoryCollector",
+    "LangfuseCollector",
 ]

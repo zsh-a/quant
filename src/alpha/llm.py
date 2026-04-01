@@ -73,95 +73,93 @@ class OpenAILLMBackend:
         return "openai"
 
     def generate_initial_population(self, count: int) -> list[str]:
-        logger.info(
-            "alpha.llm genesis start backend={} model={} target_count={}",
-            self.backend_name,
-            self.model_name,
-            count,
-        )
-        prompt = self._build_genesis_prompt(count)
-        response = self._call_llm(
-            system_prompt=GENESIS_SYSTEM_PROMPT,
-            user_prompt=prompt,
-            temperature=self.temperature_genesis,
-            call_kind="genesis",
-        )
-        formulas = self._extract_formulas(response)
-        finalized = self._finalize_formulas(
-            formulas=formulas,
-            target_count=count,
-            fallback=lambda needed: self.fallback_backend.generate_initial_population(needed),
-        )
-        logger.info(
-            "alpha.llm genesis complete backend={} extracted={} finalized={}",
-            self.backend_name,
-            len(formulas),
-            len(finalized),
-        )
-        return finalized
+        from .tracing import tracer
+
+        with tracer.start_span("genesis_pipeline", kind="breed",
+                               target_count=count, backend=self.backend_name) as span:
+            prompt = self._build_genesis_prompt(count)
+            response = self._call_llm(
+                system_prompt=GENESIS_SYSTEM_PROMPT,
+                user_prompt=prompt,
+                temperature=self.temperature_genesis,
+                call_kind="genesis",
+            )
+            formulas = self._extract_formulas(response)
+            fallback_used = len(formulas) < count
+            finalized = self._finalize_formulas(
+                formulas=formulas,
+                target_count=count,
+                fallback=lambda needed: self.fallback_backend.generate_initial_population(needed),
+            )
+            span.set("formulas_extracted", len(formulas))
+            span.set("formulas_valid", len(finalized))
+            span.set("fallback_used", fallback_used)
+            span.set("target_count", count)
+            return finalized
 
     def generate_offspring(self, spec: BreedingSpec, count: int) -> list[str]:
-        logger.info(
-            "alpha.llm evolution start backend={} model={} target_count={} has_parent_b={}",
-            self.backend_name,
-            self.model_name,
-            count,
-            bool(spec.parent_b),
-        )
-        prompt = self._build_evolution_prompt(spec, count)
-        response = self._call_llm(
-            system_prompt=EVOLUTION_SYSTEM_PROMPT,
-            user_prompt=prompt,
-            temperature=self.temperature_evolution,
-            call_kind="evolution",
-        )
-        formulas = self._extract_formulas(response)
-        finalized = self._finalize_formulas(
-            formulas=formulas,
-            target_count=count,
-            fallback=lambda needed: self.fallback_backend.generate_offspring(spec, needed),
-        )
-        logger.info(
-            "alpha.llm evolution complete backend={} extracted={} finalized={}",
-            self.backend_name,
-            len(formulas),
-            len(finalized),
-        )
-        return finalized
+        from .tracing import tracer
+
+        with tracer.start_span("evolution_pipeline", kind="breed",
+                               target_count=count, backend=self.backend_name,
+                               has_parent_b=bool(spec.parent_b)) as span:
+            prompt = self._build_evolution_prompt(spec, count)
+            response = self._call_llm(
+                system_prompt=EVOLUTION_SYSTEM_PROMPT,
+                user_prompt=prompt,
+                temperature=self.temperature_evolution,
+                call_kind="evolution",
+            )
+            formulas = self._extract_formulas(response)
+            fallback_used = len(formulas) < count
+            finalized = self._finalize_formulas(
+                formulas=formulas,
+                target_count=count,
+                fallback=lambda needed: self.fallback_backend.generate_offspring(spec, needed),
+            )
+            # Record parent fitness for correlation analysis
+            parent_metrics = spec.parent_feedback[0].get("metrics", {}) if spec.parent_feedback else {}
+            span.set("formulas_extracted", len(formulas))
+            span.set("formulas_valid", len(finalized))
+            span.set("fallback_used", fallback_used)
+            span.set("parent_a_sharpe", parent_metrics.get("sharpe", 0))
+            span.set("parent_a_rank_ic", parent_metrics.get("rank_ic_abs", 0))
+            return finalized
 
     def _call_llm(self, system_prompt: str, user_prompt: str, temperature: float, call_kind: str) -> str:
-        logger.info(
-            "alpha.llm request backend={} model={} kind={} temperature={} prompt_chars={}",
-            self.backend_name,
-            self.model_name,
-            call_kind,
-            temperature,
-            len(system_prompt) + len(user_prompt),
-        )
-        start = perf_counter()
-        response = self.client.chat.completions.create(
-            model=self.model_name,
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": user_prompt},
-            ],
-            temperature=temperature,
-            stream=False,
-            timeout=90,
-        )
-        latency = perf_counter() - start
-        self.call_stats["total_calls"] += 1
-        self.call_stats[f"{call_kind}_calls"] += 1
-        self.call_stats["total_seconds"] += latency
-        self.call_stats["last_latency_seconds"] = latency
-        logger.info(
-            "alpha.llm response backend={} model={} kind={} latency_seconds={:.4f}",
-            self.backend_name,
-            self.model_name,
-            call_kind,
-            latency,
-        )
-        return response.choices[0].message.content or ""
+        from .tracing import prompt_hash, tracer
+
+        messages = [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ]
+        with tracer.start_span(call_kind, kind="llm",
+                               model=self.model_name,
+                               backend=self.backend_name,
+                               temperature=temperature,
+                               prompt_chars=len(system_prompt) + len(user_prompt),
+                               prompt_hash=prompt_hash(system_prompt + user_prompt),
+                               input=messages) as span:
+            response = self.client.chat.completions.create(
+                model=self.model_name,
+                messages=messages,
+                temperature=temperature,
+                stream=False,
+                timeout=90,
+            )
+            content = response.choices[0].message.content or ""
+            span.set_response(response)
+            span.set("output", content)
+
+            self.call_stats["total_calls"] += 1
+            self.call_stats[f"{call_kind}_calls"] += 1
+            self.call_stats["total_seconds"] += span.duration_ms / 1000
+            self.call_stats["last_latency_seconds"] = span.duration_ms / 1000
+            total_tokens = span.attributes.get("total_tokens") or 0
+            self.call_stats.setdefault("total_tokens", 0)
+            self.call_stats["total_tokens"] += total_tokens
+
+            return content
 
     def _build_genesis_prompt(self, count: int) -> str:
         features = [
@@ -584,29 +582,32 @@ class LLMAgent:
         return self._call_llm(prompt)
 
     def _call_llm(self, prompt: str) -> str:
-        try:
-            logger.info(f"      [LLM] Sending request to {self.model_name}...")
-            logger.debug(f"      [LLM] Prompt length: {len(prompt)} chars")
+        from .tracing import prompt_hash, tracer
 
-            start_time = time.time()
+        messages = [{"role": "user", "content": prompt}]
+        with tracer.start_span("agent_call", kind="llm",
+                               model=self.model_name,
+                               backend="llm_agent",
+                               temperature=0.1,
+                               prompt_chars=len(prompt),
+                               prompt_hash=prompt_hash(prompt),
+                               input=messages) as span:
+            try:
+                response = self.client.chat.completions.create(
+                    model=self.model_name,
+                    messages=messages,
+                    temperature=0.1,
+                    stream=False,
+                    timeout=60,
+                )
+                content = response.choices[0].message.content or ""
+                span.set_response(response)
+                span.set("output", content)
+                return content
 
-            response = self.client.chat.completions.create(
-                model=self.model_name,
-                messages=[{'role': 'user', 'content': prompt}],
-                temperature=0.1,  # Minimum randomness
-                stream=False,     # 明确禁用流式响应
-                timeout=60        # API调用级别超时
-            )
-
-            elapsed = time.time() - start_time
-            result = response.choices[0].message.content
-
-            logger.info(f"      [LLM] Response received in {elapsed:.2f}s, length: {len(result)} chars")
-            return result
-
-        except Exception as e:
-            logger.error(f"      [LLM] Call failed: {type(e).__name__}: {e}")
-            return ""
+            except Exception as e:
+                span.set_error(e)
+                return ""
 
     def _parse_json_response(self, response: str) -> Dict[str, str]:
         try:

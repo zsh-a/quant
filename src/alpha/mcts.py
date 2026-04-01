@@ -102,6 +102,8 @@ class MCTSEngine:
         train_ratio: float = 0.6,
         val_ratio: float = 0.2,
     ):
+        from .tracing import tracer
+
         iters = iterations or self.max_iterations
         n_t = dataset.shape()[0]
         train_end = int(n_t * train_ratio)
@@ -112,30 +114,51 @@ class MCTSEngine:
         train_ds = dataset.take_indices(train_idx)
         val_ds = dataset.take_indices(val_idx)
 
-        metrics = self._evaluate_formula(initial_formula, train_ds)
-        score = self._calculate_score(metrics)
+        with tracer.start_span("mcts_search", kind="search",
+                               iterations=iters,
+                               dataset_shape=dataset.shape(),
+                               zoo_threshold=self.zoo_threshold) as search_span:
+            metrics = self._evaluate_formula(initial_formula, train_ds)
+            score = self._calculate_score(metrics)
 
-        self.root = AlphaNode(initial_formula, c_puct=self.c_puct)
-        self.root.metrics = metrics
-        self.root.update(score)
+            self.root = AlphaNode(initial_formula, c_puct=self.c_puct)
+            self.root.metrics = metrics
+            self.root.update(score)
+            search_span.event("seed_evaluated", formula=initial_formula[:60], score=score,
+                              rank_ic=metrics.get("rank_ic", 0))
 
-        for i in range(iters):
-            logger.info(f"MCTS Iteration {i + 1}/{iters}")
-            leaf = self._select(self.root)
-            child = self._expand(leaf, train_ds)
+            for i in range(iters):
+                with tracer.start_span("mcts_iteration", kind="mcts",
+                                       iteration=i + 1, total=iters) as iter_span:
+                    leaf = self._select(self.root)
+                    child = self._expand(leaf, train_ds)
 
-            if child:
-                self._backpropagate(child, child.value)
-                train_ic = child.metrics.get("rank_ic", 0)
-                if abs(train_ic) > self.zoo_threshold:
-                    val_metrics = self._evaluate_formula(child.formula, val_ds)
-                    val_ic = val_metrics.get("rank_ic", 0)
-                    if abs(val_ic) > self.zoo_threshold * 0.4:
-                        child.metrics["val_rank_ic"] = val_ic
-                        self._add_to_zoo(child, dataset)
-                        logger.info(f"Added to zoo: Train IC={train_ic:.4f}, Val IC={val_ic:.4f}")
+                    if child:
+                        self._backpropagate(child, child.value)
+                        train_ic = child.metrics.get("rank_ic", 0)
+                        iter_span.set("child_formula", child.formula[:60])
+                        iter_span.set("child_score", child.value)
+                        iter_span.set("child_rank_ic", train_ic)
 
-            logger.info(f"MCTS Iteration {i + 1}/{iters} completed. Zoo size: {len(self.alpha_zoo)}")
+                        if abs(train_ic) > self.zoo_threshold:
+                            val_metrics = self._evaluate_formula(child.formula, val_ds)
+                            val_ic = val_metrics.get("rank_ic", 0)
+                            iter_span.set("val_rank_ic", val_ic)
+                            if abs(val_ic) > self.zoo_threshold * 0.4:
+                                child.metrics["val_rank_ic"] = val_ic
+                                self._add_to_zoo(child, dataset)
+                                iter_span.event("zoo_add", formula=child.formula[:60],
+                                                train_ic=train_ic, val_ic=val_ic)
+                    else:
+                        iter_span.set("expansion_failed", True)
+
+                    iter_span.set("zoo_size", len(self.alpha_zoo))
+                    iter_span.set("tree_depth", self._tree_depth())
+
+            search_span.set("final_zoo_size", len(self.alpha_zoo))
+            search_span.set("total_nodes", self._tree_size())
+
+        tracer.flush()  # ensure Langfuse data is sent
 
     def _evaluate_formula(self, formula: str, dataset: AlphaDataset) -> dict[str, float]:
         try:
@@ -160,6 +183,8 @@ class MCTSEngine:
         return current
 
     def _expand(self, node: AlphaNode, train_ds: AlphaDataset) -> AlphaNode | None:
+        from .tracing import tracer
+
         ir = node.metrics.get("ic_ir", 0)
         rank_ic = node.metrics.get("rank_ic", 0)
 
@@ -176,34 +201,50 @@ class MCTSEngine:
         else:
             dimension = "Novelty (High performance but needs variation to explore new alpha space)"
 
-        suggestion = self.llm.get_refinement_suggestion(node.formula, dimension, node.metrics)
+        with tracer.start_span("mcts_expand", kind="breed",
+                               parent_formula=node.formula[:60],
+                               parent_rank_ic=rank_ic,
+                               parent_ir=ir,
+                               dimension=dimension.split("(")[0].strip()) as span:
+            suggestion = self.llm.get_refinement_suggestion(node.formula, dimension, node.metrics)
+            span.set("suggestion", suggestion[:120])
 
-        max_retries = 3
-        error_msg = None
+            max_retries = 3
+            error_msg = None
 
-        for attempt in range(max_retries):
-            new_formula = self.llm.refine_alpha(node.formula, suggestion, error_msg)
-            if not new_formula or new_formula == node.formula:
-                continue
+            for attempt in range(max_retries):
+                new_formula = self.llm.refine_alpha(node.formula, suggestion, error_msg)
+                if not new_formula or new_formula == node.formula:
+                    span.event("attempt_skip", attempt=attempt + 1, reason="unchanged")
+                    continue
 
-            metrics = self._evaluate_formula(new_formula, train_ds)
+                metrics = self._evaluate_formula(new_formula, train_ds)
 
-            if "error" in metrics:
-                error_msg = metrics["error"]
-                logger.warning(f"Attempt {attempt + 1} failed: {error_msg}. Retrying...")
-                continue
+                if "error" in metrics:
+                    error_msg = metrics["error"]
+                    span.event("attempt_fail", attempt=attempt + 1, error=error_msg[:80])
+                    continue
 
-            child = AlphaNode(new_formula, parent=node, c_puct=self.c_puct)
-            child.metrics = metrics
-            child.value = self._calculate_score(metrics)
-            node.add_child(child)
-            logger.info(f"Expanded: {new_formula[:60]}... Score: {child.value:.4f}")
-            return child
+                child = AlphaNode(new_formula, parent=node, c_puct=self.c_puct)
+                child.metrics = metrics
+                child.value = self._calculate_score(metrics)
+                node.add_child(child)
 
-        dead_child = AlphaNode(f"FAILED_{node.formula[:10]}", parent=node)
-        dead_child.value = -1.0
-        node.add_child(dead_child)
-        return None
+                # Record quality delta: did the LLM improve the parent?
+                ic_delta = metrics.get("rank_ic", 0) - rank_ic
+                span.set("child_formula", new_formula[:60])
+                span.set("child_rank_ic", metrics.get("rank_ic", 0))
+                span.set("ic_delta", ic_delta)
+                span.set("attempts_used", attempt + 1)
+                span.set("success", True)
+                return child
+
+            span.set("success", False)
+            span.set("attempts_used", max_retries)
+            dead_child = AlphaNode(f"FAILED_{node.formula[:10]}", parent=node)
+            dead_child.value = -1.0
+            node.add_child(dead_child)
+            return None
 
     def _backpropagate(self, node: AlphaNode, reward: float):
         current: AlphaNode | None = node
@@ -251,6 +292,22 @@ class MCTSEngine:
         except Exception as e:
             logger.warning(f"Deduplication check failed: {e}, adding anyway")
             self.alpha_zoo.append(node)
+
+    def _tree_depth(self) -> int:
+        if self.root is None:
+            return 0
+        def _depth(n: AlphaNode) -> int:
+            if not n.children:
+                return 1
+            return 1 + max(_depth(c) for c in n.children)
+        return _depth(self.root)
+
+    def _tree_size(self) -> int:
+        if self.root is None:
+            return 0
+        def _count(n: AlphaNode) -> int:
+            return 1 + sum(_count(c) for c in n.children)
+        return _count(self.root)
 
 
 # Backward-compatible alias
