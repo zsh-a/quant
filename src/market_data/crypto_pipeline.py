@@ -227,6 +227,8 @@ class CryptoMinuteSyncService:
                         end_time=window.end_time,
                         limit=window.expected_points,
                     )
+                    if bars and adapter.is_futures:
+                        adapter.enrich_bars(bars, requested_symbol, window.start_time, window.end_time)
                     fetched_total += len(bars)
                     inserted_total += self._store().insert_bars(bars)
                     window_last = bars[-1].open_time if bars else window.end_time

@@ -26,6 +26,8 @@ class UnifiedMinuteBar:
     volume_base: float
     volume_quote: float
     trade_count: int = 0
+    funding_rate: float = 0.0
+    open_interest: float = 0.0
     ingest_source: str = "api_sync"
     ingested_at: datetime | None = None
 
@@ -103,6 +105,8 @@ class CryptoMinuteBarStore:
                 volume_base Float64,
                 volume_quote Float64,
                 trade_count UInt32,
+                funding_rate Float64 DEFAULT 0,
+                open_interest Float64 DEFAULT 0,
                 ingest_source LowCardinality(String),
                 ingested_at DateTime64(3, 'UTC')
             )
@@ -256,7 +260,8 @@ class CryptoMinuteBarStore:
     ) -> list[dict[str, Any]]:
         sql = f"""
         SELECT provider, market_type, symbol, exchange_symbol, interval, open_time, close_time,
-               open, high, low, close, volume_base, volume_quote, trade_count
+               open, high, low, close, volume_base, volume_quote, trade_count,
+               funding_rate, open_interest
         FROM crypto_data.minute_bars
         WHERE provider = '{self._sql_quote(provider)}'
           AND symbol = '{self._sql_quote(symbol)}'

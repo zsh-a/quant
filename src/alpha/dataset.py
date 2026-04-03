@@ -126,6 +126,8 @@ class CryptoMinuteDatasetLoader:
             .reset_index()
         )
 
+        n_t, n_s = len(timestamps), len(resolved_symbols)
+
         fields = {
             "open": self._pivot_field(aligned, "open", timestamps, resolved_symbols),
             "high": self._pivot_field(aligned, "high", timestamps, resolved_symbols),
@@ -133,9 +135,21 @@ class CryptoMinuteDatasetLoader:
             "close": self._pivot_field(aligned, "close", timestamps, resolved_symbols),
             "volume": self._pivot_field(aligned, "volume_base", timestamps, resolved_symbols),
             "turnover": self._pivot_field(aligned, "volume_quote", timestamps, resolved_symbols),
-            "funding_rate": np.zeros((len(timestamps), len(resolved_symbols)), dtype=float),
-            "open_interest": np.zeros((len(timestamps), len(resolved_symbols)), dtype=float),
         }
+
+        # Read real funding_rate / open_interest from DB; fall back to zeros
+        if "funding_rate" in aligned.columns:
+            fr = self._pivot_field(aligned, "funding_rate", timestamps, resolved_symbols)
+            fields["funding_rate"] = np.nan_to_num(fr, nan=0.0)
+        else:
+            fields["funding_rate"] = np.zeros((n_t, n_s), dtype=float)
+
+        if "open_interest" in aligned.columns:
+            oi = self._pivot_field(aligned, "open_interest", timestamps, resolved_symbols)
+            fields["open_interest"] = np.nan_to_num(oi, nan=0.0)
+        else:
+            fields["open_interest"] = np.zeros((n_t, n_s), dtype=float)
+
         fields["vwap"] = np.divide(
             fields["turnover"],
             fields["volume"] + 1e-12,
@@ -202,22 +216,25 @@ class CryptoMinuteDatasetLoader:
         rule = f"{minutes}min"
         ordered = frame.iloc[frame["open_time"].values.argsort(kind="mergesort")].copy()
         ordered = ordered.set_index("open_time")
-        aggregated = ordered.resample(rule, label="left", closed="left").agg(
-            {
-                "provider": "first",
-                "market_type": "first",
-                "symbol": "first",
-                "exchange_symbol": "first",
-                "close_time": "last",
-                "open": "first",
-                "high": "max",
-                "low": "min",
-                "close": "last",
-                "volume_base": "sum",
-                "volume_quote": "sum",
-                "trade_count": "sum",
-            }
-        )
+        agg_spec = {
+            "provider": "first",
+            "market_type": "first",
+            "symbol": "first",
+            "exchange_symbol": "first",
+            "close_time": "last",
+            "open": "first",
+            "high": "max",
+            "low": "min",
+            "close": "last",
+            "volume_base": "sum",
+            "volume_quote": "sum",
+            "trade_count": "sum",
+        }
+        if "funding_rate" in ordered.columns:
+            agg_spec["funding_rate"] = "last"
+        if "open_interest" in ordered.columns:
+            agg_spec["open_interest"] = "last"
+        aggregated = ordered.resample(rule, label="left", closed="left").agg(agg_spec)
         aggregated = aggregated.dropna(subset=["open", "high", "low", "close"], how="any").reset_index()
         aggregated["symbol"] = symbol
         aggregated["interval"] = interval

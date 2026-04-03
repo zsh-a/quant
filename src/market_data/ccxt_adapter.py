@@ -4,6 +4,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
 
+from loguru import logger
+
 try:
     import ccxt
 except ImportError:  # pragma: no cover - exercised only when dependency is missing
@@ -61,6 +63,10 @@ class CcxtCryptoDataAdapter:
             }
         )
         self._alias_to_market: dict[str, dict[str, Any]] | None = None
+
+    @property
+    def is_futures(self) -> bool:
+        return self.market_type == "perpetual"
 
     def describe(self) -> dict[str, Any]:
         return {
@@ -142,6 +148,178 @@ class CcxtCryptoDataAdapter:
             )
 
         return [bars_by_open_time[key] for key in sorted(bars_by_open_time)]
+
+    # ------------------------------------------------------------------
+    # Funding rate (perpetual/swap only)
+    # ------------------------------------------------------------------
+
+    def fetch_funding_rate_history(
+        self,
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+        limit: int = 500,
+    ) -> dict[datetime, float]:
+        """Fetch historical funding rates and return {settlement_time: rate}.
+
+        Only meaningful for perpetual/swap markets.  Returns an empty dict
+        for spot markets or when the exchange does not support the endpoint.
+        """
+        if not self.is_futures:
+            return {}
+
+        market = self.resolve_market(symbol)
+        since_ms = int(start_time.astimezone(UTC).timestamp() * 1000)
+        end_ms = int(end_time.astimezone(UTC).timestamp() * 1000)
+
+        result: dict[datetime, float] = {}
+        try:
+            if not hasattr(self.client, "fetch_funding_rate_history"):
+                return result
+            records = self.client.fetch_funding_rate_history(
+                market["symbol"],
+                since=since_ms,
+                limit=limit,
+            )
+            for rec in records:
+                ts_ms = int(rec.get("timestamp") or rec.get("datetime", 0))
+                if ts_ms and since_ms <= ts_ms <= end_ms:
+                    rate = float(rec.get("fundingRate", 0) or 0)
+                    dt = datetime.fromtimestamp(ts_ms / 1000, tz=UTC)
+                    result[dt] = rate
+        except Exception as exc:
+            logger.warning(
+                "ccxt.funding_rate_history failed provider={} symbol={}: {}",
+                self.provider_name,
+                symbol,
+                exc,
+            )
+        return result
+
+    def fetch_funding_rate(self, symbol: str) -> float:
+        """Fetch current (latest) funding rate for a perpetual symbol."""
+        if not self.is_futures:
+            return 0.0
+        market = self.resolve_market(symbol)
+        try:
+            data = self.client.fetch_funding_rate(market["symbol"])
+            return float(data.get("fundingRate", 0) or 0)
+        except Exception as exc:
+            logger.warning(
+                "ccxt.fetch_funding_rate failed provider={} symbol={}: {}",
+                self.provider_name,
+                symbol,
+                exc,
+            )
+            return 0.0
+
+    # ------------------------------------------------------------------
+    # Open interest (perpetual/swap only)
+    # ------------------------------------------------------------------
+
+    def fetch_open_interest(self, symbol: str) -> float:
+        """Fetch latest open interest value (in base asset)."""
+        if not self.is_futures:
+            return 0.0
+        market = self.resolve_market(symbol)
+        try:
+            data = self.client.fetch_open_interest(market["symbol"])
+            return float(data.get("openInterestAmount", 0) or data.get("openInterest", 0) or 0)
+        except Exception as exc:
+            logger.warning(
+                "ccxt.fetch_open_interest failed provider={} symbol={}: {}",
+                self.provider_name,
+                symbol,
+                exc,
+            )
+            return 0.0
+
+    def fetch_open_interest_history(
+        self,
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+        timeframe: str = "5m",
+        limit: int = 500,
+    ) -> dict[datetime, float]:
+        """Fetch historical open interest, returns {timestamp: oi_value}."""
+        if not self.is_futures:
+            return {}
+
+        market = self.resolve_market(symbol)
+        since_ms = int(start_time.astimezone(UTC).timestamp() * 1000)
+        end_ms = int(end_time.astimezone(UTC).timestamp() * 1000)
+
+        result: dict[datetime, float] = {}
+        try:
+            if not hasattr(self.client, "fetch_open_interest_history"):
+                return result
+            records = self.client.fetch_open_interest_history(
+                market["symbol"],
+                timeframe=timeframe,
+                since=since_ms,
+                limit=limit,
+            )
+            for rec in records:
+                ts_ms = int(rec.get("timestamp", 0) or 0)
+                if ts_ms and since_ms <= ts_ms <= end_ms:
+                    oi = float(rec.get("openInterestAmount", 0) or rec.get("openInterest", 0) or 0)
+                    dt = datetime.fromtimestamp(ts_ms / 1000, tz=UTC)
+                    result[dt] = oi
+        except Exception as exc:
+            logger.warning(
+                "ccxt.open_interest_history failed provider={} symbol={}: {}",
+                self.provider_name,
+                symbol,
+                exc,
+            )
+        return result
+
+    # ------------------------------------------------------------------
+    # Enrichment — attach funding & OI to already-fetched bars
+    # ------------------------------------------------------------------
+
+    def enrich_bars(
+        self,
+        bars: list[UnifiedMinuteBar],
+        symbol: str,
+        start_time: datetime,
+        end_time: datetime,
+    ) -> list[UnifiedMinuteBar]:
+        """Attach funding_rate and open_interest to bars in-place.
+
+        Funding rates are typically published every 8h, so the rate is
+        forward-filled across minute bars until the next settlement.
+        Open interest snapshots (5m granularity) are similarly forward-filled.
+        """
+        if not bars or not self.is_futures:
+            return bars
+
+        fr_map = self.fetch_funding_rate_history(symbol, start_time, end_time)
+        oi_map = self.fetch_open_interest_history(symbol, start_time, end_time)
+
+        sorted_fr = sorted(fr_map.items())
+        sorted_oi = sorted(oi_map.items())
+        fr_idx = 0
+        oi_idx = 0
+        current_fr = 0.0
+        current_oi = 0.0
+
+        for bar in bars:
+            while fr_idx < len(sorted_fr) and sorted_fr[fr_idx][0] <= bar.open_time:
+                current_fr = sorted_fr[fr_idx][1]
+                fr_idx += 1
+            while oi_idx < len(sorted_oi) and sorted_oi[oi_idx][0] <= bar.open_time:
+                current_oi = sorted_oi[oi_idx][1]
+                oi_idx += 1
+            bar.funding_rate = current_fr
+            bar.open_interest = current_oi
+
+        return bars
+
+    # ------------------------------------------------------------------
+    # Market resolution helpers
+    # ------------------------------------------------------------------
 
     def resolve_market(self, symbol: str) -> dict[str, Any]:
         alias_map = self._get_alias_to_market()

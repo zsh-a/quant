@@ -8,7 +8,7 @@ from typing import Optional
 from loguru import logger
 
 from src.analysis.attribution import ReturnAttribution, RiskAttribution
-from src.reports.generator import ReportGenerator
+from src.analysis.reports.generator import ReportGenerator
 
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
