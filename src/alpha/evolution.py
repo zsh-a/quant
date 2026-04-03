@@ -102,11 +102,11 @@ class HeuristicLLMBackend:
         self.call_stats["initial_population_calls"] += 1
         seeds = [
             "cs_rank(ts_mean(close, 5) - close)",
-            "cs_rank(ts_std(close, 10))",
-            "cs_rank(volatility_n(close, 20))",
-            "cs_rank(oi_delta(open_interest, 1) - spread_ratio(bid_ask_spread, close))",
-            "cs_rank(adv_n(turnover, 10) - amihud(close, turnover, 5))",
-            "cs_rank(atr_n(high, low, close, 14) + funding_delta(funding_rate, 1))",
+            # "cs_rank(ts_std(close, 10))",
+            # "cs_rank(volatility_n(close, 20))",
+            # "cs_rank(adv_n(turnover, 10) - amihud(close, turnover, 5))",
+            # "cs_rank(atr_n(high, low, close, 14) - decay_linear(close, 5))",
+            # "cs_rank(ts_corr(close, volume, 10))",
         ]
         generated: list[str] = []
         attempts = 0
@@ -140,15 +140,15 @@ class HeuristicLLMBackend:
 
     def _wrap_formula(self, formula: str, objective: str, variant: int = 0) -> str:
         wrappers = [
-            f"cs_rank(({formula}) + oi_delta(open_interest, 1))",
-            f"cs_rank(({formula}) - funding_delta(funding_rate, 1))",
-            f"cs_rank(({formula}) - spread_ratio(bid_ask_spread, close))",
-            f"cs_zscore(decay_linear(({formula}), 3))",
             f"cs_rank(({formula}) - amihud(close, turnover, 5))",
             f"cs_rank(({formula}) + atr_n(high, low, close, 5))",
+            f"cs_zscore(decay_linear(({formula}), 3))",
             f"cs_rank(fillna(({formula}), 0) + cs_demean(vwap))",
             f"cs_zscore(clip(({formula}), -3, 3) + adv_n(turnover, 10))",
-            f"cs_rank(ts_zscore(({formula}), 5) + oi_delta(open_interest, 3) - funding_delta(funding_rate, 1))",
+            f"cs_rank(ts_zscore(({formula}), 5) - volatility_n(close, 10))",
+            f"cs_rank(({formula}) + ts_corr(close, volume, 10))",
+            f"cs_rank(({formula}) - ts_rank(turnover, 20))",
+            f"cs_rank(decay_linear(({formula}), 5) + ts_mean(volume, 10))",
         ]
         if "turnover" in objective.lower():
             wrappers.extend(
@@ -165,10 +165,10 @@ class HeuristicLLMBackend:
             f"cs_rank(({parent_a}) + ({parent_b}))",
             f"cs_rank(({parent_a}) - ({parent_b}))",
             f"cs_zscore(decay_linear((({parent_a}) + ({parent_b})), 3))",
-            f"where(spread_ratio(bid_ask_spread, close) < 0.002, ({parent_a}), ({parent_b}))",
-            f"cs_rank(max(({parent_a}), ({parent_b})) - funding_delta(funding_rate, 1))",
-            f"cs_rank(min(({parent_a}), ({parent_b})) + oi_delta(open_interest, 1))",
+            f"cs_rank(max(({parent_a}), ({parent_b})) - volatility_n(close, 10))",
+            f"cs_rank(min(({parent_a}), ({parent_b})) + ts_corr(close, volume, 10))",
             f"cs_rank((({parent_a}) + atr_n(high, low, close, 5)) - (({parent_b}) + amihud(close, turnover, 5)))",
+            f"cs_rank(ts_mean(({parent_a}), 3) - ts_mean(({parent_b}), 3))",
         ]
         idx = self._stable_index(
             f"{parent_a}|{parent_b}",
@@ -353,15 +353,23 @@ class EvolutionEngine:
             individual = self._build_individual(formula, {"origin": "seed"})
             if individual:
                 population.append(individual)
-        while len(population) < population_size and resolved_seeds:
-            random_seed = random.choice(resolved_seeds)
-            generated = self.llm_backend.generate_offspring(
-                BreedingSpec(parent_a=random_seed, parent_b=None, objective="bootstrap"),
+        # Fill remaining slots with heuristic mutations (fast, no LLM call, no empty metrics)
+        heuristic = HeuristicLLMBackend(registry=self.registry, schema=self.schema)
+        attempts = 0
+        max_attempts = max(population_size * 4, 8)
+        seen = {ind.expr_hash for ind in population}
+        while len(population) < population_size and attempts < max_attempts:
+            base = resolved_seeds[attempts % len(resolved_seeds)] if resolved_seeds else "cs_rank(ts_std(close, 10))"
+            candidates = heuristic.generate_offspring(
+                BreedingSpec(parent_a=base, parent_b=None, objective="bootstrap"),
                 count=1,
             )
-            individual = self._build_individual(generated[0], {"origin": "bootstrap"})
-            if individual:
-                population.append(individual)
+            for formula in candidates:
+                individual = self._build_individual(formula, {"origin": "bootstrap"})
+                if individual and individual.expr_hash not in seen:
+                    seen.add(individual.expr_hash)
+                    population.append(individual)
+            attempts += 1
         return population
 
     def select_survivors(self, pop: list[Individual], top_k: int | None = None) -> list[Individual]:

@@ -119,19 +119,18 @@ class BacktestResult:
         mean = float(np.nanmean(net_returns)) if net_returns.size else 0.0
         std = float(np.nanstd(net_returns)) if net_returns.size else 0.0
         sharpe = mean / (std + 1e-12)
-        total_return = float(np.nansum(net_returns))
+        final_equity = float(equity_curve[-1]) if equity_curve.size else 1.0
+        total_return = final_equity - 1.0  # geometric return from equity curve
         avg_turnover = float(np.nanmean(turnover)) if turnover.size else 0.0
-        drawdown = 1.0 - np.divide(
-            equity_curve,
-            np.maximum.accumulate(equity_curve),
-        )
+        peak = np.maximum.accumulate(equity_curve)
+        drawdown = np.where(peak > 1e-12, 1.0 - equity_curve / peak, 0.0)
         return {
             "sharpe": sharpe,
             "total_return": total_return,
             "avg_turnover": avg_turnover,
             "volatility": std,
-            "max_drawdown": float(np.nanmax(drawdown)) if drawdown.size else 0.0,
-            "final_equity": float(equity_curve[-1]) if equity_curve.size else 1.0,
+            "max_drawdown": float(np.clip(np.nanmax(drawdown), 0.0, 1.0)) if drawdown.size else 0.0,
+            "final_equity": final_equity,
         }
 
 
@@ -255,8 +254,9 @@ class ExecutionSimulator:
         close = np.asarray(prices["close"], dtype=float)
         forward_returns = np.zeros_like(close)
         forward_returns[:-1] = close[1:] / (close[:-1] + 1e-12) - 1.0
+        forward_returns = np.clip(forward_returns, -0.5, 0.5)  # cap per-bar returns
 
-        position_returns = np.nansum(weights_np * forward_returns, axis=1)
+        position_returns = np.clip(np.nansum(weights_np * forward_returns, axis=1), -0.5, 0.5)
         trade_sizes = np.abs(np.diff(weights_np, axis=0, prepend=np.zeros_like(weights_np[:1])))
         turnover = np.nansum(trade_sizes, axis=1)
         fees = cost_model.estimate_fee(turnover)
@@ -285,8 +285,9 @@ class ExecutionSimulator:
         weights_t = _as_torch(weights, like=close)
         forward_returns = torch.zeros_like(close)
         forward_returns[:-1] = close[1:] / (close[:-1] + 1e-12) - 1.0
+        forward_returns = torch.clamp(forward_returns, -0.5, 0.5)
 
-        position_returns = torch.nansum(weights_t * forward_returns, dim=1)
+        position_returns = torch.clamp(torch.nansum(weights_t * forward_returns, dim=1), -0.5, 0.5)
         trade_sizes = torch.abs(weights_t - torch.cat([torch.zeros_like(weights_t[:1]), weights_t[:-1]], dim=0))
         turnover = torch.nansum(trade_sizes, dim=1)
         fees = cost_model.estimate_fee(turnover)

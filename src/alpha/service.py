@@ -455,6 +455,21 @@ class AlphaService:
             metrics_by_hash = split_results["metrics_by_hash"]
             signatures_by_hash = split_results["signatures_by_hash"]
             details_by_hash.update(split_results["details_by_hash"])
+            # --- diagnostic: dump actual metrics before attach ---
+            for ind in population:
+                m = metrics_by_hash.get(ind.expr_hash, {})
+                logger.info(
+                    "alpha.search.diag gen={} formula={} signal_cov={:.4f} active_bar={:.4f} "
+                    "avg_turnover={:.6f} sharpe={:.4f} rank_ic={:.4f} inactive={}",
+                    generation,
+                    ind.formula[:50],
+                    float(m.get("signal_coverage", -1)),
+                    float(m.get("active_bar_ratio", -1)),
+                    float(m.get("avg_turnover", -1)),
+                    float(m.get("sharpe", -1)),
+                    float(m.get("rank_ic", -1)),
+                    m.get("inactive", "?"),
+                )
             scoring_start = perf_counter()
             scored_population = self.evolution.attach_metrics(population, metrics_by_hash)
             scored_population = self._filter_by_novelty(
@@ -1059,6 +1074,7 @@ class AlphaService:
         close_np = self._to_numpy(resolved_close)
         forward_returns = np.zeros_like(close_np)
         forward_returns[:-1] = close_np[1:] / (close_np[:-1] + 1e-12) - 1.0
+        forward_returns = np.clip(forward_returns, -0.5, 0.5)
         rank_ic = self._mean_cross_sectional_correlation(alpha_np[:-1], forward_returns[:-1])
         rank_ic_abs = abs(rank_ic)
         avg_turnover = float(resolved_summary.get("avg_turnover", 0.0))
@@ -1169,6 +1185,31 @@ class AlphaService:
         store: TensorStore,
         timing_breakdown: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
+        # --- diagnostic: trace data quality at each stage ---
+        alpha_np = np.asarray(alpha, dtype=float)
+        nan_ratio = float(np.mean(np.isnan(alpha_np))) if alpha_np.size else 1.0
+        alpha_std = float(np.nanstd(alpha_np)) if alpha_np.size else 0.0
+        if nan_ratio > 0.95 or alpha_std < 1e-12:
+            logger.warning(
+                "alpha.eval signal_degenerate formula={} shape={} nan_ratio={:.2%} std={:.2e}",
+                program.normalized_formula[:60],
+                alpha_np.shape,
+                nan_ratio,
+                alpha_std,
+            )
+        close_np = np.asarray(store.get_field("close"), dtype=float)
+        close_nan = float(np.mean(np.isnan(close_np))) if close_np.size else 1.0
+        liq_true = float(np.mean(dataset.liquidity_mask)) if dataset.liquidity_mask.size else 0.0
+        sess_true = float(np.mean(dataset.session_mask)) if dataset.session_mask.size else 0.0
+        if close_nan > 0.5 or liq_true < 0.5:
+            logger.warning(
+                "alpha.eval data_quality formula={} close_nan={:.2%} liquidity_mask_true={:.2%} session_mask_true={:.2%}",
+                program.normalized_formula[:40],
+                close_nan,
+                liq_true,
+                sess_true,
+            )
+
         market_ctx = MarketContext(
             liquidity_mask=dataset.liquidity_mask,
             session_mask=dataset.session_mask,
@@ -1205,6 +1246,12 @@ class AlphaService:
         alpha_signature = self._build_alpha_signature(alpha)
         if timing_breakdown is not None:
             timing_breakdown["signature_seconds"] += perf_counter() - signature_start
+        equity_np = self._to_numpy(result.equity_curve)
+        turnover_np = self._to_numpy(result.turnover)
+        equity_series = self._downsample_series(equity_np, max_points=500)
+        drawdown_series = self._build_drawdown_series(equity_np, max_points=500)
+        turnover_series = self._downsample_series(turnover_np, max_points=500)
+
         return {
             "program": program.to_dict(),
             "metrics": metrics,
@@ -1212,6 +1259,9 @@ class AlphaService:
             "alpha_tail": self._to_serializable_list(alpha[-5:]),
             "weights_tail": self._to_serializable_list(wrapped_weights[-5:]),
             "equity_tail": self._to_serializable_list(result.equity_curve[-5:]),
+            "equity_series": equity_series,
+            "drawdown_series": drawdown_series,
+            "turnover_series": turnover_series,
             "backend": self.vm.backend,
             "device": str(self.vm.device) if self.vm.device is not None else "numpy",
         }
@@ -1246,6 +1296,9 @@ class AlphaService:
             "alpha_tail": payload.get("alpha_tail", []),
             "weights_tail": payload.get("weights_tail", []),
             "equity_tail": payload.get("equity_tail", []),
+            "equity_series": payload.get("equity_series", []),
+            "drawdown_series": payload.get("drawdown_series", []),
+            "turnover_series": payload.get("turnover_series", []),
         }
 
     def list_runs(self, limit: int = 20) -> list[dict[str, Any]]:
@@ -1319,7 +1372,7 @@ class AlphaService:
         returns_np = np.asarray(returns, dtype=float)
         mask = ~np.isnan(alpha_np) & ~np.isnan(returns_np)
         valid_counts = np.sum(mask, axis=1)
-        if not np.any(valid_counts >= 2):
+        if not np.any(valid_counts >= 3):
             return 0.0
 
         safe_alpha = np.where(mask, alpha_np, 0.0)
@@ -1333,11 +1386,12 @@ class AlphaService:
         cov = np.sum(centered_alpha * centered_returns, axis=1)
         var_alpha = np.sum(centered_alpha * centered_alpha, axis=1)
         var_returns = np.sum(centered_returns * centered_returns, axis=1)
-        valid_rows = (valid_counts >= 2) & (var_alpha > 1e-24) & (var_returns > 1e-24)
+        valid_rows = (valid_counts >= 3) & (var_alpha > 1e-12) & (var_returns > 1e-12)
         if not np.any(valid_rows):
             return 0.0
 
         correlations = cov[valid_rows] / np.sqrt(var_alpha[valid_rows] * var_returns[valid_rows])
+        correlations = np.clip(correlations, -1.0, 1.0)
         return float(np.mean(correlations)) if correlations.size else 0.0
 
     def _deduplicate_population(self, population: list[Any]) -> list[Any]:
@@ -1408,6 +1462,36 @@ class AlphaService:
 
     def _to_serializable_list(self, value: Any) -> list[Any]:
         return self._to_numpy(value).tolist()
+
+    def _downsample_series(self, arr: np.ndarray, max_points: int = 500) -> list[dict[str, float]]:
+        """Downsample a 1-D array to max_points via LTTB-like min/max bucketing."""
+        flat = np.nan_to_num(arr.flatten() if arr.ndim > 1 else arr, nan=0.0)
+        n = flat.size
+        if n == 0:
+            return []
+        if n <= max_points:
+            return [{"i": int(i), "v": round(float(flat[i]), 6)} for i in range(n)]
+        step = n / max_points
+        result: list[dict[str, float]] = []
+        for b in range(max_points):
+            lo = int(b * step)
+            hi = min(int((b + 1) * step), n)
+            bucket = flat[lo:hi]
+            idx_min = lo + int(np.argmin(bucket))
+            idx_max = lo + int(np.argmax(bucket))
+            first, second = (idx_min, idx_max) if idx_min <= idx_max else (idx_max, idx_min)
+            result.append({"i": first, "v": round(float(flat[first]), 6)})
+            if first != second:
+                result.append({"i": second, "v": round(float(flat[second]), 6)})
+        return result
+
+    def _build_drawdown_series(self, equity: np.ndarray, max_points: int = 500) -> list[dict[str, float]]:
+        flat = np.nan_to_num(equity.flatten() if equity.ndim > 1 else equity, nan=1.0)
+        if flat.size == 0:
+            return []
+        peak = np.maximum.accumulate(flat)
+        dd = np.where(peak > 1e-12, 1.0 - flat / peak, 0.0)
+        return self._downsample_series(dd, max_points)
 
 
 # Backward-compatible alias

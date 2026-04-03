@@ -111,7 +111,11 @@ class CryptoMinuteDatasetLoader:
             raise ValueError("No crypto minute-bar data found for the requested provider/symbols/time range")
 
         df = pd.concat(frames, ignore_index=True)
-        df = df.sort_values(["open_time", "symbol"]).drop_duplicates(subset=["open_time", "symbol"], keep="last")
+        df = df.dropna(subset=["open_time"]).reset_index(drop=True)
+        if df.empty:
+            raise ValueError("No valid rows after concat — all open_time values are NaN")
+        sort_idx = np.lexsort([df["symbol"].values, df["open_time"].values])
+        df = df.iloc[sort_idx].reset_index(drop=True).drop_duplicates(subset=["open_time", "symbol"], keep="last")
         timestamps = sorted(df["open_time"].drop_duplicates().tolist())
         resolved_symbols = sorted(df["symbol"].drop_duplicates().tolist())
         full_index = pd.MultiIndex.from_product([timestamps, resolved_symbols], names=["open_time", "symbol"])
@@ -196,7 +200,7 @@ class CryptoMinuteDatasetLoader:
 
         symbol = str(frame["symbol"].iloc[0]).upper()
         rule = f"{minutes}min"
-        ordered = frame.sort_values("open_time").copy()
+        ordered = frame.iloc[frame["open_time"].values.argsort(kind="mergesort")].copy()
         ordered = ordered.set_index("open_time")
         aggregated = ordered.resample(rule, label="left", closed="left").agg(
             {

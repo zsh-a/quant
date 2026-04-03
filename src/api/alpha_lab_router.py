@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from src.alpha import AlphaService as AlphaLabService
+from src.alpha.tracing import InMemoryCollector, tracer
 from src.config.settings import (
     get_alpha_lab_config,
     get_bitget_config,
@@ -17,6 +18,9 @@ from src.config.settings import (
 
 router = APIRouter(prefix="/alpha-lab", tags=["alpha-lab"])
 service = AlphaLabService()
+
+_memory_collector = InMemoryCollector()
+tracer.add_collector(_memory_collector)
 
 
 class CompileRequest(BaseModel):
@@ -251,6 +255,21 @@ async def save_formula_to_zoo(request: SaveZooRequest):
         )
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@router.get("/tracing/summary")
+async def get_tracing_summary():
+    return _memory_collector.summary()
+
+
+@router.get("/tracing/spans")
+async def get_tracing_spans(
+    kind: str | None = None,
+    limit: int = Query(default=50, ge=1, le=200),
+):
+    spans = _memory_collector.find(kind=kind) if kind else _memory_collector.spans
+    recent = spans[-limit:]
+    return {"spans": [s.to_dict() for s in reversed(recent)], "total": len(spans)}
 
 
 @router.get("/bitget/config")
