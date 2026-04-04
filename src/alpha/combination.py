@@ -22,6 +22,17 @@ from .dsl import TensorSchema
 from .operators import OperatorRegistry
 from .vm import StackVM, TensorStore
 
+try:
+    import torch
+    from .gpu_ops import TRITON_AVAILABLE as _TRITON_OK, cs_rank as _triton_cs_rank, factor_correlation_matrix as _triton_factor_corr
+except Exception:  # pragma: no cover
+    torch = None
+    _TRITON_OK = False
+
+
+def _can_use_gpu() -> bool:
+    return bool(torch is not None and _TRITON_OK and torch.cuda.is_available())
+
 
 @dataclass
 class FactorSignal:
@@ -56,29 +67,53 @@ class FactorCombiner:
         self,
         zoo_entries: list[dict[str, Any]],
         dataset: AlphaDataset,
+        min_abs_ic: float = 0.0,
     ) -> list[FactorSignal]:
-        """Compile each zoo formula and run through VM to get signal arrays."""
+        """Compile each zoo formula and run through VM to get signal arrays.
+
+        When min_abs_ic > 0, skips storing the full signal for entries whose
+        stored rank_ic is below the threshold, reducing peak memory.
+        """
         store = TensorStore(dataset.fields)
-        signals: list[FactorSignal] = []
+        # Batch-compile and run via VM shared cache for memory efficiency.
+        programs = []
+        entries_with_program = []
         for entry in zoo_entries:
             formula = entry.get("formula", "")
             if not formula:
                 continue
+            # Pre-filter: skip entries whose stored IC is below threshold
+            stored_ic = abs(float(entry.get("metrics", {}).get("rank_ic", 0) or 0))
+            if min_abs_ic > 0 and stored_ic < min_abs_ic:
+                continue
             try:
                 program = self.compiler.compile(formula, self.schema)
-                raw = self.vm.run(program, store)
-                arr = np.asarray(raw, dtype=float)
-                signals.append(
-                    FactorSignal(
-                        formula=formula,
-                        expr_hash=entry.get("expr_hash", program.expr_hash),
-                        signal=arr,
-                        rank_ic=float(entry.get("metrics", {}).get("rank_ic", 0) or 0),
-                        fitness=float(entry.get("fitness", 0) or 0),
-                    )
-                )
+                programs.append(program)
+                entries_with_program.append(entry)
             except Exception as exc:
                 logger.debug("combination.materialize skip formula={}: {}", formula[:60], exc)
+
+        if not programs:
+            return []
+
+        # Batch execution shares intermediate cache, then release VM cache
+        raw_outputs = self.vm.run_batch(programs, store)
+
+        signals: list[FactorSignal] = []
+        for entry, program, raw in zip(entries_with_program, programs, raw_outputs):
+            if hasattr(raw, "cpu"):
+                arr = raw.cpu().numpy()
+            else:
+                arr = np.asarray(raw, dtype=np.float32)
+            signals.append(
+                FactorSignal(
+                    formula=entry.get("formula", ""),
+                    expr_hash=entry.get("expr_hash", program.expr_hash),
+                    signal=arr,
+                    rank_ic=float(entry.get("metrics", {}).get("rank_ic", 0) or 0),
+                    fitness=float(entry.get("fitness", 0) or 0),
+                )
+            )
         return signals
 
     def select_factors(
@@ -100,35 +135,86 @@ class FactorCombiner:
         candidates = [f for f in factors if abs(f.rank_ic) >= min_abs_ic]
         candidates.sort(key=lambda f: abs(f.rank_ic), reverse=True)
 
-        selected: list[FactorSignal] = []
-        selected_flat: list[np.ndarray] = []  # flattened signals for fast corr
+        # GPU path: batch correlation matrix
+        if _can_use_gpu() and len(candidates) > 3:
+            selected = self._select_factors_gpu(candidates, max_factors, max_correlation)
+        else:
+            selected = self._select_factors_cpu(candidates, max_factors, max_correlation)
 
+        logger.info(
+            "combination.select candidates={} selected={} min_ic={} max_corr={}",
+            len(candidates), len(selected), min_abs_ic, max_correlation,
+        )
+        return selected
+
+    def _select_factors_cpu(
+        self,
+        candidates: list[FactorSignal],
+        max_factors: int,
+        max_correlation: float,
+    ) -> list[FactorSignal]:
+        selected: list[FactorSignal] = []
+        selected_flat: list[np.ndarray] = []
         for factor in candidates:
             if len(selected) >= max_factors:
                 break
             flat = factor.signal.ravel()
-            # Remove NaN for correlation
             mask = np.isfinite(flat)
             if mask.sum() < 10:
                 continue
             flat_clean = flat.copy()
             flat_clean[~mask] = 0.0
-
             is_diverse = True
             for existing in selected_flat:
                 corr = _abs_corr(flat_clean, existing)
                 if corr >= max_correlation:
                     is_diverse = False
                     break
-
             if is_diverse:
                 selected.append(factor)
                 selected_flat.append(flat_clean)
+        return selected
 
-        logger.info(
-            "combination.select candidates={} selected={} min_ic={} max_corr={}",
-            len(candidates), len(selected), min_abs_ic, max_correlation,
+    def _select_factors_gpu(
+        self,
+        candidates: list[FactorSignal],
+        max_factors: int,
+        max_correlation: float,
+    ) -> list[FactorSignal]:
+        # Build flattened signal matrix on GPU
+        flat_signals = []
+        valid_indices = []
+        for i, factor in enumerate(candidates):
+            flat = factor.signal.ravel()
+            mask = np.isfinite(flat)
+            if mask.sum() < 10:
+                continue
+            flat_clean = flat.copy()
+            flat_clean[~mask] = 0.0
+            flat_signals.append(flat_clean)
+            valid_indices.append(i)
+        if not flat_signals:
+            return []
+
+        signals_tensor = torch.tensor(
+            np.stack(flat_signals), dtype=torch.float32, device="cuda",
         )
+        corr_matrix = _triton_factor_corr(signals_tensor).cpu().numpy()
+
+        # Greedy forward selection using precomputed matrix
+        selected: list[FactorSignal] = []
+        selected_idx: list[int] = []
+        for local_i, global_i in enumerate(valid_indices):
+            if len(selected) >= max_factors:
+                break
+            is_diverse = True
+            for sel_local in selected_idx:
+                if corr_matrix[local_i, sel_local] >= max_correlation:
+                    is_diverse = False
+                    break
+            if is_diverse:
+                selected.append(candidates[global_i])
+                selected_idx.append(local_i)
         return selected
 
     def combine(
@@ -152,7 +238,10 @@ class FactorCombiner:
             return factors[0].signal
 
         # Stack ranked signals: (n_factors, time, symbols)
-        ranked = np.stack([_cs_rank(f.signal) for f in factors], axis=0)
+        if _can_use_gpu():
+            ranked = np.stack([_cs_rank_auto(f.signal) for f in factors], axis=0)
+        else:
+            ranked = np.stack([_cs_rank(f.signal) for f in factors], axis=0)
 
         if method == "equal":
             return _equal_combine(ranked)
@@ -182,7 +271,7 @@ class FactorCombiner:
     ) -> dict[str, Any]:
         """End-to-end: materialize → select → combine → return result dict."""
         t0 = perf_counter()
-        all_factors = self.materialize_factors(zoo_entries, dataset)
+        all_factors = self.materialize_factors(zoo_entries, dataset, min_abs_ic=min_abs_ic)
         t_materialize = perf_counter() - t0
 
         t1 = perf_counter()
@@ -384,3 +473,12 @@ def _abs_corr(a: np.ndarray, b: np.ndarray) -> float:
     if denom < 1e-12:
         return 1.0
     return abs(float((am * bm).sum() / denom))
+
+
+def _cs_rank_auto(signal: np.ndarray) -> np.ndarray:
+    """Cross-sectional rank with GPU acceleration when available."""
+    if _can_use_gpu():
+        t = torch.tensor(signal, dtype=torch.float32, device="cuda")
+        ranked = _triton_cs_rank(t)
+        return ranked.cpu().numpy()
+    return _cs_rank(signal)

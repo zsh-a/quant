@@ -24,6 +24,12 @@ from .strategy_memory import StrategyMemory
 from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
 
+try:
+    import torch as _torch
+    from .gpu_evaluation import compute_ic_metrics_gpu as _gpu_ic_metrics
+except Exception:  # pragma: no cover
+    _torch = None
+
 DEFAULT_DB_SEEDS = [
     "CSRank(ts_mean(close, 5) - close)",
     "CSRank(ts_std(close, 10))",
@@ -769,8 +775,21 @@ class AlphaService:
         for fold_entry in validation_folds:
             timing_breakdown["fold_count"] += 1
             fold = fold_entry["fold"]
+            # Create split datasets lazily from the parent dataset reference.
+            dataset_ref = fold_entry.get("dataset_ref")
+            split_indices = {
+                "train": fold.train_indices,
+                "valid": fold.valid_indices,
+                "test": fold.test_indices,
+            }
+            # Support both lazy (dataset_ref) and pre-materialized (datasets) formats.
+            pre_materialized = fold_entry.get("datasets")
             fold_results: dict[str, dict[str, dict[str, Any]]] = {}
-            for split_name, split_dataset in fold_entry["datasets"].items():
+            for split_name in ("train", "valid", "test"):
+                if pre_materialized is not None:
+                    split_dataset = pre_materialized[split_name]
+                else:
+                    split_dataset = dataset_ref.take_indices(split_indices[split_name])
                 split_start = perf_counter()
                 split_results = self.evaluate_population_from_dataset(
                     population,
@@ -784,6 +803,7 @@ class AlphaService:
                     split_metrics_by_hash.setdefault(expr_hash, {}).setdefault(split_name, []).append(metrics)
                 for expr_hash, signature in split_results["signatures_by_hash"].items():
                     split_signatures_by_hash.setdefault(expr_hash, {}).setdefault(split_name, []).append(signature)
+                del split_dataset  # release fold copy immediately
 
             for individual in population:
                 expr_hash = individual.expr_hash
@@ -910,17 +930,9 @@ class AlphaService:
             raw_folds = [fallback]
             mode = "holdout"
 
-        folds = [
-            {
-                "fold": fold,
-                "datasets": {
-                    "train": dataset.take_indices(fold.train_indices),
-                    "valid": dataset.take_indices(fold.valid_indices),
-                    "test": dataset.take_indices(fold.test_indices),
-                },
-            }
-            for fold in raw_folds
-        ]
+        # Store only fold metadata — datasets are created lazily during
+        # evaluation to avoid holding all 15 split copies in memory at once.
+        folds = [{"fold": fold, "dataset_ref": dataset} for fold in raw_folds]
         return {
             "folds": folds,
             "summary": {

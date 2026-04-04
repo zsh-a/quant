@@ -42,9 +42,15 @@ from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy
 from .strategy_memory import StrategyMemory
 from .tracing import InMemoryCollector, LangfuseCollector, Span, SpanCollector, tracer
 from .validation import CPCVValidator, ValidationFold
+from .gpu_evaluation import compute_ic_metrics_gpu, compute_rank_ic_batch_gpu, compute_rank_ic_gpu
+from .gpu_ops import TRITON_AVAILABLE as triton_available
 from .vm import StackVM, TensorStore
 
 __all__ = [
+    "triton_available",
+    "compute_rank_ic_gpu",
+    "compute_rank_ic_batch_gpu",
+    "compute_ic_metrics_gpu",
     "AlphaDataset",
     "AlphaNode",
     "AlphaPersistence",

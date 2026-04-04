@@ -12,6 +12,19 @@ try:
 except Exception:  # pragma: no cover - torch is optional for this scaffold
     torch = None
 
+try:
+    from .gpu_ops import (
+        TRITON_AVAILABLE as _TRITON_OK,
+        rolling_mean_std as _triton_rolling_mean_std,
+        rolling_reduce as _triton_rolling_reduce,
+        parallel_ema as _triton_parallel_ema,
+        rolling_corr_cov as _triton_rolling_corr_cov,
+        cs_rank as _triton_cs_rank,
+        decay_linear as _triton_decay_linear,
+    )
+except Exception:  # pragma: no cover
+    _TRITON_OK = False
+
 
 ArrayLike = Any
 
@@ -37,10 +50,17 @@ class TensorStore:
 
 
 class StackVM:
-    def __init__(self, device: str | None = None, prefer_torch: bool = True):
+    def __init__(self, device: str | None = None, prefer_torch: bool = True, use_triton: bool = True):
         self.prefer_torch = prefer_torch
         self.device = self._resolve_device(device)
         self.backend = "torch" if self.device is not None else "numpy"
+        self.use_triton = (
+            use_triton
+            and self.backend == "torch"
+            and _TRITON_OK
+            and self.device is not None
+            and self.device.type == "cuda"
+        )
 
     def run(self, program: BytecodeProgram, store: TensorStore) -> ArrayLike:
         prepared_store = self._prepare_store(store)
@@ -352,37 +372,76 @@ class StackVM:
             delayed = self._delay_torch(args[0], int(self._scalar(args[1])))
             return torch.log((torch.abs(args[0]) + 1e-12) / (torch.abs(delayed) + 1e-12))
         if opcode == "ts_mean":
-            return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="mean")
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                mean, _ = _triton_rolling_mean_std(args[0], window)
+                return mean
+            return self._rolling_torch(args[0], window, reducer="mean")
         if opcode == "ts_std":
-            return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="std")
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                _, std = _triton_rolling_mean_std(args[0], window)
+                return std
+            return self._rolling_torch(args[0], window, reducer="std")
         if opcode == "ts_sum":
-            return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="sum")
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                return _triton_rolling_reduce(args[0], window, "sum")
+            return self._rolling_torch(args[0], window, reducer="sum")
         if opcode == "ts_max":
-            return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="max")
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                return _triton_rolling_reduce(args[0], window, "max")
+            return self._rolling_torch(args[0], window, reducer="max")
         if opcode == "ts_min":
-            return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="min")
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                return _triton_rolling_reduce(args[0], window, "min")
+            return self._rolling_torch(args[0], window, reducer="min")
         if opcode == "ts_rank":
             return self._ts_rank_torch(args[0], int(self._scalar(args[1])))
         if opcode == "ts_zscore":
             window = int(self._scalar(args[1]))
+            if self.use_triton:
+                mean, std = _triton_rolling_mean_std(args[0], window)
+                return (args[0] - mean) / (std + 1e-12)
             mean = self._rolling_torch(args[0], window, reducer="mean")
             std = self._rolling_torch(args[0], window, reducer="std")
             return (args[0] - mean) / (std + 1e-12)
         if opcode == "ts_corr":
-            return self._rolling_pair_torch(args[0], args[1], int(self._scalar(args[2])), reducer="corr")
+            window = int(self._scalar(args[2]))
+            if self.use_triton:
+                return _triton_rolling_corr_cov(args[0], args[1], window, "corr")
+            return self._rolling_pair_torch(args[0], args[1], window, reducer="corr")
         if opcode == "ts_cov":
-            return self._rolling_pair_torch(args[0], args[1], int(self._scalar(args[2])), reducer="cov")
+            window = int(self._scalar(args[2]))
+            if self.use_triton:
+                return _triton_rolling_corr_cov(args[0], args[1], window, "cov")
+            return self._rolling_pair_torch(args[0], args[1], window, reducer="cov")
         if opcode == "decay_linear":
-            return self._decay_linear_torch(args[0], int(self._scalar(args[1])))
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                return _triton_decay_linear(args[0], window)
+            return self._decay_linear_torch(args[0], window)
         if opcode == "ts_argmax":
             return self._ts_argextreme_torch(args[0], int(self._scalar(args[1])), mode="max")
         if opcode == "ts_argmin":
             return self._ts_argextreme_torch(args[0], int(self._scalar(args[1])), mode="min")
         if opcode == "ts_ema":
-            return self._ts_ema_torch(args[0], int(self._scalar(args[1])))
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                return _triton_parallel_ema(args[0], window)
+            return self._ts_ema_torch(args[0], window)
         if opcode == "ts_winsorize":
-            return self._ts_winsorize_torch(args[0], int(self._scalar(args[1])), self._scalar(args[2]))
+            window = int(self._scalar(args[1]))
+            n_std = self._scalar(args[2])
+            if self.use_triton:
+                mean, std = _triton_rolling_mean_std(args[0], window)
+                return torch.clamp(torch.clamp(args[0], min=mean - n_std * std), max=mean + n_std * std)
+            return self._ts_winsorize_torch(args[0], window, n_std)
         if opcode == "cs_rank":
+            if self.use_triton:
+                return _triton_cs_rank(args[0])
             return self._cs_rank_torch(args[0])
         if opcode == "cs_scale":
             denom = self._torch_nansum(torch.abs(args[0]), dim=1, keepdim=True)
@@ -403,10 +462,18 @@ class StackVM:
         if opcode == "spread_ratio":
             return args[0] / (torch.abs(args[1]) + 1e-12)
         if opcode == "adv_n":
-            return self._rolling_torch(args[0], int(self._scalar(args[1])), reducer="mean")
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                mean, _ = _triton_rolling_mean_std(args[0], window)
+                return mean
+            return self._rolling_torch(args[0], window, reducer="mean")
         if opcode == "amihud":
+            window = int(self._scalar(args[2]))
             illiquidity = torch.abs(self._execute_torch("log_return", [args[0], args[2]])) / (torch.abs(args[1]) + 1e-12)
-            return self._rolling_torch(illiquidity, int(self._scalar(args[2])), reducer="mean")
+            if self.use_triton:
+                mean, _ = _triton_rolling_mean_std(illiquidity, window)
+                return mean
+            return self._rolling_torch(illiquidity, window, reducer="mean")
         if opcode == "hlc3":
             return (args[0] + args[1] + args[2]) / 3.0
         if opcode == "ohlc4":
@@ -419,10 +486,18 @@ class StackVM:
             )
         if opcode == "atr_n":
             true_range = self._execute_torch("true_range", [args[0], args[1], args[2]])
-            return self._rolling_torch(true_range, int(self._scalar(args[3])), reducer="mean")
+            window = int(self._scalar(args[3]))
+            if self.use_triton:
+                mean, _ = _triton_rolling_mean_std(true_range, window)
+                return mean
+            return self._rolling_torch(true_range, window, reducer="mean")
         if opcode == "volatility_n":
             returns = args[0] / (self._delay_torch(args[0], 1) + 1e-12) - 1.0
-            return self._rolling_torch(returns, int(self._scalar(args[1])), reducer="std")
+            window = int(self._scalar(args[1]))
+            if self.use_triton:
+                _, std = _triton_rolling_mean_std(returns, window)
+                return std
+            return self._rolling_torch(returns, window, reducer="std")
         raise ValueError(f"Unsupported opcode: {opcode}")
 
     # ------------------------------------------------------------------
