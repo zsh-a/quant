@@ -27,7 +27,7 @@ class AlphaPersistence:
         self.zoo_dir.mkdir(parents=True, exist_ok=True)
 
     # -----------------------------------------------------------------------
-    # Run management (from AlphaLabPersistence)
+    # Run management
     # -----------------------------------------------------------------------
 
     def save_run(self, payload: dict[str, Any], run_name: str | None = None) -> PersistedRun:
@@ -234,8 +234,3 @@ class AlphaPersistence:
         df = pd.DataFrame(flat_data)
         df.to_csv(output_path, index=False)
         logger.info(f"Exported zoo summary to {output_path}")
-
-
-# Backward-compatible aliases
-AlphaLabPersistence = AlphaPersistence
-AlphaZooPersistence = AlphaPersistence

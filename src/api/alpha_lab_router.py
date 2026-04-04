@@ -7,7 +7,7 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
-from src.alpha import AlphaService as AlphaLabService
+from src.alpha import AlphaService
 from src.alpha.tracing import InMemoryCollector, tracer
 from src.config.settings import (
     get_alpha_lab_config,
@@ -17,7 +17,7 @@ from src.config.settings import (
 
 
 router = APIRouter(prefix="/alpha-lab", tags=["alpha-lab"])
-service = AlphaLabService()
+service = AlphaService()
 
 _memory_collector = InMemoryCollector()
 tracer.add_collector(_memory_collector)
@@ -46,7 +46,6 @@ class BreedRequest(BaseModel):
 
 class EvaluateDbRequest(BaseModel):
     formula: str
-    provider: str = Field(default_factory=lambda: get_crypto_market_config().default_provider)
     symbols: list[str] = Field(default_factory=lambda: get_crypto_market_config().default_symbols)
     start_time: datetime
     end_time: datetime
@@ -57,7 +56,6 @@ class EvaluateDbRequest(BaseModel):
 
 
 class SearchDbRequest(BaseModel):
-    provider: str = Field(default_factory=lambda: get_crypto_market_config().default_provider)
     symbols: list[str] = Field(default_factory=lambda: get_crypto_market_config().default_symbols)
     start_time: datetime
     end_time: datetime
@@ -99,7 +97,7 @@ def _workspace_defaults() -> dict[str, object]:
         "alpha_lab": get_alpha_lab_config().model_dump(),
         "bitget": get_bitget_config().model_dump(),
         "crypto_market": crypto_market.model_dump(),
-        "providers": ["bitget"],
+        "data_source": "crypto_data.futures_5m",
         "intervals": ["1m", "5m", "15m", "1h", "4h"],
         "sample_formulas": [
             "CSRank(ts_mean(close, 5) - close)",
@@ -175,7 +173,6 @@ async def evaluate_formula_from_db(request: EvaluateDbRequest):
     try:
         return service.evaluate_formula_from_db(
             formula=request.formula,
-            provider=request.provider,
             symbols=request.symbols,
             start_time=request.start_time,
             end_time=request.end_time,
@@ -192,7 +189,6 @@ async def evaluate_formula_from_db(request: EvaluateDbRequest):
 async def search_formulas_on_db(request: SearchDbRequest):
     try:
         return service.search_formulas_on_db(
-            provider=request.provider,
             symbols=request.symbols,
             start_time=request.start_time,
             end_time=request.end_time,

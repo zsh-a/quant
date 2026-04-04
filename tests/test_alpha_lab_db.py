@@ -11,8 +11,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 from src.alpha.auto_runner import load_auto_search_config
 from src.alpha.cli import build_parser, run_command
 from src.alpha.dataset import CryptoMinuteDatasetLoader
-from src.alpha.persistence import AlphaLabPersistence
-from src.alpha.service import AlphaLabService
+from src.alpha.persistence import AlphaPersistence
+from src.alpha.service import AlphaService
 
 START = datetime(2026, 3, 27, 0, 0, tzinfo=UTC)
 END = datetime(2026, 3, 27, 0, 19, tzinfo=UTC)
@@ -95,7 +95,7 @@ def test_dataset_loader_applies_blocked_utc_hours():
 
 
 def test_alpha_lab_service_evaluates_formula_from_db():
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     result = service.evaluate_formula_from_db(
         formula="CSRank(ts_mean(close, 2) - close)",
@@ -111,7 +111,7 @@ def test_alpha_lab_service_evaluates_formula_from_db():
 
 
 def test_alpha_lab_service_evaluates_formula_from_db_summary_only():
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     result = service.evaluate_formula_from_db(
         formula="CSRank(ts_mean(close, 2) - close)",
@@ -128,7 +128,7 @@ def test_alpha_lab_service_evaluates_formula_from_db_summary_only():
 
 
 def test_alpha_lab_service_batch_evaluates_formulas_from_db():
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     result = service.evaluate_formulas_from_db(
         formulas=[
@@ -147,7 +147,7 @@ def test_alpha_lab_service_batch_evaluates_formulas_from_db():
 
 
 def test_alpha_lab_service_benchmark_db():
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     result = service.benchmark_db(
         provider="bitget",
@@ -164,7 +164,7 @@ def test_alpha_lab_service_benchmark_db():
 
 
 def test_alpha_lab_cli_search_db():
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     parser = build_parser()
     args = parser.parse_args(
@@ -200,7 +200,7 @@ def test_alpha_lab_cli_search_db():
 
 
 def test_alpha_lab_cli_batch_evaluate_db():
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     parser = build_parser()
     args = parser.parse_args(
@@ -229,7 +229,7 @@ def test_alpha_lab_cli_batch_evaluate_db():
 
 
 def test_alpha_lab_cli_benchmark_vm():
-    service = AlphaLabService()
+    service = AlphaService()
     parser = build_parser()
     args = parser.parse_args(
         [
@@ -252,7 +252,7 @@ def test_alpha_lab_cli_benchmark_vm():
 
 
 def test_alpha_lab_cli_benchmark_db():
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     parser = build_parser()
     args = parser.parse_args(
@@ -279,9 +279,9 @@ def test_alpha_lab_cli_benchmark_db():
 
 
 def test_alpha_lab_search_persistence(tmp_path):
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
-    service.persistence = __import__("src.alpha_lab.persistence", fromlist=["AlphaLabPersistence"]).AlphaLabPersistence(str(tmp_path / "alpha_lab"))
+    service.persistence = __import__("src.alpha_lab.persistence", fromlist=["AlphaPersistence"]).AlphaPersistence(str(tmp_path / "alpha_lab"))
     result = service.search_formulas_on_db(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
@@ -303,9 +303,9 @@ def test_alpha_lab_search_persistence(tmp_path):
 
 
 def test_alpha_lab_run_and_zoo_inspection(tmp_path):
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
-    service.persistence = __import__("src.alpha_lab.persistence", fromlist=["AlphaLabPersistence"]).AlphaLabPersistence(str(tmp_path / "alpha_lab"))
+    service.persistence = __import__("src.alpha_lab.persistence", fromlist=["AlphaPersistence"]).AlphaPersistence(str(tmp_path / "alpha_lab"))
     result = service.search_formulas_on_db(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
@@ -328,7 +328,7 @@ def test_alpha_lab_run_and_zoo_inspection(tmp_path):
 
 
 def test_alpha_lab_search_top_results_are_scored():
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
     result = service.search_formulas_on_db(
         provider="bitget",
@@ -373,9 +373,9 @@ def test_auto_search_config_normalizes_symbols_and_blocked_hours(tmp_path):
 
 
 def test_alpha_lab_cli_auto_search_db_once(tmp_path):
-    service = AlphaLabService()
+    service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
-    service.persistence = AlphaLabPersistence(root_dir=str(tmp_path / "alpha_lab"))
+    service.persistence = AlphaPersistence(root_dir=str(tmp_path / "alpha_lab"))
     state_path = tmp_path / "auto_search_state.json"
     config_path = tmp_path / "auto_search.yaml"
     config_path.write_text(
@@ -431,8 +431,8 @@ def test_alpha_lab_cli_auto_search_db_once(tmp_path):
 
 
 def test_alpha_lab_persistence_prunes_runs_and_zoo(tmp_path):
-    service = AlphaLabService()
-    service.persistence = AlphaLabPersistence(root_dir=str(tmp_path / "alpha_lab"))
+    service = AlphaService()
+    service.persistence = AlphaPersistence(root_dir=str(tmp_path / "alpha_lab"))
 
     for idx in range(3):
         run = service.persistence.save_run(

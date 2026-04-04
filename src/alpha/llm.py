@@ -158,6 +158,9 @@ class OpenAILLMBackend:
         max_ast_depth: int = 5,
         client: Any | None = None,
         fallback_backend: HeuristicLLMBackend | None = None,
+        strategy_memory: Any | None = None,
+        knowledge_base: Any | None = None,
+        feature_kitchen: Any | None = None,
     ):
         self.registry = registry or OperatorRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
@@ -183,6 +186,15 @@ class OpenAILLMBackend:
             max_retries=2,
         )
 
+        # --- Enhanced modules (optional, gracefully degrade if None) ---
+        self.strategy_memory = strategy_memory
+        self.knowledge_base = knowledge_base
+        self.feature_kitchen = feature_kitchen
+        if self.feature_kitchen is not None:
+            self.feature_kitchen.build_catalog()
+        # Theme map: formula -> theme_id (populated during extraction)
+        self._last_theme_map: dict[str, str] = {}
+
     @property
     def backend_name(self) -> str:
         return "openai"
@@ -194,6 +206,7 @@ class OpenAILLMBackend:
 
         with tracer.start_span("genesis", kind="breed",
                                target_count=count, backend=self.backend_name) as span:
+            self._last_theme_map.clear()
             prompt = self._build_genesis_prompt(count)
             raw = self._call_llm(prompt, self.temperature_genesis, "genesis")
             formulas = self._extract_and_validate(raw)
@@ -208,6 +221,7 @@ class OpenAILLMBackend:
 
         with tracer.start_span("evolution", kind="breed",
                                target_count=count, backend=self.backend_name) as span:
+            self._last_theme_map.clear()
             prompt = self._build_evolution_prompt(spec, count)
             raw = self._call_llm(prompt, self.temperature_evolution, "evolution")
             formulas = self._extract_and_validate(raw)
@@ -217,39 +231,88 @@ class OpenAILLMBackend:
             span.set("finalized", len(finalized))
             return finalized
 
+    def get_theme_for_formula(self, formula: str) -> str | None:
+        """Return the theme that the LLM assigned to a formula, if any."""
+        return self._last_theme_map.get(formula)
+
     # -- prompt builders ----------------------------------------------------
 
     def _build_genesis_prompt(self, count: int) -> str:
         rules = _HARD_RULES.format(depth=self.max_ast_depth)
+
+        # --- Financial knowledge (structured themes) ---
+        if self.knowledge_base is not None and self.strategy_memory is not None:
+            # UCB bandit selects themes balancing explore/exploit
+            theme_ids = self.strategy_memory.select_themes_ucb(min(count, 6), c=1.0)
+            theme_section = self.knowledge_base.build_theme_prompt(theme_ids)
+        elif self.knowledge_base is not None:
+            # No memory yet — sample broadly
+            all_ids = self.knowledge_base.get_all_theme_ids()
+            theme_section = self.knowledge_base.build_theme_prompt(all_ids[:6])
+        else:
+            theme_section = (
+                "# Themes to explore (cover as many as possible)\n"
+                "1. Volatility compression breakout — atr_n / ts_std contraction then expansion.\n"
+                "2. Volume-price divergence — taker_buy_volume vs close, trade_count anomaly.\n"
+                "3. Funding + OI + momentum triple resonance.\n"
+                "4. Futures-spot basis — premium_close mean-reversion / trend.\n"
+                "5. Sentiment extremes — long_short_ratio / taker_long_short_vol_ratio z-score reversal.\n"
+                "6. Whale behaviour — delta(top_trader_long_short_ratio, d) as a leading signal."
+            )
+
+        # --- Feature groups (organized by financial meaning) ---
+        if self.knowledge_base is not None:
+            feature_section = self.knowledge_base.build_feature_groups_prompt()
+        else:
+            feature_section = _FIELDS
+
+        # --- Derived features (building blocks) ---
+        derived_section = ""
+        if self.feature_kitchen is not None:
+            derived_section = "\n" + self.feature_kitchen.get_catalog_as_prompt_section() + "\n"
+
+        # --- Strategy memory feedback (RL loop) ---
+        feedback_section = ""
+        if self.strategy_memory is not None:
+            feedback_section = "\n" + self.strategy_memory.build_feedback_summary() + "\n"
+
         return f"""\
 You are a senior crypto quant researcher.  Generate {count} diverse alpha factor formulas.
 
-{_FIELDS}
+{feature_section}
 
 {_OPERATORS}
-
-# Themes to explore (cover as many as possible)
-1. Volatility compression breakout — atr_n / ts_std contraction then expansion.
-2. Volume-price divergence — taker_buy_volume vs close, trade_count anomaly.
-3. Funding + OI + momentum triple resonance.
-4. Futures-spot basis — premium_close mean-reversion / trend.
-5. Sentiment extremes — long_short_ratio / taker_long_short_vol_ratio z-score reversal.
-6. Whale behaviour — delta(top_trader_long_short_ratio, d) as a leading signal.
-
+{derived_section}
+## Financial Hypotheses to Explore
+{theme_section}
+{feedback_section}
 # Rules
 {rules}
 
+For each formula, specify which theme it targets.
 Output exactly {count} items:
-[{{"rationale": "...", "formula": "cs_rank(...)"}}]"""
+[{{"theme": "...", "rationale": "...", "formula": "cs_rank(...)"}}]"""
 
     def _build_evolution_prompt(self, spec: BreedingSpec, count: int) -> str:
         rules = _HARD_RULES.format(depth=self.max_ast_depth)
         parents = self._format_parents(spec)
+
+        # --- Feature reference ---
+        if self.knowledge_base is not None:
+            feature_section = self.knowledge_base.build_feature_groups_prompt()
+        else:
+            feature_section = _FIELDS
+
+        # --- Strategy memory feedback ---
+        feedback_section = ""
+        if self.strategy_memory is not None:
+            feedback_section = "\n" + self.strategy_memory.build_feedback_summary() + "\n"
+
         return f"""\
 You are a quant formula mutation engine.  Given tournament-winning parent formulas with
 their backtest metrics, generate {count} improved offspring.
 
-{_FIELDS}
+{feature_section}
 
 {_OPERATORS}
 
@@ -263,12 +326,13 @@ their backtest metrics, generate {count} improved offspring.
 - If a parent has high turnover: wrap with decay_linear or ts_ema for smoothing.
 - If a parent has large train-test gap: simplify (reduce depth, fewer operators).
 - Actively incorporate under-used fields: premium_close, long_short_ratio, taker_buy_volume, mark_close.
-
+{feedback_section}
 # Rules
 {rules}
 
+For each formula, specify which theme it targets.
 Output exactly {count} items:
-[{{"rationale": "...", "formula": "cs_rank(...)"}}]"""
+[{{"theme": "...", "rationale": "...", "formula": "cs_rank(...)"}}]"""
 
     def _format_parents(self, spec: BreedingSpec) -> str:
         lines = []
@@ -330,15 +394,66 @@ Output exactly {count} items:
             self.call_stats["total_tokens"] += span.attributes.get("total_tokens") or 0
             return content
 
+    # -- RL feedback -------------------------------------------------------
+
+    def record_evaluation_result(
+        self,
+        formula: str,
+        theme_id: str | None,
+        metrics: dict[str, float],
+        is_novel: bool,
+        round_idx: int = 0,
+    ) -> None:
+        """Record evaluation result to close the RL feedback loop."""
+        if self.strategy_memory is None:
+            return
+        resolved_theme = theme_id or self._infer_theme(formula)
+        self.strategy_memory.record(
+            formula=formula,
+            theme_id=resolved_theme,
+            metrics=metrics,
+            is_novel=is_novel,
+            round_idx=round_idx,
+            all_fields=self.schema.fields,
+        )
+        if self.feature_kitchen is not None:
+            fitness = float(metrics.get("fitness", 0.0))
+            self.feature_kitchen.track_feature_importance(formula, fitness)
+
+    def _infer_theme(self, formula: str) -> str:
+        """Infer theme from formula content when LLM didn't return one."""
+        formula_lower = formula.lower()
+        if "funding_rate" in formula_lower and "premium" in formula_lower:
+            return "funding_basis_arb"
+        if "open_interest" in formula_lower and ("return" in formula_lower or "close" in formula_lower):
+            return "oi_momentum_divergence"
+        if "taker_buy" in formula_lower:
+            return "taker_flow_imbalance"
+        if "spread" in formula_lower or "amihud" in formula_lower:
+            return "microstructure_toxicity"
+        if "long_short_ratio" in formula_lower or "taker_long_short" in formula_lower:
+            return "sentiment_extreme_reversal"
+        if "top_trader" in formula_lower:
+            return "whale_positioning"
+        if "volatility_n" in formula_lower or "atr_n" in formula_lower:
+            return "volatility_regime_switch"
+        if "premium" in formula_lower:
+            return "premium_dynamics"
+        if "funding_rate" in formula_lower:
+            return "funding_basis_arb"
+        if "mark_close" in formula_lower or "mark_open" in formula_lower:
+            return "mark_spot_divergence"
+        return "general"
+
     # -- parsing / validation -----------------------------------------------
 
     def _extract_and_validate(self, raw: str) -> list[str]:
         """Extract formula strings from LLM output, normalise, and compile-check."""
-        candidates = self._extract_formula_strings(raw)
+        candidates = self._extract_items(raw)
         valid: list[str] = []
         seen: set[str] = set()
-        for c in candidates:
-            normed = _normalize_to_snake(c.strip())
+        for formula, theme in candidates:
+            normed = _normalize_to_snake(formula.strip())
             if not normed or normed in seen:
                 continue
             if not self._is_valid_expr(normed):
@@ -351,11 +466,14 @@ Output exactly {count} items:
                 continue
             seen.add(normed)
             valid.append(normed)
+            # Store theme mapping for lineage tracking
+            if theme:
+                self._last_theme_map[normed] = theme
         return valid
 
-    def _extract_formula_strings(self, raw: str) -> list[str]:
-        """Pull formula strings from JSON or regex fallback."""
-        formulas: list[str] = []
+    def _extract_items(self, raw: str) -> list[tuple[str, str]]:
+        """Pull (formula, theme) pairs from JSON or regex fallback."""
+        items: list[tuple[str, str]] = []
         cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw.strip(), flags=re.MULTILINE)
         # Try JSON parse
         try:
@@ -363,20 +481,30 @@ Output exactly {count} items:
             if isinstance(payload, list):
                 for item in payload:
                     if isinstance(item, dict) and "formula" in item:
-                        formulas.append(str(item["formula"]))
+                        items.append((
+                            str(item["formula"]),
+                            str(item.get("theme", "")),
+                        ))
             elif isinstance(payload, dict) and "formula" in payload:
-                formulas.append(str(payload["formula"]))
+                items.append((
+                    str(payload["formula"]),
+                    str(payload.get("theme", "")),
+                ))
         except Exception:
             pass
-        if formulas:
-            return formulas
-        # Regex fallback
+        if items:
+            return items
+        # Regex fallback (theme not available)
         for m in re.finditer(r'"formula"\s*:\s*"((?:[^"\\]|\\.)*)"', raw):
             try:
-                formulas.append(json.loads(f'"{m.group(1)}"'))
+                items.append((json.loads(f'"{m.group(1)}"'), ""))
             except Exception:
-                formulas.append(m.group(1))
-        return formulas
+                items.append((m.group(1), ""))
+        return items
+
+    def _extract_formula_strings(self, raw: str) -> list[str]:
+        """Pull formula strings from JSON or regex fallback (backward compat)."""
+        return [formula for formula, _ in self._extract_items(raw)]
 
     @staticmethod
     def _finalize(formulas: list[str], target: int, fallback) -> list[str]:
@@ -424,6 +552,9 @@ def build_default_llm_backend(
     model_name: str | None = None,
     base_url: str | None = None,
     api_key: str | None = None,
+    strategy_memory: Any | None = None,
+    knowledge_base: Any | None = None,
+    feature_kitchen: Any | None = None,
 ) -> Any:
     requested = (backend_name or "auto").lower()
     if requested == "heuristic":
@@ -433,5 +564,8 @@ def build_default_llm_backend(
         return OpenAILLMBackend(
             registry=registry, schema=schema,
             model_name=model_name, base_url=base_url, api_key=api_key,
+            strategy_memory=strategy_memory,
+            knowledge_base=knowledge_base,
+            feature_kitchen=feature_kitchen,
         )
     return HeuristicLLMBackend(registry=registry, schema=schema)

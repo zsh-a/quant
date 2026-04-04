@@ -310,5 +310,87 @@ class MCTSEngine:
         return _count(self.root)
 
 
-# Backward-compatible alias
-AlphaMiningMCTS = MCTSEngine
+    def get_refined_formulas(self) -> list[str]:
+        """Return formulas discovered during the last run.
+
+        Interface used by MCTSRefinementStrategy to collect results.
+        """
+        return [node.formula for node in self.alpha_zoo]
+
+
+# ---------------------------------------------------------------------------
+# LLM Adapter — bridges OpenAILLMBackend to the interface MCTSEngine expects
+# ---------------------------------------------------------------------------
+
+
+class MCTSLLMAdapter:
+    """Adapts OpenAILLMBackend to the MCTSEngine's expected llm_agent interface.
+
+    MCTSEngine calls:
+      - get_refinement_suggestion(formula, dimension, metrics) -> str
+      - refine_alpha(formula, suggestion, error_msg) -> str
+
+    This adapter translates those into LLM API calls using the
+    enhanced prompt with financial knowledge.
+    """
+
+    def __init__(self, llm_backend: Any) -> None:
+        self.llm_backend = llm_backend
+
+    def get_refinement_suggestion(
+        self, formula: str, dimension: str, metrics: dict
+    ) -> str:
+        """Generate a refinement suggestion using the LLM."""
+        rank_ic = metrics.get("rank_ic", 0)
+        ic_ir = metrics.get("ic_ir", 0)
+        prompt = (
+            f"You are a quant alpha researcher.\n"
+            f"Current formula: `{formula}`\n"
+            f"Metrics: rank_ic={rank_ic:.4f}, ic_ir={ic_ir:.4f}\n"
+            f"Refinement dimension: {dimension}\n\n"
+            f"Suggest ONE specific modification to improve this formula. "
+            f"Be concise (1-2 sentences)."
+        )
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            resp = self.llm_backend.client.chat.completions.create(
+                model=self.llm_backend.model_name,
+                messages=messages,
+                temperature=0.4,
+                stream=False,
+                timeout=30,
+            )
+            return resp.choices[0].message.content or ""
+        except Exception as e:
+            logger.warning(f"MCTSLLMAdapter suggestion failed: {e}")
+            return f"Try adjusting window sizes or wrapping with cs_rank for {dimension.lower()}"
+
+    def refine_alpha(
+        self, formula: str, suggestion: str, error_msg: str | None
+    ) -> str:
+        """Generate a refined formula based on suggestion."""
+        error_context = f"\nPrevious attempt failed: {error_msg}\nFix the error." if error_msg else ""
+        prompt = (
+            f"Modify this alpha formula based on the suggestion.\n"
+            f"Current: `{formula}`\n"
+            f"Suggestion: {suggestion}\n"
+            f"{error_context}\n"
+            f"Output ONLY the new formula (a valid Python expression), nothing else."
+        )
+        messages = [{"role": "user", "content": prompt}]
+        try:
+            resp = self.llm_backend.client.chat.completions.create(
+                model=self.llm_backend.model_name,
+                messages=messages,
+                temperature=0.3,
+                stream=False,
+                timeout=30,
+            )
+            content = (resp.choices[0].message.content or "").strip()
+            # Clean up: remove backticks, quotes
+            content = content.strip("`\"' \n")
+            return content
+        except Exception as e:
+            logger.warning(f"MCTSLLMAdapter refine failed: {e}")
+            return ""
+

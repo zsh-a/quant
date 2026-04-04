@@ -1,12 +1,15 @@
 """Unified alpha factor discovery module.
 
-Regularised Evolution + Quality-Diversity archive for alpha formula mining,
-multi-factor combination, and portfolio-level risk management.
+Pluggable strategy framework for alpha formula mining with:
+- LLM-driven evolution + RL feedback loop
+- MCTS local refinement
+- Financial knowledge base + derived feature catalog
+- Multi-factor combination and portfolio-level risk management
 """
 
 from .combination import FactorCombiner, FactorSignal
 from .compiler import BytecodeProgram, FormulaCompiler, Instruction
-from .dataset import AlphaDataset, CryptoMinuteDatasetLoader, StockDailyDatasetLoader
+from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
 from .dsl import ASTNode, FormulaParser, TensorSchema, TypeChecker, ValidationReport
 from .evaluation import compute_forward_returns, compute_ic_metrics, compute_rank_ic
 from .evolution import (
@@ -16,10 +19,11 @@ from .evolution import (
     FitnessPolicy,
     HeuristicLLMBackend,
     Individual,
-    SearchEngine,
     SearchResult,
 )
-from .mcts import AlphaNode, MCTSEngine
+from .feature_kitchen import DerivedFeature, FeatureKitchen
+from .financial_knowledge import FeatureGroup, FinancialKnowledgeBase, FinancialTheme
+from .mcts import AlphaNode, MCTSEngine, MCTSLLMAdapter
 from .operators import OperatorRegistry, OperatorSpec
 from .persistence import AlphaPersistence, PersistedRun
 from .risk import (
@@ -32,7 +36,10 @@ from .risk import (
     RuleOverlay,
     SignalTransformer,
 )
+from .search_strategy import SearchContext, SearchOrchestrator, SearchStrategy
 from .service import AlphaService
+from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy
+from .strategy_memory import StrategyMemory
 from .tracing import InMemoryCollector, LangfuseCollector, Span, SpanCollector, tracer
 from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
@@ -52,10 +59,15 @@ __all__ = [
     "CostModel",
     "CPCVValidator",
     "CryptoMinuteDatasetLoader",
+    "DerivedFeature",
     "EvalResult",
     "ExecutionSimulator",
     "FactorCombiner",
     "FactorSignal",
+    "FeatureGroup",
+    "FeatureKitchen",
+    "FinancialKnowledgeBase",
+    "FinancialTheme",
     "FitnessEngine",
     "FitnessPolicy",
     "FormulaCompiler",
@@ -65,21 +77,26 @@ __all__ = [
     "InMemoryCollector",
     "Instruction",
     "LangfuseCollector",
+    "LLMEvolutionStrategy",
     "MarketContext",
     "MCTSEngine",
+    "MCTSLLMAdapter",
+    "MCTSRefinementStrategy",
     "OperatorRegistry",
     "OperatorSpec",
     "PersistedRun",
     "PortfolioManager",
     "RiskConfig",
     "RuleOverlay",
-    "SearchEngine",
+    "SearchContext",
+    "SearchOrchestrator",
     "SearchResult",
+    "SearchStrategy",
     "SignalTransformer",
     "Span",
     "SpanCollector",
     "StackVM",
-    "StockDailyDatasetLoader",
+    "StrategyMemory",
     "TensorSchema",
     "TensorStore",
     "TypeChecker",

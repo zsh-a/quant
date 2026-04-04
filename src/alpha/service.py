@@ -13,10 +13,14 @@ from .combination import FactorCombiner
 from .compiler import BytecodeProgram, FormulaCompiler
 from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
 from .dsl import TensorSchema
-from .evolution import EvalResult, Individual, SearchEngine
+from .evolution import EvalResult, Individual
+from .feature_kitchen import FeatureKitchen
+from .financial_knowledge import FinancialKnowledgeBase
 from .operators import OperatorRegistry
 from .persistence import AlphaPersistence
 from .risk import CostModel, ExecutionSimulator, MarketContext, PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer
+from .search_strategy import SearchOrchestrator
+from .strategy_memory import StrategyMemory
 from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
 
@@ -37,21 +41,74 @@ class AlphaService:
         llm_base_url: str | None = None,
         llm_api_key: str | None = None,
         program_cache_size: int = 512,
+        enable_mcts: bool = False,
+        mcts_refinement_frequency: int = 3,
+        strategy_memory_path: str | None = "data/alpha_lab/strategy_memory.json",
     ):
         self.registry = OperatorRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
         self.compiler = FormulaCompiler(self.registry)
         self.vm = StackVM()
-        self.search_engine = SearchEngine(
-            compiler=self.compiler,
+
+        # --- Enhanced modules ---
+        self.knowledge_base = FinancialKnowledgeBase()
+        self.feature_kitchen = FeatureKitchen(self.schema)
+        self.strategy_memory = StrategyMemory(
+            persistence_path=strategy_memory_path,
+            all_theme_ids=self.knowledge_base.get_all_theme_ids(),
+        )
+        # Load persisted strategy memory from previous sessions
+        self.strategy_memory.load()
+
+        # --- Build LLM backend ---
+        from .llm import build_default_llm_backend
+        from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy
+
+        resolved_llm = llm_backend or build_default_llm_backend(
             registry=self.registry,
             schema=self.schema,
-            llm_backend=llm_backend,
             backend_name=llm_backend_name,
             model_name=llm_model,
             base_url=llm_base_url,
             api_key=llm_api_key,
+            strategy_memory=self.strategy_memory,
+            knowledge_base=self.knowledge_base,
+            feature_kitchen=self.feature_kitchen,
         )
+        self.llm_backend = resolved_llm
+
+        # --- Assemble strategies ---
+        strategies: list = [
+            LLMEvolutionStrategy(llm_backend=resolved_llm),
+        ]
+
+        if enable_mcts:
+            from .mcts import MCTSEngine, MCTSLLMAdapter
+            llm_adapter = MCTSLLMAdapter(resolved_llm)
+            mcts_engine = MCTSEngine(
+                compiler=self.compiler,
+                vm=self.vm,
+                schema=self.schema,
+                llm_agent=llm_adapter,
+            )
+            strategies.append(
+                MCTSRefinementStrategy(
+                    mcts_engine=mcts_engine,
+                    activation_frequency=mcts_refinement_frequency,
+                ),
+            )
+
+        # --- Search orchestrator ---
+        self.search_engine = SearchOrchestrator(
+            strategies=strategies,
+            compiler=self.compiler,
+            registry=self.registry,
+            schema=self.schema,
+            strategy_memory=self.strategy_memory,
+            knowledge_base=self.knowledge_base,
+            feature_kitchen=self.feature_kitchen,
+        )
+
         self.signal_transformer = SignalTransformer()
         self.rule_overlay = RuleOverlay()
         self.portfolio_manager = PortfolioManager()
@@ -150,7 +207,6 @@ class AlphaService:
     def evaluate_formula_from_db(
         self,
         formula: str,
-        provider: str,
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
@@ -160,7 +216,6 @@ class AlphaService:
         summary_only: bool = False,
     ) -> dict[str, Any]:
         dataset = self.dataset_loader.load(
-            provider=provider,
             symbols=symbols,
             start_time=start_time,
             end_time=end_time,
@@ -173,7 +228,6 @@ class AlphaService:
     def evaluate_formulas_from_db(
         self,
         formulas: list[str],
-        provider: str,
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
@@ -183,7 +237,6 @@ class AlphaService:
         summary_only: bool = False,
     ) -> dict[str, dict[str, Any]]:
         dataset = self.dataset_loader.load(
-            provider=provider,
             symbols=symbols,
             start_time=start_time,
             end_time=end_time,
@@ -280,7 +333,6 @@ class AlphaService:
 
     def benchmark_db(
         self,
-        provider: str,
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
@@ -294,7 +346,6 @@ class AlphaService:
 
         load_start = perf_counter()
         dataset = self.dataset_loader.load(
-            provider=provider,
             symbols=symbols,
             start_time=start_time,
             end_time=end_time,
@@ -346,7 +397,6 @@ class AlphaService:
 
     def search_formulas_on_db(
         self,
-        provider: str,
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
@@ -370,17 +420,17 @@ class AlphaService:
         overall_start = perf_counter()
         timing: dict[str, Any] = {}
 
-        # Top-level trace: all child spans in SearchEngine + LLM nest under this
+        # Top-level trace: all child spans nest under this
         with tracer.start_span(
             "search", kind="search",
-            provider=provider, symbols=",".join(symbols),
+            symbols=",".join(symbols),
             rounds=generations, batch_size=offspring_count,
         ) as search_span:
             # 1. Load dataset
             with tracer.start_span("load_dataset", kind="internal",
                                    symbols=len(symbols), interval=interval):
                 dataset = self.dataset_loader.load(
-                    provider=provider, symbols=symbols, start_time=start_time,
+                    symbols=symbols, start_time=start_time,
                     end_time=end_time, interval=interval,
                     min_quote_volume=min_quote_volume, blocked_utc_hours=blocked_utc_hours,
                 )
@@ -422,13 +472,17 @@ class AlphaService:
                 novelty_threshold=novelty_threshold,
                 evaluate_fn=evaluate_fn,
                 quick_evaluate_fn=quick_fn,
+                dataset=dataset,
             )
+
+            # 4b. Persist strategy memory for cross-session learning
+            self.strategy_memory.save()
 
             # 5. Build result
             timing.update(search_result.timing)
             result = {
                 "dataset": {
-                    "provider": dataset.provider, "interval": dataset.interval,
+                    "interval": dataset.interval,
                     "symbols": dataset.symbols, "shape": dataset.shape(),
                 },
                 "llm": self._llm_backend_summary(),
@@ -490,7 +544,6 @@ class AlphaService:
 
     def combine_factors_from_db(
         self,
-        provider: str,
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
@@ -513,7 +566,6 @@ class AlphaService:
 
         # 1. Load dataset
         dataset = self.dataset_loader.load(
-            provider=provider,
             symbols=symbols,
             start_time=start_time,
             end_time=end_time,
@@ -1099,7 +1151,6 @@ class AlphaService:
 
     def _dataset_summary(self, dataset: AlphaDataset) -> dict[str, Any]:
         return {
-            "provider": dataset.provider,
             "interval": dataset.interval,
             "symbols": dataset.symbols,
             "timestamps": dataset.timestamps[:5],
@@ -1107,7 +1158,7 @@ class AlphaService:
         }
 
     def _llm_backend_summary(self) -> dict[str, Any]:
-        backend = self.search_engine.llm_backend
+        backend = self.llm_backend
         return {
             "backend": getattr(backend, "backend_name", backend.__class__.__name__),
             "model": getattr(backend, "model_name", None),
@@ -1382,7 +1433,3 @@ class AlphaService:
         peak = np.maximum.accumulate(flat)
         dd = np.where(peak > 1e-12, 1.0 - flat / peak, 0.0)
         return self._downsample_series(dd, max_points)
-
-
-# Backward-compatible alias
-AlphaLabService = AlphaService
