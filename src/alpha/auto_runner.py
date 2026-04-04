@@ -26,6 +26,8 @@ class AutoSearchWindowConfig(BaseModel):
     lag_minutes: int = 5
     step_minutes: int = 60
     anchor_time: str | None = None
+    start_time: str | None = None
+    end_time: str | None = None
 
 
 class AutoSearchSearchConfig(BaseModel):
@@ -117,6 +119,7 @@ def build_service_from_auto_search_config(config: AutoSearchConfig) -> AlphaServ
         llm_model=config.search.llm_model,
         llm_base_url=config.search.llm_base_url,
         llm_api_key=config.search.llm_api_key,
+        program_cache_size=512,
     )
 
 
@@ -355,6 +358,15 @@ def _resolve_window(
     config: AutoSearchConfig,
     now_fn: Callable[[], datetime],
 ) -> dict[str, str]:
+    # Fixed window: explicit start_time / end_time
+    if config.window.start_time and config.window.end_time:
+        start_time = _parse_iso(config.window.start_time)
+        end_time = _parse_iso(config.window.end_time)
+        if start_time >= end_time:
+            raise ValueError(f"start_time ({config.window.start_time}) must be before end_time ({config.window.end_time})")
+        return {"start": start_time.isoformat(), "end": end_time.isoformat()}
+
+    # Rolling window: anchor/now - lag - lookback
     if config.window.step_minutes <= 0:
         raise ValueError("window.step_minutes must be > 0")
     if config.window.lookback_minutes <= 0:
@@ -376,6 +388,41 @@ def _floor_time(value: datetime, step_minutes: int) -> datetime:
     step_seconds = step_minutes * 60
     timestamp = int(value.astimezone(UTC).timestamp())
     return datetime.fromtimestamp((timestamp // step_seconds) * step_seconds, tz=UTC)
+
+
+def _generate_feedback_seeds(
+    service: AlphaService,
+    entries: list[dict[str, Any]],
+    count: int,
+    objective: str,
+) -> list[str]:
+    """Generate feedback seed formulas via the search engine's LLM backend."""
+    from .evolution import BreedingSpec
+
+    if count <= 0 or not entries:
+        return []
+    ranked = sorted(
+        [e for e in entries if e.get("formula")],
+        key=lambda e: float(e.get("fitness", 0) or 0),
+        reverse=True,
+    )
+    if not ranked:
+        return []
+    parent_a = ranked[0]
+    parent_b = ranked[1] if len(ranked) > 1 else None
+    feedback = [{"formula": parent_a["formula"], "metrics": parent_a.get("metrics", {}), "rationale": "Carryover elite."}]
+    if parent_b:
+        feedback.append({"formula": parent_b["formula"], "metrics": parent_b.get("metrics", {}), "rationale": "Secondary elite."})
+    formulas = service.search_engine.llm_backend.generate_offspring(
+        BreedingSpec(
+            parent_a=parent_a["formula"],
+            parent_b=parent_b["formula"] if parent_b else None,
+            objective=objective,
+            parent_feedback=feedback,
+        ),
+        count=count,
+    )
+    return [f for f in formulas if f][:count]
 
 
 def _resolve_cycle_seed_bundle(
@@ -410,8 +457,8 @@ def _resolve_cycle_seed_bundle(
 
     source_entries = feedback_entries or zoo_entries or carryover_entries
     if config.search.feedback_seed_count > 0:
-        for formula in service.evolution.generate_feedback_seed_formulas(
-            entries=source_entries,
+        for formula in _generate_feedback_seeds(
+            service, source_entries,
             count=config.search.feedback_seed_count,
             objective=config.search.feedback_objective,
         ):

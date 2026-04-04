@@ -1,5 +1,11 @@
+# Fixed window (set both to use explicit time range, ignores lookback/lag/step):
+#   start_time: "2024-01-01T00:00:00+00:00"
+#   end_time:   "2024-07-01T00:00:00+00:00"
+# Rolling window (default): uses lookback_minutes from now/anchor_time
 window:
-  lookback_minutes: 10080
+  start_time: "2020-01-01T00:00:00+00:00"             # ISO8601, e.g. "2024-01-01T00:00:00+00:00"
+  end_time: "2024-07-01T00:00:00+00:00"               # ISO8601, e.g. "2024-07-01T00:00:00+00:00"
+  lookback_minutes: 10080  # rolling mode: 7 days
   lag_minutes: 10
   step_minutes: 60
 

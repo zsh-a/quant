@@ -2,10 +2,13 @@ from __future__ import annotations
 
 import hashlib
 import random
+from collections import deque
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from time import perf_counter
+from typing import Any, Callable, Protocol
 
 import numpy as np
+from loguru import logger
 
 from .compiler import BytecodeProgram, FormulaCompiler
 from .dsl import TensorSchema
@@ -271,7 +274,74 @@ class FitnessEngine:
         )
 
 
-class EvolutionEngine:
+
+
+# ---------------------------------------------------------------------------
+# Evaluation callback types
+# ---------------------------------------------------------------------------
+
+@dataclass
+class EvalResult:
+    """Result from an evaluation callback."""
+
+    metrics_by_hash: dict[str, dict[str, float]]
+    signatures_by_hash: dict[str, list[float]]
+    details_by_hash: dict[str, dict[str, Any]]
+    timing: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class SearchResult:
+    """Final output of SearchEngine.run()."""
+
+    archive: list[Individual]
+    all_evaluated: list[Individual]
+    details_by_hash: dict[str, dict[str, Any]]
+    rounds: list[dict[str, Any]]
+    timing: dict[str, Any]
+    total_evaluations: int
+    total_rejected: int
+
+
+# ---------------------------------------------------------------------------
+# SearchEngine — Regularized Evolution with Quality-Diversity Archive
+# ---------------------------------------------------------------------------
+
+
+# Archive bin boundaries for MAP-Elites grid
+_IC_BINS = (0.0, 0.02, 0.05, float("inf"))
+_TURNOVER_BINS = (0.0, 0.05, 0.20, float("inf"))
+
+
+def _bin_index(value: float, edges: tuple[float, ...]) -> int:
+    for i in range(len(edges) - 1):
+        if value < edges[i + 1]:
+            return i
+    return len(edges) - 2
+
+
+class SearchEngine:
+    """
+    Regularised Evolution with Quality-Diversity archive.
+
+    Differences from the old synchronous GA:
+
+    * **Tournament selection + aging** — each round samples a small tournament
+      from the population, picks the best parents, breeds offspring.  Old
+      individuals are evicted by age, preventing premature convergence.
+
+    * **Early stopping** — new candidates are first quick-screened on a single
+      validation fold; only promising ones proceed to full CPCV evaluation.
+      This typically eliminates ~40-60 % of candidates cheaply.
+
+    * **MAP-Elites archive** — an (|IC| × turnover) grid stores the best
+      individual per behavioural niche.  The archive is the primary output,
+      guaranteeing diversity in the final result set.
+
+    * **No synchronous generations** — evaluation budget is spent continuously,
+      which is more efficient and easier to parallelise in the future.
+    """
+
     def __init__(
         self,
         llm_backend: LLMBackend | None = None,
@@ -282,6 +352,8 @@ class EvolutionEngine:
         model_name: str | None = None,
         base_url: str | None = None,
         api_key: str | None = None,
+        population_cap: int = 30,
+        tournament_size: int = 7,
     ):
         self.registry = registry or OperatorRegistry()
         self.compiler = compiler or FormulaCompiler(self.registry)
@@ -300,211 +372,296 @@ class EvolutionEngine:
         self.llm_backend = llm_backend
         self.fitness_engine = FitnessEngine()
 
-    def generate_feedback_seed_formulas(
+        self._population_cap = population_cap
+        self._tournament_size = tournament_size
+
+    # -- public API ---------------------------------------------------------
+
+    def run(
         self,
-        entries: list[dict[str, Any]],
-        count: int,
-        objective: str = "improve robustness and reduce turnover",
-    ) -> list[str]:
-        if count <= 0:
-            return []
+        *,
+        seeds: list[str],
+        rounds: int,
+        batch_size: int,
+        top_k: int,
+        novelty_threshold: float,
+        evaluate_fn: Callable[[list[Individual]], EvalResult],
+        quick_evaluate_fn: Callable[[list[Individual]], EvalResult] | None = None,
+    ) -> SearchResult:
+        """
+        Execute the search loop.
 
-        ranked_entries = sorted(
-            [entry for entry in entries if entry.get("formula")],
-            key=lambda item: float(item.get("fitness", item.get("metrics", {}).get("sharpe", 0.0)) or 0.0),
-            reverse=True,
+        Parameters
+        ----------
+        seeds : initial formula strings
+        rounds : number of breed-evaluate rounds
+        batch_size : offspring generated per round
+        top_k : how many to return from archive
+        novelty_threshold : signature correlation ceiling
+        evaluate_fn : full CPCV evaluator (provided by service)
+        quick_evaluate_fn : optional 1-fold quick screener
+        """
+        overall_start = perf_counter()
+
+        # 1. Initialise population from seeds
+        population: deque[Individual] = deque(maxlen=self._population_cap)
+        archive: dict[tuple[int, int], Individual] = {}
+        seen_hashes: set[str] = set()
+        all_evaluated: list[Individual] = []
+        details_by_hash: dict[str, dict[str, Any]] = {}
+        round_summaries: list[dict[str, Any]] = []
+        total_evaluations = 0
+        total_rejected = 0
+
+        init_start = perf_counter()
+        initial = self._build_initial_population(seeds, max(batch_size, len(seeds)))
+        init_seconds = perf_counter() - init_start
+
+        # Evaluate initial batch
+        if initial:
+            init_eval = evaluate_fn(initial)
+            details_by_hash.update(init_eval.details_by_hash)
+            for ind in initial:
+                m = init_eval.metrics_by_hash.get(ind.expr_hash, {})
+                ind.metrics = m
+                ind.fitness = self.fitness_engine.score(m)
+                population.append(ind)
+                seen_hashes.add(ind.expr_hash)
+                all_evaluated.append(ind)
+                self._archive_update(archive, ind)
+            total_evaluations += len(initial)
+
+        logger.info(
+            "search.init population={} archive={} init_seconds={:.3f}",
+            len(population), len(archive), init_seconds,
         )
-        if not ranked_entries:
-            return []
 
-        parent_a = ranked_entries[0]
-        parent_b = ranked_entries[1] if len(ranked_entries) > 1 else None
-        parent_feedback = [
-            {
-                "formula": parent_a.get("formula", ""),
-                "metrics": dict(parent_a.get("metrics") or {}),
-                "rationale": "Carryover elite from previous evaluated cycle.",
-            }
-        ]
-        if parent_b:
-            parent_feedback.append(
-                {
-                    "formula": parent_b.get("formula", ""),
-                    "metrics": dict(parent_b.get("metrics") or {}),
-                    "rationale": "Secondary carryover elite for crossover diversity.",
-                }
+        # 2. Main loop
+        for round_idx in range(rounds):
+            round_start = perf_counter()
+            round_info: dict[str, Any] = {"round": round_idx}
+
+            # Tournament selection → parents
+            parents = self._tournament_select(list(population))
+
+            # Generate offspring batch
+            gen_start = perf_counter()
+            offspring = self._breed_batch(parents, batch_size, seen_hashes)
+            round_info["generate_seconds"] = perf_counter() - gen_start
+            round_info["candidates_generated"] = len(offspring)
+
+            if not offspring:
+                round_summaries.append(round_info)
+                continue
+
+            # Quick screen (optional early stopping)
+            screened = offspring
+            quick_rejected = 0
+            if quick_evaluate_fn and len(offspring) > 1:
+                screen_start = perf_counter()
+                quick_result = quick_evaluate_fn(offspring)
+                screened = []
+                for ind in offspring:
+                    qm = quick_result.metrics_by_hash.get(ind.expr_hash, {})
+                    if self._passes_quick_screen(qm):
+                        screened.append(ind)
+                    else:
+                        quick_rejected += 1
+                round_info["quick_screen_seconds"] = perf_counter() - screen_start
+            round_info["quick_rejected"] = quick_rejected
+            total_rejected += quick_rejected
+
+            # Full evaluate survivors
+            if screened:
+                eval_start = perf_counter()
+                full_result = evaluate_fn(screened)
+                round_info["eval_seconds"] = perf_counter() - eval_start
+                details_by_hash.update(full_result.details_by_hash)
+
+                for ind in screened:
+                    m = full_result.metrics_by_hash.get(ind.expr_hash, {})
+                    ind.metrics = m
+                    ind.fitness = self.fitness_engine.score(m)
+                    population.append(ind)  # aging: oldest auto-evicted by deque
+                    seen_hashes.add(ind.expr_hash)
+                    all_evaluated.append(ind)
+                    self._archive_update(archive, ind)
+
+                total_evaluations += len(screened)
+
+            round_info["evaluated"] = len(screened)
+            round_info["archive_size"] = len(archive)
+            round_info["population_size"] = len(population)
+            round_info["total_seconds"] = perf_counter() - round_start
+
+            best_in_archive = max(archive.values(), key=lambda x: x.fitness) if archive else None
+            round_info["best_fitness"] = best_in_archive.fitness if best_in_archive else 0.0
+
+            round_summaries.append(round_info)
+            logger.info(
+                "search.round round={} generated={} rejected={} evaluated={} "
+                "archive={} best_fitness={:.4f} seconds={:.3f}",
+                round_idx, len(offspring), quick_rejected, len(screened),
+                len(archive),
+                round_info["best_fitness"],
+                round_info["total_seconds"],
             )
 
-        generated = self.llm_backend.generate_offspring(
-            BreedingSpec(
-                parent_a=parent_a.get("formula", ""),
-                parent_b=parent_b.get("formula", "") if parent_b else None,
-                objective=objective,
-                parent_feedback=parent_feedback,
-            ),
-            count=count,
+        # 3. Build final result from archive
+        archive_list = sorted(archive.values(), key=lambda x: x.fitness, reverse=True)
+
+        # Novelty filter on archive for the final top_k
+        final = self._novelty_filter(archive_list, details_by_hash, novelty_threshold)[:top_k]
+
+        timing = {
+            "init_seconds": init_seconds,
+            "rounds": round_summaries,
+            "overall_seconds": perf_counter() - overall_start,
+        }
+
+        logger.info(
+            "search.complete total_eval={} rejected={} archive={} final={} seconds={:.3f}",
+            total_evaluations, total_rejected, len(archive), len(final), timing["overall_seconds"],
         )
 
-        validated: list[str] = []
-        seen: set[str] = set()
-        for formula in generated:
-            if not formula or formula in seen:
-                continue
-            if self._build_individual(formula, {"origin": "feedback_seed"}) is None:
-                continue
-            seen.add(formula)
-            validated.append(formula)
-            if len(validated) >= count:
-                break
-        return validated
+        return SearchResult(
+            archive=final,
+            all_evaluated=all_evaluated,
+            details_by_hash=details_by_hash,
+            rounds=round_summaries,
+            timing=timing,
+            total_evaluations=total_evaluations,
+            total_rejected=total_rejected,
+        )
 
-    def initialize(self, seeds: list[str], population_size: int) -> list[Individual]:
+    # -- internals ----------------------------------------------------------
+
+    def _build_initial_population(self, seeds: list[str], target: int) -> list[Individual]:
         population: list[Individual] = []
-        resolved_seeds = list(seeds)
-        if not resolved_seeds:
-            resolved_seeds = self.llm_backend.generate_initial_population(population_size)
-        for formula in resolved_seeds[:population_size]:
-            individual = self._build_individual(formula, {"origin": "seed"})
-            if individual:
-                population.append(individual)
-        # Fill remaining slots with heuristic mutations (fast, no LLM call, no empty metrics)
+        seen: set[str] = set()
+        # Compile seeds
+        for formula in seeds:
+            ind = self._build_individual(formula, {"origin": "seed"})
+            if ind and ind.expr_hash not in seen:
+                population.append(ind)
+                seen.add(ind.expr_hash)
+        # Fill with heuristic mutations
         heuristic = HeuristicLLMBackend(registry=self.registry, schema=self.schema)
-        attempts = 0
-        max_attempts = max(population_size * 4, 8)
-        seen = {ind.expr_hash for ind in population}
-        while len(population) < population_size and attempts < max_attempts:
-            base = resolved_seeds[attempts % len(resolved_seeds)] if resolved_seeds else "cs_rank(ts_std(close, 10))"
-            candidates = heuristic.generate_offspring(
-                BreedingSpec(parent_a=base, parent_b=None, objective="bootstrap"),
-                count=1,
-            )
-            for formula in candidates:
-                individual = self._build_individual(formula, {"origin": "bootstrap"})
-                if individual and individual.expr_hash not in seen:
-                    seen.add(individual.expr_hash)
-                    population.append(individual)
-            attempts += 1
-        return population
+        if not seeds:
+            seeds = heuristic.generate_initial_population(target)
+            for formula in seeds:
+                ind = self._build_individual(formula, {"origin": "seed"})
+                if ind and ind.expr_hash not in seen:
+                    population.append(ind)
+                    seen.add(ind.expr_hash)
+        attempt = 0
+        while len(population) < target and attempt < target * 4:
+            base = seeds[attempt % len(seeds)] if seeds else "cs_rank(ts_std(close, 10))"
+            for f in heuristic.generate_offspring(
+                BreedingSpec(parent_a=base, parent_b=None, objective="bootstrap"), count=1,
+            ):
+                ind = self._build_individual(f, {"origin": "bootstrap"})
+                if ind and ind.expr_hash not in seen:
+                    population.append(ind)
+                    seen.add(ind.expr_hash)
+            attempt += 1
+        return population[:target]
 
-    def select_survivors(self, pop: list[Individual], top_k: int | None = None) -> list[Individual]:
-        top_k = top_k or max(1, len(pop) // 2)
-        ranked = sorted(pop, key=lambda item: item.fitness, reverse=True)
-        return ranked[:top_k]
+    def _tournament_select(self, population: list[Individual]) -> list[Individual]:
+        """Sample a tournament, return top 2 as parents."""
+        if len(population) <= 2:
+            return list(population)
+        k = min(self._tournament_size, len(population))
+        tournament = random.sample(population, k)
+        tournament.sort(key=lambda x: x.fitness, reverse=True)
+        return tournament[:2]
 
-    def breed(self, survivors: list[Individual], n_offspring: int) -> list[Individual]:
-        if not survivors or n_offspring <= 0:
+    def _breed_batch(
+        self,
+        parents: list[Individual],
+        count: int,
+        seen: set[str],
+    ) -> list[Individual]:
+        """Generate a batch of offspring from parents."""
+        if not parents:
             return []
-        offspring: list[Individual] = []
-        jobs = self._build_breeding_jobs(survivors, n_offspring)
-        for parent_a, parent_b, requested_count in jobs:
-            formulas = self.llm_backend.generate_offspring(
-                BreedingSpec(
-                    parent_a=parent_a.formula,
-                    parent_b=parent_b.formula if parent_b else None,
-                    objective="improve robustness and reduce turnover",
-                    parent_feedback=[
-                        {
-                            "formula": parent_a.formula,
-                            "metrics": parent_a.metrics,
-                            "rationale": "Primary parent selected from previous generation elites.",
-                        },
-                        *(
-                            [
-                                {
-                                    "formula": parent_b.formula,
-                                    "metrics": parent_b.metrics,
-                                    "rationale": "Secondary parent selected for crossover diversity.",
-                                }
-                            ]
-                            if parent_b
-                            else []
-                        ),
-                    ],
+        parent_a = parents[0]
+        parent_b = parents[1] if len(parents) > 1 else None
+
+        spec = BreedingSpec(
+            parent_a=parent_a.formula,
+            parent_b=parent_b.formula if parent_b else None,
+            objective="improve robustness and reduce turnover",
+            parent_feedback=[
+                {"formula": parent_a.formula, "metrics": parent_a.metrics,
+                 "rationale": "Tournament winner."},
+                *(
+                    [{"formula": parent_b.formula, "metrics": parent_b.metrics,
+                      "rationale": "Tournament runner-up."}]
+                    if parent_b else []
                 ),
-                count=requested_count,
-            )
-            lineage = {
+            ],
+        )
+        formulas = self.llm_backend.generate_offspring(spec, count=count)
+        offspring: list[Individual] = []
+        for f in formulas:
+            ind = self._build_individual(f, {
                 "parent_a": parent_a.expr_hash,
                 "parent_b": parent_b.expr_hash if parent_b else None,
-            }
-            for formula in formulas:
-                child = self._build_individual(formula, lineage)
-                if child:
-                    offspring.append(child)
-                if len(offspring) >= n_offspring:
-                    return offspring[:n_offspring]
-
-        if len(offspring) >= n_offspring:
-            return offspring[:n_offspring]
-
-        for idx in range(n_offspring - len(offspring)):
-            parent_a = survivors[idx % len(survivors)]
-            parent_b = survivors[(idx + 1) % len(survivors)] if len(survivors) > 1 else None
-            formulas = self.llm_backend.generate_offspring(
-                BreedingSpec(
-                    parent_a=parent_a.formula,
-                    parent_b=parent_b.formula if parent_b else None,
-                    objective="improve robustness and reduce turnover",
-                    parent_feedback=[
-                        {
-                            "formula": parent_a.formula,
-                            "metrics": parent_a.metrics,
-                            "rationale": "Fallback primary parent selected from previous generation elites.",
-                        },
-                        *(
-                            [
-                                {
-                                    "formula": parent_b.formula,
-                                    "metrics": parent_b.metrics,
-                                    "rationale": "Fallback secondary parent selected for crossover diversity.",
-                                }
-                            ]
-                            if parent_b
-                            else []
-                        ),
-                    ],
-                ),
-                count=1,
-            )
-            if not formulas:
-                continue
-            child = self._build_individual(
-                formulas[0],
-                {
-                    "parent_a": parent_a.expr_hash,
-                    "parent_b": parent_b.expr_hash if parent_b else None,
-                },
-            )
-            if child:
-                offspring.append(child)
+            })
+            if ind and ind.expr_hash not in seen:
+                offspring.append(ind)
         return offspring
 
-    def _build_breeding_jobs(
-        self,
-        survivors: list[Individual],
-        n_offspring: int,
-    ) -> list[tuple[Individual, Individual | None, int]]:
-        if not survivors or n_offspring <= 0:
-            return []
-        pair_count = min(len(survivors), n_offspring)
-        jobs: list[tuple[Individual, Individual | None, int]] = []
-        base_count = n_offspring // pair_count
-        remainder = n_offspring % pair_count
-        for idx in range(pair_count):
-            parent_a = survivors[idx % len(survivors)]
-            parent_b = survivors[(idx + 1) % len(survivors)] if len(survivors) > 1 else None
-            requested_count = base_count + (1 if idx < remainder else 0)
-            if requested_count <= 0:
-                continue
-            jobs.append((parent_a, parent_b, requested_count))
-        return jobs
+    def _passes_quick_screen(self, metrics: dict[str, float]) -> bool:
+        """Fast rejection of obviously bad candidates."""
+        if float(metrics.get("inactive", 0)) >= 1.0:
+            return False
+        if float(metrics.get("signal_coverage", 1.0)) < 0.30:
+            return False
+        if float(metrics.get("active_bar_ratio", 1.0)) < 0.05:
+            return False
+        return True
 
-    def attach_metrics(self, pop: list[Individual], metrics_by_hash: dict[str, dict[str, float]]) -> list[Individual]:
-        for individual in pop:
-            metrics = metrics_by_hash.get(individual.expr_hash, {})
-            individual.metrics = metrics
-            individual.fitness = self.fitness_engine.score(metrics)
-        return pop
+    @staticmethod
+    def _archive_cell(ind: Individual) -> tuple[int, int]:
+        ic = abs(float(ind.metrics.get("rank_ic_abs", ind.metrics.get("rank_ic", 0)) or 0))
+        turnover = float(ind.metrics.get("avg_turnover", 0) or 0)
+        return (_bin_index(ic, _IC_BINS), _bin_index(turnover, _TURNOVER_BINS))
+
+    def _archive_update(self, archive: dict[tuple[int, int], Individual], ind: Individual) -> None:
+        if ind.fitness <= self.fitness_engine.policy.reject_score:
+            return
+        cell = self._archive_cell(ind)
+        existing = archive.get(cell)
+        if existing is None or ind.fitness > existing.fitness:
+            archive[cell] = ind
+
+    def _novelty_filter(
+        self,
+        individuals: list[Individual],
+        details: dict[str, dict[str, Any]],
+        threshold: float,
+    ) -> list[Individual]:
+        """Remove behaviourally similar individuals from a ranked list."""
+        kept: list[Individual] = []
+        kept_sigs: list[np.ndarray] = []
+        for ind in individuals:
+            detail = details.get(ind.expr_hash, {})
+            sig = detail.get("alpha_signature")
+            if sig is None:
+                kept.append(ind)
+                continue
+            sig_arr = np.asarray(sig, dtype=float)
+            is_dup = False
+            for existing in kept_sigs:
+                if _sig_corr(sig_arr, existing) >= threshold:
+                    is_dup = True
+                    break
+            if not is_dup:
+                kept.append(ind)
+                kept_sigs.append(sig_arr)
+        return kept if kept else individuals[:1]
 
     def _build_individual(self, formula: str, lineage: dict[str, Any]) -> Individual | None:
         try:
@@ -517,3 +674,16 @@ class EvolutionEngine:
             expr_hash=program.expr_hash,
             lineage=lineage,
         )
+
+
+def _sig_corr(a: np.ndarray, b: np.ndarray) -> float:
+    """Absolute Pearson correlation between two signature vectors."""
+    n = min(len(a), len(b))
+    if n < 3:
+        return 0.0
+    a, b = a[:n], b[:n]
+    am, bm = a - a.mean(), b - b.mean()
+    denom = np.sqrt((am * am).sum() * (bm * bm).sum())
+    if denom < 1e-12:
+        return 1.0
+    return abs(float((am * bm).sum() / denom))

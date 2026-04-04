@@ -13,7 +13,7 @@ from .combination import FactorCombiner
 from .compiler import BytecodeProgram, FormulaCompiler
 from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
 from .dsl import TensorSchema
-from .evolution import EvolutionEngine
+from .evolution import EvalResult, Individual, SearchEngine
 from .operators import OperatorRegistry
 from .persistence import AlphaPersistence
 from .risk import CostModel, ExecutionSimulator, MarketContext, PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer
@@ -42,9 +42,9 @@ class AlphaService:
         self.schema = schema or TensorSchema.default_market_schema()
         self.compiler = FormulaCompiler(self.registry)
         self.vm = StackVM()
-        self.evolution = EvolutionEngine(
-            registry=self.registry,
+        self.search_engine = SearchEngine(
             compiler=self.compiler,
+            registry=self.registry,
             schema=self.schema,
             llm_backend=llm_backend,
             backend_name=llm_backend_name,
@@ -192,29 +192,6 @@ class AlphaService:
             blocked_utc_hours=blocked_utc_hours,
         )
         return self.evaluate_formulas_from_dataset(formulas=formulas, dataset=dataset, summary_only=summary_only)
-
-    def seed_population(self, seeds: list[str], population_size: int = 8) -> list[dict[str, Any]]:
-        population = self.evolution.initialize(seeds, population_size)
-        return [
-            {
-                "formula": individual.formula,
-                "expr_hash": individual.expr_hash,
-                "lineage": individual.lineage,
-            }
-            for individual in population
-        ]
-
-    def breed_population(self, formulas: list[str], offspring_count: int = 4) -> list[dict[str, Any]]:
-        survivors = self.evolution.initialize(formulas, len(formulas))
-        offspring = self.evolution.breed(survivors, offspring_count)
-        return [
-            {
-                "formula": individual.formula,
-                "expr_hash": individual.expr_hash,
-                "lineage": individual.lineage,
-            }
-            for individual in offspring
-        ]
 
     def benchmark_vm(
         self,
@@ -395,230 +372,83 @@ class AlphaService:
             "overall_seconds": 0.0,
             "dataset_load_seconds": 0.0,
             "validation_plan_seconds": 0.0,
-            "population_init_seconds": 0.0,
             "persistence_seconds": 0.0,
-            "per_generation": [],
         }
         _search_span_ctx = tracer.start_span(
-            "ga_search", kind="search",
+            "search", kind="search",
             provider=provider,
             symbols=",".join(symbols),
-            generations=generations,
+            rounds=generations,
+            batch_size=offspring_count,
             population_size=population_size,
-            offspring_count=offspring_count,
-            llm_backend=getattr(self.evolution.llm_backend, "backend_name",
-                                self.evolution.llm_backend.__class__.__name__),
+            llm_backend=getattr(self.search_engine.llm_backend, "backend_name",
+                                self.search_engine.llm_backend.__class__.__name__),
         )
         _search_span = _search_span_ctx.__enter__()
         logger.info(
-            "alpha.search start provider={} symbols={} generations={} population_size={} offspring_count={} llm_backend={} trace_id={}",
-            provider,
-            ",".join(symbols),
-            generations,
-            population_size,
-            offspring_count,
-            getattr(self.evolution.llm_backend, "backend_name", self.evolution.llm_backend.__class__.__name__),
+            "alpha.search start provider={} symbols={} rounds={} batch={} pop_cap={} llm={} trace_id={}",
+            provider, ",".join(symbols), generations, offspring_count, population_size,
+            getattr(self.search_engine.llm_backend, "backend_name", "?"),
             _search_span.trace_id[:8],
         )
+
+        # 1. Load dataset
         dataset_start = perf_counter()
         dataset = self.dataset_loader.load(
-            provider=provider,
-            symbols=symbols,
-            start_time=start_time,
-            end_time=end_time,
-            interval=interval,
-            min_quote_volume=min_quote_volume,
-            blocked_utc_hours=blocked_utc_hours,
+            provider=provider, symbols=symbols, start_time=start_time,
+            end_time=end_time, interval=interval,
+            min_quote_volume=min_quote_volume, blocked_utc_hours=blocked_utc_hours,
         )
         timing["dataset_load_seconds"] = perf_counter() - dataset_start
-        logger.info(
-            "alpha.search dataset_loaded shape={} load_seconds={:.4f}",
-            dataset.shape(),
-            timing["dataset_load_seconds"],
-        )
-        validation_start = perf_counter()
+
+        # 2. Validation plan
+        val_start = perf_counter()
         validation_plan = self._build_validation_plan(
-            dataset,
-            n_splits=n_splits,
-            purge_window=purge_window,
+            dataset, n_splits=n_splits, purge_window=purge_window,
             embargo_window=embargo_window,
         )
-        timing["validation_plan_seconds"] = perf_counter() - validation_start
-        logger.info(
-            "alpha.search validation_ready mode={} fold_count={} plan_seconds={:.4f}",
-            validation_plan["summary"]["mode"],
-            validation_plan["summary"]["fold_count"],
-            timing["validation_plan_seconds"],
-        )
-        seeds = list(seeds or [])
-        init_start = perf_counter()
-        population = self._deduplicate_population(self.evolution.initialize(seeds, population_size))
-        timing["population_init_seconds"] = perf_counter() - init_start
-        logger.info(
-            "alpha.search population_initialized requested_seeds={} actual_population={} init_seconds={:.4f}",
-            len(seeds),
-            len(population),
-            timing["population_init_seconds"],
-        )
-        generation_summaries = []
-        details_by_hash: dict[str, dict[str, Any]] = {}
-        lineage_edges: list[dict[str, Any]] = []
-        last_metrics_by_hash: dict[str, dict[str, float]] = {}
-        final_population: list[Any] = population
+        timing["validation_plan_seconds"] = perf_counter() - val_start
+        folds = validation_plan["folds"]
 
-        for generation in range(generations):
-            generation_start = perf_counter()
-            logger.info(
-                "alpha.search generation_start generation={} population_size={}",
-                generation,
-                len(population),
-            )
-            evaluation_start = perf_counter()
-            split_results = self.evaluate_population_on_validation_plan(population, validation_plan["folds"])
-            evaluation_seconds = perf_counter() - evaluation_start
-            evaluation_timing = dict(split_results.get("timing", {}))
-            metrics_by_hash = split_results["metrics_by_hash"]
-            signatures_by_hash = split_results["signatures_by_hash"]
-            details_by_hash.update(split_results["details_by_hash"])
-            # --- diagnostic: dump actual metrics before attach ---
-            for ind in population:
-                m = metrics_by_hash.get(ind.expr_hash, {})
-                logger.info(
-                    "alpha.search.diag gen={} formula={} signal_cov={:.4f} active_bar={:.4f} "
-                    "avg_turnover={:.6f} sharpe={:.4f} rank_ic={:.4f} inactive={}",
-                    generation,
-                    ind.formula[:50],
-                    float(m.get("signal_coverage", -1)),
-                    float(m.get("active_bar_ratio", -1)),
-                    float(m.get("avg_turnover", -1)),
-                    float(m.get("sharpe", -1)),
-                    float(m.get("rank_ic", -1)),
-                    m.get("inactive", "?"),
-                )
-            scoring_start = perf_counter()
-            scored_population = self.evolution.attach_metrics(population, metrics_by_hash)
-            scored_population = self._filter_by_novelty(
-                scored_population,
-                signatures_by_hash=signatures_by_hash,
-                threshold=novelty_threshold,
-            )
-            survivors = self.evolution.select_survivors(
-                scored_population,
-                top_k=max(1, min(top_k, len(scored_population))),
-            )
-            scoring_seconds = perf_counter() - scoring_start
-            last_metrics_by_hash = metrics_by_hash
-            final_population = survivors
-            offspring_count_actual = 0
-            breeding_seconds = 0.0
-            generation_summaries.append(
-                {
-                    "generation": generation,
-                    "population_size": len(scored_population),
-                    "novelty_threshold": novelty_threshold,
-                    "validation_mode": validation_plan["summary"]["mode"],
-                    "fold_count": validation_plan["summary"]["fold_count"],
-                    "survivors": [
-                        {
-                            "formula": individual.formula,
-                            "expr_hash": individual.expr_hash,
-                            "fitness": individual.fitness,
-                            "metrics": metrics_by_hash.get(individual.expr_hash, {}),
-                        }
-                        for individual in survivors
-                    ],
-                }
-            )
-            generation_timing = {
-                "generation": generation,
-                "evaluation_seconds": evaluation_seconds,
-                "compile_seconds": float(evaluation_timing.get("compile_seconds", 0.0)),
-                "tensor_store_seconds": float(evaluation_timing.get("tensor_store_seconds", 0.0)),
-                "vm_run_seconds": float(evaluation_timing.get("vm_run_seconds", 0.0)),
-                "signal_transform_seconds": float(evaluation_timing.get("signal_transform_seconds", 0.0)),
-                "rule_overlay_seconds": float(evaluation_timing.get("rule_overlay_seconds", 0.0)),
-                "backtest_seconds": float(evaluation_timing.get("backtest_seconds", 0.0)),
-                "fitness_seconds": float(evaluation_timing.get("fitness_seconds", 0.0)),
-                "signature_seconds": float(evaluation_timing.get("signature_seconds", 0.0)),
-                "aggregation_seconds": float(evaluation_timing.get("aggregation_seconds", 0.0)),
-                "fold_loop_seconds": float(evaluation_timing.get("fold_loop_seconds", 0.0)),
-                "selection_seconds": scoring_seconds,
-                "breeding_seconds": breeding_seconds,
-                "total_seconds": 0.0,
-                "population_size": len(population),
-                "survivor_count": len(survivors),
-                "offspring_count": offspring_count_actual,
-                "fold_count": int(evaluation_timing.get("fold_count", 0)),
-                "split_count": int(evaluation_timing.get("split_count", 0)),
-                "dataset_eval_calls": int(evaluation_timing.get("dataset_eval_calls", 0)),
-                "formula_evaluations": int(evaluation_timing.get("formula_evaluations", 0)),
-            }
-            if generation == generations - 1:
-                generation_timing["total_seconds"] = perf_counter() - generation_start
-                timing["per_generation"].append(generation_timing)
-                logger.info(
-                    "alpha.search generation_complete generation={} survivors={} eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} total_seconds={:.4f}",
-                    generation,
-                    len(survivors),
-                    evaluation_seconds,
-                    generation_timing["vm_run_seconds"],
-                    generation_timing["backtest_seconds"],
-                    generation_timing["fitness_seconds"],
-                    scoring_seconds,
-                    generation_timing["total_seconds"],
-                )
-                break
-            breeding_start = perf_counter()
-            offspring = self._deduplicate_population(self.evolution.breed(survivors, offspring_count))
-            breeding_seconds = perf_counter() - breeding_start
-            offspring_count_actual = len(offspring)
-            for child in offspring:
-                lineage_edges.append(
-                    {
-                        "expr_hash": child.expr_hash,
-                        "formula": child.formula,
-                        "parent_a": child.lineage.get("parent_a"),
-                        "parent_b": child.lineage.get("parent_b"),
-                        "generation": generation + 1,
-                    }
-                )
-            generation_timing["breeding_seconds"] = breeding_seconds
-            generation_timing["offspring_count"] = offspring_count_actual
-            if not offspring:
-                final_population = survivors
-                generation_timing["total_seconds"] = perf_counter() - generation_start
-                timing["per_generation"].append(generation_timing)
-                logger.info(
-                    "alpha.search generation_complete generation={} survivors={} offspring=0 eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} breed_seconds={:.4f} total_seconds={:.4f}",
-                    generation,
-                    len(survivors),
-                    evaluation_seconds,
-                    generation_timing["vm_run_seconds"],
-                    generation_timing["backtest_seconds"],
-                    generation_timing["fitness_seconds"],
-                    scoring_seconds,
-                    breeding_seconds,
-                    generation_timing["total_seconds"],
-                )
-                break
-            population = survivors + offspring
-            generation_timing["total_seconds"] = perf_counter() - generation_start
-            timing["per_generation"].append(generation_timing)
-            logger.info(
-                "alpha.search generation_complete generation={} survivors={} offspring={} eval_seconds={:.4f} vm_seconds={:.4f} backtest_seconds={:.4f} fitness_seconds={:.4f} select_seconds={:.4f} breed_seconds={:.4f} total_seconds={:.4f}",
-                generation,
-                len(survivors),
-                offspring_count_actual,
-                evaluation_seconds,
-                generation_timing["vm_run_seconds"],
-                generation_timing["backtest_seconds"],
-                generation_timing["fitness_seconds"],
-                scoring_seconds,
-                breeding_seconds,
-                generation_timing["total_seconds"],
+        # 3. Build evaluation callbacks for the search engine
+        def evaluate_fn(individuals):
+            r = self.evaluate_population_on_validation_plan(individuals, folds)
+            return EvalResult(
+                metrics_by_hash=r["metrics_by_hash"],
+                signatures_by_hash=r["signatures_by_hash"],
+                details_by_hash=r["details_by_hash"],
+                timing=r.get("timing", {}),
             )
 
-        ranked_population = sorted(final_population, key=lambda item: item.fitness, reverse=True)
+        # Quick screen: evaluate on first fold only (train+valid, no test)
+        quick_fn = None
+        if len(folds) > 1:
+            def quick_fn(individuals):
+                r = self.evaluate_population_on_validation_plan(individuals, folds[:1])
+                return EvalResult(
+                    metrics_by_hash=r["metrics_by_hash"],
+                    signatures_by_hash=r["signatures_by_hash"],
+                    details_by_hash=r["details_by_hash"],
+                    timing=r.get("timing", {}),
+                )
+
+        # 4. Run search
+        search_result = self.search_engine.run(
+            seeds=list(seeds or []),
+            rounds=generations,
+            batch_size=max(offspring_count, 2),
+            top_k=top_k,
+            novelty_threshold=novelty_threshold,
+            evaluate_fn=evaluate_fn,
+            quick_evaluate_fn=quick_fn,
+        )
+
+        # 5. Format result (compatible with existing consumers)
+        timing.update(search_result.timing)
+        last_metrics = {
+            ind.expr_hash: ind.metrics for ind in search_result.archive
+        }
+
         result = {
             "dataset": {
                 "provider": dataset.provider,
@@ -629,66 +459,76 @@ class AlphaService:
             "llm": self._llm_backend_summary(),
             "timing": timing,
             "validation": validation_plan["summary"],
-            "generations": generation_summaries,
-            "lineage": lineage_edges,
+            "search_stats": {
+                "total_evaluations": search_result.total_evaluations,
+                "total_rejected": search_result.total_rejected,
+                "archive_size": len(search_result.archive),
+            },
+            "generations": search_result.rounds,
+            "lineage": [
+                {
+                    "expr_hash": ind.expr_hash,
+                    "formula": ind.formula,
+                    "parent_a": ind.lineage.get("parent_a"),
+                    "parent_b": ind.lineage.get("parent_b"),
+                }
+                for ind in search_result.all_evaluated
+                if ind.lineage.get("parent_a")
+            ],
             "top_results": [
                 {
-                    "formula": individual.formula,
-                    "expr_hash": individual.expr_hash,
-                    "fitness": individual.fitness,
-                    "lineage": individual.lineage,
-                    "metrics": last_metrics_by_hash.get(individual.expr_hash, {}),
+                    "formula": ind.formula,
+                    "expr_hash": ind.expr_hash,
+                    "fitness": ind.fitness,
+                    "lineage": ind.lineage,
+                    "metrics": ind.metrics,
                 }
-                for individual in ranked_population[:top_k]
+                for ind in search_result.archive[:top_k]
             ],
             "evaluations": {
-                expr_hash: {
-                    "formula": next((item.formula for item in ranked_population if item.expr_hash == expr_hash), None),
-                    "metrics": details["fitness_metrics"],
-                    "split_metrics": details["split_metrics"],
-                    "fold_metrics": details.get("fold_metrics", []),
+                h: {
+                    "formula": d.get("formula"),
+                    "metrics": d.get("fitness_metrics", {}),
+                    "split_metrics": d.get("split_metrics", {}),
+                    "fold_metrics": d.get("fold_metrics", []),
                 }
-                for expr_hash, details in details_by_hash.items()
+                for h, d in search_result.details_by_hash.items()
             },
         }
+
+        # 6. Persist
         persisted_run_id: str | None = None
         if persist:
-            persistence_start = perf_counter()
+            ps = perf_counter()
             run = self.persistence.save_run(result, run_name=run_name or "search_db")
             zoo_paths = self.persistence.save_zoo_entries(result["top_results"], run.run_id)
-            timing["persistence_seconds"] = perf_counter() - persistence_start
+            timing["persistence_seconds"] = perf_counter() - ps
             persisted_run_id = run.run_id
             result["persistence"] = {
-                "run_id": run.run_id,
-                "run_path": run.run_path,
-                "zoo_paths": zoo_paths,
+                "run_id": run.run_id, "run_path": run.run_path, "zoo_paths": zoo_paths,
             }
-            logger.info(
-                "alpha.search persistence_complete run_id={} persistence_seconds={:.4f}",
-                run.run_id,
-                timing["persistence_seconds"],
-            )
+
         timing["overall_seconds"] = perf_counter() - overall_start
 
-        # Close search span and attach summary
+        # 7. Tracing
         _search_span.set("top_results", len(result["top_results"]))
         _search_span.set("overall_seconds", timing["overall_seconds"])
+        _search_span.set("total_evaluations", search_result.total_evaluations)
+        _search_span.set("total_rejected", search_result.total_rejected)
         if result["top_results"]:
             best = result["top_results"][0]
             _search_span.set("best_fitness", best.get("fitness", 0))
             _search_span.set("best_formula", best.get("formula", "")[:60])
-        # Attach LLM usage summary from backend
-        llm_backend = self.evolution.llm_backend
+        llm_backend = self.search_engine.llm_backend
         _search_span.set("llm_call_stats", dict(getattr(llm_backend, "call_stats", {})))
         _search_span_ctx.__exit__(None, None, None)
-        tracer.flush()  # ensure Langfuse data is sent
-
+        tracer.flush()
         result["trace_id"] = _search_span.trace_id
 
         logger.info(
-            "alpha.search complete top_results={} overall_seconds={:.4f} trace_id={}",
-            len(result["top_results"]),
-            timing["overall_seconds"],
+            "alpha.search complete top={} evaluated={} rejected={} seconds={:.3f} trace={}",
+            len(result["top_results"]), search_result.total_evaluations,
+            search_result.total_rejected, timing["overall_seconds"],
             _search_span.trace_id[:8],
         )
         if persisted_run_id is not None:
@@ -820,10 +660,11 @@ class AlphaService:
         dataset_splits: dict[str, AlphaDataset],
     ) -> dict[str, Any]:
         program = self._compile_cached(formula)
-        population = [self.evolution._build_individual(formula, {"origin": "manual"})]
-        if not population or population[0] is None:
-            raise ValueError(f"Unable to compile formula: {formula}")
-        population[0].program = program
+        ind = Individual(
+            formula=formula, program=program, expr_hash=program.expr_hash,
+            lineage={"origin": "manual"},
+        )
+        population = [ind]
         split_results = self.evaluate_population_across_splits(population, dataset_splits)
         expr_hash = population[0].expr_hash
         return split_results["details_by_hash"][expr_hash]
@@ -1313,7 +1154,7 @@ class AlphaService:
         }
 
     def _llm_backend_summary(self) -> dict[str, Any]:
-        backend = self.evolution.llm_backend
+        backend = self.search_engine.llm_backend
         return {
             "backend": getattr(backend, "backend_name", backend.__class__.__name__),
             "model": getattr(backend, "model_name", None),
@@ -1537,54 +1378,6 @@ class AlphaService:
         correlations = cov[valid_rows] / np.sqrt(var_alpha[valid_rows] * var_returns[valid_rows])
         correlations = np.clip(correlations, -1.0, 1.0)
         return float(np.mean(correlations)) if correlations.size else 0.0
-
-    def _deduplicate_population(self, population: list[Any]) -> list[Any]:
-        seen: set[str] = set()
-        deduped = []
-        for individual in population:
-            if individual.expr_hash in seen:
-                continue
-            seen.add(individual.expr_hash)
-            deduped.append(individual)
-        return deduped
-
-    def _filter_by_novelty(
-        self,
-        population: list[Any],
-        signatures_by_hash: dict[str, list[float] | None],
-        threshold: float,
-    ) -> list[Any]:
-        kept = []
-        kept_signatures: list[np.ndarray] = []
-        for individual in sorted(population, key=lambda item: item.fitness, reverse=True):
-            signature = signatures_by_hash.get(individual.expr_hash)
-            if not signature:
-                kept.append(individual)
-                kept_signatures.append(np.array([], dtype=float))
-                continue
-            candidate = np.asarray(signature, dtype=float)
-            is_duplicate = False
-            for existing in kept_signatures:
-                if existing.size == 0 or candidate.size == 0:
-                    continue
-                corr = self._signature_corr(candidate, existing)
-                if corr >= threshold:
-                    is_duplicate = True
-                    break
-            if not is_duplicate:
-                kept.append(individual)
-                kept_signatures.append(candidate)
-        return kept or population[:1]
-
-    def _signature_corr(self, a: np.ndarray, b: np.ndarray) -> float:
-        if a.size == 0 or b.size == 0:
-            return 0.0
-        min_len = min(a.size, b.size)
-        left = a[:min_len]
-        right = b[:min_len]
-        if np.std(left) < 1e-12 or np.std(right) < 1e-12:
-            return 1.0 if np.allclose(left, right) else 0.0
-        return float(abs(np.corrcoef(left, right)[0, 1]))
 
     def _build_alpha_signature(self, alpha: Any) -> list[float]:
         data = np.nan_to_num(self._to_numpy(alpha), nan=0.0, posinf=0.0, neginf=0.0)

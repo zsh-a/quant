@@ -1,7 +1,7 @@
 """Unified alpha factor discovery module.
 
-Merges alpha_lab (crypto, GA+LLM, compiled VM) and alpha_mining (stock, MCTS+LLM)
-into a single extensible framework.
+Regularised Evolution + Quality-Diversity archive for alpha formula mining,
+multi-factor combination, and portfolio-level risk management.
 """
 
 from .combination import FactorCombiner, FactorSignal
@@ -11,11 +11,13 @@ from .dsl import ASTNode, FormulaParser, TensorSchema, TypeChecker, ValidationRe
 from .evaluation import compute_forward_returns, compute_ic_metrics, compute_rank_ic
 from .evolution import (
     BreedingSpec,
-    EvolutionEngine,
+    EvalResult,
     FitnessEngine,
     FitnessPolicy,
     HeuristicLLMBackend,
     Individual,
+    SearchEngine,
+    SearchResult,
 )
 from .mcts import AlphaNode, MCTSEngine
 from .operators import OperatorRegistry, OperatorSpec
@@ -35,18 +37,11 @@ from .tracing import InMemoryCollector, LangfuseCollector, Span, SpanCollector, 
 from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
 
-# Backward-compatible aliases
-DSLRegistry = OperatorRegistry
-AlphaLabService = AlphaService
-AlphaLabPersistence = AlphaPersistence
-
 __all__ = [
-    "AlphaService",
-    "AlphaLabService",
-    "AlphaPersistence",
-    "AlphaLabPersistence",
     "AlphaDataset",
     "AlphaNode",
+    "AlphaPersistence",
+    "AlphaService",
     "ASTNode",
     "BacktestResult",
     "BreedingSpec",
@@ -57,18 +52,19 @@ __all__ = [
     "CostModel",
     "CPCVValidator",
     "CryptoMinuteDatasetLoader",
+    "EvalResult",
+    "ExecutionSimulator",
     "FactorCombiner",
     "FactorSignal",
-    "DSLRegistry",
-    "EvolutionEngine",
-    "ExecutionSimulator",
     "FitnessEngine",
     "FitnessPolicy",
     "FormulaCompiler",
     "FormulaParser",
     "HeuristicLLMBackend",
     "Individual",
+    "InMemoryCollector",
     "Instruction",
+    "LangfuseCollector",
     "MarketContext",
     "MCTSEngine",
     "OperatorRegistry",
@@ -77,17 +73,17 @@ __all__ = [
     "PortfolioManager",
     "RiskConfig",
     "RuleOverlay",
+    "SearchEngine",
+    "SearchResult",
     "SignalTransformer",
+    "Span",
+    "SpanCollector",
     "StackVM",
     "StockDailyDatasetLoader",
     "TensorSchema",
     "TensorStore",
     "TypeChecker",
+    "tracer",
     "ValidationFold",
     "ValidationReport",
-    "tracer",
-    "Span",
-    "SpanCollector",
-    "InMemoryCollector",
-    "LangfuseCollector",
 ]
