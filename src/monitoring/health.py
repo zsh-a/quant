@@ -2,222 +2,136 @@
 Health check system for monitoring application status.
 """
 
-from typing import Dict, Any, List
+from typing import Dict, Any
 from datetime import datetime
+from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
 import psutil
 from loguru import logger
 
+_executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="health")
+
 
 class HealthStatus:
-    """Health check status levels"""
     HEALTHY = "healthy"
     DEGRADED = "degraded"
     UNHEALTHY = "unhealthy"
 
 
+def _classify(value: float, warn: float, crit: float) -> str:
+    if value > crit:
+        return HealthStatus.UNHEALTHY
+    if value > warn:
+        return HealthStatus.DEGRADED
+    return HealthStatus.HEALTHY
+
+
 class HealthCheck:
-    """System health checker"""
-    
     def __init__(self):
-        self.checks: List[callable] = []
-        self.register_default_checks()
-    
-    def register_check(self, check_func: callable):
-        """Register a health check function"""
-        self.checks.append(check_func)
-    
-    def register_default_checks(self):
-        """Register default health checks"""
-        self.register_check(self.check_cpu)
-        self.register_check(self.check_memory)
-        self.register_check(self.check_disk)
-    
-    def check_cpu(self) -> Dict[str, Any]:
-        """Check CPU usage"""
-        try:
-            cpu_percent = psutil.cpu_percent(interval=1)
-            
-            if cpu_percent > 90:
-                status = HealthStatus.UNHEALTHY
-                message = f"CPU usage critical: {cpu_percent}%"
-            elif cpu_percent > 80:
-                status = HealthStatus.DEGRADED
-                message = f"CPU usage high: {cpu_percent}%"
-            else:
-                status = HealthStatus.HEALTHY
-                message = f"CPU usage normal: {cpu_percent}%"
-            
-            return {
-                'component': 'cpu',
-                'status': status,
-                'message': message,
-                'value': cpu_percent,
-                'threshold': 80
-            }
-        except Exception as e:
-            return {
-                'component': 'cpu',
-                'status': HealthStatus.UNHEALTHY,
-                'message': f"Failed to check CPU: {e}",
-                'error': str(e)
-            }
-    
-    def check_memory(self) -> Dict[str, Any]:
-        """Check memory usage"""
-        try:
-            memory = psutil.virtual_memory()
-            
-            if memory.percent > 95:
-                status = HealthStatus.UNHEALTHY
-                message = f"Memory usage critical: {memory.percent}%"
-            elif memory.percent > 90:
-                status = HealthStatus.DEGRADED
-                message = f"Memory usage high: {memory.percent}%"
-            else:
-                status = HealthStatus.HEALTHY
-                message = f"Memory usage normal: {memory.percent}%"
-            
-            return {
-                'component': 'memory',
-                'status': status,
-                'message': message,
-                'value': memory.percent,
-                'used_mb': memory.used / (1024 * 1024),
-                'total_mb': memory.total / (1024 * 1024),
-                'threshold': 90
-            }
-        except Exception as e:
-            return {
-                'component': 'memory',
-                'status': HealthStatus.UNHEALTHY,
-                'message': f"Failed to check memory: {e}",
-                'error': str(e)
-            }
-    
-    def check_disk(self) -> Dict[str, Any]:
-        """Check disk usage"""
-        try:
-            disk = psutil.disk_usage('/')
-            
-            if disk.percent > 95:
-                status = HealthStatus.UNHEALTHY
-                message = f"Disk usage critical: {disk.percent}%"
-            elif disk.percent > 90:
-                status = HealthStatus.DEGRADED
-                message = f"Disk usage high: {disk.percent}%"
-            else:
-                status = HealthStatus.HEALTHY
-                message = f"Disk usage normal: {disk.percent}%"
-            
-            return {
-                'component': 'disk',
-                'status': status,
-                'message': message,
-                'value': disk.percent,
-                'used_gb': disk.used / (1024 ** 3),
-                'total_gb': disk.total / (1024 ** 3),
-                'threshold': 90
-            }
-        except Exception as e:
-            return {
-                'component': 'disk',
-                'status': HealthStatus.UNHEALTHY,
-                'message': f"Failed to check disk: {e}",
-                'error': str(e)
-            }
-    
-    def check_database(self) -> Dict[str, Any]:
-        """Check database connectivity"""
-        try:
-            from src.market_data.db import DB
+        self._db = None
+        self._redis = None
 
-            db = DB()
-            result = db.client.query("SELECT 1")
+    # ---- local checks (instant) ----
 
-            if result.result_rows:
-                return {
-                    'component': 'database',
-                    'status': HealthStatus.HEALTHY,
-                    'message': 'Database connection OK'
-                }
-            else:
-                return {
-                    'component': 'database',
-                    'status': HealthStatus.UNHEALTHY,
-                    'message': 'Database query failed'
-                }
-        except Exception as e:
-            return {
-                'component': 'database',
-                'status': HealthStatus.UNHEALTHY,
-                'message': f"Database connection failed: {e}",
-                'error': str(e)
-            }
-    
-    def check_redis(self) -> Dict[str, Any]:
-        """Check Redis connectivity"""
+    @staticmethod
+    def check_cpu() -> Dict[str, Any]:
         try:
-            import redis
-            
-            r = redis.Redis(host='localhost', port=6379, db=0)
-            r.ping()
-            
+            pct = psutil.cpu_percent(interval=None)
+            return {"component": "cpu", "status": _classify(pct, 80, 90), "value": pct}
+        except Exception as e:
+            return {"component": "cpu", "status": HealthStatus.UNHEALTHY, "error": str(e)}
+
+    @staticmethod
+    def check_memory() -> Dict[str, Any]:
+        try:
+            mem = psutil.virtual_memory()
             return {
-                'component': 'redis',
-                'status': HealthStatus.HEALTHY,
-                'message': 'Redis connection OK'
+                "component": "memory",
+                "status": _classify(mem.percent, 90, 95),
+                "value": mem.percent,
+                "used_mb": round(mem.used / (1024 * 1024)),
+                "total_mb": round(mem.total / (1024 * 1024)),
             }
         except Exception as e:
+            return {"component": "memory", "status": HealthStatus.UNHEALTHY, "error": str(e)}
+
+    @staticmethod
+    def check_disk() -> Dict[str, Any]:
+        try:
+            disk = psutil.disk_usage("/")
             return {
-                'component': 'redis',
-                'status': HealthStatus.DEGRADED,
-                'message': f"Redis connection failed: {e}",
-                'error': str(e)
+                "component": "disk",
+                "status": _classify(disk.percent, 90, 95),
+                "value": disk.percent,
+                "used_gb": round(disk.used / (1024**3), 1),
+                "total_gb": round(disk.total / (1024**3), 1),
             }
-    
+        except Exception as e:
+            return {"component": "disk", "status": HealthStatus.UNHEALTHY, "error": str(e)}
+
+    # ---- remote checks (may be slow) ----
+
+    def _check_database_inner(self) -> Dict[str, Any]:
+        try:
+            if self._db is None:
+                from src.market_data.db import DB
+                self._db = DB()
+            self._db.client.query("SELECT 1")
+            return {"component": "database", "status": HealthStatus.HEALTHY}
+        except Exception as e:
+            self._db = None
+            return {"component": "database", "status": HealthStatus.UNHEALTHY, "error": str(e)}
+
+    def _check_redis_inner(self) -> Dict[str, Any]:
+        try:
+            if self._redis is None:
+                import redis
+                self._redis = redis.Redis(host="localhost", port=6379, db=0, socket_timeout=2, socket_connect_timeout=2)
+            self._redis.ping()
+            return {"component": "redis", "status": HealthStatus.HEALTHY}
+        except Exception as e:
+            self._redis = None
+            return {"component": "redis", "status": HealthStatus.DEGRADED, "error": str(e)}
+
+    @staticmethod
+    def _run_with_timeout(fn, timeout: float, component: str) -> Dict[str, Any]:
+        """Run a check function with a hard timeout."""
+        fut = _executor.submit(fn)
+        try:
+            return fut.result(timeout=timeout)
+        except FuturesTimeout:
+            fut.cancel()
+            return {"component": component, "status": HealthStatus.DEGRADED, "error": f"timeout ({timeout}s)"}
+        except Exception as e:
+            return {"component": component, "status": HealthStatus.UNHEALTHY, "error": str(e)}
+
+    # ---- aggregate ----
+
     def run_all_checks(self) -> Dict[str, Any]:
-        """Run all health checks"""
-        results = []
-        overall_status = HealthStatus.HEALTHY
-        
-        # Run registered checks
-        for check in self.checks:
+        # Local checks: instant
+        checks = [self.check_cpu(), self.check_memory(), self.check_disk()]
+
+        # Remote checks: hard 3s timeout each, run concurrently
+        db_fut = _executor.submit(self._check_database_inner)
+        redis_fut = _executor.submit(self._check_redis_inner)
+
+        for fut, component in [(db_fut, "database"), (redis_fut, "redis")]:
             try:
-                result = check()
-                results.append(result)
-                
-                # Update overall status
-                if result['status'] == HealthStatus.UNHEALTHY:
-                    overall_status = HealthStatus.UNHEALTHY
-                elif result['status'] == HealthStatus.DEGRADED and overall_status == HealthStatus.HEALTHY:
-                    overall_status = HealthStatus.DEGRADED
+                checks.append(fut.result(timeout=3))
+            except FuturesTimeout:
+                fut.cancel()
+                checks.append({"component": component, "status": HealthStatus.DEGRADED, "error": "timeout (3s)"})
             except Exception as e:
-                logger.error(f"Health check failed: {e}")
-                results.append({
-                    'component': 'unknown',
-                    'status': HealthStatus.UNHEALTHY,
-                    'message': f"Check failed: {e}",
-                    'error': str(e)
-                })
-                overall_status = HealthStatus.UNHEALTHY
-        
-        # Check database
-        results.append(self.check_database())
-        
-        # Check Redis (optional)
-        redis_check = self.check_redis()
-        if redis_check['status'] != HealthStatus.HEALTHY:
-            # Redis is optional, so only degrade if other checks are healthy
-            if overall_status == HealthStatus.HEALTHY:
-                overall_status = HealthStatus.DEGRADED
-        results.append(redis_check)
-        
-        return {
-            'status': overall_status,
-            'timestamp': datetime.now().isoformat(),
-            'checks': results
-        }
+                checks.append({"component": component, "status": HealthStatus.UNHEALTHY, "error": str(e)})
+
+        worst = HealthStatus.HEALTHY
+        for c in checks:
+            s = c["status"]
+            if s == HealthStatus.UNHEALTHY:
+                worst = HealthStatus.UNHEALTHY
+            elif s == HealthStatus.DEGRADED and worst == HealthStatus.HEALTHY:
+                worst = HealthStatus.DEGRADED
+
+        return {"status": worst, "timestamp": datetime.now().isoformat(), "checks": checks}
 
 
-# Global health checker instance
 health_checker = HealthCheck()

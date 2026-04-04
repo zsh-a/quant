@@ -1,14 +1,19 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { LazyLog, ScrollFollow } from '@melloware/react-logviewer';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
+import { FixedSizeList as List } from 'react-window';
+import AutoSizer from 'react-virtualized-auto-sizer';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
 import { API_BASE } from '../utils/api';
+
+// ---------------------------------------------------------------------------
+// Types
+// ---------------------------------------------------------------------------
 
 interface LogViewerProps {
     sessionId: string | null;
 }
 
-interface SessionLogEntry {
+interface LogEntry {
     timestamp: string;
     level: string;
     source: string;
@@ -16,211 +21,568 @@ interface SessionLogEntry {
     extra?: Record<string, unknown>;
 }
 
-export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
-    const [logs, setLogs] = useState<string>('等待会话日志...');
-    const [filter, setFilter] = useState<string>('');
-    const [levelFilter, setLevelFilter] = useState<string>('');
-    const [sourceFilter, setSourceFilter] = useState<string>('');
-    const [autoRefresh, setAutoRefresh] = useState<boolean>(true);
-    const refreshInterval = 2000;
-    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+interface RowData {
+    entries: LogEntry[];
+    searchTerm: string;
+    searchRegex: RegExp | null;
+    activeMatchIndex: number;
+    matchMap: Map<number, number[]>;  // rowIndex -> [charStart, ...]
+}
 
-    const formatLogLines = (entries: SessionLogEntry[]) => {
-        if (!entries.length) return '当前会话还没有日志。';
+// ---------------------------------------------------------------------------
+// Constants
+// ---------------------------------------------------------------------------
 
-        return entries.map((entry) => {
-            const level = `[${String(entry.level || 'INFO').padEnd(7, ' ')}]`;
-            const source = `[${String(entry.source || 'system').padEnd(10, ' ')}]`;
-            const extras = entry.extra && Object.keys(entry.extra).length > 0
-                ? ` | ${Object.entries(entry.extra).map(([key, value]) => `${key}=${String(value)}`).join(' | ')}`
-                : '';
-            return `${entry.timestamp} ${level} ${source} ${entry.message}${extras}`;
-        }).join('\n');
-    };
+const ROW_HEIGHT = 24;
+const REFRESH_INTERVAL = 2000;
 
-    const fetchLogs = useCallback(async () => {
-        if (!sessionId) {
-            setLogs('尚未选择会话，请先从总览或实验室中打开一个会话。');
-            return;
+const LEVEL_COLORS: Record<string, string> = {
+    DEBUG: '#8b949e',
+    INFO: '#58a6ff',
+    WARNING: '#d29922',
+    ERROR: '#f85149',
+};
+
+const LEVEL_BG: Record<string, string> = {
+    WARNING: 'rgba(210,153,34,0.06)',
+    ERROR: 'rgba(248,81,73,0.08)',
+};
+
+const SOURCE_COLORS: Record<string, string> = {
+    strategy: '#7ee787',
+    broker: '#d2a8ff',
+    engine: '#79c0ff',
+    system: '#8b949e',
+};
+
+// ---------------------------------------------------------------------------
+// Highlight helper – wraps matched substrings in <mark>
+// ---------------------------------------------------------------------------
+
+function highlightText(text: string, regex: RegExp | null): React.ReactNode {
+    if (!regex) return text;
+    const parts: React.ReactNode[] = [];
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+    // Reset lastIndex for global regex
+    regex.lastIndex = 0;
+    let safety = 0;
+    while ((match = regex.exec(text)) !== null && safety++ < 200) {
+        if (match.index > lastIndex) {
+            parts.push(text.slice(lastIndex, match.index));
         }
+        parts.push(
+            <mark key={match.index} style={{
+                background: 'rgba(227,173,48,0.35)',
+                color: '#e3e3e3',
+                borderRadius: 2,
+                padding: '0 1px',
+            }}>
+                {match[0]}
+            </mark>,
+        );
+        lastIndex = match.index + match[0].length;
+        if (match[0].length === 0) break; // Prevent infinite loop on zero-length matches
+    }
+    if (lastIndex < text.length) {
+        parts.push(text.slice(lastIndex));
+    }
+    return parts.length > 0 ? <>{parts}</> : text;
+}
 
+// ---------------------------------------------------------------------------
+// Log row (memoized)
+// ---------------------------------------------------------------------------
+
+const LogRow = memo<{ index: number; style: React.CSSProperties; data: RowData }>(
+    ({ index, style, data }) => {
+        const entry = data.entries[index];
+        const level = (entry.level || 'INFO').toUpperCase();
+        const source = entry.source || 'system';
+        const levelColor = LEVEL_COLORS[level] || '#c9d1d9';
+        const sourceColor = SOURCE_COLORS[source] || '#8b949e';
+        const bgColor = LEVEL_BG[level] || 'transparent';
+        const regex = data.searchRegex;
+
+        const extraParts = entry.extra && Object.keys(entry.extra).length > 0
+            ? Object.entries(entry.extra).map(([k, v]) => `${k}=${String(v)}`)
+            : null;
+
+        return (
+            <div
+                style={{
+                    ...style,
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 0,
+                    padding: '0 12px',
+                    borderBottom: '1px solid #21262d',
+                    background: bgColor,
+                    whiteSpace: 'nowrap',
+                    fontFamily: 'IBM Plex Mono, JetBrains Mono, Consolas, Monaco, monospace',
+                    fontSize: 12,
+                    lineHeight: `${ROW_HEIGHT}px`,
+                    color: '#c9d1d9',
+                    cursor: 'default',
+                    userSelect: 'text',
+                }}
+                className="log-row"
+            >
+                {/* line number */}
+                <span style={{ color: '#484f58', minWidth: 44, textAlign: 'right', marginRight: 12, flexShrink: 0 }}>
+                    {index + 1}
+                </span>
+
+                {/* timestamp */}
+                <span style={{ color: '#6e7681', marginRight: 8, flexShrink: 0 }}>
+                    {highlightText(entry.timestamp.slice(11, 23) || entry.timestamp, regex)}
+                </span>
+
+                {/* level badge */}
+                <span style={{
+                    color: levelColor,
+                    fontWeight: 600,
+                    minWidth: 56,
+                    marginRight: 6,
+                    flexShrink: 0,
+                }}>
+                    {level}
+                </span>
+
+                {/* source badge */}
+                <span style={{
+                    color: sourceColor,
+                    background: `${sourceColor}15`,
+                    border: `1px solid ${sourceColor}30`,
+                    borderRadius: 4,
+                    padding: '0 5px',
+                    fontSize: 11,
+                    marginRight: 8,
+                    flexShrink: 0,
+                }}>
+                    {source}
+                </span>
+
+                {/* message */}
+                <span style={{ flexShrink: 0 }}>
+                    {highlightText(entry.message, regex)}
+                </span>
+
+                {/* extra fields */}
+                {extraParts && (
+                    <span style={{ color: '#6e7681', marginLeft: 8, flexShrink: 0 }}>
+                        {extraParts.map((part, i) => (
+                            <span key={i}>
+                                {i > 0 && <span style={{ margin: '0 4px', color: '#30363d' }}>·</span>}
+                                {highlightText(part, regex)}
+                            </span>
+                        ))}
+                    </span>
+                )}
+            </div>
+        );
+    },
+);
+LogRow.displayName = 'LogRow';
+
+// ---------------------------------------------------------------------------
+// Search bar
+// ---------------------------------------------------------------------------
+
+interface SearchBarProps {
+    value: string;
+    onChange: (v: string) => void;
+    matchCount: number;
+    activeMatch: number;
+    onPrev: () => void;
+    onNext: () => void;
+    useRegex: boolean;
+    onToggleRegex: () => void;
+    caseSensitive: boolean;
+    onToggleCase: () => void;
+    onClose: () => void;
+}
+
+const SearchBar: React.FC<SearchBarProps> = ({
+    value, onChange, matchCount, activeMatch,
+    onPrev, onNext, useRegex, onToggleRegex,
+    caseSensitive, onToggleCase, onClose,
+}) => (
+    <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        gap: 6,
+        padding: '6px 12px',
+        background: '#161b22',
+        borderBottom: '1px solid #30363d',
+        fontSize: 13,
+    }}>
+        <input
+            type="text"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            placeholder="搜索日志..."
+            autoFocus
+            style={{
+                flex: 1,
+                minWidth: 180,
+                padding: '4px 8px',
+                borderRadius: 6,
+                border: '1px solid #30363d',
+                background: '#0d1117',
+                color: '#c9d1d9',
+                fontSize: 13,
+                fontFamily: 'IBM Plex Mono, JetBrains Mono, Consolas, monospace',
+                outline: 'none',
+            }}
+            onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                    e.shiftKey ? onPrev() : onNext();
+                }
+                if (e.key === 'Escape') onClose();
+            }}
+        />
+        <button onClick={onToggleRegex} title="正则表达式" style={{
+            padding: '2px 6px',
+            borderRadius: 4,
+            border: `1px solid ${useRegex ? '#58a6ff' : '#30363d'}`,
+            background: useRegex ? 'rgba(88,166,255,0.15)' : 'transparent',
+            color: useRegex ? '#58a6ff' : '#8b949e',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontFamily: 'monospace',
+            fontWeight: 600,
+        }}>.*</button>
+        <button onClick={onToggleCase} title="区分大小写" style={{
+            padding: '2px 6px',
+            borderRadius: 4,
+            border: `1px solid ${caseSensitive ? '#58a6ff' : '#30363d'}`,
+            background: caseSensitive ? 'rgba(88,166,255,0.15)' : 'transparent',
+            color: caseSensitive ? '#58a6ff' : '#8b949e',
+            cursor: 'pointer',
+            fontSize: 12,
+            fontWeight: 600,
+        }}>Aa</button>
+        <span style={{ color: '#8b949e', fontSize: 12, minWidth: 60, textAlign: 'center' }}>
+            {matchCount > 0 ? `${activeMatch + 1}/${matchCount}` : value ? '无匹配' : ''}
+        </span>
+        <button onClick={onPrev} disabled={matchCount === 0} style={navBtnStyle}>↑</button>
+        <button onClick={onNext} disabled={matchCount === 0} style={navBtnStyle}>↓</button>
+        <button onClick={onClose} style={{ ...navBtnStyle, color: '#8b949e' }}>✕</button>
+    </div>
+);
+
+const navBtnStyle: React.CSSProperties = {
+    padding: '2px 8px',
+    borderRadius: 4,
+    border: '1px solid #30363d',
+    background: 'transparent',
+    color: '#c9d1d9',
+    cursor: 'pointer',
+    fontSize: 13,
+};
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
+export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
+    const [entries, setEntries] = useState<LogEntry[]>([]);
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [levelFilter, setLevelFilter] = useState('');
+    const [sourceFilter, setSourceFilter] = useState('');
+    const [autoRefresh, setAutoRefresh] = useState(true);
+    const [autoFollow, setAutoFollow] = useState(true);
+
+    // Search state
+    const [showSearch, setShowSearch] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [useRegex, setUseRegex] = useState(false);
+    const [caseSensitive, setCaseSensitive] = useState(false);
+    const [activeMatchIndex, setActiveMatchIndex] = useState(0);
+
+    const listRef = useRef<List>(null);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const prevEntryCountRef = useRef(0);
+
+    // ---- Fetch logs ----
+    const fetchLogs = useCallback(async () => {
+        if (!sessionId) return;
         try {
-            const params = new URLSearchParams();
+            setLoading(true);
+            const params = new URLSearchParams({ limit: '2000', format: 'json' });
             if (levelFilter) params.append('level', levelFilter);
             if (sourceFilter) params.append('source', sourceFilter);
-            params.append('limit', '1000');
-            params.append('format', 'json');
-
-            const response = await fetch(`${API_BASE}/logs/${sessionId}?${params.toString()}`);
-            if (response.ok) {
-                const payload = await response.json();
-                setLogs(formatLogLines(payload.logs || []));
-            } else {
-                setLogs(`获取日志失败：${response.statusText}`);
-            }
-        } catch (error) {
-            setLogs(`异常：${error}`);
+            const resp = await fetch(`${API_BASE}/logs/${sessionId}?${params}`);
+            if (!resp.ok) { setError(`获取失败: ${resp.statusText}`); return; }
+            const data = await resp.json();
+            setEntries(data.logs || []);
+            setError(null);
+        } catch (err) {
+            setError(`异常: ${err}`);
+        } finally {
+            setLoading(false);
         }
     }, [sessionId, levelFilter, sourceFilter]);
 
+    // ---- Polling ----
     useEffect(() => {
         fetchLogs();
-
+        if (intervalRef.current) clearInterval(intervalRef.current);
         if (autoRefresh && sessionId) {
-            intervalRef.current = setInterval(fetchLogs, refreshInterval);
+            intervalRef.current = setInterval(fetchLogs, REFRESH_INTERVAL);
         }
+        return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
+    }, [fetchLogs, autoRefresh, sessionId]);
 
-        return () => {
-            if (intervalRef.current) {
-                clearInterval(intervalRef.current);
+    // ---- Auto-follow: scroll to bottom when new entries arrive ----
+    useEffect(() => {
+        if (autoFollow && entries.length > prevEntryCountRef.current && listRef.current) {
+            listRef.current.scrollToItem(entries.length - 1, 'end');
+        }
+        prevEntryCountRef.current = entries.length;
+    }, [entries.length, autoFollow]);
+
+    // ---- Keyboard shortcut: Ctrl+F / Cmd+F ----
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'f') {
+                // Only capture if our container is focused/hovered
+                if (containerRef.current?.contains(document.activeElement) || containerRef.current?.matches(':hover')) {
+                    e.preventDefault();
+                    setShowSearch(true);
+                }
+            }
+            if (e.key === 'Escape' && showSearch) {
+                setShowSearch(false);
             }
         };
-    }, [fetchLogs, autoRefresh, refreshInterval, sessionId]);
+        window.addEventListener('keydown', handler);
+        return () => window.removeEventListener('keydown', handler);
+    }, [showSearch]);
 
-    const handleClearLogs = async () => {
+    // ---- Build search regex ----
+    const searchRegex = useMemo(() => {
+        if (!searchTerm) return null;
+        try {
+            const flags = caseSensitive ? 'g' : 'gi';
+            const pattern = useRegex ? searchTerm : searchTerm.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            return new RegExp(pattern, flags);
+        } catch {
+            return null;
+        }
+    }, [searchTerm, useRegex, caseSensitive]);
+
+    // ---- Compute matches: which rows match ----
+    const matchedRowIndices = useMemo(() => {
+        if (!searchRegex) return [];
+        const result: number[] = [];
+        for (let i = 0; i < entries.length; i++) {
+            const e = entries[i];
+            const text = `${e.timestamp} ${e.level} ${e.source} ${e.message} ${
+                e.extra ? Object.entries(e.extra).map(([k, v]) => `${k}=${v}`).join(' ') : ''
+            }`;
+            searchRegex.lastIndex = 0;
+            if (searchRegex.test(text)) {
+                result.push(i);
+            }
+        }
+        return result;
+    }, [entries, searchRegex]);
+
+    // ---- Clamp active match index ----
+    useEffect(() => {
+        if (activeMatchIndex >= matchedRowIndices.length) {
+            setActiveMatchIndex(Math.max(0, matchedRowIndices.length - 1));
+        }
+    }, [matchedRowIndices.length, activeMatchIndex]);
+
+    // ---- Navigate matches ----
+    const goToMatch = useCallback((dir: 1 | -1) => {
+        if (matchedRowIndices.length === 0) return;
+        const next = (activeMatchIndex + dir + matchedRowIndices.length) % matchedRowIndices.length;
+        setActiveMatchIndex(next);
+        listRef.current?.scrollToItem(matchedRowIndices[next], 'center');
+    }, [activeMatchIndex, matchedRowIndices]);
+
+    // ---- Clear logs ----
+    const handleClear = async () => {
         if (!sessionId) return;
         try {
             await fetch(`${API_BASE}/logs/${sessionId}`, { method: 'DELETE' });
-            setLogs('日志已清空。');
-        } catch (error) {
-            console.error('Failed to clear logs:', error);
+            setEntries([]);
+        } catch (err) {
+            console.error('Failed to clear logs:', err);
         }
     };
 
-    // Filter logs client-side if there's a text filter
-    const filteredLogs = filter
-        ? logs.split('\n').filter(line => line.toLowerCase().includes(filter.toLowerCase())).join('\n')
-        : logs;
+    // ---- Row data (passed to memoized row component) ----
+    const rowData = useMemo<RowData>(() => ({
+        entries,
+        searchTerm,
+        searchRegex,
+        activeMatchIndex,
+        matchMap: new Map(),
+    }), [entries, searchTerm, searchRegex, activeMatchIndex]);
+
+    // ---- Level/source counts for filter badges ----
+    const levelCounts = useMemo(() => {
+        const counts: Record<string, number> = {};
+        for (const e of entries) {
+            const l = (e.level || 'INFO').toUpperCase();
+            counts[l] = (counts[l] || 0) + 1;
+        }
+        return counts;
+    }, [entries]);
 
     return (
         <SectionCard
             title="策略日志"
             description="按级别、来源和关键词筛选会话日志。"
-            action={<span style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>会话：{sessionId || '未选择'}</span>}
+            action={
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    {loading && <span style={{ color: '#58a6ff', fontSize: 12 }}>加载中...</span>}
+                    <span style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
+                        {entries.length > 0 ? `${entries.length} 条` : ''} · 会话：{sessionId?.slice(0, 8) || '未选择'}
+                    </span>
+                </div>
+            }
         >
-            <div style={filtersStyle}>
-                <input
-                    type="text"
-                    placeholder="搜索日志..."
-                    value={filter}
-                    onChange={(e) => setFilter(e.target.value)}
-                    style={inputStyle}
-                />
-                <select
-                    value={levelFilter}
-                    onChange={(e) => setLevelFilter(e.target.value)}
-                    style={selectStyle}
-                >
-                    <option value="">全部级别</option>
-                    <option value="DEBUG">DEBUG</option>
-                    <option value="INFO">INFO</option>
-                    <option value="WARNING">WARNING</option>
-                    <option value="ERROR">ERROR</option>
-                </select>
+            {/* ---- Toolbar ---- */}
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                {/* Level filter pills */}
+                <div style={{ display: 'flex', gap: 4 }}>
+                    {['', 'INFO', 'WARNING', 'ERROR', 'DEBUG'].map((lv) => {
+                        const active = levelFilter === lv;
+                        const label = lv || '全部';
+                        const count = lv ? (levelCounts[lv] || 0) : entries.length;
+                        const color = lv ? LEVEL_COLORS[lv] : '#c9d1d9';
+                        return (
+                            <button
+                                key={lv}
+                                onClick={() => setLevelFilter(lv)}
+                                style={{
+                                    padding: '3px 10px',
+                                    borderRadius: 6,
+                                    border: `1px solid ${active ? `${color}60` : 'var(--border)'}`,
+                                    background: active ? `${color}18` : 'transparent',
+                                    color: active ? color : 'var(--text-dim)',
+                                    fontSize: 12,
+                                    fontWeight: active ? 600 : 400,
+                                    cursor: 'pointer',
+                                    transition: 'all 0.15s',
+                                }}
+                            >
+                                {label}{count > 0 ? ` ${count}` : ''}
+                            </button>
+                        );
+                    })}
+                </div>
+
+                <div style={{ width: 1, height: 20, background: 'var(--border)' }} />
+
+                {/* Source filter */}
                 <select
                     value={sourceFilter}
                     onChange={(e) => setSourceFilter(e.target.value)}
-                    style={selectStyle}
+                    style={{
+                        padding: '3px 8px',
+                        borderRadius: 6,
+                        border: '1px solid var(--border)',
+                        background: 'var(--input-bg)',
+                        color: 'var(--text)',
+                        fontSize: 12,
+                        cursor: 'pointer',
+                    }}
                 >
                     <option value="">全部来源</option>
                     <option value="strategy">策略</option>
                     <option value="broker">Broker</option>
                     <option value="engine">Engine</option>
                 </select>
-                <label style={checkboxLabelStyle}>
-                    <input
-                        type="checkbox"
-                        checked={autoRefresh}
-                        onChange={(e) => setAutoRefresh(e.target.checked)}
-                    />
-                    自动刷新
+
+                <div style={{ flex: 1 }} />
+
+                {/* Right-side controls */}
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={autoFollow} onChange={(e) => setAutoFollow(e.target.checked)} style={{ width: 'auto' }} />
+                    跟踪
                 </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer' }}>
+                    <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} style={{ width: 'auto' }} />
+                    轮询
+                </label>
+                <Button onClick={() => setShowSearch((v) => !v)} variant="ghost" size="sm" title="Ctrl+F">搜索</Button>
                 <Button onClick={fetchLogs} variant="outline" size="sm">刷新</Button>
-                <Button onClick={handleClearLogs} variant="danger" size="sm">清空</Button>
+                <Button onClick={handleClear} variant="danger" size="sm">清空</Button>
             </div>
 
-            <div style={logContainerStyle}>
-                <div style={{ height: '100%', minHeight: 'inherit' }}>
-                    <ScrollFollow
-                        startFollowing={true}
-                        render={({ follow, onScroll }) => (
-                            <LazyLog
-                                text={filteredLogs}
-                                follow={follow}
-                                onScroll={onScroll}
-                                enableSearch={true}
-                                caseInsensitive={true}
-                                enableHotKeys={true}
-                                selectableLines={true}
-                                style={{
-                                    height: '100%',
-                                    backgroundColor: '#0d1117',
-                                    color: '#c9d1d9',
-                                    fontSize: '12px',
-                                    fontFamily: 'IBM Plex Mono, JetBrains Mono, Consolas, Monaco, monospace',
-                                }}
-                                lineClassName="log-line"
-                            />
+            {/* ---- Search bar ---- */}
+            {showSearch && (
+                <SearchBar
+                    value={searchTerm}
+                    onChange={(v) => { setSearchTerm(v); setActiveMatchIndex(0); }}
+                    matchCount={matchedRowIndices.length}
+                    activeMatch={activeMatchIndex}
+                    onPrev={() => goToMatch(-1)}
+                    onNext={() => goToMatch(1)}
+                    useRegex={useRegex}
+                    onToggleRegex={() => setUseRegex((v) => !v)}
+                    caseSensitive={caseSensitive}
+                    onToggleCase={() => setCaseSensitive((v) => !v)}
+                    onClose={() => { setShowSearch(false); setSearchTerm(''); }}
+                />
+            )}
+
+            {/* ---- Log area ---- */}
+            <div
+                ref={containerRef}
+                tabIndex={-1}
+                style={{
+                    height: 'calc(100vh - 360px)',
+                    minHeight: 400,
+                    borderRadius: 8,
+                    border: '1px solid var(--border)',
+                    background: '#0d1117',
+                    overflow: 'hidden',
+                }}
+            >
+                {error ? (
+                    <div style={{ padding: 24, color: '#f85149' }}>{error}</div>
+                ) : entries.length === 0 ? (
+                    <div style={{ padding: 24, color: '#8b949e', fontSize: 13 }}>
+                        {sessionId ? '当前会话还没有日志。' : '尚未选择会话。'}
+                    </div>
+                ) : (
+                    <AutoSizer>
+                        {({ height, width }) => (
+                            <List
+                                ref={listRef}
+                                height={height}
+                                width={width}
+                                itemCount={entries.length}
+                                itemSize={ROW_HEIGHT}
+                                itemData={rowData}
+                                overscanCount={30}
+                                style={{ overflowX: 'auto', overflowY: 'auto' }}
+                            >
+                                {LogRow}
+                            </List>
                         )}
-                    />
-                </div>
+                    </AutoSizer>
+                )}
             </div>
 
+            {/* ---- Row hover style ---- */}
             <style>{`
-                .log-line {
-                    padding: 2px 8px;
-                    border-bottom: 1px solid #21262d;
-                }
-                .log-line:hover {
+                .log-row:hover {
                     background: #161b22 !important;
                 }
             `}</style>
         </SectionCard>
     );
-};
-
-const filtersStyle: React.CSSProperties = {
-    display: 'flex',
-    gap: '0.75rem',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-};
-
-const inputStyle: React.CSSProperties = {
-    flex: 1,
-    minWidth: '200px',
-    padding: '0.5rem 1rem',
-    borderRadius: '8px',
-    border: '1px solid var(--border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text)',
-    fontSize: '0.9rem',
-};
-
-const selectStyle: React.CSSProperties = {
-    padding: '0.5rem 1rem',
-    borderRadius: '8px',
-    border: '1px solid var(--border)',
-    background: 'var(--input-bg)',
-    color: 'var(--text)',
-    fontSize: '0.9rem',
-    cursor: 'pointer',
-};
-
-const checkboxLabelStyle: React.CSSProperties = {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '0.5rem',
-    color: 'var(--text-dim)',
-    fontSize: '0.9rem',
-};
-
-const logContainerStyle: React.CSSProperties = {
-    minHeight: 'calc(100vh - 360px)',
-    height: 'calc(100vh - 360px)',
-    borderRadius: '8px',
-    overflow: 'hidden',
-    border: '1px solid var(--border)',
 };
 
 export default StrategyLogViewer;
