@@ -368,63 +368,33 @@ class AlphaService:
         from .tracing import tracer
 
         overall_start = perf_counter()
-        timing: dict[str, Any] = {
-            "overall_seconds": 0.0,
-            "dataset_load_seconds": 0.0,
-            "validation_plan_seconds": 0.0,
-            "persistence_seconds": 0.0,
-        }
-        _search_span_ctx = tracer.start_span(
+        timing: dict[str, Any] = {}
+
+        # Top-level trace: all child spans in SearchEngine + LLM nest under this
+        with tracer.start_span(
             "search", kind="search",
-            provider=provider,
-            symbols=",".join(symbols),
-            rounds=generations,
-            batch_size=offspring_count,
-            population_size=population_size,
-            llm_backend=getattr(self.search_engine.llm_backend, "backend_name",
-                                self.search_engine.llm_backend.__class__.__name__),
-        )
-        _search_span = _search_span_ctx.__enter__()
-        logger.info(
-            "alpha.search start provider={} symbols={} rounds={} batch={} pop_cap={} llm={} trace_id={}",
-            provider, ",".join(symbols), generations, offspring_count, population_size,
-            getattr(self.search_engine.llm_backend, "backend_name", "?"),
-            _search_span.trace_id[:8],
-        )
+            provider=provider, symbols=",".join(symbols),
+            rounds=generations, batch_size=offspring_count,
+        ) as search_span:
+            # 1. Load dataset
+            with tracer.start_span("load_dataset", kind="internal",
+                                   symbols=len(symbols), interval=interval):
+                dataset = self.dataset_loader.load(
+                    provider=provider, symbols=symbols, start_time=start_time,
+                    end_time=end_time, interval=interval,
+                    min_quote_volume=min_quote_volume, blocked_utc_hours=blocked_utc_hours,
+                )
 
-        # 1. Load dataset
-        dataset_start = perf_counter()
-        dataset = self.dataset_loader.load(
-            provider=provider, symbols=symbols, start_time=start_time,
-            end_time=end_time, interval=interval,
-            min_quote_volume=min_quote_volume, blocked_utc_hours=blocked_utc_hours,
-        )
-        timing["dataset_load_seconds"] = perf_counter() - dataset_start
-
-        # 2. Validation plan
-        val_start = perf_counter()
-        validation_plan = self._build_validation_plan(
-            dataset, n_splits=n_splits, purge_window=purge_window,
-            embargo_window=embargo_window,
-        )
-        timing["validation_plan_seconds"] = perf_counter() - val_start
-        folds = validation_plan["folds"]
-
-        # 3. Build evaluation callbacks for the search engine
-        def evaluate_fn(individuals):
-            r = self.evaluate_population_on_validation_plan(individuals, folds)
-            return EvalResult(
-                metrics_by_hash=r["metrics_by_hash"],
-                signatures_by_hash=r["signatures_by_hash"],
-                details_by_hash=r["details_by_hash"],
-                timing=r.get("timing", {}),
+            # 2. Validation plan
+            validation_plan = self._build_validation_plan(
+                dataset, n_splits=n_splits, purge_window=purge_window,
+                embargo_window=embargo_window,
             )
+            folds = validation_plan["folds"]
 
-        # Quick screen: evaluate on first fold only (train+valid, no test)
-        quick_fn = None
-        if len(folds) > 1:
-            def quick_fn(individuals):
-                r = self.evaluate_population_on_validation_plan(individuals, folds[:1])
+            # 3. Evaluation callbacks
+            def evaluate_fn(individuals):
+                r = self.evaluate_population_on_validation_plan(individuals, folds)
                 return EvalResult(
                     metrics_by_hash=r["metrics_by_hash"],
                     signatures_by_hash=r["signatures_by_hash"],
@@ -432,107 +402,90 @@ class AlphaService:
                     timing=r.get("timing", {}),
                 )
 
-        # 4. Run search
-        search_result = self.search_engine.run(
-            seeds=list(seeds or []),
-            rounds=generations,
-            batch_size=max(offspring_count, 2),
-            top_k=top_k,
-            novelty_threshold=novelty_threshold,
-            evaluate_fn=evaluate_fn,
-            quick_evaluate_fn=quick_fn,
-        )
+            quick_fn = None
+            if len(folds) > 1:
+                def quick_fn(individuals):
+                    r = self.evaluate_population_on_validation_plan(individuals, folds[:1])
+                    return EvalResult(
+                        metrics_by_hash=r["metrics_by_hash"],
+                        signatures_by_hash=r["signatures_by_hash"],
+                        details_by_hash=r["details_by_hash"],
+                        timing=r.get("timing", {}),
+                    )
 
-        # 5. Format result (compatible with existing consumers)
-        timing.update(search_result.timing)
-        last_metrics = {
-            ind.expr_hash: ind.metrics for ind in search_result.archive
-        }
+            # 4. Run search (all round/breed/eval spans nest under this trace)
+            search_result = self.search_engine.run(
+                seeds=list(seeds or []),
+                rounds=generations,
+                batch_size=max(offspring_count, 2),
+                top_k=top_k,
+                novelty_threshold=novelty_threshold,
+                evaluate_fn=evaluate_fn,
+                quick_evaluate_fn=quick_fn,
+            )
 
-        result = {
-            "dataset": {
-                "provider": dataset.provider,
-                "interval": dataset.interval,
-                "symbols": dataset.symbols,
-                "shape": dataset.shape(),
-            },
-            "llm": self._llm_backend_summary(),
-            "timing": timing,
-            "validation": validation_plan["summary"],
-            "search_stats": {
-                "total_evaluations": search_result.total_evaluations,
-                "total_rejected": search_result.total_rejected,
-                "archive_size": len(search_result.archive),
-            },
-            "generations": search_result.rounds,
-            "lineage": [
-                {
-                    "expr_hash": ind.expr_hash,
-                    "formula": ind.formula,
-                    "parent_a": ind.lineage.get("parent_a"),
-                    "parent_b": ind.lineage.get("parent_b"),
-                }
-                for ind in search_result.all_evaluated
-                if ind.lineage.get("parent_a")
-            ],
-            "top_results": [
-                {
-                    "formula": ind.formula,
-                    "expr_hash": ind.expr_hash,
-                    "fitness": ind.fitness,
-                    "lineage": ind.lineage,
-                    "metrics": ind.metrics,
-                }
-                for ind in search_result.archive[:top_k]
-            ],
-            "evaluations": {
-                h: {
-                    "formula": d.get("formula"),
-                    "metrics": d.get("fitness_metrics", {}),
-                    "split_metrics": d.get("split_metrics", {}),
-                    "fold_metrics": d.get("fold_metrics", []),
-                }
-                for h, d in search_result.details_by_hash.items()
-            },
-        }
-
-        # 6. Persist
-        persisted_run_id: str | None = None
-        if persist:
-            ps = perf_counter()
-            run = self.persistence.save_run(result, run_name=run_name or "search_db")
-            zoo_paths = self.persistence.save_zoo_entries(result["top_results"], run.run_id)
-            timing["persistence_seconds"] = perf_counter() - ps
-            persisted_run_id = run.run_id
-            result["persistence"] = {
-                "run_id": run.run_id, "run_path": run.run_path, "zoo_paths": zoo_paths,
+            # 5. Build result
+            timing.update(search_result.timing)
+            result = {
+                "dataset": {
+                    "provider": dataset.provider, "interval": dataset.interval,
+                    "symbols": dataset.symbols, "shape": dataset.shape(),
+                },
+                "llm": self._llm_backend_summary(),
+                "timing": timing,
+                "validation": validation_plan["summary"],
+                "search_stats": {
+                    "total_evaluations": search_result.total_evaluations,
+                    "total_rejected": search_result.total_rejected,
+                    "archive_size": len(search_result.archive),
+                },
+                "rounds": search_result.rounds,
+                "lineage": [
+                    {"expr_hash": ind.expr_hash, "formula": ind.formula,
+                     "parent_a": ind.lineage.get("parent_a"),
+                     "parent_b": ind.lineage.get("parent_b")}
+                    for ind in search_result.all_evaluated
+                    if ind.lineage.get("parent_a")
+                ],
+                "top_results": [
+                    {"formula": ind.formula, "expr_hash": ind.expr_hash,
+                     "fitness": ind.fitness, "lineage": ind.lineage,
+                     "metrics": ind.metrics}
+                    for ind in search_result.archive[:top_k]
+                ],
+                "evaluations": {
+                    h: {"formula": d.get("formula"),
+                        "metrics": d.get("fitness_metrics", {}),
+                        "split_metrics": d.get("split_metrics", {})}
+                    for h, d in search_result.details_by_hash.items()
+                },
             }
 
-        timing["overall_seconds"] = perf_counter() - overall_start
+            # 6. Persist
+            if persist:
+                with tracer.start_span("persist", kind="internal"):
+                    run = self.persistence.save_run(result, run_name=run_name or "search_db")
+                    zoo_paths = self.persistence.save_zoo_entries(result["top_results"], run.run_id)
+                result["persistence"] = {
+                    "run_id": run.run_id, "run_path": run.run_path, "zoo_paths": zoo_paths,
+                }
 
-        # 7. Tracing
-        _search_span.set("top_results", len(result["top_results"]))
-        _search_span.set("overall_seconds", timing["overall_seconds"])
-        _search_span.set("total_evaluations", search_result.total_evaluations)
-        _search_span.set("total_rejected", search_result.total_rejected)
-        if result["top_results"]:
-            best = result["top_results"][0]
-            _search_span.set("best_fitness", best.get("fitness", 0))
-            _search_span.set("best_formula", best.get("formula", "")[:60])
-        llm_backend = self.search_engine.llm_backend
-        _search_span.set("llm_call_stats", dict(getattr(llm_backend, "call_stats", {})))
-        _search_span_ctx.__exit__(None, None, None)
+            timing["overall_seconds"] = perf_counter() - overall_start
+
+            # 7. Summary on top-level span (visible in Langfuse dashboard)
+            search_span.set("total_evaluations", search_result.total_evaluations)
+            search_span.set("total_rejected", search_result.total_rejected)
+            search_span.set("archive_size", len(search_result.archive))
+            if result["top_results"]:
+                best = result["top_results"][0]
+                search_span.set("best_fitness", round(best["fitness"], 4))
+                search_span.set("best_formula", best["formula"][:60])
+
         tracer.flush()
-        result["trace_id"] = _search_span.trace_id
+        result["trace_id"] = search_span.trace_id
 
-        logger.info(
-            "alpha.search complete top={} evaluated={} rejected={} seconds={:.3f} trace={}",
-            len(result["top_results"]), search_result.total_evaluations,
-            search_result.total_rejected, timing["overall_seconds"],
-            _search_span.trace_id[:8],
-        )
-        if persisted_run_id is not None:
-            self.persistence.update_run(persisted_run_id, result)
+        if result.get("persistence", {}).get("run_id"):
+            self.persistence.update_run(result["persistence"]["run_id"], result)
         return result
 
     def combine_factors_from_db(

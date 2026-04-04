@@ -401,9 +401,10 @@ class SearchEngine:
         evaluate_fn : full CPCV evaluator (provided by service)
         quick_evaluate_fn : optional 1-fold quick screener
         """
+        from .tracing import tracer
+
         overall_start = perf_counter()
 
-        # 1. Initialise population from seeds
         population: deque[Individual] = deque(maxlen=self._population_cap)
         archive: dict[tuple[int, int], Individual] = {}
         seen_hashes: set[str] = set()
@@ -413,81 +414,101 @@ class SearchEngine:
         total_evaluations = 0
         total_rejected = 0
 
-        init_start = perf_counter()
-        initial = self._build_initial_population(seeds, max(batch_size, len(seeds)))
-        init_seconds = perf_counter() - init_start
+        # --- init ---
+        with tracer.start_span("init", kind="search",
+                               seed_count=len(seeds), batch_size=batch_size) as init_span:
+            initial = self._build_initial_population(seeds, max(batch_size, len(seeds)))
+            init_span.set("compiled", len(initial))
 
-        # Evaluate initial batch
-        if initial:
-            init_eval = evaluate_fn(initial)
-            details_by_hash.update(init_eval.details_by_hash)
-            for ind in initial:
-                m = init_eval.metrics_by_hash.get(ind.expr_hash, {})
-                ind.metrics = m
-                ind.fitness = self.fitness_engine.score(m)
-                population.append(ind)
-                seen_hashes.add(ind.expr_hash)
-                all_evaluated.append(ind)
-                self._archive_update(archive, ind)
-            total_evaluations += len(initial)
+            if initial:
+                with tracer.start_span("init_evaluate", kind="eval",
+                                       count=len(initial)):
+                    init_eval = evaluate_fn(initial)
+                details_by_hash.update(init_eval.details_by_hash)
+                for ind in initial:
+                    m = init_eval.metrics_by_hash.get(ind.expr_hash, {})
+                    ind.metrics = m
+                    ind.fitness = self.fitness_engine.score(m)
+                    population.append(ind)
+                    seen_hashes.add(ind.expr_hash)
+                    all_evaluated.append(ind)
+                    self._archive_update(archive, ind)
+                total_evaluations += len(initial)
 
-        logger.info(
-            "search.init population={} archive={} init_seconds={:.3f}",
-            len(population), len(archive), init_seconds,
-        )
+            init_span.set("population", len(population))
+            init_span.set("archive", len(archive))
+        init_seconds = perf_counter() - overall_start
 
-        # 2. Main loop
+        # --- main loop ---
         for round_idx in range(rounds):
             round_start = perf_counter()
-            round_info: dict[str, Any] = {"round": round_idx}
+            round_ctx = tracer.start_span(
+                f"round_{round_idx}", kind="search",
+                round=round_idx, population=len(population), archive=len(archive),
+            )
+            round_span = round_ctx.__enter__()
 
-            # Tournament selection → parents
+            # Tournament
             parents = self._tournament_select(list(population))
+            round_span.set("parent_a", parents[0].formula[:50] if parents else "")
+            if len(parents) > 1:
+                round_span.set("parent_b", parents[1].formula[:50])
 
-            # Generate offspring batch
-            gen_start = perf_counter()
-            offspring = self._breed_batch(parents, batch_size, seen_hashes)
-            round_info["generate_seconds"] = perf_counter() - gen_start
-            round_info["candidates_generated"] = len(offspring)
+            # Breed
+            with tracer.start_span("breed", kind="breed",
+                                   batch_size=batch_size) as breed_span:
+                offspring = self._breed_batch(parents, batch_size, seen_hashes)
+                breed_span.set("generated", len(offspring))
+
+            round_info: dict[str, Any] = {
+                "round": round_idx,
+                "candidates_generated": len(offspring),
+            }
 
             if not offspring:
+                round_ctx.__exit__(None, None, None)
                 round_summaries.append(round_info)
                 continue
 
-            # Quick screen (optional early stopping)
+            # Quick screen
             screened = offspring
             quick_rejected = 0
             if quick_evaluate_fn and len(offspring) > 1:
-                screen_start = perf_counter()
-                quick_result = quick_evaluate_fn(offspring)
-                screened = []
-                for ind in offspring:
-                    qm = quick_result.metrics_by_hash.get(ind.expr_hash, {})
-                    if self._passes_quick_screen(qm):
-                        screened.append(ind)
-                    else:
-                        quick_rejected += 1
-                round_info["quick_screen_seconds"] = perf_counter() - screen_start
+                with tracer.start_span("quick_screen", kind="eval",
+                                       count=len(offspring)) as qs_span:
+                    quick_result = quick_evaluate_fn(offspring)
+                    screened = []
+                    for ind in offspring:
+                        qm = quick_result.metrics_by_hash.get(ind.expr_hash, {})
+                        if self._passes_quick_screen(qm):
+                            screened.append(ind)
+                        else:
+                            quick_rejected += 1
+                    qs_span.set("passed", len(screened))
+                    qs_span.set("rejected", quick_rejected)
             round_info["quick_rejected"] = quick_rejected
             total_rejected += quick_rejected
 
-            # Full evaluate survivors
+            # Full evaluate
             if screened:
-                eval_start = perf_counter()
-                full_result = evaluate_fn(screened)
-                round_info["eval_seconds"] = perf_counter() - eval_start
+                with tracer.start_span("evaluate", kind="eval",
+                                       count=len(screened)) as eval_span:
+                    full_result = evaluate_fn(screened)
                 details_by_hash.update(full_result.details_by_hash)
 
+                best_this_round = -999.0
                 for ind in screened:
                     m = full_result.metrics_by_hash.get(ind.expr_hash, {})
                     ind.metrics = m
                     ind.fitness = self.fitness_engine.score(m)
-                    population.append(ind)  # aging: oldest auto-evicted by deque
+                    population.append(ind)
                     seen_hashes.add(ind.expr_hash)
                     all_evaluated.append(ind)
                     self._archive_update(archive, ind)
+                    best_this_round = max(best_this_round, ind.fitness)
 
                 total_evaluations += len(screened)
+                eval_span.set("best_fitness", round(best_this_round, 4))
 
             round_info["evaluated"] = len(screened)
             round_info["archive_size"] = len(archive)
@@ -497,20 +518,16 @@ class SearchEngine:
             best_in_archive = max(archive.values(), key=lambda x: x.fitness) if archive else None
             round_info["best_fitness"] = best_in_archive.fitness if best_in_archive else 0.0
 
+            round_span.set("evaluated", len(screened))
+            round_span.set("rejected", quick_rejected)
+            round_span.set("archive", len(archive))
+            round_span.set("best_fitness", round(round_info["best_fitness"], 4))
+            round_ctx.__exit__(None, None, None)
+
             round_summaries.append(round_info)
-            logger.info(
-                "search.round round={} generated={} rejected={} evaluated={} "
-                "archive={} best_fitness={:.4f} seconds={:.3f}",
-                round_idx, len(offspring), quick_rejected, len(screened),
-                len(archive),
-                round_info["best_fitness"],
-                round_info["total_seconds"],
-            )
 
-        # 3. Build final result from archive
+        # --- result ---
         archive_list = sorted(archive.values(), key=lambda x: x.fitness, reverse=True)
-
-        # Novelty filter on archive for the final top_k
         final = self._novelty_filter(archive_list, details_by_hash, novelty_threshold)[:top_k]
 
         timing = {
@@ -518,11 +535,6 @@ class SearchEngine:
             "rounds": round_summaries,
             "overall_seconds": perf_counter() - overall_start,
         }
-
-        logger.info(
-            "search.complete total_eval={} rejected={} archive={} final={} seconds={:.3f}",
-            total_evaluations, total_rejected, len(archive), len(final), timing["overall_seconds"],
-        )
 
         return SearchResult(
             archive=final,

@@ -137,56 +137,71 @@ class SpanCollector(Protocol):
 
 
 class LoguruCollector:
-    """Default collector: emits spans as structured loguru messages."""
+    """Default collector: emits spans as structured loguru messages.
+
+    Shows hierarchy via indentation (depth derived from parent chain)
+    and formats each span kind with its most useful attributes.
+    """
+
+    def __init__(self) -> None:
+        self._depth: dict[str, int] = {}  # span_id → nesting depth
 
     def on_span_end(self, span: Span) -> None:
-        attrs = span.attributes
-        base = (
-            f"span.{span.kind}.{span.operation} "
-            f"trace={span.trace_id[:8]} span={span.span_id[:8]} "
-            f"status={span.status} duration_ms={span.duration_ms:.1f}"
-        )
+        depth = 0
+        if span.parent_id and span.parent_id in self._depth:
+            depth = self._depth[span.parent_id] + 1
+        self._depth[span.span_id] = depth
+        # Limit cache
+        if len(self._depth) > 500:
+            oldest = list(self._depth)[:200]
+            for k in oldest:
+                del self._depth[k]
+
+        indent = "│ " * depth
+        a = span.attributes
+        ms = f"{span.duration_ms:.0f}ms"
 
         if span.kind == "llm":
-            tokens = attrs.get("total_tokens", "?")
-            cost = attrs.get("estimated_cost_usd")
-            cost_str = f" cost=${cost:.5f}" if cost is not None else ""
-            model = attrs.get("model", "?")
-            resp_len = attrs.get("response_length", "?")
-            base += f" model={model} tokens={tokens}{cost_str} resp_len={resp_len}"
+            tokens = a.get("total_tokens", "?")
+            cost = a.get("estimated_cost_usd")
+            cost_s = f" ${cost:.4f}" if cost else ""
+            line = f"{indent}⚡ {span.operation}  {ms}  tokens={tokens}{cost_s}"
         elif span.kind == "breed":
-            extracted = attrs.get("formulas_extracted", "?")
-            valid = attrs.get("formulas_valid", "?")
-            fallback = attrs.get("fallback_used", "?")
-            base += f" extracted={extracted} valid={valid} fallback={fallback}"
+            gen = a.get("generated", a.get("finalized", "?"))
+            line = f"{indent}🧬 {span.operation}  {ms}  generated={gen}"
+        elif span.kind == "eval":
+            count = a.get("count", "?")
+            best = a.get("best_fitness")
+            extra = f"  best={best:.4f}" if best is not None else ""
+            line = f"{indent}📊 {span.operation}  {ms}  n={count}{extra}"
+        elif span.kind == "search":
+            # Round or top-level search
+            arch = a.get("archive", a.get("archive_size"))
+            bf = a.get("best_fitness")
+            rej = a.get("rejected", a.get("total_rejected"))
+            parts = [ms]
+            if arch is not None:
+                parts.append(f"archive={arch}")
+            if bf is not None:
+                parts.append(f"best={bf}")
+            if rej:
+                parts.append(f"rejected={rej}")
+            line = f"{indent}🔍 {span.operation}  {'  '.join(parts)}"
+        else:
+            line = f"{indent}● {span.operation}  {ms}"
 
         if span.status == "error":
-            logger.warning(f"{base} error={span.error}")
+            logger.warning(f"{line}  ✗ {span.error}")
         else:
-            logger.info(base)
-
-        # Emit events as debug lines
-        for evt in span.events:
-            logger.debug(
-                "span.event.{} trace={} span={} {}",
-                evt.name,
-                span.trace_id[:8],
-                span.span_id[:8],
-                " ".join(f"{k}={v}" for k, v in evt.attributes.items()),
-            )
+            logger.info(line)
 
 
 class LangfuseCollector:
-    """Collector that sends spans to Langfuse as traces/generations/spans.
+    """Sends spans to Langfuse with proper trace → span → generation hierarchy.
 
-    Requires environment variables (or constructor args):
-    - ``LANGFUSE_PUBLIC_KEY``
-    - ``LANGFUSE_SECRET_KEY``
-    - ``LANGFUSE_HOST`` (optional, defaults to Langfuse cloud)
-
-    LLM spans (kind="llm") are sent as Langfuse *generations* with full
-    token/cost metadata.  All other span kinds are sent as Langfuse *spans*.
-    Top-level spans (no parent) automatically create a Langfuse *trace*.
+    Top-level spans (no parent) create a Langfuse *trace*.
+    LLM spans become Langfuse *generations* (with token/cost metadata).
+    All other spans become Langfuse *spans* nested under their parent.
     """
 
     def __init__(
@@ -198,26 +213,23 @@ class LangfuseCollector:
     ) -> None:
         self.enabled = enabled
         self._client = None
-        self._traces: dict[str, Any] = {}  # trace_id -> langfuse top-level observation
-        self._observations: dict[str, Any] = {}  # span_id -> langfuse observation
+        self._traces: dict[str, Any] = {}   # trace_id → Langfuse trace object
+        self._obs: dict[str, Any] = {}       # span_id → Langfuse observation
         if not enabled:
             return
         resolved_pk = public_key or os.getenv("LANGFUSE_PUBLIC_KEY")
         resolved_sk = secret_key or os.getenv("LANGFUSE_SECRET_KEY")
         if not resolved_pk or not resolved_sk:
-            logger.debug("langfuse collector disabled: missing public_key or secret_key")
             self.enabled = False
             return
         try:
             from langfuse import Langfuse
-
             self._client = Langfuse(
-                public_key=resolved_pk,
-                secret_key=resolved_sk,
+                public_key=resolved_pk, secret_key=resolved_sk,
                 host=host or os.getenv("LANGFUSE_HOST"),
             )
         except Exception as exc:
-            logger.warning("langfuse collector init failed: {}", exc)
+            logger.warning("langfuse init failed: {}", exc)
             self.enabled = False
 
     def on_span_end(self, span: Span) -> None:
@@ -236,21 +248,12 @@ class LangfuseCollector:
                 pass
 
     def _send(self, span: Span) -> None:
-        from datetime import datetime, timezone
-
-        end_dt = datetime.fromtimestamp(span.end_time, tz=timezone.utc) if span.end_time else None
+        _NATIVE = {"model", "prompt_tokens", "completion_tokens", "total_tokens",
+                    "estimated_cost_usd", "temperature", "input", "output"}
+        metadata = {k: v for k, v in span.attributes.items() if k not in _NATIVE}
         level = "ERROR" if span.status == "error" else "DEFAULT"
-        # Fields handled natively by Langfuse — exclude from metadata
-        _LF_NATIVE = {"model", "prompt_tokens", "completion_tokens", "total_tokens",
-                       "estimated_cost_usd", "temperature", "input", "output"}
-        metadata = {k: v for k, v in span.attributes.items() if k not in _LF_NATIVE}
-        if span.events:
-            metadata["events"] = [
-                {"name": e.name, "ts": e.timestamp, **e.attributes}
-                for e in span.events
-            ]
 
-        parent = self._get_parent(span)
+        parent = self._resolve_parent(span)
 
         if span.kind == "llm":
             obs = parent.start_observation(
@@ -264,17 +267,16 @@ class LangfuseCollector:
                 level=level,
                 status_message=span.error,
             )
-            obs.update(
-                usage_details={
-                    "input": span.attributes.get("prompt_tokens") or 0,
-                    "output": span.attributes.get("completion_tokens") or 0,
-                    "total": span.attributes.get("total_tokens") or 0,
-                },
-            )
+            obs.update(usage_details={
+                "input": span.attributes.get("prompt_tokens") or 0,
+                "output": span.attributes.get("completion_tokens") or 0,
+                "total": span.attributes.get("total_tokens") or 0,
+            })
             obs.end()
         else:
+            name = span.operation if span.kind == "search" else f"{span.kind}.{span.operation}"
             obs = parent.start_observation(
-                name=f"{span.kind}.{span.operation}",
+                name=name,
                 as_type="span",
                 metadata=metadata,
                 level=level,
@@ -282,27 +284,27 @@ class LangfuseCollector:
             )
             obs.end()
 
-        # Cache this observation so child spans can nest under it
-        self._observations[span.span_id] = obs
+        self._obs[span.span_id] = obs
 
-    def _get_parent(self, span: Span) -> Any:
-        """Return the Langfuse parent (observation or trace-level client)."""
-        # If parent span was already sent, nest under it
-        if span.parent_id and span.parent_id in self._observations:
-            return self._observations[span.parent_id]
-        # Otherwise create/reuse a top-level trace
+        # Evict old entries
+        if len(self._obs) > 500:
+            for k in list(self._obs)[:250]:
+                del self._obs[k]
+
+    def _resolve_parent(self, span: Span) -> Any:
+        # Nest under parent observation if available
+        if span.parent_id and span.parent_id in self._obs:
+            return self._obs[span.parent_id]
+        # Create or reuse a top-level trace
         if span.trace_id not in self._traces:
-            trace_name = span.operation if span.parent_id is None else f"alpha.{span.kind}"
             obs = self._client.start_observation(
-                name=trace_name,
+                name=span.operation,
                 as_type="span",
                 metadata={"trace_id": span.trace_id, "kind": span.kind},
             )
             self._traces[span.trace_id] = obs
-            # Limit cache
             if len(self._traces) > 200:
-                oldest = next(iter(self._traces))
-                del self._traces[oldest]
+                del self._traces[next(iter(self._traces))]
         return self._traces[span.trace_id]
 
 
