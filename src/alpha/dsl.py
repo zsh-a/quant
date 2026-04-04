@@ -34,16 +34,19 @@ class TensorSchema:
         return cls(
             fields=frozenset(
                 {
-                    "open",
-                    "high",
-                    "low",
-                    "close",
-                    "volume",
-                    "turnover",
-                    "vwap",
-                    "funding_rate",
-                    "open_interest",
-                    "bid_ask_spread",
+                    # Core OHLCV
+                    "open", "high", "low", "close", "volume",
+                    "turnover", "vwap", "bid_ask_spread",
+                    # Volume details
+                    "trade_count", "taker_buy_volume", "taker_buy_quote_volume",
+                    # Mark price (fair value)
+                    "mark_open", "mark_high", "mark_low", "mark_close",
+                    # Premium index (futures–spot basis)
+                    "premium_open", "premium_high", "premium_low", "premium_close",
+                    # Market metrics
+                    "funding_rate", "open_interest", "open_interest_value",
+                    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
+                    "long_short_ratio", "taker_long_short_vol_ratio",
                 }
             ),
             masks=frozenset({"liquidity_mask", "session_mask"}),
@@ -153,9 +156,34 @@ class TypeChecker:
         self.field_aliases = {
             "oi": "open_interest",
             "openinterest": "open_interest",
+            "oivalue": "open_interest_value",
+            "openinterestvalue": "open_interest_value",
             "fundingrate": "funding_rate",
             "bidaskspread": "bid_ask_spread",
-            "bid_ask_spread": "bid_ask_spread",
+            "tradecount": "trade_count",
+            "trades": "trade_count",
+            "takerbuyvolume": "taker_buy_volume",
+            "takerbuyquotevolume": "taker_buy_quote_volume",
+            "markopen": "mark_open",
+            "markhigh": "mark_high",
+            "marklow": "mark_low",
+            "markclose": "mark_close",
+            "mark": "mark_close",
+            "premiumopen": "premium_open",
+            "premiumhigh": "premium_high",
+            "premiumlow": "premium_low",
+            "premiumclose": "premium_close",
+            "premium": "premium_close",
+            "basis": "premium_close",
+            "lsratio": "long_short_ratio",
+            "longshort": "long_short_ratio",
+            "longshortratio": "long_short_ratio",
+            "takerlsratio": "taker_long_short_vol_ratio",
+            "takerlongshortvol": "taker_long_short_vol_ratio",
+            "takerlongshortratio": "taker_long_short_vol_ratio",
+            "takerlongshorvolratio": "taker_long_short_vol_ratio",
+            "toptraderlongshortratio": "top_trader_long_short_ratio",
+            "toptraderlongshortpositionratio": "top_trader_long_short_position_ratio",
         }
 
     def infer(self, ast_node: ASTNode, schema: TensorSchema) -> ASTNode:

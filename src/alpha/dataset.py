@@ -8,7 +8,7 @@ import numpy as np
 import pandas as pd
 from loguru import logger
 
-from src.market_data.crypto_store import CryptoMinuteBarStore
+from src.market_data.clickhouse import create_clickhouse_client
 
 
 @dataclass
@@ -53,14 +53,54 @@ class AlphaDataset:
         )
 
 
-class CryptoMinuteDatasetLoader:
-    def __init__(self, store: CryptoMinuteBarStore | None = None):
-        self.store = store
+_FUTURES_TABLE = "crypto_data.futures_5m"
+_BASE_INTERVAL_MINUTES = 5
 
-    def _store(self) -> CryptoMinuteBarStore:
-        if self.store is None:
-            self.store = CryptoMinuteBarStore()
-        return self.store
+_SELECT_COLUMNS = [
+    "symbol", "open_time", "close_time",
+    "open", "high", "low", "close",
+    "volume", "quote_volume", "trade_count",
+    "taker_buy_volume", "taker_buy_quote_volume",
+    "mark_open", "mark_high", "mark_low", "mark_close",
+    "premium_open", "premium_high", "premium_low", "premium_close",
+    "open_interest", "open_interest_value",
+    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
+    "long_short_ratio", "taker_long_short_vol_ratio",
+    "funding_rate",
+]
+
+# Fields that should use "last" aggregation when resampling (snapshot values)
+_RESAMPLE_LAST = {
+    "symbol", "close_time", "close",
+    "mark_close", "premium_close",
+    "open_interest", "open_interest_value",
+    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
+    "long_short_ratio", "taker_long_short_vol_ratio",
+    "funding_rate",
+}
+
+# Fields that should be zero-filled when NaN
+_ZERO_FILL_FIELDS = [
+    "trade_count", "taker_buy_volume", "taker_buy_quote_volume",
+    "mark_open", "mark_high", "mark_low", "mark_close",
+    "premium_open", "premium_high", "premium_low", "premium_close",
+    "open_interest", "open_interest_value",
+    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
+    "long_short_ratio", "taker_long_short_vol_ratio",
+    "funding_rate",
+]
+
+
+class CryptoMinuteDatasetLoader:
+    """Load alpha datasets from Binance Vision futures_5m table in ClickHouse."""
+
+    def __init__(self, client=None):
+        self._client = client
+
+    def _get_client(self):
+        if self._client is None:
+            self._client = create_clickhouse_client()
+        return self._client
 
     def load(
         self,
@@ -68,54 +108,45 @@ class CryptoMinuteDatasetLoader:
         symbols: list[str],
         start_time: datetime,
         end_time: datetime,
-        interval: str = "1m",
+        interval: str = "5m",
         min_quote_volume: float = 0.0,
         blocked_utc_hours: list[int] | set[int] | tuple[int, ...] | None = None,
     ) -> AlphaDataset:
-        frames = []
+        client = self._get_client()
+        upper_symbols = [s.upper() for s in symbols]
+
+        # Query from futures_5m
+        symbols_clause = ",".join(f"'{s}'" for s in upper_symbols)
+        start_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
+        end_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+        cols = ", ".join(_SELECT_COLUMNS)
+
+        result = client.query(
+            f"SELECT {cols} FROM {_FUTURES_TABLE} "
+            f"WHERE symbol IN ({symbols_clause}) "
+            f"AND open_time >= toDateTime64('{start_str}', 3, 'UTC') "
+            f"AND open_time < toDateTime64('{end_str}', 3, 'UTC') "
+            f"ORDER BY open_time, symbol"
+        )
+
+        if not result.result_rows:
+            raise ValueError("No futures data found for the requested symbols/time range")
+
+        df = pd.DataFrame(result.result_rows, columns=result.column_names)
+        df["open_time"] = pd.to_datetime(df["open_time"], utc=True)
+
+        # Resample if requested interval > 5m base
         requested_interval = interval
-        source_interval = "1m" if self._should_resample_interval(interval) else interval
-        for symbol in symbols:
-            rows = self._store().query_bars(
-                provider=provider,
-                symbol=symbol.upper(),
-                start_time=start_time,
-                end_time=end_time,
-                interval=source_interval,
-            )
-            if not rows and source_interval != requested_interval:
-                logger.warning(
-                    "alpha.dataset resample_source_missing provider={} symbol={} source_interval={} fallback_interval={}",
-                    provider,
-                    symbol.upper(),
-                    source_interval,
-                    requested_interval,
-                )
-                rows = self._store().query_bars(
-                    provider=provider,
-                    symbol=symbol.upper(),
-                    start_time=start_time,
-                    end_time=end_time,
-                    interval=requested_interval,
-                )
-            if not rows:
-                continue
-            frame = pd.DataFrame(rows)
-            frame["open_time"] = pd.to_datetime(frame["open_time"], utc=True)
-            frame["symbol"] = symbol.upper()
-            if self._should_resample_interval(requested_interval) and source_interval == "1m":
-                frame = self._resample_symbol_frame(frame, requested_interval)
-            frames.append(frame)
+        if self._should_resample(requested_interval):
+            frames = []
+            for sym in df["symbol"].unique():
+                frames.append(self._resample_frame(df[df["symbol"] == sym].copy(), requested_interval))
+            df = pd.concat(frames, ignore_index=True)
 
-        if not frames:
-            raise ValueError("No crypto minute-bar data found for the requested provider/symbols/time range")
-
-        df = pd.concat(frames, ignore_index=True)
-        df = df.dropna(subset=["open_time"]).reset_index(drop=True)
-        if df.empty:
-            raise ValueError("No valid rows after concat — all open_time values are NaN")
+        # Deduplicate and align across all symbols × timestamps
         sort_idx = np.lexsort([df["symbol"].values, df["open_time"].values])
-        df = df.iloc[sort_idx].reset_index(drop=True).drop_duplicates(subset=["open_time", "symbol"], keep="last")
+        df = df.iloc[sort_idx].reset_index(drop=True)
+        df = df.drop_duplicates(subset=["open_time", "symbol"], keep="last")
         timestamps = sorted(df["open_time"].drop_duplicates().tolist())
         resolved_symbols = sorted(df["symbol"].drop_duplicates().tolist())
         full_index = pd.MultiIndex.from_product([timestamps, resolved_symbols], names=["open_time", "symbol"])
@@ -126,40 +157,31 @@ class CryptoMinuteDatasetLoader:
             .reset_index()
         )
 
-        n_t, n_s = len(timestamps), len(resolved_symbols)
+        # Build fields dict
+        fields: dict[str, np.ndarray] = {}
 
-        fields = {
-            "open": self._pivot_field(aligned, "open", timestamps, resolved_symbols),
-            "high": self._pivot_field(aligned, "high", timestamps, resolved_symbols),
-            "low": self._pivot_field(aligned, "low", timestamps, resolved_symbols),
-            "close": self._pivot_field(aligned, "close", timestamps, resolved_symbols),
-            "volume": self._pivot_field(aligned, "volume_base", timestamps, resolved_symbols),
-            "turnover": self._pivot_field(aligned, "volume_quote", timestamps, resolved_symbols),
-        }
+        # Core OHLCV
+        for name in ["open", "high", "low", "close", "volume"]:
+            fields[name] = self._pivot(aligned, name, timestamps, resolved_symbols)
 
-        # Read real funding_rate / open_interest from DB; fall back to zeros
-        if "funding_rate" in aligned.columns:
-            fr = self._pivot_field(aligned, "funding_rate", timestamps, resolved_symbols)
-            fields["funding_rate"] = np.nan_to_num(fr, nan=0.0)
-        else:
-            fields["funding_rate"] = np.zeros((n_t, n_s), dtype=float)
+        # Quote volume as turnover (for backward compatibility)
+        fields["turnover"] = self._pivot(aligned, "quote_volume", timestamps, resolved_symbols)
 
-        if "open_interest" in aligned.columns:
-            oi = self._pivot_field(aligned, "open_interest", timestamps, resolved_symbols)
-            fields["open_interest"] = np.nan_to_num(oi, nan=0.0)
-        else:
-            fields["open_interest"] = np.zeros((n_t, n_s), dtype=float)
+        # Additional raw fields (zero-fill NaN)
+        for name in _ZERO_FILL_FIELDS:
+            fields[name] = np.nan_to_num(
+                self._pivot(aligned, name, timestamps, resolved_symbols), nan=0.0,
+            )
 
-        fields["vwap"] = np.divide(
-            fields["turnover"],
-            fields["volume"] + 1e-12,
-        )
+        # Derived fields
+        fields["vwap"] = np.divide(fields["turnover"], fields["volume"] + 1e-12)
         close_ref = np.nan_to_num(np.abs(fields["close"]), nan=0.0, posinf=0.0, neginf=0.0)
         raw_spread = np.nan_to_num(np.abs(fields["high"] - fields["low"]) * 0.02, nan=0.0, posinf=0.0, neginf=0.0)
         min_spread = np.maximum(close_ref * 0.0001, 1e-6)
         max_spread = np.maximum(close_ref * 0.0025, min_spread)
         fields["bid_ask_spread"] = np.clip(raw_spread, min_spread, max_spread)
 
+        # Masks
         liquidity_mask = fields["turnover"] > float(min_quote_volume)
         blocked_hours = {int(hour) % 24 for hour in (blocked_utc_hours or [])}
         tradable_by_row = np.array(
@@ -167,6 +189,11 @@ class CryptoMinuteDatasetLoader:
             dtype=bool,
         )
         session_mask = np.broadcast_to(tradable_by_row[:, None], liquidity_mask.shape).copy()
+
+        logger.info(
+            "alpha.dataset loaded from {} symbols={} timestamps={} interval={}",
+            _FUTURES_TABLE, len(resolved_symbols), len(timestamps), requested_interval,
+        )
 
         return AlphaDataset(
             provider=provider,
@@ -178,26 +205,30 @@ class CryptoMinuteDatasetLoader:
             session_mask=session_mask,
         )
 
-    def _pivot_field(
+    def _pivot(
         self,
         aligned: pd.DataFrame,
         column: str,
         timestamps: list[pd.Timestamp],
         symbols: list[str],
     ) -> np.ndarray:
-        matrix = (
+        return (
             aligned.pivot(index="open_time", columns="symbol", values=column)
             .reindex(index=timestamps, columns=symbols)
             .to_numpy(dtype=float)
         )
-        return matrix
 
-    def _should_resample_interval(self, interval: str) -> bool:
+    def _should_resample(self, interval: str) -> bool:
         minutes = self._interval_minutes(interval)
-        return minutes is not None and minutes > 1
+        return minutes is not None and minutes > _BASE_INTERVAL_MINUTES
 
     def _interval_minutes(self, interval: str) -> int | None:
         normalized = str(interval).strip().lower()
+        if normalized.endswith("h"):
+            try:
+                return int(normalized[:-1]) * 60
+            except ValueError:
+                return None
         if not normalized.endswith("m"):
             return None
         try:
@@ -205,50 +236,42 @@ class CryptoMinuteDatasetLoader:
         except ValueError:
             return None
 
-    def _resample_symbol_frame(self, frame: pd.DataFrame, interval: str) -> pd.DataFrame:
+    def _resample_frame(self, frame: pd.DataFrame, interval: str) -> pd.DataFrame:
         minutes = self._interval_minutes(interval)
-        if minutes is None or minutes <= 1:
+        if minutes is None or minutes <= _BASE_INTERVAL_MINUTES:
             return frame
         if frame.empty:
             return frame
 
         symbol = str(frame["symbol"].iloc[0]).upper()
         rule = f"{minutes}min"
-        ordered = frame.iloc[frame["open_time"].values.argsort(kind="mergesort")].copy()
-        ordered = ordered.set_index("open_time")
-        agg_spec = {
-            "provider": "first",
-            "market_type": "first",
-            "symbol": "first",
-            "exchange_symbol": "first",
-            "close_time": "last",
-            "open": "first",
-            "high": "max",
-            "low": "min",
-            "close": "last",
-            "volume_base": "sum",
-            "volume_quote": "sum",
-            "trade_count": "sum",
-        }
-        if "funding_rate" in ordered.columns:
-            agg_spec["funding_rate"] = "last"
-        if "open_interest" in ordered.columns:
-            agg_spec["open_interest"] = "last"
+        ordered = frame.sort_values("open_time").set_index("open_time")
+
+        agg_spec: dict[str, str] = {}
+        for col in ordered.columns:
+            if col in ("symbol",):
+                agg_spec[col] = "first"
+            elif col in ("close_time", "close", "mark_close", "premium_close"):
+                agg_spec[col] = "last"
+            elif col in ("open", "mark_open", "premium_open"):
+                agg_spec[col] = "first"
+            elif col in ("high", "mark_high", "premium_high"):
+                agg_spec[col] = "max"
+            elif col in ("low", "mark_low", "premium_low"):
+                agg_spec[col] = "min"
+            elif col in ("volume", "quote_volume", "trade_count",
+                         "taker_buy_volume", "taker_buy_quote_volume"):
+                agg_spec[col] = "sum"
+            elif col in _RESAMPLE_LAST:
+                agg_spec[col] = "last"
+
         aggregated = ordered.resample(rule, label="left", closed="left").agg(agg_spec)
         aggregated = aggregated.dropna(subset=["open", "high", "low", "close"], how="any").reset_index()
         aggregated["symbol"] = symbol
-        aggregated["interval"] = interval
-        if "exchange_symbol" in aggregated.columns:
-            aggregated["exchange_symbol"] = aggregated["exchange_symbol"].fillna(symbol)
-        if "close_time" in aggregated.columns:
-            fallback_close = aggregated["open_time"] + pd.to_timedelta(minutes, unit="min") - pd.to_timedelta(1, unit="ms")
-            aggregated["close_time"] = aggregated["close_time"].fillna(fallback_close)
+
         logger.info(
-            "alpha.dataset resampled symbol={} from_interval=1m to_interval={} rows_in={} rows_out={}",
-            symbol,
-            interval,
-            len(frame),
-            len(aggregated),
+            "alpha.dataset resampled symbol={} from=5m to={} rows_in={} rows_out={}",
+            symbol, interval, len(frame), len(aggregated),
         )
         return aggregated
 

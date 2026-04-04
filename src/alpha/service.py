@@ -224,17 +224,39 @@ class AlphaService:
         rng = np.random.default_rng(7)
         base_close = 100.0 + np.cumsum(rng.normal(0.0, 0.5, size=(rows, cols)), axis=0)
         base_volume = np.abs(rng.normal(1000.0, 150.0, size=(rows, cols))) + 1.0
+        base_turnover = base_close * base_volume
+        base_oi = np.abs(rng.normal(1_000_000.0, 10_000.0, size=(rows, cols)))
         fields = {
             "open": base_close - rng.normal(0.0, 0.1, size=(rows, cols)),
             "high": base_close + np.abs(rng.normal(0.25, 0.1, size=(rows, cols))),
             "low": base_close - np.abs(rng.normal(0.25, 0.1, size=(rows, cols))),
             "close": base_close,
             "volume": base_volume,
-            "turnover": base_close * base_volume,
+            "turnover": base_turnover,
             "vwap": base_close + rng.normal(0.0, 0.03, size=(rows, cols)),
-            "funding_rate": np.zeros((rows, cols), dtype=float),
-            "open_interest": np.abs(rng.normal(1_000_000.0, 10_000.0, size=(rows, cols))),
             "bid_ask_spread": np.abs(rng.normal(0.5, 0.05, size=(rows, cols))),
+            # Volume details
+            "trade_count": np.abs(rng.normal(500.0, 100.0, size=(rows, cols))),
+            "taker_buy_volume": base_volume * np.abs(rng.normal(0.5, 0.1, size=(rows, cols))),
+            "taker_buy_quote_volume": base_turnover * np.abs(rng.normal(0.5, 0.1, size=(rows, cols))),
+            # Mark price
+            "mark_open": base_close - rng.normal(0.0, 0.05, size=(rows, cols)),
+            "mark_high": base_close + np.abs(rng.normal(0.2, 0.08, size=(rows, cols))),
+            "mark_low": base_close - np.abs(rng.normal(0.2, 0.08, size=(rows, cols))),
+            "mark_close": base_close + rng.normal(0.0, 0.02, size=(rows, cols)),
+            # Premium index (basis)
+            "premium_open": rng.normal(0.0, 0.001, size=(rows, cols)),
+            "premium_high": np.abs(rng.normal(0.001, 0.0005, size=(rows, cols))),
+            "premium_low": -np.abs(rng.normal(0.001, 0.0005, size=(rows, cols))),
+            "premium_close": rng.normal(0.0, 0.0008, size=(rows, cols)),
+            # Market metrics
+            "funding_rate": rng.normal(0.0001, 0.0001, size=(rows, cols)),
+            "open_interest": base_oi,
+            "open_interest_value": base_oi * base_close,
+            "top_trader_long_short_ratio": np.abs(rng.normal(1.0, 0.3, size=(rows, cols))),
+            "top_trader_long_short_position_ratio": np.abs(rng.normal(1.0, 0.3, size=(rows, cols))),
+            "long_short_ratio": np.abs(rng.normal(1.0, 0.2, size=(rows, cols))),
+            "taker_long_short_vol_ratio": np.abs(rng.normal(1.0, 0.2, size=(rows, cols))),
         }
         store = TensorStore({name: np.asarray(values, dtype=float) for name, values in fields.items()})
         programs = [self._compile_cached(formula) for formula in formulas]
