@@ -1,16 +1,21 @@
-# Fixed window (set both to use explicit time range, ignores lookback/lag/step):
-#   start_time: "2024-01-01T00:00:00+00:00"
-#   end_time:   "2024-07-01T00:00:00+00:00"
-# Rolling window (default): uses lookback_minutes from now/anchor_time
+# Alpha Auto Search Configuration
+# Data source: crypto_data.futures_5m (ClickHouse)
+#
+# Usage:
+#   python -m src.alpha.cli auto --config config/alpha_lab/auto_search.example.yaml --once
+
+# --- Time Window ---
+# Fixed window: set both start_time and end_time
+# Rolling window: uses lookback_minutes from now (or anchor_time)
 window:
-  start_time: "2020-01-01T00:00:00+00:00"             # ISO8601, e.g. "2024-01-01T00:00:00+00:00"
-  end_time: "2024-07-01T00:00:00+00:00"               # ISO8601, e.g. "2024-07-01T00:00:00+00:00"
-  lookback_minutes: 10080  # rolling mode: 7 days
+  start_time: "2020-01-01T00:00:00+00:00"
+  end_time: "2024-07-01T00:00:00+00:00"
+  lookback_minutes: 10080     # 7 days
   lag_minutes: 10
   step_minutes: 60
 
+# --- Search ---
 search:
-  provider: binance
   symbols:
     - BTCUSDT
     - ETHUSDT
@@ -20,48 +25,56 @@ search:
   interval: 5m
   min_quote_volume: 1000000
   blocked_utc_hours: []
+
+  # Evolution parameters
   population_size: 8
   offspring_count: 4
   top_k: 5
   generations: 3
   novelty_threshold: 0.995
+
+  # CPCV validation
   n_splits: 5
   purge_window: 0
   embargo_window: 0
-  persist: true
-  run_name: auto_search_db
-  seeds:
-    - CSRank(ts_mean(close, 5) - close)
-    - CSRank(ts_std(close, 10))
-    - CSRank(delta(premium_close, 5))
-    - CSRank(ts_zscore(funding_rate, 20))
-  seed_zoo_limit: 5
-  feedback_seed_count: 2
-  feedback_objective: improve robustness and reduce turnover
-  carryover_top_k: 3
-  llm_backend: auto
-  llm_model:
-  llm_base_url:
-  llm_api_key:
 
-# Post-search factor combination (runs after each search cycle)
+  # Persistence
+  persist: true
+  run_name: auto_search
+
+  # Seed formulas
+  seeds:
+    - "cs_rank(ts_mean(close, 5) - close)"
+    - "cs_rank(ts_std(close, 10))"
+    - "cs_rank(delta(premium_close, 5))"
+    - "cs_rank(ts_zscore(funding_rate, 20))"
+  seed_zoo_limit: 5            # Load top-k from zoo as additional seeds
+  feedback_seed_count: 2       # Generate N offspring from best parents via LLM
+  feedback_objective: "improve robustness and reduce turnover"
+  carryover_top_k: 3           # Carry top-k from previous cycle
+
+  # LLM backend
+  llm_backend: auto            # auto | openai | heuristic
+  llm_model:                   # e.g. gpt-4.1-mini (default from env)
+
+# --- Factor Combination (after each search cycle) ---
 combination:
   enabled: true
-  method: ic_weighted        # equal | ic_weighted | ridge
+  method: ic_weighted           # equal | ic_weighted | ridge
   max_factors: 10
   min_abs_ic: 0.01
   max_correlation: 0.70
   ic_lookback: 60
   zoo_limit: 50
-  # Risk management
-  vol_target: 0.15           # Annualized target volatility (0 = disabled)
-  max_drawdown: 0.15         # Drawdown threshold for deleveraging (0 = disabled)
-  trailing_stop_pct: 0.05    # Trailing stop on equity curve (0 = disabled)
+  vol_target: 0.15              # Annualized target vol (0 = disabled)
+  max_drawdown: 0.15            # Drawdown deleveraging threshold (0 = disabled)
+  trailing_stop_pct: 0.05       # Trailing stop on equity (0 = disabled)
 
+# --- Runtime ---
 runtime:
   poll_interval_seconds: 300
   sleep_after_success_seconds: 60
-  max_cycles:
+  max_cycles:                   # null = unlimited
   continue_on_error: true
   failure_backoff_seconds: 30
   max_failure_backoff_seconds: 900

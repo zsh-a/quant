@@ -167,59 +167,69 @@ def run_auto_search_loop(
                 continue
 
             attempted += 1
-            seeds = _resolve_seeds(config, service, state)
-            logger.info(
-                "alpha.auto_search cycle={} start={} end={} seeds={}",
-                attempted, window["start"], window["end"], len(seeds),
-            )
 
-            result = service.search_formulas_on_db(
-                symbols=list(config.search.symbols),
-                start_time=_parse_iso(window["start"]),
-                end_time=_parse_iso(window["end"]),
-                interval=config.search.interval,
-                min_quote_volume=config.search.min_quote_volume,
-                seeds=seeds,
-                population_size=config.search.population_size,
-                offspring_count=config.search.offspring_count,
-                top_k=config.search.top_k,
-                generations=config.search.generations,
-                run_name=config.search.run_name,
-                persist=config.search.persist,
-                novelty_threshold=config.search.novelty_threshold,
-                n_splits=config.search.n_splits,
-                purge_window=config.search.purge_window,
-                embargo_window=config.search.embargo_window,
-                blocked_utc_hours=config.search.blocked_utc_hours,
-            )
+            # Wrap entire cycle in a single trace so seed generation
+            # and search share the same trace_id in Langfuse.
+            from .tracing import tracer
+            with tracer.start_span(
+                "auto_search_cycle", kind="search",
+                cycle=attempted,
+                window_start=window["start"],
+                window_end=window["end"],
+            ):
+                seeds = _resolve_seeds(config, service, state)
+                logger.info(
+                    "alpha.auto_search cycle={} start={} end={} seeds={}",
+                    attempted, window["start"], window["end"], len(seeds),
+                )
 
-            # Optional: combine factors
-            combo_result: dict[str, Any] | None = None
-            if config.combination.enabled:
-                try:
-                    c = config.combination
-                    combo_result = service.combine_factors_from_db(
-                        symbols=list(config.search.symbols),
-                        start_time=_parse_iso(window["start"]),
-                        end_time=_parse_iso(window["end"]),
-                        interval=config.search.interval,
-                        min_quote_volume=config.search.min_quote_volume,
-                        blocked_utc_hours=config.search.blocked_utc_hours,
-                        method=c.method,
-                        max_factors=c.max_factors,
-                        min_abs_ic=c.min_abs_ic,
-                        max_correlation=c.max_correlation,
-                        ic_lookback=c.ic_lookback,
-                        zoo_limit=c.zoo_limit,
-                        risk_config=RiskConfig(
-                            vol_target=c.vol_target,
-                            max_drawdown=c.max_drawdown,
-                            trailing_stop_pct=c.trailing_stop_pct,
-                        ),
-                        summary_only=True,
-                    )
-                except Exception as exc:
-                    logger.warning("alpha.auto_search combination failed: {}", exc)
+                result = service.search_formulas_on_db(
+                    symbols=list(config.search.symbols),
+                    start_time=_parse_iso(window["start"]),
+                    end_time=_parse_iso(window["end"]),
+                    interval=config.search.interval,
+                    min_quote_volume=config.search.min_quote_volume,
+                    seeds=seeds,
+                    population_size=config.search.population_size,
+                    offspring_count=config.search.offspring_count,
+                    top_k=config.search.top_k,
+                    generations=config.search.generations,
+                    run_name=config.search.run_name,
+                    persist=config.search.persist,
+                    novelty_threshold=config.search.novelty_threshold,
+                    n_splits=config.search.n_splits,
+                    purge_window=config.search.purge_window,
+                    embargo_window=config.search.embargo_window,
+                    blocked_utc_hours=config.search.blocked_utc_hours,
+                )
+
+                # Optional: combine factors
+                combo_result = None
+                if config.combination.enabled:
+                    try:
+                        c = config.combination
+                        combo_result = service.combine_factors_from_db(
+                            symbols=list(config.search.symbols),
+                            start_time=_parse_iso(window["start"]),
+                            end_time=_parse_iso(window["end"]),
+                            interval=config.search.interval,
+                            min_quote_volume=config.search.min_quote_volume,
+                            blocked_utc_hours=config.search.blocked_utc_hours,
+                            method=c.method,
+                            max_factors=c.max_factors,
+                            min_abs_ic=c.min_abs_ic,
+                            max_correlation=c.max_correlation,
+                            ic_lookback=c.ic_lookback,
+                            zoo_limit=c.zoo_limit,
+                            risk_config=RiskConfig(
+                                vol_target=c.vol_target,
+                                max_drawdown=c.max_drawdown,
+                                trailing_stop_pct=c.trailing_stop_pct,
+                            ),
+                            summary_only=True,
+                        )
+                    except Exception as exc:
+                        logger.warning("alpha.auto_search combination failed: {}", exc)
 
             # Update state
             successful += 1
