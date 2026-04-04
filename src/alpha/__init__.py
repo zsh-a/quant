@@ -4,6 +4,7 @@ Merges alpha_lab (crypto, GA+LLM, compiled VM) and alpha_mining (stock, MCTS+LLM
 into a single extensible framework.
 """
 
+from .combination import FactorCombiner, FactorSignal
 from .compiler import BytecodeProgram, FormulaCompiler, Instruction
 from .dataset import AlphaDataset, CryptoMinuteDatasetLoader, StockDailyDatasetLoader
 from .dsl import ASTNode, FormulaParser, TensorSchema, TypeChecker, ValidationReport
@@ -24,6 +25,8 @@ from .risk import (
     CostModel,
     ExecutionSimulator,
     MarketContext,
+    PortfolioManager,
+    RiskConfig,
     RuleOverlay,
     SignalTransformer,
 )
@@ -54,6 +57,8 @@ __all__ = [
     "CostModel",
     "CPCVValidator",
     "CryptoMinuteDatasetLoader",
+    "FactorCombiner",
+    "FactorSignal",
     "DSLRegistry",
     "EvolutionEngine",
     "ExecutionSimulator",
@@ -69,6 +74,8 @@ __all__ = [
     "OperatorRegistry",
     "OperatorSpec",
     "PersistedRun",
+    "PortfolioManager",
+    "RiskConfig",
     "RuleOverlay",
     "SignalTransformer",
     "StackVM",

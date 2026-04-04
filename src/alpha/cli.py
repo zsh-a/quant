@@ -18,6 +18,7 @@ from src.alpha.auto_runner import (
     load_auto_search_config,
     run_auto_search_loop,
 )
+from src.alpha.risk import RiskConfig
 from src.alpha.service import AlphaService
 
 
@@ -128,6 +129,25 @@ def build_parser() -> argparse.ArgumentParser:
     list_zoo = subparsers.add_parser("list-zoo", help="List persisted alpha zoo entries")
     list_zoo.add_argument("--limit", type=int, default=50)
 
+    combine = subparsers.add_parser("combine-db", help="Combine zoo factors into a composite signal and evaluate")
+    combine.add_argument("--provider", required=True)
+    combine.add_argument("--symbols", required=True, help="Comma-separated symbols")
+    combine.add_argument("--start", required=True, help="ISO8601 start time")
+    combine.add_argument("--end", required=True, help="ISO8601 end time")
+    combine.add_argument("--interval", default="5m")
+    combine.add_argument("--min-quote-volume", type=float, default=0.0)
+    combine.add_argument("--blocked-utc-hours", default="")
+    combine.add_argument("--method", default="ic_weighted", choices=["equal", "ic_weighted", "ridge"])
+    combine.add_argument("--max-factors", type=int, default=10)
+    combine.add_argument("--min-abs-ic", type=float, default=0.01)
+    combine.add_argument("--max-correlation", type=float, default=0.70)
+    combine.add_argument("--ic-lookback", type=int, default=60)
+    combine.add_argument("--zoo-limit", type=int, default=50)
+    combine.add_argument("--vol-target", type=float, default=0.15, help="Annualized target vol (0=disabled)")
+    combine.add_argument("--max-drawdown", type=float, default=0.15, help="Max drawdown for deleveraging (0=disabled)")
+    combine.add_argument("--trailing-stop", type=float, default=0.05, help="Trailing stop pct (0=disabled)")
+    combine.add_argument("--summary-only", action="store_true")
+
     lineage = subparsers.add_parser("lineage", help="Show persisted lineage for a run")
     lineage.add_argument("--run-id", required=True)
 
@@ -202,6 +222,29 @@ def run_command(args: argparse.Namespace, service: AlphaService) -> Any:
             purge_window=args.purge_window,
             embargo_window=args.embargo_window,
             blocked_utc_hours=_parse_int_list(args.blocked_utc_hours),
+        )
+    if args.command == "combine-db":
+        risk_cfg = RiskConfig(
+            vol_target=args.vol_target,
+            max_drawdown=args.max_drawdown,
+            trailing_stop_pct=args.trailing_stop,
+        )
+        return service.combine_factors_from_db(
+            provider=args.provider,
+            symbols=_parse_symbols(args.symbols),
+            start_time=_parse_iso(args.start),
+            end_time=_parse_iso(args.end),
+            interval=args.interval,
+            min_quote_volume=args.min_quote_volume,
+            blocked_utc_hours=_parse_int_list(args.blocked_utc_hours),
+            method=args.method,
+            max_factors=args.max_factors,
+            min_abs_ic=args.min_abs_ic,
+            max_correlation=args.max_correlation,
+            ic_lookback=args.ic_lookback,
+            zoo_limit=args.zoo_limit,
+            risk_config=risk_cfg,
+            summary_only=args.summary_only,
         )
     if args.command == "auto-search-db":
         config = load_auto_search_config(args.config)

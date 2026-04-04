@@ -162,18 +162,6 @@ class OpenAILLMBackend:
             return content
 
     def _build_genesis_prompt(self, count: int) -> str:
-        features = [
-            "Close, High, Low, Open, Volume, Turnover, VWAP",
-            "FundingRate, OI, BidAskSpread",
-        ]
-        operators = [
-            "Abs(x), Log(x), Sign(x), Sqrt(x), Div(x, y)",
-            "Ts_Mean(x, d), Ts_Max(x, d), Ts_Min(x, d), Ts_Rank(x, d), StdDev(x, d), Delay(x, d), Delta(x, d), Corr(x, y, d)",
-            "Ts_Zscore(x, d), Returns_N(x, d), Log_Return(x, d), Decay_Linear(x, d)",
-            "CSRank(x), CSZScore(x), CSDemean(x)",
-            "OIDelta(OI, d), FundingDelta(FundingRate, d), SpreadRatio(BidAskSpread, Close), AdvN(Turnover, d), Amihud(Close, Turnover, d), ATR_N(High, Low, Close, d)",
-            "HLC3(High, Low, Close), OHLC4(Open, High, Low, Close), Where(cond, x, y), Clip(x, lo, hi), FillNA(x, value)",
-        ]
         return f"""
 # Role
 你是一位就职于顶级 Crypto 自营机构的资深量化研究员。你的任务是挖掘高夏普、低相关性的 Alpha 因子公式。
@@ -181,24 +169,39 @@ class OpenAILLMBackend:
 # Environment & Constraints
 你只能使用以下字段和算子。严禁发明未列出的变量或函数。
 
-## Features
-- {features[0]}
-- {features[1]}
+## Features — 核心行情
+- Close, High, Low, Open, Volume, Turnover, VWAP, BidAskSpread
+
+## Features — 成交量细节
+- TradeCount（成交笔数）, TakerBuyVolume（主动买入量）, TakerBuyQuoteVolume（主动买入额）
+
+## Features — 标记价格（公允价值）
+- MarkOpen, MarkHigh, MarkLow, MarkClose
+
+## Features — 期现基差（Premium Index = 期货 − 现货）
+- PremiumOpen, PremiumHigh, PremiumLow, PremiumClose
+
+## Features — 市场微观结构
+- FundingRate（资金费率）, OI（持仓量）, OIValue（持仓价值 = OI × 价格）
+- LongShortRatio（多空比）, TakerLongShortVolRatio（主动买卖比）
+- TopTraderLongShortRatio（大户多空比）, TopTraderLongShortPositionRatio（大户持仓多空比）
 
 ## Operators
-- {operators[0]}
-- {operators[1]}
-- {operators[2]}
-- {operators[3]}
-- {operators[4]}
-- {operators[5]}
+- Abs(x), Log(x), Sign(x), Sqrt(x), Div(x, y)
+- Ts_Mean(x, d), Ts_Max(x, d), Ts_Min(x, d), Ts_Rank(x, d), StdDev(x, d), Delay(x, d), Delta(x, d), Corr(x, y, d)
+- Ts_Zscore(x, d), Returns_N(x, d), Log_Return(x, d), Decay_Linear(x, d), Ts_EMA(x, d)
+- CSRank(x), CSZScore(x), CSDemean(x)
+- OIDelta(OI, d), FundingDelta(FundingRate, d), SpreadRatio(BidAskSpread, Close), AdvN(Turnover, d), Amihud(Close, Turnover, d), ATR_N(High, Low, Close, d)
+- HLC3(High, Low, Close), OHLC4(Open, High, Low, Close), Where(cond, x, y), Clip(x, lo, hi), FillNA(x, value)
 
 # Task
 请生成 {count} 个截然不同的 Alpha 因子，重点关注：
-1. 波动率压缩后的突破。
-2. 成交量/流动性与价格的背离。
-3. 资金费率、持仓与价格动量的结合。
-4. 价差、冲击成本与趋势的关系。
+1. 波动率压缩后的突破（ATR / StdDev 收敛 → 方向突破）。
+2. 成交量/流动性与价格的背离（TakerBuyVolume vs Close, TradeCount 异常）。
+3. 资金费率 + 持仓量 + 动量的三重共振（FundingRate × OIDelta × Returns）。
+4. 期现基差（PremiumClose）与趋势/均值回归的关系。
+5. 多空情绪极端化（LongShortRatio / TakerLongShortVolRatio 偏离均值时反转）。
+6. 大户行为信号（TopTraderLongShortRatio 变化 → 领先指标）。
 
 # Hard Rules
 1. 公式必须能被 Python ast.parse(..., mode="eval") 解析。

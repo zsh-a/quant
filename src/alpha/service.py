@@ -9,13 +9,14 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
+from .combination import FactorCombiner
 from .compiler import BytecodeProgram, FormulaCompiler
 from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
 from .dsl import TensorSchema
 from .evolution import EvolutionEngine
 from .operators import OperatorRegistry
 from .persistence import AlphaPersistence
-from .risk import CostModel, ExecutionSimulator, MarketContext, RuleOverlay, SignalTransformer
+from .risk import CostModel, ExecutionSimulator, MarketContext, PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer
 from .validation import CPCVValidator, ValidationFold
 from .vm import StackVM, TensorStore
 
@@ -53,9 +54,11 @@ class AlphaService:
         )
         self.signal_transformer = SignalTransformer()
         self.rule_overlay = RuleOverlay()
+        self.portfolio_manager = PortfolioManager()
         self.execution = ExecutionSimulator()
         self.dataset_loader = CryptoMinuteDatasetLoader()
         self.persistence = AlphaPersistence()
+        self.combiner = FactorCombiner(compiler=self.compiler, vm=self.vm, schema=self.schema)
         self.validator = CPCVValidator()
         self._program_cache_size = max(int(program_cache_size), 0)
         self._program_cache: OrderedDict[str, BytecodeProgram] = OrderedDict()
@@ -690,6 +693,125 @@ class AlphaService:
         )
         if persisted_run_id is not None:
             self.persistence.update_run(persisted_run_id, result)
+        return result
+
+    def combine_factors_from_db(
+        self,
+        provider: str,
+        symbols: list[str],
+        start_time: datetime,
+        end_time: datetime,
+        interval: str = "5m",
+        min_quote_volume: float = 0.0,
+        blocked_utc_hours: list[int] | None = None,
+        method: str = "ic_weighted",
+        max_factors: int = 10,
+        min_abs_ic: float = 0.01,
+        max_correlation: float = 0.70,
+        ic_lookback: int = 60,
+        zoo_limit: int = 50,
+        risk_config: RiskConfig | None = None,
+        summary_only: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Load market data, pick factors from zoo, combine, apply risk management, and evaluate.
+        """
+        overall_start = perf_counter()
+
+        # 1. Load dataset
+        dataset = self.dataset_loader.load(
+            provider=provider,
+            symbols=symbols,
+            start_time=start_time,
+            end_time=end_time,
+            interval=interval,
+            min_quote_volume=min_quote_volume,
+            blocked_utc_hours=blocked_utc_hours,
+        )
+        load_seconds = perf_counter() - overall_start
+
+        # 2. Load zoo entries
+        zoo_entries = self.persistence.list_zoo_entries(limit=zoo_limit)
+        if not zoo_entries:
+            raise ValueError("Alpha zoo is empty — run search-db first to populate it")
+
+        # 3. Select & combine
+        combo_result = self.combiner.combine_from_zoo(
+            zoo_entries=zoo_entries,
+            dataset=dataset,
+            method=method,
+            max_factors=max_factors,
+            min_abs_ic=min_abs_ic,
+            max_correlation=max_correlation,
+            ic_lookback=ic_lookback,
+        )
+        combined_signal = combo_result["combined_signal"]
+
+        # 4. Signal → weights → rule overlay
+        store = TensorStore(dataset.fields)
+        market_ctx = MarketContext(
+            liquidity_mask=dataset.liquidity_mask,
+            session_mask=dataset.session_mask,
+        )
+        target_weights = self.signal_transformer.to_target_weights(combined_signal, market_ctx)
+        wrapped_weights = self.rule_overlay.apply(target_weights, market_ctx)
+
+        # 5. Portfolio risk management (vol targeting, drawdown control, trailing stop)
+        risk_cfg = risk_config or RiskConfig()
+        close_np = np.asarray(store.get_field("close"), dtype=float)
+        managed_weights = self.portfolio_manager.apply(wrapped_weights, close_np, risk_cfg)
+
+        # 6. Execute
+        bt_result = self.execution.simulate(
+            managed_weights,
+            {"close": store.get_field("close"), "bid_ask_spread": store.get_field("bid_ask_spread")},
+            CostModel(),
+            funding_rate=store.get_field("funding_rate"),
+        )
+
+        # 7. Metrics
+        fwd = np.zeros_like(close_np)
+        fwd[:-1] = close_np[1:] / (close_np[:-1] + 1e-12) - 1.0
+        fwd = np.clip(fwd, -0.5, 0.5)
+        from .evaluation import compute_rank_ic
+        rank_ic = compute_rank_ic(combined_signal[:-1], fwd[:-1])
+
+        result: dict[str, Any] = {
+            "dataset": self._dataset_summary(dataset),
+            "combination": {
+                "method": method,
+                "selected_factors": combo_result["selected_factors"],
+                "factor_count": len(combo_result["selected_factors"]),
+            },
+            "risk_config": {
+                "vol_target": risk_cfg.vol_target,
+                "max_drawdown": risk_cfg.max_drawdown,
+                "trailing_stop_pct": risk_cfg.trailing_stop_pct,
+            },
+            "metrics": {
+                **bt_result.summary(),
+                "rank_ic": float(rank_ic),
+            },
+            "timing": {
+                "dataset_load_seconds": load_seconds,
+                **combo_result["timing"],
+                "overall_seconds": perf_counter() - overall_start,
+            },
+        }
+        if not summary_only:
+            result["equity_series"] = bt_result.equity_curve.tolist()[-20:]
+            result["turnover_series"] = bt_result.turnover.tolist()[-20:]
+
+        logger.info(
+            "alpha.combine_factors complete method={} factors={} sharpe={:.4f} rank_ic={:.4f} "
+            "max_dd={:.4f} overall={:.3f}s",
+            method,
+            len(combo_result["selected_factors"]),
+            float(bt_result.summary().get("sharpe", 0)),
+            float(rank_ic),
+            float(bt_result.summary().get("max_drawdown", 0)),
+            result["timing"]["overall_seconds"],
+        )
         return result
 
     def evaluate_formula_across_splits(

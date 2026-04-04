@@ -231,6 +231,117 @@ class RuleOverlay:
         return weights
 
 
+@dataclass
+class RiskConfig:
+    """Portfolio-level risk management configuration."""
+
+    vol_target: float = 0.15
+    """Annualized target volatility. 0 = disabled."""
+
+    vol_lookback: int = 60
+    """Bars for realized vol estimation."""
+
+    max_drawdown: float = 0.15
+    """Drawdown threshold for proportional deleveraging. 0 = disabled."""
+
+    trailing_stop_pct: float = 0.05
+    """Trailing stop on equity curve. 0 = disabled."""
+
+    trailing_stop_cooldown: int = 12
+    """Bars to stay flat after trailing stop triggers."""
+
+    bars_per_year: float = 365.25 * 24 * 12
+    """Annualization factor (default: 5-minute bars)."""
+
+
+class PortfolioManager:
+    """
+    Dynamic position management layer.
+
+    Sits between RuleOverlay and ExecutionSimulator.  Walks forward bar-by-bar,
+    computing a virtual equity curve from weights × forward returns, and applies:
+
+    1. **Volatility targeting** — scale weights so the portfolio's rolling realised
+       vol matches ``vol_target``.
+    2. **Drawdown control** — linearly deleverage when cumulative drawdown from
+       peak exceeds ``max_drawdown``.
+    3. **Trailing stop** — zero all weights when equity drops more than
+       ``trailing_stop_pct`` from peak; stay flat for ``cooldown`` bars.
+    """
+
+    def apply(
+        self,
+        weights: np.ndarray,
+        close: np.ndarray,
+        config: RiskConfig,
+    ) -> np.ndarray:
+        weights = np.asarray(weights, dtype=float).copy()
+        close = np.asarray(close, dtype=float)
+        n_time = weights.shape[0]
+        if n_time < 2:
+            return weights
+
+        # Forward returns for virtual equity tracking
+        fwd = np.zeros_like(close)
+        fwd[:-1] = close[1:] / (close[:-1] + 1e-12) - 1.0
+        fwd = np.clip(fwd, -0.5, 0.5)
+
+        # Pre-compute rolling realised vol (annualised) for vol targeting
+        vol_scale = np.ones(n_time, dtype=float)
+        if config.vol_target > 0 and config.vol_lookback > 1:
+            port_ret = np.nansum(weights * fwd, axis=1)
+            vol_scale = self._rolling_vol_scale(port_ret, config)
+
+        # Walk forward: apply vol scaling, then drawdown + trailing stop
+        equity = 1.0
+        peak_equity = 1.0
+        stop_cooldown = 0
+
+        for t in range(n_time):
+            # 1) Volatility scaling
+            weights[t] *= vol_scale[t]
+
+            # 2) Trailing stop (higher priority — full exit)
+            if stop_cooldown > 0:
+                weights[t] = 0.0
+                stop_cooldown -= 1
+            elif config.trailing_stop_pct > 0:
+                dd = 1.0 - equity / (peak_equity + 1e-12)
+                if dd > config.trailing_stop_pct:
+                    weights[t] = 0.0
+                    stop_cooldown = config.trailing_stop_cooldown
+
+            # 3) Drawdown control (proportional deleveraging)
+            if config.max_drawdown > 0 and stop_cooldown == 0:
+                dd = 1.0 - equity / (peak_equity + 1e-12)
+                if dd > config.max_drawdown * 0.5:
+                    lever = max(1.0 - dd / config.max_drawdown, 0.0)
+                    weights[t] *= lever
+
+            # Update virtual equity
+            bar_ret = float(np.nansum(weights[t] * fwd[t]))
+            equity *= (1.0 + bar_ret)
+            if equity > peak_equity:
+                peak_equity = equity
+
+        return weights
+
+    def _rolling_vol_scale(self, port_returns: np.ndarray, config: RiskConfig) -> np.ndarray:
+        """Compute per-bar scaling factor: vol_target / realized_vol."""
+        n = len(port_returns)
+        scale = np.ones(n, dtype=float)
+        lookback = config.vol_lookback
+        ann_factor = np.sqrt(config.bars_per_year)
+
+        for t in range(lookback, n):
+            window = port_returns[t - lookback : t]
+            realised_vol = float(np.nanstd(window)) * ann_factor
+            if realised_vol > 1e-6:
+                raw = config.vol_target / realised_vol
+                scale[t] = np.clip(raw, 0.1, 3.0)  # prevent extreme leverage
+        return scale
+
+
 class ExecutionSimulator:
     def simulate(
         self,

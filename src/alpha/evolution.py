@@ -102,11 +102,13 @@ class HeuristicLLMBackend:
         self.call_stats["initial_population_calls"] += 1
         seeds = [
             "cs_rank(ts_mean(close, 5) - close)",
-            # "cs_rank(ts_std(close, 10))",
-            # "cs_rank(volatility_n(close, 20))",
-            # "cs_rank(adv_n(turnover, 10) - amihud(close, turnover, 5))",
-            # "cs_rank(atr_n(high, low, close, 14) - decay_linear(close, 5))",
-            # "cs_rank(ts_corr(close, volume, 10))",
+            "cs_rank(ts_std(close, 10))",
+            "cs_rank(delta(premium_close, 5))",
+            "cs_rank(ts_zscore(funding_rate, 20))",
+            "cs_rank(delta(open_interest, 10) - ts_mean(delta(open_interest, 10), 20))",
+            "cs_rank(ts_zscore(long_short_ratio, 20))",
+            "cs_rank(div(taker_buy_volume, volume + 1e-12) - 0.5)",
+            "cs_rank(ts_corr(close, taker_buy_volume, 10))",
         ]
         generated: list[str] = []
         attempts = 0
@@ -125,11 +127,17 @@ class HeuristicLLMBackend:
             ("ts_max(", "ts_rank("),
             ("ts_rank(", "ts_mean("),
             ("close", "vwap"),
+            ("close", "mark_close"),
             ("volume", "turnover"),
+            ("volume", "taker_buy_volume"),
             ("close", "hlc3(high, low, close)"),
             ("turnover", "adv_n(turnover, 5)"),
             ("close", "ohlc4(open, high, low, close)"),
             ("volatility_n(close, 20)", "atr_n(high, low, close, 14)"),
+            ("funding_rate", "ts_zscore(funding_rate, 20)"),
+            ("open_interest", "delta(open_interest, 5)"),
+            ("close", "premium_close"),
+            ("volume", "trade_count"),
         ]
         offset = self._stable_index(formula, len(replacements), salt=f"mutate:{variant}")
         for idx in range(len(replacements)):
@@ -149,6 +157,12 @@ class HeuristicLLMBackend:
             f"cs_rank(({formula}) + ts_corr(close, volume, 10))",
             f"cs_rank(({formula}) - ts_rank(turnover, 20))",
             f"cs_rank(decay_linear(({formula}), 5) + ts_mean(volume, 10))",
+            # New-field-aware wrappers
+            f"cs_rank(({formula}) + delta(premium_close, 5))",
+            f"cs_rank(({formula}) - ts_zscore(funding_rate, 20))",
+            f"cs_rank(({formula}) + ts_zscore(long_short_ratio, 20))",
+            f"cs_rank(({formula}) + delta(open_interest, 10))",
+            f"cs_rank(({formula}) - ts_rank(taker_buy_volume, 10))",
         ]
         if "turnover" in objective.lower():
             wrappers.extend(

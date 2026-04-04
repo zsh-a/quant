@@ -10,6 +10,7 @@ import yaml
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from .risk import RiskConfig
 from .service import AlphaService
 
 
@@ -67,9 +68,25 @@ class AutoSearchRuntimeConfig(BaseModel):
     max_zoo_entries: int | None = None
 
 
+class AutoSearchCombinationConfig(BaseModel):
+    """Post-search factor combination settings."""
+
+    enabled: bool = False
+    method: str = "ic_weighted"
+    max_factors: int = 10
+    min_abs_ic: float = 0.01
+    max_correlation: float = 0.70
+    ic_lookback: int = 60
+    zoo_limit: int = 50
+    vol_target: float = 0.15
+    max_drawdown: float = 0.15
+    trailing_stop_pct: float = 0.05
+
+
 class AutoSearchConfig(BaseModel):
     window: AutoSearchWindowConfig = Field(default_factory=AutoSearchWindowConfig)
     search: AutoSearchSearchConfig
+    combination: AutoSearchCombinationConfig = Field(default_factory=AutoSearchCombinationConfig)
     runtime: AutoSearchRuntimeConfig = Field(default_factory=AutoSearchRuntimeConfig)
 
 
@@ -187,6 +204,42 @@ def run_auto_search_loop(
                 embargo_window=config.search.embargo_window,
                 blocked_utc_hours=config.search.blocked_utc_hours,
             )
+            # Post-search: combine factors from zoo if enabled
+            combo_result: dict[str, Any] | None = None
+            if config.combination.enabled:
+                try:
+                    combo_cfg = config.combination
+                    risk_cfg = RiskConfig(
+                        vol_target=combo_cfg.vol_target,
+                        max_drawdown=combo_cfg.max_drawdown,
+                        trailing_stop_pct=combo_cfg.trailing_stop_pct,
+                    )
+                    combo_result = service.combine_factors_from_db(
+                        provider=config.search.provider,
+                        symbols=list(config.search.symbols),
+                        start_time=_parse_iso(window["start"]),
+                        end_time=_parse_iso(window["end"]),
+                        interval=config.search.interval,
+                        min_quote_volume=config.search.min_quote_volume,
+                        blocked_utc_hours=config.search.blocked_utc_hours,
+                        method=combo_cfg.method,
+                        max_factors=combo_cfg.max_factors,
+                        min_abs_ic=combo_cfg.min_abs_ic,
+                        max_correlation=combo_cfg.max_correlation,
+                        ic_lookback=combo_cfg.ic_lookback,
+                        zoo_limit=combo_cfg.zoo_limit,
+                        risk_config=risk_cfg,
+                        summary_only=True,
+                    )
+                    logger.info(
+                        "alpha.auto_search combination_complete factors={} sharpe={:.4f} max_dd={:.4f}",
+                        combo_result.get("combination", {}).get("factor_count", 0),
+                        combo_result.get("metrics", {}).get("sharpe", 0),
+                        combo_result.get("metrics", {}).get("max_drawdown", 0),
+                    )
+                except Exception as exc:
+                    logger.warning("alpha.auto_search combination_failed: {}", exc)
+
             successful_cycles += 1
             state["successful_cycles"] = successful_cycles
             state["consecutive_failures"] = 0
@@ -195,6 +248,11 @@ def run_auto_search_loop(
             state["last_success_at"] = datetime.now(UTC).isoformat()
             state["last_run_id"] = result.get("persistence", {}).get("run_id")
             state["carryover_entries"] = _build_carryover_entries(result, config.search.carryover_top_k)
+            if combo_result:
+                state["last_combination"] = {
+                    "metrics": combo_result.get("metrics"),
+                    "factor_count": combo_result.get("combination", {}).get("factor_count"),
+                }
             state["updated_at"] = datetime.now(UTC).isoformat()
             _save_state(state_path, state)
             retention = _apply_retention(config, service)
@@ -209,6 +267,7 @@ def run_auto_search_loop(
                 "top_fitness": top_results[0].get("fitness") if top_results else None,
                 "top_result_count": len(top_results),
                 "run_id": result.get("persistence", {}).get("run_id"),
+                "combination": combo_result.get("metrics") if combo_result else None,
                 "timing": result.get("timing", {}),
                 "validation": result.get("validation", {}),
                 "retention": retention,

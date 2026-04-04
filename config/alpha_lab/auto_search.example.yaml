@@ -4,7 +4,7 @@ window:
   step_minutes: 60
 
 search:
-  provider: bitget
+  provider: binance
   symbols:
     - BTCUSDT
     - ETHUSDT
@@ -27,7 +27,8 @@ search:
   seeds:
     - CSRank(ts_mean(close, 5) - close)
     - CSRank(ts_std(close, 10))
-    - CSRank(volatility_n(close, 20))
+    - CSRank(delta(premium_close, 5))
+    - CSRank(ts_zscore(funding_rate, 20))
   seed_zoo_limit: 5
   feedback_seed_count: 2
   feedback_objective: improve robustness and reduce turnover
@@ -36,6 +37,20 @@ search:
   llm_model:
   llm_base_url:
   llm_api_key:
+
+# Post-search factor combination (runs after each search cycle)
+combination:
+  enabled: true
+  method: ic_weighted        # equal | ic_weighted | ridge
+  max_factors: 10
+  min_abs_ic: 0.01
+  max_correlation: 0.70
+  ic_lookback: 60
+  zoo_limit: 50
+  # Risk management
+  vol_target: 0.15           # Annualized target volatility (0 = disabled)
+  max_drawdown: 0.15         # Drawdown threshold for deleveraging (0 = disabled)
+  trailing_stop_pct: 0.05    # Trailing stop on equity curve (0 = disabled)
 
 runtime:
   poll_interval_seconds: 300
