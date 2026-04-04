@@ -654,6 +654,13 @@ def run_simulation_job_task(
         engine = TradingEngine(strategy=strategy, broker=broker, data_stream=stream, on_step=on_step)
         engine.run()
 
+        # Flush session logs so the final strategy entries are persisted before
+        # we mark the run as completed (avoids the frontend missing tail logs).
+        from src.utils.session_logger import get_session_logger as _get_sl
+        _sl = _get_sl(session_id, create=False)
+        if _sl:
+            _sl.flush(force=True)
+
         account = broker.get_account_info()
         if broker.equity_history:
             session_db.add_equity_points(session_id, broker.equity_history)

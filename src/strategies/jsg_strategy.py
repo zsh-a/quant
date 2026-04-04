@@ -335,6 +335,8 @@ class JSGStrategy(Strategy):
 
         self._log(f"调仓: 目标={target}, 当前持仓={hold_list}")
 
+        submitted_orders = []  # Track orders submitted during rebalance
+
         # Sell stocks not in target (full liquidation)
         for stock in hold_list:
             if stock not in target:
@@ -345,7 +347,8 @@ class JSGStrategy(Strategy):
                     action="sell_all",
                 )
                 if qty > 0:
-                    self.sell(stock, qty)
+                    order_id = self.sell(stock, qty)
+                    submitted_orders.append(f"卖出 {stock} x{qty}")
                     self._trailing_highs.pop(stock, None)
 
         # Buy target stocks (or adjust position size)
@@ -376,6 +379,11 @@ class JSGStrategy(Strategy):
                     delta=delta,
                 )
                 if delta > 0:
-                    self.buy(code, delta)
+                    order_id = self.buy(code, delta)
+                    submitted_orders.append(f"买入 {code} x{delta} @{price:.2f}")
                 elif delta < 0:
-                    self.sell(code, abs(delta))
+                    order_id = self.sell(code, abs(delta))
+                    submitted_orders.append(f"卖出 {code} x{abs(delta)} @{price:.2f}")
+
+        if submitted_orders:
+            self._log(f"提交NEXT_OPEN订单({len(submitted_orders)}笔): {submitted_orders}")

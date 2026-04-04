@@ -311,6 +311,8 @@ class MultiFactorStrategy(Strategy):
         account = self.engine.broker.get_account_info()
         hold_list = list(account["positions"].keys())
 
+        submitted_orders = []
+
         # Sell stocks not in target
         for stock in hold_list:
             if stock not in target_stocks:
@@ -318,10 +320,13 @@ class MultiFactorStrategy(Strategy):
                 if qty > 0:
                     self._log(f"清仓 {stock}: qty={qty}", stock=stock)
                     self.sell(stock, qty)
+                    submitted_orders.append(f"卖出 {stock} x{qty}")
 
         # Buy target stocks with equal weight
         total_equity = account["total_equity"]
         if not target_stocks:
+            if submitted_orders:
+                self._log(f"提交NEXT_OPEN订单({len(submitted_orders)}笔): {submitted_orders}")
             return
 
         val_per_stock = (total_equity * 0.95) / len(target_stocks)
@@ -343,6 +348,11 @@ class MultiFactorStrategy(Strategy):
             if delta > 0:
                 self._log(f"买入 {code}: {delta}股 @ {price:.2f}")
                 self.buy(code, delta)
+                submitted_orders.append(f"买入 {code} x{delta} @{price:.2f}")
             elif delta < 0:
                 self._log(f"卖出 {code}: {abs(delta)}股 @ {price:.2f}")
                 self.sell(code, abs(delta))
+                submitted_orders.append(f"卖出 {code} x{abs(delta)} @{price:.2f}")
+
+        if submitted_orders:
+            self._log(f"提交NEXT_OPEN订单({len(submitted_orders)}笔): {submitted_orders}")

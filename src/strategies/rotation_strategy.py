@@ -289,12 +289,15 @@ class RotationStrategy(Strategy):
         elif self.timing == "OPEN" and is_live:
             exec_type = "IMMEDIATE_OPEN"
 
+        submitted_orders = []
+
         for stock in hold_list:
             if stock not in target:
                 qty = account["positions"][stock]
                 if qty > 0:
                     self._log(f"清仓 {stock}: qty={qty}")
                     self.sell(stock, qty, execution_type=exec_type)
+                    submitted_orders.append(f"卖出 {stock} x{qty}")
 
         total_equity = account["total_equity"]
         if target:
@@ -309,8 +312,15 @@ class RotationStrategy(Strategy):
 
                 curr_qty = account["positions"].get(code, 0)
                 if target_qty > curr_qty:
-                    self._log(f"买入 {code}: {target_qty - curr_qty}股")
-                    self.buy(code, target_qty - curr_qty, execution_type=exec_type)
+                    delta = target_qty - curr_qty
+                    self._log(f"买入 {code}: {delta}股")
+                    self.buy(code, delta, execution_type=exec_type)
+                    submitted_orders.append(f"买入 {code} x{delta} @{price:.2f}")
                 elif target_qty < curr_qty:
-                    self._log(f"卖出 {code}: {curr_qty - target_qty}股")
-                    self.sell(code, curr_qty - target_qty, execution_type=exec_type)
+                    delta = curr_qty - target_qty
+                    self._log(f"卖出 {code}: {delta}股")
+                    self.sell(code, delta, execution_type=exec_type)
+                    submitted_orders.append(f"卖出 {code} x{delta} @{price:.2f}")
+
+        if submitted_orders:
+            self._log(f"提交{exec_type}订单({len(submitted_orders)}笔): {submitted_orders}")

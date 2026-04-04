@@ -20,6 +20,7 @@ from typing import Any
 from src.market_data.crypto_pipeline import CryptoMinuteSyncService
 
 DEFAULT_HISTORY_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "DOGEUSDT"]
+DEFAULT_VISION_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEUSDT"]
 DEFAULT_HISTORY_START = "2020-01-01T00:00:00+00:00"
 
 
@@ -94,6 +95,26 @@ def build_parser() -> argparse.ArgumentParser:
     coverage_parser.add_argument("--interval", default="1m", help="Bar interval")
     coverage_parser.add_argument("--limit", type=int, default=100, help="Max rows to return")
 
+    # ── Binance Vision (data.binance.vision USD-M futures bulk data) ──
+    vision_sync_parser = subparsers.add_parser(
+        "vision-sync",
+        help="Sync USD-M futures data from data.binance.vision (klines+premium+mark+metrics+funding)",
+    )
+    vision_sync_parser.add_argument(
+        "--symbols",
+        default=",".join(DEFAULT_VISION_SYMBOLS),
+        help="Comma-separated symbols",
+    )
+    vision_sync_parser.add_argument("--interval", default="5m", help="Kline interval (default: 5m)")
+    vision_sync_parser.add_argument("--start", default=None, help="Start date, e.g. 2020-01-01")
+    vision_sync_parser.add_argument("--end", default=None, help="End date")
+    vision_sync_parser.add_argument("--verbose", "-v", action="store_true", help="Print per-period progress")
+
+    vision_status_parser = subparsers.add_parser(
+        "vision-status", help="Show binance-vision futures sync status per symbol"
+    )
+    vision_status_parser.add_argument("--symbols", default=None, help="Comma-separated symbols")
+
     return parser
 
 
@@ -141,7 +162,39 @@ def run_command(args: argparse.Namespace, service: CryptoMinuteSyncService) -> A
         return service.get_overview()
     if args.command == "coverage":
         return {"coverage": service.get_coverage(interval=args.interval, limit=args.limit)}
+    if args.command == "vision-sync":
+        return _run_vision_sync(args)
+    if args.command == "vision-status":
+        return _run_vision_status(args)
     raise ValueError(f"Unsupported command: {args.command}")
+
+
+def _run_vision_sync(args) -> Any:
+    from src.market_data.binance_vision import BinanceVisionSyncer
+
+    syncer = BinanceVisionSyncer()
+    symbols = _parse_symbols(args.symbols)
+
+    def _progress(e: dict) -> None:
+        print(
+            f"  [{e['symbol']}] {e['period']}  {e['progress']}"
+            f"  rows={e['rows']}  +{e['new']}  total={e['total_new']}"
+        )
+
+    return syncer.sync(
+        symbols=symbols,
+        interval=args.interval,
+        start=args.start,
+        end=getattr(args, "end", None),
+        progress=_progress if args.verbose else None,
+    )
+
+
+def _run_vision_status(args) -> Any:
+    from src.market_data.binance_vision import BinanceVisionSyncer
+
+    syncer = BinanceVisionSyncer()
+    return syncer.status(symbols=_parse_symbols(getattr(args, "symbols", None)))
 
 
 def _build_progress_callback(verbose: bool):

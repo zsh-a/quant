@@ -442,6 +442,21 @@ class BacktestBroker(Broker):
             self.last_prices[sym] = bar.close
 
     def get_state_snapshot(self, last_processed_at: str | None = None) -> Dict[str, Any]:
+        # Serialize pending orders (e.g. NEXT_OPEN orders awaiting execution)
+        pending_orders = []
+        for order_id, order in self.orders.items():
+            if order.status in ("PENDING", "SUBMITTED"):
+                pending_orders.append({
+                    "id": order.id,
+                    "symbol": order.symbol,
+                    "type": order.type,
+                    "quantity": order.quantity,
+                    "price": order.price,
+                    "execution_type": order.execution_type,
+                    "status": order.status,
+                    "created_at": order.created_at.isoformat() if order.created_at else None,
+                })
+
         return {
             "cash": float(self.cash),
             "initial_cash": float(self.initial_cash),
@@ -452,6 +467,7 @@ class BacktestBroker(Broker):
             "last_prices": {k: float(v) for k, v in self.last_prices.items()},
             "last_equity": float(self._last_equity),
             "last_processed_at": last_processed_at,
+            "pending_orders": pending_orders,
         }
 
     def restore_from_snapshot(self, snapshot: Dict[str, Any]):
@@ -465,6 +481,22 @@ class BacktestBroker(Broker):
         self.position_costs = {k: float(v) for k, v in (snapshot.get("position_costs") or {}).items()}
         self.last_prices = {k: float(v) for k, v in (snapshot.get("last_prices") or {}).items()}
         self._last_equity = float(snapshot.get("last_equity", self.cash))
+
+        # Restore pending orders (e.g. NEXT_OPEN orders from previous run)
+        for order_data in snapshot.get("pending_orders") or []:
+            order = Order(
+                symbol=order_data["symbol"],
+                type=order_data["type"],
+                quantity=order_data["quantity"],
+                price=order_data.get("price"),
+                execution_type=order_data.get("execution_type", "NEXT_OPEN"),
+            )
+            order.id = order_data["id"]
+            order.status = order_data.get("status", "SUBMITTED")
+            if order_data.get("created_at"):
+                order.created_at = datetime.fromisoformat(order_data["created_at"])
+            self.orders[order.id] = order
+            logger.info(f"Restored pending order: {order.type} {order.symbol} qty={order.quantity} exec={order.execution_type}")
 
     def get_report(self):
         if not self.equity_history:
