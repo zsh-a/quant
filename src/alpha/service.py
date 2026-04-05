@@ -49,7 +49,8 @@ class AlphaService:
         llm_base_url: str | None = None,
         llm_api_key: str | None = None,
         program_cache_size: int = 512,
-        enable_mcts: bool = False,
+        strategy: str = "evolution",
+        neural_sample_batch: int = 512,
         mcts_refinement_frequency: int = 3,
         strategy_memory_path: str | None = "data/alpha_lab/strategy_memory.json",
     ):
@@ -86,28 +87,10 @@ class AlphaService:
         )
         self.llm_backend = resolved_llm
 
-        # --- Assemble strategies ---
-        from .search_strategy import EnumerationStrategy
-        strategies: list = [
-            EnumerationStrategy(),  # bulk seeding on round 0
-            LLMEvolutionStrategy(llm_backend=resolved_llm),
-        ]
-
-        if enable_mcts:
-            from .mcts import MCTSEngine, MCTSLLMAdapter
-            llm_adapter = MCTSLLMAdapter(resolved_llm)
-            mcts_engine = MCTSEngine(
-                compiler=self.compiler,
-                vm=self.vm,
-                schema=self.schema,
-                llm_agent=llm_adapter,
-            )
-            strategies.append(
-                MCTSRefinementStrategy(
-                    mcts_engine=mcts_engine,
-                    activation_frequency=mcts_refinement_frequency,
-                ),
-            )
+        # --- Assemble strategies by mode ---
+        strategies: list = self._build_strategies(
+            strategy, resolved_llm, neural_sample_batch, mcts_refinement_frequency,
+        )
 
         # --- Search orchestrator ---
         self.search_engine = SearchOrchestrator(
@@ -132,6 +115,58 @@ class AlphaService:
         self._program_cache: OrderedDict[str, BytecodeProgram] = OrderedDict()
         self._program_cache_lock = threading.Lock()
         self._complexity_cache: dict[str, dict[str, float]] = {}
+
+    # ------------------------------------------------------------------
+    # Strategy assembly
+    # ------------------------------------------------------------------
+
+    _STRATEGY_MODES = ("evolution", "neural", "full")
+
+    def _build_strategies(
+        self,
+        mode: str,
+        llm_backend: Any,
+        neural_sample_batch: int,
+        mcts_frequency: int,
+    ) -> list:
+        from .search_strategy import EnumerationStrategy
+        from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy, NeuralFormulaStrategy
+
+        if mode not in self._STRATEGY_MODES:
+            raise ValueError(
+                f"Unknown strategy mode {mode!r}, choose from {self._STRATEGY_MODES}"
+            )
+
+        if mode == "neural":
+            return [
+                NeuralFormulaStrategy(
+                    registry=self.registry,
+                    schema=self.schema,
+                    sample_batch=neural_sample_batch,
+                    min_round=0,
+                ),
+            ]
+
+        # evolution (default) or full
+        strategies: list = [
+            EnumerationStrategy(),
+            LLMEvolutionStrategy(llm_backend=llm_backend),
+        ]
+        if mode == "full":
+            from .mcts import MCTSEngine, MCTSLLMAdapter
+            llm_adapter = MCTSLLMAdapter(llm_backend)
+            mcts_engine = MCTSEngine(
+                compiler=self.compiler, vm=self.vm,
+                schema=self.schema, llm_agent=llm_adapter,
+            )
+            strategies.append(MCTSRefinementStrategy(
+                mcts_engine=mcts_engine, activation_frequency=mcts_frequency,
+            ))
+            strategies.append(NeuralFormulaStrategy(
+                registry=self.registry, schema=self.schema,
+                sample_batch=neural_sample_batch,
+            ))
+        return strategies
 
     def list_operators(self) -> list[dict[str, Any]]:
         return [asdict(spec) for spec in self.registry.list_operators()]

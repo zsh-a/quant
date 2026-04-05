@@ -40,7 +40,7 @@ from .risk import (
 )
 from .search_strategy import SearchContext, SearchOrchestrator, SearchStrategy
 from .service import AlphaService
-from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy
+from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy, NeuralFormulaStrategy
 from .strategy_memory import StrategyMemory
 from .tracing import InMemoryCollector, LangfuseCollector, Span, SpanCollector, tracer
 from .validation import CPCVValidator, ValidationFold
@@ -90,6 +90,7 @@ __all__ = [
     "MCTSEngine",
     "MCTSLLMAdapter",
     "MCTSRefinementStrategy",
+    "NeuralFormulaStrategy",
     "OperatorRegistry",
     "OperatorSpec",
     "PersistedRun",

@@ -87,6 +87,9 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--no-persist", action="store_true")
     search.add_argument("--llm-backend", default="auto", choices=["auto", "heuristic", "openai"])
     search.add_argument("--llm-model", default=None)
+    search.add_argument("--strategy", default="evolution", choices=["evolution", "neural", "full"],
+                        help="Search algorithm: evolution (LLM+enum), neural (Transformer+RL), full (all)")
+    search.add_argument("--neural-batch", type=int, default=512)
 
     # -- combine --
     combine = sub.add_parser("combine", help="Combine zoo factors into composite signal")
@@ -225,6 +228,8 @@ def main(argv: list[str] | None = None, service: AlphaService | None = None) -> 
         service = AlphaService(
             llm_backend_name=getattr(args, "llm_backend", "auto"),
             llm_model=getattr(args, "llm_model", None),
+            strategy=getattr(args, "strategy", "evolution"),
+            neural_sample_batch=getattr(args, "neural_batch", 512),
         )
 
     result = run_command(args, service)

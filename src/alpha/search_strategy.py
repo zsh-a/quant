@@ -7,6 +7,7 @@ SearchOrchestrator that manages multiple strategies in a unified loop.
 Current strategies:
   - LLMEvolutionStrategy (strategies/llm_evolution.py)
   - MCTSRefinementStrategy (strategies/mcts_refinement.py)
+  - NeuralFormulaStrategy (strategies/neural_formula.py)
 
 Future strategies (each just implements the same 4-method interface):
   - DAGEvolutionStrategy (AlphaPROBE)
