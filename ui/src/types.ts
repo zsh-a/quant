@@ -286,10 +286,27 @@ export interface AlphaLabWorkspaceDefaults {
     sample_formulas: string[];
 }
 
+export interface AlphaLabTrainingSnapshot {
+    round: number;
+    step: number;
+    loss: number;
+    avg_reward: number;
+    best_reward: number;
+    valid_ratio: number;
+    unique: number;
+    best_formula: string;
+}
+
+export interface AlphaLabTrainingHistory {
+    history: AlphaLabTrainingSnapshot[];
+    plot_available: boolean;
+}
+
 export interface AlphaLabWorkspace {
     operators: AlphaLabOperator[];
     defaults: AlphaLabWorkspaceDefaults;
     runs: AlphaLabRunSummary[];
     zoo: AlphaLabZooEntry[];
     engine?: AlphaLabEngineInfo;
+    strategy_modes?: string[];
 }

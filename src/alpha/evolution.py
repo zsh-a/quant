@@ -8,7 +8,7 @@ from typing import Any, Protocol
 import numpy as np
 from loguru import logger
 
-from .compiler import FormulaCompiler
+from .compiler import BytecodeProgram, FormulaCompiler
 from .dsl import TensorSchema
 from .operators import OperatorRegistry
 

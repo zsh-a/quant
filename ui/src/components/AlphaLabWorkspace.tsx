@@ -33,6 +33,7 @@ import type {
   AlphaLabRunDetail,
   AlphaLabSearchJob,
   AlphaLabSeriesPoint,
+  AlphaLabTrainingSnapshot,
   AlphaLabValidationReport,
   AlphaLabWorkspace as WorkspacePayload,
   AlphaLabZooEntry,
@@ -63,7 +64,7 @@ const TRACING_POLL_MS = 10_000
 
 /* ── helpers ──────────────────────────────────────────────────────────── */
 
-type Tab = 'workbench' | 'zoo' | 'runs' | 'combine' | 'tracing'
+type Tab = 'workbench' | 'zoo' | 'runs' | 'combine' | 'tracing' | 'neural'
 
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
   const r = await fetch(`${API_BASE}${path}`, init)
@@ -178,6 +179,9 @@ export const AlphaLabWorkspace: React.FC = () => {
   const [gens, setGens] = useState(3)
   const [topK, setTopK] = useState(5)
   const [nSplits, setNSplits] = useState(5)
+  const [strategy, setStrategy] = useState<string>('evolution')
+  const [neuralBatch, setNeuralBatch] = useState(4096)
+  const [trainingHistory, setTrainingHistory] = useState<AlphaLabTrainingSnapshot[] | null>(null)
   const searchPollRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null)
 
   // ���─ runs ──
@@ -262,11 +266,12 @@ export const AlphaLabWorkspace: React.FC = () => {
       const r = await api<{ job_id: string; status: string }>('/alpha-lab/search-db', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ symbols: symList(), start_time: toISO(startTime), end_time: toISO(endTime), interval, seeds,
-          population_size: popSize, offspring_count: offspring, generations: gens, top_k: topK, n_splits: nSplits, persist: true }),
+          population_size: popSize, offspring_count: offspring, generations: gens, top_k: topK, n_splits: nSplits, persist: true,
+          strategy, neural_batch: neuralBatch }),
       })
       setSearchJob({ job_id: r.job_id, status: 'pending' })
     } catch (e) { setErr(e instanceof Error ? e.message : 'Search submit failed') }
-  }, [formula, interval, symbols, startTime, endTime, searchSeeds, popSize, offspring, gens, topK, nSplits, symList])
+  }, [formula, interval, symbols, startTime, endTime, searchSeeds, popSize, offspring, gens, topK, nSplits, symList, strategy, neuralBatch])
 
   // Poll search job status
   useEffect(() => {
@@ -316,11 +321,21 @@ export const AlphaLabWorkspace: React.FC = () => {
     } catch { /* ignore */ }
   }, [])
 
+  const loadTrainingHistory = useCallback(async () => {
+    try {
+      const r = await api<{ history: AlphaLabTrainingSnapshot[]; plot_available: boolean }>('/alpha-lab/neural/history')
+      setTrainingHistory(r.history.length > 0 ? r.history : null)
+    } catch { setTrainingHistory(null) }
+  }, [])
+
   useEffect(() => { void loadWorkspace() }, [loadWorkspace])
   useEffect(() => {
     if (tab === 'tracing') { void loadTracing(); tracingRef.current = globalThis.setInterval(loadTracing, TRACING_POLL_MS) }
     return () => { if (tracingRef.current) { clearInterval(tracingRef.current); tracingRef.current = null } }
   }, [tab, loadTracing])
+  useEffect(() => {
+    if (tab === 'neural') void loadTrainingHistory()
+  }, [tab, loadTrainingHistory])
 
   const isSearchActive = searchJob?.status === 'pending' || searchJob?.status === 'running'
   const engineLabel = ws?.engine ? `${ws.engine.backend}${ws.engine.triton ? ' · Triton' : ''} · ${ws.engine.device}` : 'loading'
@@ -357,6 +372,7 @@ export const AlphaLabWorkspace: React.FC = () => {
           <TabsTrigger value="runs"><Workflow className="mr-1.5 size-3.5" />Runs</TabsTrigger>
           <TabsTrigger value="combine"><SearchCode className="mr-1.5 size-3.5" />Combine</TabsTrigger>
           <TabsTrigger value="tracing"><Eye className="mr-1.5 size-3.5" />Tracing</TabsTrigger>
+          <TabsTrigger value="neural"><Cpu className="mr-1.5 size-3.5" />Neural</TabsTrigger>
         </TabsList>
 
         {/* ──── TAB: Workbench ──── */}
@@ -405,7 +421,24 @@ export const AlphaLabWorkspace: React.FC = () => {
           </SectionCard>
 
           {/* Search panel */}
-          <SectionCard title="GA Search" description="Run evolutionary search with LLM-driven breeding. Submits as background job.">
+          <SectionCard title="Alpha Search" description="Run alpha search. Submits as background job.">
+            <div className="grid gap-4 grid-cols-2 md:grid-cols-3">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Strategy</label>
+                <select value={strategy} onChange={e => setStrategy(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-border bg-input px-3 text-sm text-foreground outline-none">
+                  {(ws?.strategy_modes ?? ['evolution', 'neural', 'full']).map(m => (
+                    <option key={m} value={m}>{m === 'evolution' ? 'Evolution (LLM+Enum)' : m === 'neural' ? 'Neural (Transformer+RL)' : 'Full (All Strategies)'}</option>
+                  ))}
+                </select>
+              </div>
+              {(strategy === 'neural' || strategy === 'full') && (
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Neural Batch</label>
+                  <Input type="number" min={64} max={8192} value={neuralBatch} onChange={e => setNeuralBatch(+e.target.value || 4096)} />
+                </div>
+              )}
+            </div>
             <div className="grid gap-4 grid-cols-2 md:grid-cols-5">
               <div className="space-y-1.5"><label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Pop Size</label>
                 <Input type="number" min={2} max={32} value={popSize} onChange={e => setPopSize(+e.target.value || 6)} /></div>
@@ -639,6 +672,61 @@ export const AlphaLabWorkspace: React.FC = () => {
                 })}</tbody>
               </table></div>
             ) : <EmptyState title="No spans" description="LLM call traces appear here automatically." />}
+          </SectionCard>
+        </TabsContent>
+
+        {/* ──── TAB: Neural ──── */}
+        <TabsContent value="neural" className="space-y-6">
+          <SectionCard title="Neural Training" description="Transformer + REINFORCE training progress"
+            action={<Button variant="outline" size="sm" onClick={loadTrainingHistory}><RefreshCw className="size-3.5" />Refresh</Button>}>
+            {!trainingHistory ? (
+              <EmptyState message="No training history yet. Run a search with Neural strategy." />
+            ) : (
+              <div className="space-y-6">
+                {/* Training curves image */}
+                <div className="rounded-xl border border-border/50 overflow-hidden">
+                  <img src={`${API_BASE}/alpha-lab/neural/plot?t=${Date.now()}`} alt="Training curves"
+                    className="w-full" onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                </div>
+                {/* Summary metrics */}
+                {trainingHistory.length > 0 && (() => {
+                  const last = trainingHistory[trainingHistory.length - 1];
+                  return (
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                      <MetricCard label="Steps" value={last.step} />
+                      <MetricCard label="Loss" value={last.loss.toFixed(4)} />
+                      <MetricCard label="Avg Reward" value={last.avg_reward.toFixed(4)} />
+                      <MetricCard label="Valid Ratio" value={`${(last.valid_ratio * 100).toFixed(1)}%`} />
+                    </div>
+                  );
+                })()}
+                {/* History table */}
+                <div className="overflow-x-auto rounded-xl border border-border/50">
+                  <table className="w-full text-xs">
+                    <thead><tr className="border-b border-border/50 text-muted-foreground">
+                      <th className="px-3 py-2 text-left">Step</th>
+                      <th className="px-3 py-2 text-right">Loss</th>
+                      <th className="px-3 py-2 text-right">Avg Reward</th>
+                      <th className="px-3 py-2 text-right">Best Reward</th>
+                      <th className="px-3 py-2 text-right">Valid %</th>
+                      <th className="px-3 py-2 text-right">Unique</th>
+                      <th className="px-3 py-2 text-left">Best Formula</th>
+                    </tr></thead>
+                    <tbody>{trainingHistory.slice(-20).reverse().map((s, i) => (
+                      <tr key={s.step} className="border-b border-border/30 hover:bg-card/50">
+                        <td className="px-3 py-1.5 font-mono">{s.step}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">{s.loss.toFixed(4)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">{s.avg_reward.toFixed(4)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">{s.best_reward.toFixed(4)}</td>
+                        <td className="px-3 py-1.5 text-right font-mono">{(s.valid_ratio * 100).toFixed(1)}%</td>
+                        <td className="px-3 py-1.5 text-right">{s.unique}</td>
+                        <td className="px-3 py-1.5 truncate max-w-[300px] font-mono text-muted-foreground">{s.best_formula}</td>
+                      </tr>
+                    ))}</tbody>
+                  </table>
+                </div>
+              </div>
+            )}
           </SectionCard>
         </TabsContent>
       </Tabs>

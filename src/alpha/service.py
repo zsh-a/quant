@@ -33,9 +33,9 @@ except Exception:  # pragma: no cover
     _torch = None
 
 DEFAULT_DB_SEEDS = [
-    "CSRank(ts_mean(close, 5) - close)",
-    "CSRank(ts_std(close, 10))",
-    "CSRank(volatility_n(close, 20))",
+    "cs_rank(ts_mean(close, 5) - close)",
+    "cs_rank(ts_std(close, 10))",
+    "cs_rank(volatility_n(close, 20))",
 ]
 
 

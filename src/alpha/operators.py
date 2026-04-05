@@ -188,7 +188,3 @@ class OperatorRegistry:
                 normalized_formula=formula.strip(),
                 errors=[str(exc)],
             )
-
-
-# Backward-compatible alias
-DSLRegistry = OperatorRegistry

@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
+from fastapi.responses import FileResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 
@@ -31,7 +32,10 @@ def _run_search_job(job_id: str, params: dict[str, Any]) -> None:
     """Execute search in background thread — updates _SEARCH_JOBS in-place."""
     try:
         _SEARCH_JOBS[job_id]["status"] = "running"
-        result = service.search_formulas_on_db(**params)
+        strategy = params.pop("strategy", "evolution")
+        neural_batch = params.pop("neural_batch", 4096)
+        svc = AlphaService(strategy=strategy, neural_sample_batch=neural_batch) if strategy != "evolution" else service
+        result = svc.search_formulas_on_db(**params)
         _SEARCH_JOBS[job_id].update(status="completed", result=result)
         logger.info("alpha.search job={} completed", job_id)
     except Exception as exc:
@@ -77,6 +81,8 @@ class SearchDbRequest(BaseModel):
     n_splits: int = 5
     purge_window: int = 0
     embargo_window: int = 0
+    strategy: str = "evolution"  # "evolution" | "neural" | "full"
+    neural_batch: int = 4096
 
 
 class CombineZooRequest(BaseModel):
@@ -128,6 +134,7 @@ def _workspace_defaults() -> dict[str, object]:
             "cs_rank(ts_std(close, 10))",
             "cs_rank(ts_zscore(funding_rate, 20))",
         ],
+        "strategy_modes": ["evolution", "neural", "full"],
     }
 
 
@@ -144,6 +151,7 @@ async def get_workspace(
     return {
         "operators": service.list_operators(),
         "defaults": _workspace_defaults(),
+        "strategy_modes": ["evolution", "neural", "full"],
         "runs": service.list_runs(limit=run_limit),
         "zoo": service.list_zoo(limit=zoo_limit),
         "engine": {
@@ -209,6 +217,8 @@ async def submit_search(request: SearchDbRequest, background_tasks: BackgroundTa
         "purge_window": request.purge_window,
         "embargo_window": request.embargo_window,
         "blocked_utc_hours": _normalize_blocked_hours(request.blocked_utc_hours),
+        "strategy": request.strategy,
+        "neural_batch": request.neural_batch,
     }
     _SEARCH_JOBS[job_id] = {
         "status": "pending",
@@ -337,3 +347,28 @@ async def get_tracing_spans(
     spans = _memory_collector.find(kind=kind) if kind else _memory_collector.spans
     recent = spans[-limit:]
     return {"spans": [s.to_dict() for s in reversed(recent)], "total": len(spans)}
+
+
+# --- Neural strategy ---
+
+
+@router.get("/neural/history")
+async def get_neural_history():
+    """Get neural strategy training history if available."""
+    from pathlib import Path
+    import json
+    p = Path("data/alpha_lab/neural/training_history.json")
+    if not p.exists():
+        return {"history": [], "plot_available": False}
+    history = json.loads(p.read_text())
+    plot_available = Path("data/alpha_lab/neural/training_curves.png").exists()
+    return {"history": history, "plot_available": plot_available}
+
+
+@router.get("/neural/plot")
+async def get_neural_plot():
+    from pathlib import Path
+    p = Path("data/alpha_lab/neural/training_curves.png")
+    if not p.exists():
+        raise HTTPException(status_code=404, detail="No training plot available")
+    return FileResponse(p, media_type="image/png")
