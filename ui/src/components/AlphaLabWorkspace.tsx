@@ -40,6 +40,8 @@ import type {
 } from '../types'
 import { API_BASE } from '../utils/api'
 import { formatPercent, formatPrice } from '../utils/format'
+import { SearchProgress } from './alpha-lab/SearchProgress'
+import { LLMAnalysis } from './alpha-lab/LLMAnalysis'
 import { EmptyState } from './layout/EmptyState'
 import { MetricCard } from './layout/MetricCard'
 import { SectionCard } from './layout/SectionCard'
@@ -461,28 +463,17 @@ export const AlphaLabWorkspace: React.FC = () => {
                 {isSearchActive ? <Loader2 className="animate-spin" /> : <Zap />}{isSearchActive ? 'Running...' : 'Start Search'}</Button>
             </div>
 
-            {/* Search job status */}
+            {/* Search job status with pipeline visualization */}
             {searchJob && (
-              <div className={`rounded-xl border p-4 space-y-3 ${searchJob.status === 'completed' ? 'border-emerald-500/20 bg-emerald-500/10' : searchJob.status === 'failed' ? 'border-rose-500/20 bg-rose-500/10' : 'border-blue-500/20 bg-blue-500/10'}`}>
-                <div className="flex items-center gap-3">
-                  {searchJob.status === 'completed' ? <CheckCircle2 className="size-4 text-emerald-400" /> : searchJob.status === 'failed' ? <AlertTriangle className="size-4 text-rose-400" /> : <Loader2 className="size-4 animate-spin text-blue-400" />}
-                  <span className="text-sm font-semibold">{searchJob.status === 'completed' ? 'Search completed' : searchJob.status === 'failed' ? 'Search failed' : 'Search running...'}</span>
-                  <Badge variant="info">{searchJob.job_id}</Badge>
-                  {searchJob.run_id && <Badge>{searchJob.run_id}</Badge>}
-                </div>
-                {searchJob.error && <p className="text-xs text-rose-300">{searchJob.error}</p>}
-                {searchJob.top_results?.slice(0, 5).map((item, i) => (
-                  <div key={item.expr_hash ?? i} className="flex items-center justify-between gap-3 rounded-lg bg-card/60 px-3 py-2">
-                    <div className="min-w-0">
-                      <div className="truncate font-mono text-xs text-foreground">{item.formula}</div>
-                      <div className="mt-0.5 text-xs text-muted-foreground">
-                        fit {fmt('sharpe', item.fitness)} · sharpe {fmt('sharpe', item.metrics?.sharpe)} · IC {fmt('rank_ic', item.metrics?.rank_ic)}
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="sm" onClick={() => handleLoadFormula(item.formula)}>Load</Button>
-                  </div>
-                ))}
-              </div>
+              <SearchProgress searchJob={searchJob} onLoadFormula={handleLoadFormula} />
+            )}
+
+            {/* LLM Analysis (available after search completes) */}
+            {searchJob?.status === 'completed' && searchJob.job_id && (
+              <LLMAnalysis
+                jobId={searchJob.job_id}
+                onApplySeeds={(seeds) => setSearchSeeds(seeds.join('\n'))}
+              />
             )}
           </SectionCard>
 

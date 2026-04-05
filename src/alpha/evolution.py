@@ -11,6 +11,7 @@ from loguru import logger
 from .compiler import BytecodeProgram, FormulaCompiler
 from .dsl import TensorSchema
 from .operators import OperatorRegistry
+from .pipeline import Lineage, PipelineRecord
 
 
 @dataclass
@@ -18,7 +19,7 @@ class Individual:
     formula: str
     program: BytecodeProgram
     expr_hash: str
-    lineage: dict[str, Any] = field(default_factory=dict)
+    lineage: Lineage = field(default_factory=lambda: Lineage(origin="unknown"))
     metrics: dict[str, float] = field(default_factory=dict)
     fitness: float = 0.0
 
@@ -299,5 +300,6 @@ class SearchResult:
     timing: dict[str, Any]
     total_evaluations: int
     total_rejected: int
+    pipeline: PipelineRecord | None = None
 
 

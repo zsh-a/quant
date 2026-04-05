@@ -28,6 +28,7 @@ from .financial_knowledge import FeatureGroup, FinancialKnowledgeBase, Financial
 from .mcts import AlphaNode, MCTSEngine, MCTSLLMAdapter
 from .operators import OperatorRegistry, OperatorSpec
 from .persistence import AlphaPersistence, PersistedRun
+from .pipeline import ArchiveEntry, Lineage, PipelineRecord, RoundRecord, StageKind, StageRecord
 from .risk import (
     BacktestResult,
     CostModel,
@@ -83,6 +84,12 @@ __all__ = [
     "HeuristicLLMBackend",
     "Individual",
     "InMemoryCollector",
+    "ArchiveEntry",
+    "Lineage",
+    "PipelineRecord",
+    "RoundRecord",
+    "StageKind",
+    "StageRecord",
     "Instruction",
     "LangfuseCollector",
     "LLMEvolutionStrategy",

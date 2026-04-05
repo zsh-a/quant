@@ -2,16 +2,19 @@
 
 from __future__ import annotations
 
+import asyncio
+import json as _json
 import uuid
 from datetime import datetime
 from typing import Any
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from loguru import logger
 from pydantic import BaseModel, Field
 
 from src.alpha import AlphaService
+from src.alpha.pipeline import RoundRecord, StageRecord
 from src.alpha.tracing import InMemoryCollector, tracer
 from src.config.settings import get_alpha_lab_config, get_bitget_config, get_crypto_market_config
 
@@ -26,20 +29,44 @@ tracer.add_collector(_memory_collector)
 # ---------------------------------------------------------------------------
 
 _SEARCH_JOBS: dict[str, dict[str, Any]] = {}
+_SEARCH_EVENTS: dict[str, asyncio.Queue[dict[str, Any]]] = {}
 
 
-def _run_search_job(job_id: str, params: dict[str, Any]) -> None:
+def _run_search_job(
+    job_id: str,
+    params: dict[str, Any],
+    loop: asyncio.AbstractEventLoop | None = None,
+) -> None:
     """Execute search in background thread — updates _SEARCH_JOBS in-place."""
+    queue = _SEARCH_EVENTS.get(job_id)
+
+    def _push(event: dict[str, Any]) -> None:
+        if queue and loop:
+            loop.call_soon_threadsafe(queue.put_nowait, event)
+
+    def _on_stage(stage: StageRecord) -> None:
+        _push({"type": "stage", "data": stage.to_dict()})
+
+    def _on_round(round_rec: RoundRecord) -> None:
+        _push({"type": "round", "data": round_rec.to_dict()})
+
     try:
         _SEARCH_JOBS[job_id]["status"] = "running"
         strategy = params.pop("strategy", "evolution")
         neural_batch = params.pop("neural_batch", 4096)
         svc = AlphaService(strategy=strategy, neural_sample_batch=neural_batch) if strategy != "evolution" else service
-        result = svc.search_formulas_on_db(**params)
+        result = svc.search_formulas_on_db(
+            **params,
+            job_id=job_id,
+            on_stage_complete=_on_stage,
+            on_round_complete=_on_round,
+        )
         _SEARCH_JOBS[job_id].update(status="completed", result=result)
+        _push({"type": "complete", "data": {"status": "completed"}})
         logger.info("alpha.search job={} completed", job_id)
     except Exception as exc:
         _SEARCH_JOBS[job_id].update(status="failed", error=str(exc))
+        _push({"type": "complete", "data": {"status": "failed", "error": str(exc)}})
         logger.error("alpha.search job={} failed: {}", job_id, exc)
 
 
@@ -227,7 +254,9 @@ async def submit_search(request: SearchDbRequest, background_tasks: BackgroundTa
         "error": None,
         "created_at": datetime.utcnow().isoformat(),
     }
-    background_tasks.add_task(_run_search_job, job_id, params)
+    loop = asyncio.get_running_loop()
+    _SEARCH_EVENTS[job_id] = asyncio.Queue()
+    background_tasks.add_task(_run_search_job, job_id, params, loop)
     return {"job_id": job_id, "status": "pending"}
 
 
@@ -248,6 +277,7 @@ async def get_search_job(job_id: str):
         response["search_stats"] = result.get("search_stats", {})
         response["timing"] = result.get("timing", {})
         response["run_id"] = result.get("persistence", {}).get("run_id")
+        response["pipeline"] = result.get("pipeline")
     if job["error"]:
         response["error"] = job["error"]
     return response
@@ -329,6 +359,139 @@ async def combine_factors_from_zoo(request: CombineZooRequest):
         )
     except (ValueError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+# --- SSE: real-time search progress ---
+
+
+@router.get("/search-jobs/{job_id}/events")
+async def stream_search_events(job_id: str):
+    """SSE stream of pipeline stage/round events for a running search job."""
+    job = _SEARCH_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    queue = _SEARCH_EVENTS.get(job_id)
+    if not queue:
+        raise HTTPException(status_code=404, detail="No event stream for this job")
+
+    async def event_generator():
+        while True:
+            try:
+                event = await asyncio.wait_for(queue.get(), timeout=30.0)
+                yield f"data: {_json.dumps(event)}\n\n"
+                if event.get("type") == "complete":
+                    break
+            except asyncio.TimeoutError:
+                yield ": keepalive\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
+
+
+@router.get("/search-jobs/{job_id}/pipeline")
+async def get_search_pipeline(job_id: str):
+    """Get the full pipeline record for a completed search job."""
+    job = _SEARCH_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["status"] != "completed" or not job.get("result"):
+        raise HTTPException(status_code=400, detail="Job not completed yet")
+    pipeline = job["result"].get("pipeline")
+    if not pipeline:
+        return {"pipeline": None}
+    return {"pipeline": pipeline}
+
+
+class AnalyzeSearchRequest(BaseModel):
+    instruction: str = "Analyze the search results and suggest improvements"
+
+
+@router.post("/search-jobs/{job_id}/analyze")
+async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
+    """Send pipeline state to LLM for analysis."""
+    from src.alpha.llm_context import build_analysis_prompt, build_pipeline_summary
+    from src.alpha.pipeline import ArchiveEntry
+
+    job = _SEARCH_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job["status"] != "completed" or not job.get("result"):
+        raise HTTPException(status_code=400, detail="Job not completed yet")
+
+    result = job["result"]
+    pipeline_data = result.get("pipeline")
+    if not pipeline_data:
+        raise HTTPException(status_code=400, detail="No pipeline data available")
+
+    # Build archive entries from top_results
+    archive_entries: list[ArchiveEntry] = []
+    for tr in result.get("top_results", []):
+        metrics = tr.get("metrics", {})
+        lineage = tr.get("lineage", {})
+        archive_entries.append(ArchiveEntry(
+            formula=tr.get("formula", ""),
+            expr_hash=tr.get("expr_hash", ""),
+            fitness=tr.get("fitness", 0),
+            rank_ic=float(metrics.get("rank_ic", 0) or 0),
+            sharpe=float(metrics.get("sharpe", 0) or 0),
+            turnover=float(metrics.get("avg_turnover", 0) or 0),
+            origin=lineage.get("origin", "unknown") if isinstance(lineage, dict) else "unknown",
+        ))
+
+    # Build pipeline record from serialized data
+    from src.alpha.pipeline import PipelineRecord, RoundRecord as RR, StageRecord as SR, StageKind
+    pr = PipelineRecord(
+        job_id=pipeline_data.get("job_id", job_id),
+        total_evaluations=pipeline_data.get("total_evaluations", 0),
+        total_rejected=pipeline_data.get("total_rejected", 0),
+    )
+    for rd in pipeline_data.get("rounds", []):
+        rr = RR(
+            round_idx=rd.get("round", 0),
+            strategies_activated=rd.get("strategies", []),
+            archive_size=rd.get("archive_size", 0),
+            population_size=rd.get("population_size", 0),
+            best_fitness=rd.get("best_fitness", 0),
+            duration_ms=rd.get("duration_ms", 0),
+        )
+        for sd in rd.get("stages", []):
+            try:
+                kind = StageKind(sd.get("kind", "generate"))
+            except ValueError:
+                kind = StageKind.GENERATE
+            rr.stages.append(SR(
+                kind=kind,
+                strategy=sd.get("strategy", ""),
+                round_idx=sd.get("round", 0),
+                input_count=sd.get("input", 0),
+                output_count=sd.get("output", 0),
+                duration_ms=sd.get("duration_ms", 0),
+                best_fitness=sd.get("best_fitness"),
+            ))
+        pr.rounds.append(rr)
+
+    summary = build_pipeline_summary(
+        pipeline=pr,
+        archive=archive_entries,
+        strategy_memory=getattr(service, "strategy_memory", None),
+    )
+    prompt = build_analysis_prompt(summary, request.instruction)
+
+    # Call LLM for analysis (use the same backend as formula generation)
+    analysis = ""
+    try:
+        llm = getattr(service, "_llm_backend", None)
+        if llm and hasattr(llm, "_call_llm"):
+            analysis = llm._call_llm(prompt, temperature=0.3, tag="analysis")
+        else:
+            analysis = "(LLM backend not available — returning summary only)"
+    except Exception as e:
+        analysis = f"(LLM analysis failed: {e})"
+
+    return {
+        "summary": summary,
+        "analysis": analysis,
+        "prompt_length": len(prompt),
+    }
 
 
 # --- Tracing ---

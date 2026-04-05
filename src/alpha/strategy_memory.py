@@ -290,6 +290,36 @@ class StrategyMemory:
         return [f for f, _ in scored[:k]]
 
     # ------------------------------------------------------------------
+    # Summaries for LLM context builder
+    # ------------------------------------------------------------------
+
+    def get_theme_summary(self) -> dict[str, dict[str, Any]]:
+        """Return theme stats as plain dicts (for llm_context)."""
+        result: dict[str, dict[str, Any]] = {}
+        for tid, ts in self._theme_stats.items():
+            if ts.count == 0:
+                continue
+            result[tid] = {
+                "count": ts.count,
+                "avg_fitness": ts.mean_fitness,
+                "success_rate": ts.success_rate,
+                "best_fitness": ts.best_fitness,
+            }
+        return result
+
+    def get_operator_summary(self) -> dict[str, dict[str, Any]]:
+        """Return operator stats as plain dicts (for llm_context)."""
+        result: dict[str, dict[str, Any]] = {}
+        for op, stats in self._operator_stats.items():
+            if stats.count < 2:
+                continue
+            result[op] = {
+                "count": stats.count,
+                "avg_fitness": stats.mean,
+            }
+        return result
+
+    # ------------------------------------------------------------------
     # Persistence
     # ------------------------------------------------------------------
 

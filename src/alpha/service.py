@@ -461,6 +461,9 @@ class AlphaService:
         purge_window: int = 0,
         embargo_window: int = 0,
         blocked_utc_hours: list[int] | None = None,
+        job_id: str = "",
+        on_stage_complete: Any = None,
+        on_round_complete: Any = None,
     ) -> dict[str, Any]:
         from .tracing import tracer
 
@@ -520,6 +523,9 @@ class AlphaService:
                 evaluate_fn=evaluate_fn,
                 quick_evaluate_fn=quick_fn,
                 dataset=dataset,
+                job_id=job_id,
+                on_stage_complete=on_stage_complete,
+                on_round_complete=on_round_complete,
             )
 
             # 4b. Persist strategy memory for cross-session learning
@@ -543,14 +549,14 @@ class AlphaService:
                 "rounds": search_result.rounds,
                 "lineage": [
                     {"expr_hash": ind.expr_hash, "formula": ind.formula,
-                     "parent_a": ind.lineage.get("parent_a"),
-                     "parent_b": ind.lineage.get("parent_b")}
+                     "parent_a": ind.lineage.parent_a,
+                     "parent_b": ind.lineage.parent_b}
                     for ind in search_result.all_evaluated
-                    if ind.lineage.get("parent_a")
+                    if ind.lineage.parent_a
                 ],
                 "top_results": [
                     {"formula": ind.formula, "expr_hash": ind.expr_hash,
-                     "fitness": ind.fitness, "lineage": ind.lineage,
+                     "fitness": ind.fitness, "lineage": ind.lineage.to_dict(),
                      "metrics": ind.metrics}
                     for ind in search_result.archive[:top_k]
                 ],
@@ -560,6 +566,7 @@ class AlphaService:
                         "split_metrics": d.get("split_metrics", {})}
                     for h, d in search_result.details_by_hash.items()
                 },
+                "pipeline": search_result.pipeline.to_dict() if search_result.pipeline else None,
             }
 
             # 6. Persist

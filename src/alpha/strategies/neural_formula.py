@@ -29,6 +29,7 @@ from torch.distributions import Categorical
 from ..evolution import Individual
 from ..operators import OperatorRegistry, OperatorSpec
 from ..dsl import TensorSchema
+from ..pipeline import Lineage
 from ..search_strategy import SearchContext, build_individual
 
 
@@ -534,7 +535,7 @@ class NeuralFormulaStrategy:
                     break
                 ind = build_individual(
                     ctx.compiler, ctx.schema, formula,
-                    {"origin": "neural_formula", "screen_ic": round(ic, 5)},
+                    Lineage(origin="neural_formula", screen_ic=round(ic, 5)),
                 )
                 if ind and ind.expr_hash not in ctx.seen_hashes:
                     candidates.append(ind)

@@ -13,6 +13,7 @@ from typing import Any
 from loguru import logger
 
 from ..evolution import BreedingSpec, Individual, LLMBackend
+from ..pipeline import Lineage
 from ..search_strategy import SearchContext, build_individual
 
 
@@ -51,7 +52,7 @@ class LLMEvolutionStrategy:
         if not ctx.population:
             # Genesis: use initial population from the LLM
             formulas = self.llm_backend.generate_initial_population(batch_size)
-            return self._compile_formulas(ctx, formulas, {"origin": "llm_genesis"})
+            return self._compile_formulas(ctx, formulas, Lineage(origin="llm_genesis"))
 
         parents = self._tournament_select(list(ctx.population))
         if not parents:
@@ -85,10 +86,11 @@ class LLMEvolutionStrategy:
         )
 
         formulas = self.llm_backend.generate_offspring(spec, count=batch_size)
-        return self._compile_formulas_with_theme(ctx, formulas, {
-            "parent_a": parent_a.expr_hash,
-            "parent_b": parent_b.expr_hash if parent_b else None,
-        })
+        return self._compile_formulas_with_theme(ctx, formulas, Lineage(
+            origin="llm_evolution",
+            parent_a=parent_a.expr_hash,
+            parent_b=parent_b.expr_hash if parent_b else None,
+        ))
 
     def on_evaluation_complete(
         self, ctx: SearchContext, evaluated: list[Individual]
@@ -96,9 +98,10 @@ class LLMEvolutionStrategy:
         # Close the RL feedback loop
         if hasattr(self.llm_backend, "record_evaluation_result"):
             for ind in evaluated:
+                theme = ind.lineage.theme if isinstance(ind.lineage, Lineage) else ind.lineage.get("theme")
                 self.llm_backend.record_evaluation_result(
                     ind.formula,
-                    ind.lineage.get("theme"),
+                    theme,
                     ind.metrics,
                     is_novel=True,
                 )
@@ -126,17 +129,21 @@ class LLMEvolutionStrategy:
         self,
         ctx: SearchContext,
         formulas: list[str],
-        base_lineage: dict[str, Any],
+        base_lineage: Lineage,
     ) -> list[Individual]:
         """Compile formulas and attach theme info from LLM output."""
         offspring: list[Individual] = []
         for f in formulas:
-            lineage = dict(base_lineage)
+            lineage = Lineage(
+                origin=base_lineage.origin,
+                parent_a=base_lineage.parent_a,
+                parent_b=base_lineage.parent_b,
+            )
             # Retrieve theme assigned by LLM during extraction
             if hasattr(self.llm_backend, "get_theme_for_formula"):
                 theme = self.llm_backend.get_theme_for_formula(f)
                 if theme:
-                    lineage["theme"] = theme
+                    lineage.theme = theme
             ind = build_individual(ctx.compiler, ctx.schema, f, lineage)
             if ind and ind.expr_hash not in ctx.seen_hashes:
                 offspring.append(ind)
@@ -146,11 +153,12 @@ class LLMEvolutionStrategy:
     def _compile_formulas(
         ctx: SearchContext,
         formulas: list[str],
-        lineage: dict[str, Any],
+        lineage: Lineage,
     ) -> list[Individual]:
         offspring: list[Individual] = []
         for f in formulas:
-            ind = build_individual(ctx.compiler, ctx.schema, f, dict(lineage))
+            lin = Lineage(origin=lineage.origin, theme=lineage.theme)
+            ind = build_individual(ctx.compiler, ctx.schema, f, lin)
             if ind and ind.expr_hash not in ctx.seen_hashes:
                 offspring.append(ind)
         return offspring

@@ -41,6 +41,14 @@ from .evolution import (
     SearchResult,
 )
 from .operators import OperatorRegistry
+from .pipeline import (
+    ArchiveEntry,
+    Lineage,
+    PipelineRecord,
+    RoundRecord,
+    StageKind,
+    StageRecord,
+)
 
 
 # ---------------------------------------------------------------------------
@@ -167,13 +175,15 @@ def build_individual(
     compiler: FormulaCompiler,
     schema: TensorSchema,
     formula: str,
-    lineage: dict[str, Any],
+    lineage: Lineage | dict[str, Any],
 ) -> Individual | None:
     """Compile a formula into an Individual, or return None on failure."""
     try:
         program = compiler.compile(formula, schema)
     except ValueError:
         return None
+    if isinstance(lineage, dict):
+        lineage = Lineage.from_dict(lineage)
     return Individual(
         formula=formula,
         program=program,
@@ -256,7 +266,7 @@ class EnumerationStrategy:
         for formula, ic in passed[:self.top_k]:
             if len(candidates) >= self.top_k:
                 break
-            ind = build_individual(ctx.compiler, ctx.schema, formula, {"origin": "enumeration", "screen_ic": round(ic, 5)})
+            ind = build_individual(ctx.compiler, ctx.schema, formula, Lineage(origin="enumeration", screen_ic=round(ic, 5)))
             if ind and ind.expr_hash not in ctx.seen_hashes:
                 candidates.append(ind)
 
@@ -321,11 +331,15 @@ class SearchOrchestrator:
         evaluate_fn: Callable[[list[Individual]], EvalResult],
         quick_evaluate_fn: Callable[[list[Individual]], EvalResult] | None = None,
         dataset: AlphaDataset | None = None,
+        job_id: str = "",
+        on_stage_complete: Callable[[StageRecord], None] | None = None,
+        on_round_complete: Callable[[RoundRecord], None] | None = None,
     ) -> SearchResult:
         """Execute the search loop with all registered strategies."""
         from .tracing import tracer
 
         overall_start = perf_counter()
+        pipeline = PipelineRecord(job_id=job_id)
 
         # Build context
         ctx = SearchContext(
@@ -391,6 +405,7 @@ class SearchOrchestrator:
                 "round": round_idx,
                 "strategies_activated": [],
             }
+            round_rec = RoundRecord(round_idx=round_idx)
 
             for strategy in self.strategies:
                 if not strategy.should_activate(ctx):
@@ -398,12 +413,14 @@ class SearchOrchestrator:
 
                 strategy_name = strategy.name
                 round_info["strategies_activated"].append(strategy_name)
+                round_rec.strategies_activated.append(strategy_name)
 
                 with tracer.start_span(
                     f"strategy_{strategy_name}", kind="search",
                     strategy=strategy_name, round=round_idx,
                 ) as strat_span:
                     # 1. Generate candidates (or use prefetched from previous round)
+                    gen_start = perf_counter()
                     if prefetch_future is not None and strategy_name == "llm_evolution":
                         try:
                             candidates = prefetch_future.result(timeout=120)
@@ -414,6 +431,18 @@ class SearchOrchestrator:
                         candidates = strategy.generate_candidates(ctx)
                     strat_span.set("candidates_generated", len(candidates))
 
+                    gen_stage = StageRecord(
+                        kind=StageKind.GENERATE,
+                        strategy=strategy_name,
+                        round_idx=round_idx,
+                        input_count=0,
+                        output_count=len(candidates),
+                        duration_ms=(perf_counter() - gen_start) * 1000,
+                    )
+                    round_rec.stages.append(gen_stage)
+                    if on_stage_complete:
+                        on_stage_complete(gen_stage)
+
                     if not candidates:
                         continue
 
@@ -421,6 +450,7 @@ class SearchOrchestrator:
                     screened = candidates
                     quick_rejected = 0
                     if quick_evaluate_fn and len(candidates) > 1:
+                        qs_start = perf_counter()
                         with tracer.start_span(
                             "quick_screen", kind="eval", count=len(candidates),
                         ) as qs_span:
@@ -434,6 +464,18 @@ class SearchOrchestrator:
                                     quick_rejected += 1
                             qs_span.set("passed", len(screened))
                             qs_span.set("rejected", quick_rejected)
+
+                        qs_stage = StageRecord(
+                            kind=StageKind.QUICK_SCREEN,
+                            strategy=strategy_name,
+                            round_idx=round_idx,
+                            input_count=len(candidates),
+                            output_count=len(screened),
+                            duration_ms=(perf_counter() - qs_start) * 1000,
+                        )
+                        round_rec.stages.append(qs_stage)
+                        if on_stage_complete:
+                            on_stage_complete(qs_stage)
                     ctx.total_rejected += quick_rejected
 
                     # 3. Top-N gating: limit full CPCV to top candidates
@@ -467,12 +509,26 @@ class SearchOrchestrator:
 
                     # 5. Full evaluate
                     if screened:
+                        eval_start = perf_counter()
                         with tracer.start_span(
                             "evaluate", kind="eval", count=len(screened),
                         ) as eval_span:
                             self._evaluate_and_update(ctx, screened)
                             best = max((ind.fitness for ind in screened), default=-999)
                             eval_span.set("best_fitness", round(best, 4))
+
+                        eval_stage = StageRecord(
+                            kind=StageKind.EVALUATE,
+                            strategy=strategy_name,
+                            round_idx=round_idx,
+                            input_count=len(screened),
+                            output_count=len(screened),
+                            duration_ms=(perf_counter() - eval_start) * 1000,
+                            best_fitness=best,
+                        )
+                        round_rec.stages.append(eval_stage)
+                        if on_stage_complete:
+                            on_stage_complete(eval_stage)
 
                         strategy.on_evaluation_complete(ctx, screened)
 
@@ -488,13 +544,26 @@ class SearchOrchestrator:
             )
             round_info["best_fitness"] = best_in_archive.fitness if best_in_archive else 0.0
 
+            # Build archive snapshot for this round
+            round_rec.archive_size = len(ctx.archive)
+            round_rec.population_size = len(ctx.population)
+            round_rec.best_fitness = round_info["best_fitness"]
+            round_rec.duration_ms = (perf_counter() - round_start) * 1000
+            round_rec.archive_snapshot = self._build_archive_snapshot(ctx.archive, limit=5)
+
             round_span.set("archive", len(ctx.archive))
             round_span.set("best_fitness", round(round_info["best_fitness"], 4))
             round_ctx.__exit__(None, None, None)
 
             round_summaries.append(round_info)
+            pipeline.rounds.append(round_rec)
+            if on_round_complete:
+                on_round_complete(round_rec)
 
         prefetch_executor.shutdown(wait=False)
+
+        pipeline.total_evaluations = ctx.total_evaluations
+        pipeline.total_rejected = ctx.total_rejected
 
         # --- result ---
         archive_list = sorted(ctx.archive.values(), key=lambda x: x.fitness, reverse=True)
@@ -514,6 +583,7 @@ class SearchOrchestrator:
             timing=timing,
             total_evaluations=ctx.total_evaluations,
             total_rejected=ctx.total_rejected,
+            pipeline=pipeline,
         )
 
     # ------------------------------------------------------------------
@@ -551,7 +621,7 @@ class SearchOrchestrator:
         seen: set[str] = set()
 
         for formula in seeds:
-            ind = build_individual(self.compiler, self.schema, formula, {"origin": "seed"})
+            ind = build_individual(self.compiler, self.schema, formula, Lineage(origin="seed"))
             if ind and ind.expr_hash not in seen:
                 population.append(ind)
                 seen.add(ind.expr_hash)
@@ -560,7 +630,7 @@ class SearchOrchestrator:
         if not seeds:
             seeds = heuristic.generate_initial_population(target)
             for formula in seeds:
-                ind = build_individual(self.compiler, self.schema, formula, {"origin": "seed"})
+                ind = build_individual(self.compiler, self.schema, formula, Lineage(origin="seed"))
                 if ind and ind.expr_hash not in seen:
                     population.append(ind)
                     seen.add(ind.expr_hash)
@@ -571,13 +641,32 @@ class SearchOrchestrator:
             for f in heuristic.generate_offspring(
                 BreedingSpec(parent_a=base, parent_b=None, objective="bootstrap"), count=1,
             ):
-                ind = build_individual(self.compiler, self.schema, f, {"origin": "bootstrap"})
+                ind = build_individual(self.compiler, self.schema, f, Lineage(origin="bootstrap"))
                 if ind and ind.expr_hash not in seen:
                     population.append(ind)
                     seen.add(ind.expr_hash)
             attempt += 1
 
         return population[:target]
+
+    @staticmethod
+    def _build_archive_snapshot(
+        archive: dict[tuple[int, int], Individual], limit: int = 5,
+    ) -> list[ArchiveEntry]:
+        """Build a lightweight snapshot of the top archive members."""
+        top = sorted(archive.values(), key=lambda x: x.fitness, reverse=True)[:limit]
+        entries: list[ArchiveEntry] = []
+        for ind in top:
+            entries.append(ArchiveEntry(
+                formula=ind.formula,
+                expr_hash=ind.expr_hash,
+                fitness=ind.fitness,
+                rank_ic=float(ind.metrics.get("rank_ic", 0) or 0),
+                sharpe=float(ind.metrics.get("sharpe", 0) or 0),
+                turnover=float(ind.metrics.get("avg_turnover", 0) or 0),
+                origin=ind.lineage.origin if isinstance(ind.lineage, Lineage) else ind.lineage.get("origin", "unknown"),
+            ))
+        return entries
 
     @staticmethod
     def _passes_quick_screen(metrics: dict[str, float]) -> bool:

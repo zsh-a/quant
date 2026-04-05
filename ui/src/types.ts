@@ -264,7 +264,54 @@ export interface AlphaLabSearchJob {
     top_count?: number;
     search_stats?: Record<string, number>;
     timing?: Record<string, number>;
+    pipeline?: AlphaPipelineRecord;
 }
+
+/* ── Pipeline types ─────────────────────────────────────────────────── */
+
+export interface AlphaStageRecord {
+    kind: 'generate' | 'quick_screen' | 'evaluate' | 'fitness' | 'archive';
+    strategy: string;
+    round: number;
+    input: number;
+    output: number;
+    duration_ms: number;
+    best_fitness?: number;
+    metadata?: Record<string, unknown>;
+}
+
+export interface AlphaArchiveEntry {
+    formula: string;
+    expr_hash: string;
+    fitness: number;
+    rank_ic: number;
+    sharpe: number;
+    turnover: number;
+    origin: string;
+}
+
+export interface AlphaRoundRecord {
+    round: number;
+    strategies: string[];
+    stages: AlphaStageRecord[];
+    archive_snapshot: AlphaArchiveEntry[];
+    archive_size: number;
+    population_size: number;
+    best_fitness: number;
+    duration_ms: number;
+}
+
+export interface AlphaPipelineRecord {
+    job_id: string;
+    rounds: AlphaRoundRecord[];
+    total_evaluations: number;
+    total_rejected: number;
+}
+
+export type SearchSSEEvent =
+    | { type: 'stage'; data: AlphaStageRecord }
+    | { type: 'round'; data: AlphaRoundRecord }
+    | { type: 'complete'; data: { status: string; error?: string } };
 
 export interface AlphaLabCombineResult {
     metrics?: Record<string, number>;

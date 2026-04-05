@@ -19,6 +19,7 @@ from loguru import logger
 
 from ..search_strategy import SearchContext, build_individual
 from ..evolution import Individual
+from ..pipeline import Lineage
 
 
 class MCTSRefinementStrategy:
@@ -75,10 +76,7 @@ class MCTSRefinementStrategy:
                         ctx.compiler,
                         ctx.schema,
                         formula,
-                        {
-                            "origin": "mcts_refinement",
-                            "parent_a": member.expr_hash,
-                        },
+                        Lineage(origin="mcts_refinement", parent_a=member.expr_hash),
                     )
                     if ind and ind.expr_hash not in ctx.seen_hashes:
                         candidates.append(ind)
