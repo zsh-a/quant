@@ -49,6 +49,7 @@ from .pipeline import (
     StageKind,
     StageRecord,
 )
+from .strategy_state import FactorCatalog, FactorCatalogEntry
 
 
 # ---------------------------------------------------------------------------
@@ -95,6 +96,9 @@ class SearchContext:
     total_evaluations: int = 0
     total_rejected: int = 0
     batch_size: int = 8
+
+    # --- factor catalog (unified factor tracking) ---
+    factor_catalog: FactorCatalog | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -305,6 +309,7 @@ class SearchOrchestrator:
         knowledge_base: Any | None = None,
         feature_kitchen: Any | None = None,
         population_cap: int = 30,
+        checkpoint_manager: Any | None = None,
     ) -> None:
         self.registry = registry or OperatorRegistry()
         self.compiler = compiler or FormulaCompiler(self.registry)
@@ -315,6 +320,7 @@ class SearchOrchestrator:
         self.knowledge_base = knowledge_base
         self.feature_kitchen = feature_kitchen
         self._population_cap = population_cap
+        self._checkpoint_manager = checkpoint_manager
 
     # ------------------------------------------------------------------
     # Public API
@@ -334,12 +340,26 @@ class SearchOrchestrator:
         job_id: str = "",
         on_stage_complete: Callable[[StageRecord], None] | None = None,
         on_round_complete: Callable[[RoundRecord], None] | None = None,
+        resume_from: str | None = None,
     ) -> SearchResult:
         """Execute the search loop with all registered strategies."""
+        from pathlib import Path
         from .tracing import tracer
 
         overall_start = perf_counter()
         pipeline = PipelineRecord(job_id=job_id)
+
+        # Restore from checkpoint if resuming
+        start_round = 0
+        restored_catalog: FactorCatalog | None = None
+        if resume_from and self._checkpoint_manager:
+            ckpt_path = Path(resume_from)
+            if ckpt_path.exists():
+                restored_catalog, saved_state = self._checkpoint_manager.restore_strategies(
+                    ckpt_path, self.strategies,
+                )
+                start_round = saved_state.get("round_idx", -1) + 1
+                logger.info("search.resume from round={}", start_round)
 
         # Build context
         ctx = SearchContext(
@@ -363,7 +383,11 @@ class SearchOrchestrator:
             total_evaluations=0,
             total_rejected=0,
             batch_size=batch_size,
+            factor_catalog=restored_catalog or FactorCatalog(),
         )
+
+        if start_round > 0:
+            ctx.round_idx = start_round
 
         round_summaries: list[dict[str, Any]] = []
 
@@ -513,7 +537,7 @@ class SearchOrchestrator:
                         with tracer.start_span(
                             "evaluate", kind="eval", count=len(screened),
                         ) as eval_span:
-                            self._evaluate_and_update(ctx, screened)
+                            self._evaluate_and_update(ctx, screened, strategy_name=strategy_name)
                             best = max((ind.fitness for ind in screened), default=-999)
                             eval_span.set("best_fitness", round(best, 4))
 
@@ -560,6 +584,27 @@ class SearchOrchestrator:
             if on_round_complete:
                 on_round_complete(round_rec)
 
+            # Checkpoint at round boundary (if manager configured)
+            if (
+                self._checkpoint_manager
+                and ctx.factor_catalog is not None
+                and self._checkpoint_manager.should_checkpoint(round_idx, rounds)
+            ):
+                self._checkpoint_manager.create_checkpoint(
+                    job_id=job_id,
+                    round_idx=round_idx,
+                    strategies=self.strategies,
+                    factor_catalog=ctx.factor_catalog,
+                    ctx_state={
+                        "round_idx": round_idx,
+                        "total_evaluations": ctx.total_evaluations,
+                        "total_rejected": ctx.total_rejected,
+                    },
+                    archive_snapshot=[
+                        e.to_dict() for e in self._build_archive_snapshot(ctx.archive, limit=10)
+                    ],
+                )
+
         prefetch_executor.shutdown(wait=False)
 
         pipeline.total_evaluations = ctx.total_evaluations
@@ -592,7 +637,12 @@ class SearchOrchestrator:
 
     _MAX_EVALUATED_HISTORY = 200  # cap to bound memory; archive keeps the best
 
-    def _evaluate_and_update(self, ctx: SearchContext, individuals: list[Individual]) -> None:
+    def _evaluate_and_update(
+        self,
+        ctx: SearchContext,
+        individuals: list[Individual],
+        strategy_name: str = "",
+    ) -> None:
         """Run full evaluation, update fitness/population/archive."""
         result = ctx.evaluate_fn(individuals)
         ctx.details_by_hash.update(result.details_by_hash)
@@ -605,6 +655,22 @@ class SearchOrchestrator:
             ctx.seen_hashes.add(ind.expr_hash)
             ctx.all_evaluated.append(ind)
             archive_update(ctx.archive, ind, self.fitness_engine.policy.reject_score)
+
+            # Record to factor catalog
+            if ctx.factor_catalog is not None:
+                origin = ind.lineage.origin if isinstance(ind.lineage, Lineage) else "unknown"
+                ctx.factor_catalog.record(FactorCatalogEntry(
+                    formula=ind.formula,
+                    expr_hash=ind.expr_hash,
+                    strategy=strategy_name or origin,
+                    round_idx=ctx.round_idx,
+                    rank_ic=float(m.get("rank_ic", 0) or 0),
+                    sharpe=float(m.get("sharpe", 0) or 0),
+                    turnover=float(m.get("avg_turnover", 0) or 0),
+                    fitness=ind.fitness,
+                    evaluated=True,
+                    lineage=ind.lineage.to_dict() if isinstance(ind.lineage, Lineage) else {},
+                ))
 
         ctx.total_evaluations += len(individuals)
 

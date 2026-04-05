@@ -14,6 +14,7 @@ Key design (aligned with AlphaGPT):
 
 from __future__ import annotations
 
+import io
 import json
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,7 @@ from ..operators import OperatorRegistry, OperatorSpec
 from ..dsl import TensorSchema
 from ..pipeline import Lineage
 from ..search_strategy import SearchContext, build_individual
+from ..strategy_state import StrategySnapshot
 
 
 # ---------------------------------------------------------------------------
@@ -580,6 +582,59 @@ class NeuralFormulaStrategy:
             "device": str(self._device),
             "history": self.history.to_dict(),
         }
+
+    # ------------------------------------------------------------------
+    # StatefulStrategy interface — model checkpoint save/load
+    # ------------------------------------------------------------------
+
+    def save_state(self) -> StrategySnapshot:
+        """Serialize model weights, optimizer, and training state."""
+        buf = io.BytesIO()
+        torch.save(
+            {
+                "model_state_dict": self._model.state_dict(),
+                "optimizer_state_dict": self._optimizer.state_dict(),
+                "global_step": self._global_step,
+                "best_ic": self._best_ic,
+                "best_formula": self._best_formula,
+            },
+            buf,
+        )
+        return StrategySnapshot(
+            strategy_name=self.name,
+            round_idx=0,
+            format="pt_state_dict",
+            data=buf.getvalue(),
+            metadata={
+                "vocab_size": self._vocab.size,
+                "d_model": self._model.d_model,
+                "global_step": self._global_step,
+                "best_ic": self._best_ic,
+            },
+        )
+
+    def load_state(self, snapshot: StrategySnapshot) -> None:
+        """Restore model weights and training state from checkpoint."""
+        # Validate vocab compatibility
+        saved_vocab = snapshot.metadata.get("vocab_size")
+        if saved_vocab is not None and saved_vocab != self._vocab.size:
+            raise ValueError(
+                f"Vocab size mismatch: checkpoint has {saved_vocab}, "
+                f"current registry produces {self._vocab.size}. "
+                f"Cannot restore — operator registry may have changed."
+            )
+        buf = io.BytesIO(snapshot.data)
+        state = torch.load(buf, map_location=self._device, weights_only=False)
+        self._model.load_state_dict(state["model_state_dict"])
+        self._optimizer.load_state_dict(state["optimizer_state_dict"])
+        self._global_step = state.get("global_step", 0)
+        self._best_ic = state.get("best_ic", 0.0)
+        self._best_formula = state.get("best_formula", "")
+        logger.info(
+            "neural_formula.restored step={} best_ic={:.4f}",
+            self._global_step,
+            self._best_ic,
+        )
 
     # ------------------------------------------------------------------
     # Internal training loop (aligned with AlphaGPT engine.py)

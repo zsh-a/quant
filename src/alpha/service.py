@@ -92,6 +92,10 @@ class AlphaService:
             strategy, resolved_llm, neural_sample_batch, mcts_refinement_frequency,
         )
 
+        # --- Checkpoint manager ---
+        from .checkpoint import CheckpointManager
+        self.checkpoint_manager = CheckpointManager()
+
         # --- Search orchestrator ---
         self.search_engine = SearchOrchestrator(
             strategies=strategies,
@@ -101,6 +105,7 @@ class AlphaService:
             strategy_memory=self.strategy_memory,
             knowledge_base=self.knowledge_base,
             feature_kitchen=self.feature_kitchen,
+            checkpoint_manager=self.checkpoint_manager,
         )
 
         self.signal_transformer = SignalTransformer()

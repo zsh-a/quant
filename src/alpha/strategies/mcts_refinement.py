@@ -17,9 +17,12 @@ from typing import Any
 
 from loguru import logger
 
+import json as _json
+
 from ..search_strategy import SearchContext, build_individual
 from ..evolution import Individual
 from ..pipeline import Lineage
+from ..strategy_state import StrategySnapshot
 
 
 class MCTSRefinementStrategy:
@@ -107,3 +110,43 @@ class MCTSRefinementStrategy:
             "top_k_to_refine": self.top_k_to_refine,
             "zoo_size": len(self.mcts_engine.alpha_zoo) if self.mcts_engine else 0,
         }
+
+    # ------------------------------------------------------------------
+    # StatefulStrategy interface — warm-start zoo
+    # ------------------------------------------------------------------
+
+    def save_state(self) -> StrategySnapshot:
+        """Serialize the MCTS alpha zoo for warm-starting."""
+        zoo_data = [
+            {
+                "formula": node.formula,
+                "metrics": node.metrics,
+                "visits": node.visits,
+                "value": node.value,
+            }
+            for node in self.mcts_engine.alpha_zoo
+        ]
+        return StrategySnapshot(
+            strategy_name=self.name,
+            round_idx=0,
+            format="json",
+            data=_json.dumps(zoo_data).encode("utf-8"),
+            metadata={"zoo_size": len(zoo_data)},
+        )
+
+    def load_state(self, snapshot: StrategySnapshot) -> None:
+        """Restore alpha zoo from a previous checkpoint."""
+        from ..mcts import AlphaNode
+
+        zoo_data = _json.loads(snapshot.data.decode("utf-8"))
+        self.mcts_engine.alpha_zoo = []
+        for item in zoo_data:
+            node = AlphaNode(formula=item["formula"])
+            node.metrics = item.get("metrics", {})
+            node.visits = item.get("visits", 0)
+            node.value = item.get("value", 0.0)
+            self.mcts_engine.alpha_zoo.append(node)
+        logger.info(
+            "mcts_refinement.restored zoo_size={}",
+            len(self.mcts_engine.alpha_zoo),
+        )

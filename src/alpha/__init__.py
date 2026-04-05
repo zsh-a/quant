@@ -27,8 +27,10 @@ from .feature_kitchen import DerivedFeature, FeatureKitchen
 from .financial_knowledge import FeatureGroup, FinancialKnowledgeBase, FinancialTheme
 from .mcts import AlphaNode, MCTSEngine, MCTSLLMAdapter
 from .operators import OperatorRegistry, OperatorSpec
+from .checkpoint import CheckpointManager, SearchCheckpoint
 from .persistence import AlphaPersistence, PersistedRun
 from .pipeline import ArchiveEntry, Lineage, PipelineRecord, RoundRecord, StageKind, StageRecord
+from .strategy_state import FactorCatalog, FactorCatalogEntry, StatefulStrategy, StrategySnapshot
 from .risk import (
     BacktestResult,
     CostModel,
@@ -85,11 +87,17 @@ __all__ = [
     "Individual",
     "InMemoryCollector",
     "ArchiveEntry",
+    "CheckpointManager",
+    "FactorCatalog",
+    "FactorCatalogEntry",
     "Lineage",
     "PipelineRecord",
     "RoundRecord",
+    "SearchCheckpoint",
     "StageKind",
     "StageRecord",
+    "StatefulStrategy",
+    "StrategySnapshot",
     "Instruction",
     "LangfuseCollector",
     "LLMEvolutionStrategy",

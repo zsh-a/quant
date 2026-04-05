@@ -13,6 +13,9 @@ import type {
   AlphaLabWorkspace,
   AlphaLabZooEntry,
   AlphaPipelineRecord,
+  CheckpointEntry,
+  FactorCatalogResponse,
+  StrategyStateResponse,
 } from '../types'
 
 class AlphaApiError extends Error {
@@ -85,4 +88,25 @@ export const alphaApi = {
 
   // Neural
   getNeuralHistory: () => request<AlphaLabTrainingHistory>('/alpha-lab/neural/history'),
+
+  // Strategy State Management
+  getStrategyState: () => request<StrategyStateResponse>('/alpha-lab/strategy-state'),
+  listCheckpoints: () => request<{ checkpoints: CheckpointEntry[] }>('/alpha-lab/checkpoints'),
+  getJobCheckpoints: (jobId: string) =>
+    request<{ job_id: string; checkpoints: CheckpointEntry[] }>(`/alpha-lab/checkpoints/${jobId}`),
+  getFactorCatalog: (params?: {
+    strategy?: string; round_idx?: number; min_ic?: number;
+    evaluated_only?: boolean; limit?: number;
+  }) => {
+    const qs = new URLSearchParams()
+    if (params?.strategy) qs.set('strategy', params.strategy)
+    if (params?.round_idx != null) qs.set('round_idx', String(params.round_idx))
+    if (params?.min_ic != null) qs.set('min_ic', String(params.min_ic))
+    if (params?.evaluated_only) qs.set('evaluated_only', 'true')
+    if (params?.limit) qs.set('limit', String(params.limit))
+    const q = qs.toString()
+    return request<FactorCatalogResponse>(`/alpha-lab/factor-catalog${q ? '?' + q : ''}`)
+  },
+  getFactorCatalogStats: () =>
+    request<{ strategies: Record<string, unknown>; total_factors: number; job_id?: string }>('/alpha-lab/factor-catalog/stats'),
 }

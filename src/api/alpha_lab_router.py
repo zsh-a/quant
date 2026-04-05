@@ -535,3 +535,216 @@ async def get_neural_plot():
     if not p.exists():
         raise HTTPException(status_code=404, detail="No training plot available")
     return FileResponse(p, media_type="image/png")
+
+
+# --- Strategy State Management ---
+
+
+@router.get("/strategy-state")
+async def get_strategy_state():
+    """Get current state of all registered strategies."""
+    from src.alpha.strategy_state import StatefulStrategy
+
+    strategies_info: list[dict[str, Any]] = []
+    for strategy in service.search_engine.strategies:
+        info: dict[str, Any] = {
+            "name": strategy.name,
+            "stateful": isinstance(strategy, StatefulStrategy),
+        }
+        if hasattr(strategy, "get_stats"):
+            stats = strategy.get_stats()
+            # Exclude large fields like full history
+            info["stats"] = {
+                k: v for k, v in stats.items()
+                if k != "history" and not isinstance(v, (list, bytes))
+            }
+        strategies_info.append(info)
+
+    # Strategy memory summary
+    memory_summary = None
+    if service.strategy_memory:
+        memory_summary = {
+            "themes": service.strategy_memory.get_theme_summary(),
+            "operators": service.strategy_memory.get_operator_summary(),
+        }
+
+    return {
+        "strategies": strategies_info,
+        "strategy_memory": memory_summary,
+    }
+
+
+@router.get("/checkpoints")
+async def list_checkpoints():
+    """List all available checkpoints across jobs."""
+    from pathlib import Path
+
+    ckpt_dir = Path(service.checkpoint_manager._dir)
+    if not ckpt_dir.exists():
+        return {"checkpoints": []}
+
+    checkpoints: list[dict[str, Any]] = []
+    for job_dir in sorted(ckpt_dir.iterdir(), reverse=True):
+        if not job_dir.is_dir():
+            continue
+        for ckpt in sorted(job_dir.glob("checkpoint_r*"), reverse=True):
+            manifest_path = ckpt / "manifest.json"
+            if not manifest_path.exists():
+                continue
+            try:
+                manifest = _json.loads(manifest_path.read_text())
+                strategies_saved = manifest.get("strategy_names", [])
+                checkpoints.append({
+                    "job_id": manifest.get("job_id", job_dir.name),
+                    "round_idx": manifest.get("round_idx", 0),
+                    "timestamp": manifest.get("timestamp", 0),
+                    "path": str(ckpt),
+                    "strategies": strategies_saved,
+                    "archive_count": len(manifest.get("archive_formulas", [])),
+                    "context_state": manifest.get("context_state", {}),
+                })
+            except Exception:
+                continue
+
+    return {"checkpoints": checkpoints}
+
+
+@router.get("/checkpoints/{job_id}")
+async def get_job_checkpoints(job_id: str):
+    """List checkpoints for a specific job."""
+    from pathlib import Path
+
+    job_dir = Path(service.checkpoint_manager._dir) / job_id
+    if not job_dir.exists():
+        return {"checkpoints": []}
+
+    checkpoints: list[dict[str, Any]] = []
+    for ckpt in sorted(job_dir.glob("checkpoint_r*"), reverse=True):
+        manifest_path = ckpt / "manifest.json"
+        if not manifest_path.exists():
+            continue
+        try:
+            manifest = _json.loads(manifest_path.read_text())
+            # Read strategy metadata
+            strategy_details = []
+            for name in manifest.get("strategy_names", []):
+                safe = name.replace("/", "_")
+                meta_path = ckpt / f"strategy_{safe}.meta.json"
+                if meta_path.exists():
+                    meta = _json.loads(meta_path.read_text())
+                    strategy_details.append({
+                        "name": name,
+                        "format": meta.get("format"),
+                        "metadata": meta.get("metadata", {}),
+                    })
+            checkpoints.append({
+                "round_idx": manifest.get("round_idx", 0),
+                "timestamp": manifest.get("timestamp", 0),
+                "path": str(ckpt),
+                "strategies": strategy_details,
+                "archive_formulas": manifest.get("archive_formulas", [])[:5],
+                "context_state": manifest.get("context_state", {}),
+            })
+        except Exception:
+            continue
+
+    return {"job_id": job_id, "checkpoints": checkpoints}
+
+
+@router.get("/factor-catalog")
+async def get_factor_catalog(
+    strategy: str | None = None,
+    round_idx: int | None = None,
+    min_ic: float | None = None,
+    evaluated_only: bool = False,
+    limit: int = Query(default=100, ge=1, le=500),
+):
+    """Query the factor catalog from the latest search context."""
+    # Find the most recent completed job's factor catalog
+    catalog_data: list[dict[str, Any]] = []
+    catalog_stats: dict[str, Any] = {}
+
+    # Check active search jobs for factor catalog
+    for job_id, job in sorted(
+        _SEARCH_JOBS.items(),
+        key=lambda x: x[1].get("created_at", ""),
+        reverse=True,
+    ):
+        result = job.get("result")
+        if not result:
+            continue
+        pipeline = result.get("pipeline")
+        if not pipeline:
+            continue
+        # Rebuild catalog from pipeline rounds
+        from src.alpha.strategy_state import FactorCatalog, FactorCatalogEntry
+        catalog = FactorCatalog()
+        # Try to load from checkpoint if available
+        ckpt = service.checkpoint_manager.latest_checkpoint(job_id)
+        if ckpt:
+            try:
+                from src.alpha.checkpoint import SearchCheckpoint
+                saved = SearchCheckpoint.load(ckpt)
+                catalog = FactorCatalog.from_json_list(saved.factor_catalog_json)
+            except Exception:
+                pass
+        if len(catalog) > 0:
+            entries = catalog.query(
+                strategy=strategy,
+                round_idx=round_idx,
+                min_ic=min_ic,
+                evaluated_only=evaluated_only,
+                limit=limit,
+            )
+            catalog_data = [
+                {
+                    "formula": e.formula,
+                    "expr_hash": e.expr_hash,
+                    "strategy": e.strategy,
+                    "round_idx": e.round_idx,
+                    "rank_ic": e.rank_ic,
+                    "sharpe": e.sharpe,
+                    "turnover": e.turnover,
+                    "fitness": e.fitness,
+                    "evaluated": e.evaluated,
+                }
+                for e in entries
+            ]
+            catalog_stats = catalog.stats_by_strategy()
+            break  # Use the first job with catalog data
+
+    return {
+        "entries": catalog_data,
+        "stats": catalog_stats,
+        "total": len(catalog_data),
+    }
+
+
+@router.get("/factor-catalog/stats")
+async def get_factor_catalog_stats():
+    """Aggregate statistics across all strategies."""
+    stats: dict[str, Any] = {"strategies": {}, "total_factors": 0}
+
+    for job_id, job in sorted(
+        _SEARCH_JOBS.items(),
+        key=lambda x: x[1].get("created_at", ""),
+        reverse=True,
+    ):
+        result = job.get("result")
+        if not result:
+            continue
+        ckpt = service.checkpoint_manager.latest_checkpoint(job_id)
+        if ckpt:
+            try:
+                from src.alpha.checkpoint import SearchCheckpoint
+                saved = SearchCheckpoint.load(ckpt)
+                from src.alpha.strategy_state import FactorCatalog
+                catalog = FactorCatalog.from_json_list(saved.factor_catalog_json)
+                stats["strategies"] = catalog.stats_by_strategy()
+                stats["total_factors"] = len(catalog)
+                stats["job_id"] = job_id
+                break
+            except Exception:
+                pass
+
+    return stats

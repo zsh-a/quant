@@ -357,3 +357,48 @@ export interface AlphaLabWorkspace {
     engine?: AlphaLabEngineInfo;
     strategy_modes?: string[];
 }
+
+/* ── Strategy State Management ──────────────────────────────────────── */
+
+export interface StrategyInfo {
+    name: string;
+    stateful: boolean;
+    stats?: Record<string, unknown>;
+}
+
+export interface StrategyStateResponse {
+    strategies: StrategyInfo[];
+    strategy_memory?: {
+        themes: Record<string, { count: number; avg_fitness: number; success_rate: number; best_fitness: number }>;
+        operators: Record<string, { count: number; avg_fitness: number }>;
+    } | null;
+}
+
+export interface CheckpointEntry {
+    job_id: string;
+    round_idx: number;
+    timestamp: number;
+    path: string;
+    strategies: string[] | Array<{ name: string; format: string; metadata: Record<string, unknown> }>;
+    archive_count?: number;
+    archive_formulas?: Array<Record<string, unknown>>;
+    context_state?: Record<string, unknown>;
+}
+
+export interface FactorCatalogEntry {
+    formula: string;
+    expr_hash: string;
+    strategy: string;
+    round_idx: number;
+    rank_ic: number;
+    sharpe: number;
+    turnover: number;
+    fitness: number;
+    evaluated: boolean;
+}
+
+export interface FactorCatalogResponse {
+    entries: FactorCatalogEntry[];
+    stats: Record<string, { total_generated: number; total_evaluated: number; best_fitness: number; avg_ic: number }>;
+    total: number;
+}
