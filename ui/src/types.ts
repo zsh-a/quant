@@ -178,12 +178,16 @@ export interface MarketDbOverview {
     generated_at: string;
 }
 
+/* ======================================================================== */
+/*  Alpha Lab types                                                         */
+/* ======================================================================== */
+
 export interface AlphaLabOperator {
     name: string;
     category?: string;
-    arity?: number;
-    description?: string;
-    output_type?: string;
+    min_args?: number;
+    max_args?: number;
+    output_kind?: string;
 }
 
 export interface AlphaLabValidationReport {
@@ -194,17 +198,14 @@ export interface AlphaLabValidationReport {
 }
 
 export interface AlphaLabDatasetSummary {
-    provider: string;
     interval: string;
     symbols: string[];
     shape: [number, number];
-    timestamps?: string[];
 }
 
 export interface AlphaLabRunSummary {
     run_id: string;
     saved_at?: string;
-    path?: string;
     dataset?: Record<string, unknown>;
     top_results?: number;
 }
@@ -219,20 +220,20 @@ export interface AlphaLabZooEntry {
     tags?: string[];
     source?: string;
     saved_at?: string;
-    run_id?: string;
-    path?: string;
-    validation?: AlphaLabValidationReport;
 }
 
 export interface AlphaLabRunDetail {
     run_id: string;
     dataset?: AlphaLabDatasetSummary;
-    validation?: Record<string, unknown>;
-    timing?: Record<string, unknown>;
-    generations?: Array<Record<string, unknown>>;
+    timing?: Record<string, number>;
     top_results?: AlphaLabZooEntry[];
     lineage?: Array<Record<string, unknown>>;
-    evaluations?: Record<string, unknown>;
+    search_stats?: { total_evaluations?: number; total_rejected?: number; archive_size?: number };
+}
+
+export interface AlphaLabSeriesPoint {
+    i: number;
+    v: number;
 }
 
 export interface AlphaLabEvaluationSummary {
@@ -242,16 +243,45 @@ export interface AlphaLabEvaluationSummary {
     expr_hash?: string;
     normalized_formula?: string;
     metrics: Record<string, number>;
-    alpha_tail?: number[][];
-    weights_tail?: number[][];
-    equity_tail?: number[];
+    equity_series?: AlphaLabSeriesPoint[];
+    drawdown_series?: AlphaLabSeriesPoint[];
+    turnover_series?: AlphaLabSeriesPoint[];
+}
+
+export interface AlphaLabEngineInfo {
+    backend: string;
+    device: string;
+    triton: boolean;
+}
+
+export interface AlphaLabSearchJob {
+    job_id: string;
+    status: 'pending' | 'running' | 'completed' | 'failed';
+    created_at?: string;
+    error?: string;
+    run_id?: string;
+    top_results?: AlphaLabZooEntry[];
+    top_count?: number;
+    search_stats?: Record<string, number>;
+    timing?: Record<string, number>;
+}
+
+export interface AlphaLabCombineResult {
+    metrics?: Record<string, number>;
+    combination?: {
+        method: string;
+        factor_count: number;
+        selected_factors?: Array<{ formula: string; rank_ic: number; fitness: number }>;
+        timing?: Record<string, number>;
+    };
+    equity_series?: AlphaLabSeriesPoint[];
+    drawdown_series?: AlphaLabSeriesPoint[];
 }
 
 export interface AlphaLabWorkspaceDefaults {
     alpha_lab: Record<string, unknown>;
     bitget: Record<string, unknown>;
     crypto_market: Record<string, unknown>;
-    providers: string[];
     intervals: string[];
     sample_formulas: string[];
 }
@@ -261,4 +291,5 @@ export interface AlphaLabWorkspace {
     defaults: AlphaLabWorkspaceDefaults;
     runs: AlphaLabRunSummary[];
     zoo: AlphaLabZooEntry[];
+    engine?: AlphaLabEngineInfo;
 }
