@@ -195,6 +195,83 @@ def _sig_corr(a: np.ndarray, b: np.ndarray) -> float:
 
 
 # ---------------------------------------------------------------------------
+# Enumeration Strategy (bulk seeding via programmatic generation)
+# ---------------------------------------------------------------------------
+
+
+class EnumerationStrategy:
+    """Flood the initial population with programmatically enumerated formulas.
+
+    On round 0, generates hundreds of candidates via :class:`FormulaEnumerator`,
+    screens them with a fast IC-only check (no CPCV), and returns the top-K as
+    pre-screened :class:`Individual` objects for the orchestrator to evaluate.
+
+    This is complementary to LLM-based strategies: enumeration provides breadth,
+    LLM provides depth.
+    """
+
+    def __init__(
+        self,
+        max_enumerate: int = 500,
+        top_k: int = 30,
+        min_abs_ic: float = 0.015,
+    ) -> None:
+        self.max_enumerate = max_enumerate
+        self.top_k = top_k
+        self.min_abs_ic = min_abs_ic
+
+    @property
+    def name(self) -> str:
+        return "enumeration"
+
+    def should_activate(self, ctx: SearchContext) -> bool:
+        # Only run on the genesis round for bulk seeding
+        return ctx.round_idx == 0 and ctx.dataset is not None
+
+    def generate_candidates(self, ctx: SearchContext) -> list[Individual]:
+        from .enumerator import FormulaEnumerator
+        from .fast_screen import fast_screen_ic
+
+        # 1. Enumerate formulas
+        enumerator = FormulaEnumerator(compiler=ctx.compiler, schema=ctx.schema)
+        formulas = enumerator.generate(max_count=self.max_enumerate)
+        if not formulas:
+            return []
+
+        # 2. Fast IC screen on the full dataset (no CPCV)
+        from .vm import StackVM
+        vm = StackVM()
+        passed = fast_screen_ic(
+            formulas,
+            ctx.dataset,
+            ctx.compiler,
+            vm,
+            ctx.schema,
+            min_abs_ic=self.min_abs_ic,
+        )
+
+        # 3. Compile top-K into Individuals
+        candidates: list[Individual] = []
+        for formula, ic in passed[:self.top_k]:
+            if len(candidates) >= self.top_k:
+                break
+            ind = build_individual(ctx.compiler, ctx.schema, formula, {"origin": "enumeration", "screen_ic": round(ic, 5)})
+            if ind and ind.expr_hash not in ctx.seen_hashes:
+                candidates.append(ind)
+
+        logger.info(
+            "enumeration.generate enumerated={} ic_passed={} candidates={}",
+            len(formulas), len(passed), len(candidates),
+        )
+        return candidates
+
+    def on_evaluation_complete(
+        self, ctx: SearchContext, evaluated: list[Individual],
+    ) -> None:
+        pass  # No internal learning needed
+
+
+# ---------------------------------------------------------------------------
 # Search Orchestrator
 # ---------------------------------------------------------------------------
 
@@ -291,7 +368,13 @@ class SearchOrchestrator:
             init_span.set("archive", len(ctx.archive))
         init_seconds = perf_counter() - overall_start
 
-        # --- main loop ---
+        # --- main loop (with pipeline overlap) ---
+        # Pre-generated candidates from the previous round's LLM call.
+        # While evaluation runs, the next round's LLM call is already in flight.
+        from concurrent.futures import ThreadPoolExecutor, Future
+        prefetch_future: Future | None = None
+        prefetch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="llm_prefetch")
+
         for round_idx in range(rounds):
             round_start = perf_counter()
             ctx.round_idx = round_idx
@@ -319,8 +402,15 @@ class SearchOrchestrator:
                     f"strategy_{strategy_name}", kind="search",
                     strategy=strategy_name, round=round_idx,
                 ) as strat_span:
-                    # 1. Generate candidates
-                    candidates = strategy.generate_candidates(ctx)
+                    # 1. Generate candidates (or use prefetched from previous round)
+                    if prefetch_future is not None and strategy_name == "llm_evolution":
+                        try:
+                            candidates = prefetch_future.result(timeout=120)
+                        except Exception:
+                            candidates = strategy.generate_candidates(ctx)
+                        prefetch_future = None
+                    else:
+                        candidates = strategy.generate_candidates(ctx)
                     strat_span.set("candidates_generated", len(candidates))
 
                     if not candidates:
@@ -345,7 +435,36 @@ class SearchOrchestrator:
                             qs_span.set("rejected", quick_rejected)
                     ctx.total_rejected += quick_rejected
 
-                    # 3. Full evaluate
+                    # 3. Top-N gating: limit full CPCV to top candidates
+                    max_full_eval = max(ctx.batch_size * 2, 8)
+                    if quick_evaluate_fn and len(screened) > max_full_eval:
+                        quick_result_for_rank = quick_evaluate_fn(screened)
+                        if quick_result_for_rank:
+                            def _qs_rank(ind: Individual) -> float:
+                                qm = quick_result_for_rank.metrics_by_hash.get(ind.expr_hash, {})
+                                return abs(float(qm.get("rank_ic", 0))) + float(qm.get("sharpe", 0)) * 0.1
+                            screened.sort(key=_qs_rank, reverse=True)
+                        screened = screened[:max_full_eval]
+                        logger.info("search.top_n_gate passed={} limit={}", len(screened), max_full_eval)
+
+                    # 4. Pipeline: pre-generate next round's LLM candidates
+                    #    while this round's evaluation runs.
+                    next_round_idx = round_idx + 1
+                    if (
+                        next_round_idx < rounds
+                        and strategy_name == "llm_evolution"
+                        and prefetch_future is None
+                    ):
+                        # Snapshot context for prefetch (population won't change
+                        # until after evaluation completes below).
+                        def _prefetch_gen(strat=strategy, c=ctx):
+                            try:
+                                return strat.generate_candidates(c)
+                            except Exception:
+                                return []
+                        prefetch_future = prefetch_executor.submit(_prefetch_gen)
+
+                    # 5. Full evaluate
                     if screened:
                         with tracer.start_span(
                             "evaluate", kind="eval", count=len(screened),
@@ -354,7 +473,6 @@ class SearchOrchestrator:
                             best = max((ind.fitness for ind in screened), default=-999)
                             eval_span.set("best_fitness", round(best, 4))
 
-                        # 4. Callback
                         strategy.on_evaluation_complete(ctx, screened)
 
                     strat_span.set("evaluated", len(screened))
@@ -374,6 +492,8 @@ class SearchOrchestrator:
             round_ctx.__exit__(None, None, None)
 
             round_summaries.append(round_info)
+
+        prefetch_executor.shutdown(wait=False)
 
         # --- result ---
         archive_list = sorted(ctx.archive.values(), key=lambda x: x.fitness, reverse=True)
@@ -399,6 +519,8 @@ class SearchOrchestrator:
     # Internal helpers
     # ------------------------------------------------------------------
 
+    _MAX_EVALUATED_HISTORY = 200  # cap to bound memory; archive keeps the best
+
     def _evaluate_and_update(self, ctx: SearchContext, individuals: list[Individual]) -> None:
         """Run full evaluation, update fitness/population/archive."""
         result = ctx.evaluate_fn(individuals)
@@ -414,6 +536,13 @@ class SearchOrchestrator:
             archive_update(ctx.archive, ind, self.fitness_engine.policy.reject_score)
 
         ctx.total_evaluations += len(individuals)
+
+        # Evict oldest entries to cap memory (archive retains the best)
+        while len(ctx.all_evaluated) > self._MAX_EVALUATED_HISTORY:
+            evicted = ctx.all_evaluated.pop(0)
+            # Keep details only for archive members
+            if evicted.expr_hash not in {ind.expr_hash for cell in ctx.archive.values() for ind in [cell]}:
+                ctx.details_by_hash.pop(evicted.expr_hash, None)
 
     def _build_initial_population(self, seeds: list[str], target: int) -> list[Individual]:
         """Compile seeds + fill gap with heuristic mutations."""

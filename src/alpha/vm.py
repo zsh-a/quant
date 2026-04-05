@@ -49,6 +49,43 @@ class TensorStore:
         return bool(torch is not None and isinstance(first, torch.Tensor))
 
 
+class SubexprCache:
+    """Thread-safe LRU cache for subexpression results.
+
+    Cache keys include the dataset shape so that results from different
+    fold splits (train vs valid vs test) never collide — even when
+    evaluated concurrently by ThreadPoolExecutor.
+    """
+
+    def __init__(self, max_entries: int = 4096):
+        import threading
+        from collections import OrderedDict
+        self._cache: OrderedDict[tuple[Any, ...], ArrayLike] = OrderedDict()
+        self._max = max_entries
+        self._lock = threading.Lock()
+        self.hits = 0
+        self.misses = 0
+
+    def get(self, key: tuple[Any, ...], shape: tuple[int, ...]) -> ArrayLike | None:
+        full_key = (shape, *key)
+        with self._lock:
+            val = self._cache.get(full_key)
+            if val is not None:
+                self._cache.move_to_end(full_key)
+                self.hits += 1
+                return val
+            self.misses += 1
+            return None
+
+    def put(self, key: tuple[Any, ...], shape: tuple[int, ...], value: ArrayLike) -> None:
+        full_key = (shape, *key)
+        with self._lock:
+            self._cache[full_key] = value
+            self._cache.move_to_end(full_key)
+            while len(self._cache) > self._max:
+                self._cache.popitem(last=False)
+
+
 class StackVM:
     def __init__(self, device: str | None = None, prefer_torch: bool = True, use_triton: bool = True):
         self.prefer_torch = prefer_torch
@@ -61,6 +98,11 @@ class StackVM:
             and self.device is not None
             and self.device.type == "cuda"
         )
+        self.persistent_cache: SubexprCache | None = None
+
+    def enable_persistent_cache(self, max_entries: int = 4096) -> None:
+        """Enable cross-batch subexpression cache for repeated evaluations."""
+        self.persistent_cache = SubexprCache(max_entries=max_entries)
 
     def run(self, program: BytecodeProgram, store: TensorStore) -> ArrayLike:
         prepared_store = self._prepare_store(store)
@@ -87,8 +129,7 @@ class StackVM:
             if ins.opcode == "push_field":
                 cache_key = ("field", ins.value)
                 registers[ins.dst] = self._cache_lookup_or_compute(
-                    cache_key,
-                    shared_cache,
+                    cache_key, shared_cache, output_shape,
                     lambda: store.get_field(ins.value),
                 )
                 register_keys[ins.dst] = cache_key
@@ -96,8 +137,7 @@ class StackVM:
             if ins.opcode == "push_const":
                 cache_key = ("const", float(ins.value), output_shape)
                 registers[ins.dst] = self._cache_lookup_or_compute(
-                    cache_key,
-                    shared_cache,
+                    cache_key, shared_cache, output_shape,
                     lambda: self._broadcast_const(ins.value, output_shape, store),
                 )
                 register_keys[ins.dst] = cache_key
@@ -105,8 +145,7 @@ class StackVM:
             args = [registers[idx] for idx in ins.args]
             cache_key = (ins.opcode, *(register_keys[idx] for idx in ins.args))
             registers[ins.dst] = self._cache_lookup_or_compute(
-                cache_key,
-                shared_cache,
+                cache_key, shared_cache, output_shape,
                 lambda: self._execute(ins.opcode, args),
             )
             register_keys[ins.dst] = cache_key
@@ -140,13 +179,30 @@ class StackVM:
         self,
         cache_key: tuple[Any, ...],
         shared_cache: dict[tuple[Any, ...], ArrayLike] | None,
+        shape: tuple[int, ...],
         compute: Any,
     ) -> ArrayLike:
+        # Check persistent cache (shape-keyed, thread-safe)
+        pc = self.persistent_cache
+        if pc is not None:
+            val = pc.get(cache_key, shape)
+            if val is not None:
+                if shared_cache is not None:
+                    shared_cache[cache_key] = val
+                return val
+
+        # Per-batch shared cache (single-thread within one run_batch call)
         if shared_cache is None:
-            return compute()
-        if cache_key not in shared_cache:
+            result = compute()
+        elif cache_key not in shared_cache:
             shared_cache[cache_key] = compute()
-        return shared_cache[cache_key]
+            result = shared_cache[cache_key]
+        else:
+            result = shared_cache[cache_key]
+
+        if pc is not None:
+            pc.put(cache_key, shape, result)
+        return result
 
     def _broadcast_const(self, value: Any, shape: tuple[int, ...], store: TensorStore) -> ArrayLike:
         if self.backend == "torch":

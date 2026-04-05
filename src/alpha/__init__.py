@@ -10,6 +10,8 @@ Pluggable strategy framework for alpha formula mining with:
 from .combination import FactorCombiner, FactorSignal
 from .compiler import BytecodeProgram, FormulaCompiler, Instruction
 from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
+from .enumerator import FormulaEnumerator
+from .fast_screen import fast_screen_ic
 from .dsl import ASTNode, FormulaParser, TensorSchema, TypeChecker, ValidationReport
 from .evaluation import compute_forward_returns, compute_ic_metrics, compute_rank_ic
 from .evolution import (
@@ -98,6 +100,8 @@ __all__ = [
     "SearchOrchestrator",
     "SearchResult",
     "SearchStrategy",
+    "FormulaEnumerator",
+    "fast_screen_ic",
     "SignalTransformer",
     "Span",
     "SpanCollector",

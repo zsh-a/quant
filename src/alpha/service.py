@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import threading
 from collections import OrderedDict
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import asdict
 from datetime import datetime
 from time import perf_counter
@@ -55,6 +57,7 @@ class AlphaService:
         self.schema = schema or TensorSchema.default_market_schema()
         self.compiler = FormulaCompiler(self.registry)
         self.vm = StackVM()
+        self.vm.enable_persistent_cache(max_entries=1024)
 
         # --- Enhanced modules ---
         self.knowledge_base = FinancialKnowledgeBase()
@@ -84,7 +87,9 @@ class AlphaService:
         self.llm_backend = resolved_llm
 
         # --- Assemble strategies ---
+        from .search_strategy import EnumerationStrategy
         strategies: list = [
+            EnumerationStrategy(),  # bulk seeding on round 0
             LLMEvolutionStrategy(llm_backend=resolved_llm),
         ]
 
@@ -125,6 +130,7 @@ class AlphaService:
         self.validator = CPCVValidator()
         self._program_cache_size = max(int(program_cache_size), 0)
         self._program_cache: OrderedDict[str, BytecodeProgram] = OrderedDict()
+        self._program_cache_lock = threading.Lock()
         self._complexity_cache: dict[str, dict[str, float]] = {}
 
     def list_operators(self) -> list[dict[str, Any]]:
@@ -751,7 +757,6 @@ class AlphaService:
             signatures_by_hash[individual.expr_hash] = evaluation["alpha_signature"]
             details_by_hash[individual.expr_hash] = {
                 "formula": individual.formula,
-                "program": evaluation["program"],
                 "metrics": evaluation["metrics"],
                 "alpha_signature": evaluation["alpha_signature"],
             }
@@ -772,38 +777,61 @@ class AlphaService:
         split_signatures_by_hash: dict[str, dict[str, list[list[float]]]] = {}
         details_by_hash: dict[str, dict[str, Any]] = {}
 
-        for fold_entry in validation_folds:
-            timing_breakdown["fold_count"] += 1
+        # --- Parallel fold evaluation ---
+        # Each fold (with train/valid/test splits) is evaluated independently.
+        # Uses ThreadPoolExecutor because VM releases the GIL during numpy/torch ops.
+        def _eval_fold(fold_entry: dict[str, Any]) -> tuple[Any, dict[str, dict[str, Any]]]:
             fold = fold_entry["fold"]
-            # Create split datasets lazily from the parent dataset reference.
             dataset_ref = fold_entry.get("dataset_ref")
             split_indices = {
                 "train": fold.train_indices,
                 "valid": fold.valid_indices,
                 "test": fold.test_indices,
             }
-            # Support both lazy (dataset_ref) and pre-materialized (datasets) formats.
             pre_materialized = fold_entry.get("datasets")
-            fold_results: dict[str, dict[str, dict[str, Any]]] = {}
+            fold_results: dict[str, dict[str, Any]] = {}
             for split_name in ("train", "valid", "test"):
                 if pre_materialized is not None:
                     split_dataset = pre_materialized[split_name]
                 else:
                     split_dataset = dataset_ref.take_indices(split_indices[split_name])
-                split_start = perf_counter()
                 split_results = self.evaluate_population_from_dataset(
-                    population,
-                    split_dataset,
-                    timing_breakdown=timing_breakdown,
+                    population, split_dataset,
                 )
-                timing_breakdown["fold_loop_seconds"] += perf_counter() - split_start
-                timing_breakdown["split_count"] += 1
                 fold_results[split_name] = split_results
+                del split_dataset
+            return fold, fold_results
+
+        n_folds = len(validation_folds)
+        # Scale workers by dataset size to cap total memory.
+        # Each worker holds a TensorStore + alpha outputs (~30-50 MB for typical datasets).
+        first_ref = validation_folds[0].get("dataset_ref") if validation_folds else None
+        if first_ref is not None:
+            t, s = first_ref.shape()
+            n_fields = len(first_ref.fields)
+            est_mb_per_worker = t * s * n_fields * 4 / (1024 * 1024)  # float32
+            max_workers = max(1, min(n_folds, 4, int(512 / max(est_mb_per_worker, 1))))
+        else:
+            max_workers = min(n_folds, 2)
+        if n_folds > 1 and max_workers > 1:
+            with ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futures = {pool.submit(_eval_fold, fe): fe for fe in validation_folds}
+                completed_folds = []
+                for future in as_completed(futures):
+                    completed_folds.append(future.result())
+        else:
+            completed_folds = [_eval_fold(fe) for fe in validation_folds]
+
+        # Merge results from all folds
+        for fold, fold_results in completed_folds:
+            timing_breakdown["fold_count"] += 1
+            for split_name in ("train", "valid", "test"):
+                timing_breakdown["split_count"] += 1
+                split_results = fold_results[split_name]
                 for expr_hash, metrics in split_results["metrics_by_hash"].items():
                     split_metrics_by_hash.setdefault(expr_hash, {}).setdefault(split_name, []).append(metrics)
                 for expr_hash, signature in split_results["signatures_by_hash"].items():
                     split_signatures_by_hash.setdefault(expr_hash, {}).setdefault(split_name, []).append(signature)
-                del split_dataset  # release fold copy immediately
 
             for individual in population:
                 expr_hash = individual.expr_hash
@@ -1141,18 +1169,20 @@ class AlphaService:
         return np.mean(stacked, axis=0).astype(float).tolist()
 
     def _compile_cached(self, formula: str) -> BytecodeProgram:
-        program = self._program_cache.get(formula)
-        if program is not None:
-            self._program_cache.move_to_end(formula)
-            return program
+        with self._program_cache_lock:
+            program = self._program_cache.get(formula)
+            if program is not None:
+                self._program_cache.move_to_end(formula)
+                return program
 
         program = self.compiler.compile(formula, self.schema)
         if self._program_cache_size <= 0:
             return program
-        self._program_cache[formula] = program
-        self._program_cache.move_to_end(formula)
-        while len(self._program_cache) > self._program_cache_size:
-            self._program_cache.popitem(last=False)
+        with self._program_cache_lock:
+            self._program_cache[formula] = program
+            self._program_cache.move_to_end(formula)
+            while len(self._program_cache) > self._program_cache_size:
+                self._program_cache.popitem(last=False)
         return program
 
     def program_cache_stats(self) -> dict[str, int]:
@@ -1395,18 +1425,22 @@ class AlphaService:
         correlations = np.clip(correlations, -1.0, 1.0)
         return float(np.mean(correlations)) if correlations.size else 0.0
 
-    def _build_alpha_signature(self, alpha: Any) -> list[float]:
+    def _build_alpha_signature(self, alpha: Any, max_points: int = 200) -> list[float]:
         data = np.nan_to_num(self._to_numpy(alpha), nan=0.0, posinf=0.0, neginf=0.0)
         if data.size == 0:
             return []
-        signature = np.concatenate(
-            [
-                np.mean(data, axis=1),
-                np.std(data, axis=1),
-                np.mean(data, axis=0),
-            ]
-        )
-        return signature.astype(float).tolist()
+        row_mean = np.mean(data, axis=1)  # (T,)
+        row_std = np.std(data, axis=1)    # (T,)
+        col_mean = np.mean(data, axis=0)  # (S,)
+        # Downsample time-axis vectors to cap memory
+        if len(row_mean) > max_points:
+            step = len(row_mean) / max_points
+            indices = np.arange(max_points) * step
+            indices = np.clip(indices.astype(int), 0, len(row_mean) - 1)
+            row_mean = row_mean[indices]
+            row_std = row_std[indices]
+        signature = np.concatenate([row_mean, row_std, col_mean])
+        return signature.astype(np.float32).tolist()
 
     def _to_numpy(self, value: Any) -> np.ndarray:
         if hasattr(value, "detach") and hasattr(value, "cpu"):

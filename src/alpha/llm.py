@@ -204,10 +204,13 @@ class OpenAILLMBackend:
     def generate_initial_population(self, count: int) -> list[str]:
         from .tracing import tracer
 
+        # Over-generate: ask LLM for 2x then take best after validation.
+        # This reduces fallback to heuristic and improves diversity.
+        request_count = min(count * 2, 24)
         with tracer.start_span("genesis", kind="breed",
                                target_count=count, backend=self.backend_name) as span:
             self._last_theme_map.clear()
-            prompt = self._build_genesis_prompt(count)
+            prompt = self._build_genesis_prompt(request_count)
             raw = self._call_llm(prompt, self.temperature_genesis, "genesis")
             formulas = self._extract_and_validate(raw)
             finalized = self._finalize(formulas, count,
@@ -219,10 +222,11 @@ class OpenAILLMBackend:
     def generate_offspring(self, spec: BreedingSpec, count: int) -> list[str]:
         from .tracing import tracer
 
+        request_count = min(count * 2, 16)
         with tracer.start_span("evolution", kind="breed",
                                target_count=count, backend=self.backend_name) as span:
             self._last_theme_map.clear()
-            prompt = self._build_evolution_prompt(spec, count)
+            prompt = self._build_evolution_prompt(spec, request_count)
             raw = self._call_llm(prompt, self.temperature_evolution, "evolution")
             formulas = self._extract_and_validate(raw)
             finalized = self._finalize(formulas, count,
