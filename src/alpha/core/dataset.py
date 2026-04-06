@@ -28,6 +28,82 @@ class AlphaDataset:
         close = self.fields["close"]
         return int(close.shape[0]), int(close.shape[1])
 
+    def build_universe_mask(
+        self,
+        adv_window: int = 288,
+        top_n: int = 80,
+        skip_top_n: int = 0,
+        min_adv: float = 0.0,
+    ) -> np.ndarray:
+        """Build a dynamic universe mask based on rolling ADV.
+
+        For each timestep, only the top-N symbols by rolling average daily
+        turnover (quote volume) are included.  This implements the "dynamic
+        universe filtering" needed for robust cross-sectional strategies.
+
+        Args:
+            adv_window: Lookback window in bars for rolling average
+                        (default 288 = 1 day of 5m bars).
+            top_n: Include top N symbols by ADV at each timestep.
+            skip_top_n: Skip the top N most liquid symbols (for small-fund
+                        strategies that avoid mega-caps).
+            min_adv: Minimum ADV threshold (absolute, in quote currency).
+
+        Returns:
+            Boolean mask of shape (T, N) where True = symbol in universe.
+        """
+        turnover = self.fields.get("turnover")
+        if turnover is None:
+            turnover = self.fields.get("quote_volume")
+        if turnover is None:
+            # Fallback: all symbols included
+            T, N = self.shape()
+            return np.ones((T, N), dtype=bool)
+
+        T, N = turnover.shape
+
+        # Rolling average turnover (ADV proxy)
+        # Use cumsum trick for fast rolling mean
+        cumsum = np.nancumsum(turnover, axis=0)
+        adv = np.full_like(turnover, np.nan)
+        adv[adv_window:] = (cumsum[adv_window:] - cumsum[:-adv_window]) / adv_window
+        # For the first `adv_window` bars, use expanding mean
+        for t in range(1, min(adv_window, T)):
+            adv[t] = cumsum[t] / (t + 1)
+        adv[0] = turnover[0]
+
+        # Build mask: per-timestep top-N by ADV (excluding top skip_top_n)
+        mask = np.zeros((T, N), dtype=bool)
+        for t in range(T):
+            row = adv[t]
+            valid = ~np.isnan(row)
+            if not valid.any():
+                continue
+            # Apply min_adv threshold
+            if min_adv > 0:
+                valid = valid & (row >= min_adv)
+            # Rank by ADV descending
+            order = np.argsort(-np.nan_to_num(row, nan=-1))
+            # Select range [skip_top_n, skip_top_n + top_n]
+            count = 0
+            for idx in order:
+                if not valid[idx]:
+                    continue
+                count += 1
+                if count <= skip_top_n:
+                    continue
+                if count > skip_top_n + top_n:
+                    break
+                mask[t, idx] = True
+
+        included = mask.sum(axis=1).mean()
+        logger.info(
+            "universe_mask built: adv_window={} top_n={} skip_top={} "
+            "avg_included={:.1f}/{} symbols",
+            adv_window, top_n, skip_top_n, included, N,
+        )
+        return mask
+
     def slice_by_index(self, start_idx: int, end_idx: int) -> AlphaDataset:
         """Contiguous slice — returns numpy views (zero-copy)."""
         start_idx = max(start_idx, 0)

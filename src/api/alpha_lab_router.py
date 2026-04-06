@@ -159,6 +159,8 @@ def _normalize_blocked_hours(values: list[int] | None) -> list[int] | None:
 
 
 def _workspace_defaults() -> dict[str, object]:
+    from src.market_data.binance_vision import EXPANDED_SYMBOLS
+
     crypto_market = get_crypto_market_config()
     return {
         "alpha_lab": get_alpha_lab_config().model_dump(),
@@ -171,6 +173,38 @@ def _workspace_defaults() -> dict[str, object]:
             "cs_rank(ts_zscore(funding_rate, 20))",
         ],
         "extra_strategies": ["mcts", "neural"],
+        "symbol_presets": [
+            {
+                "key": "top5",
+                "label": "Top 5 (BTC/ETH/SOL...)",
+                "brief": "流动性最强的 5 个，适合单因子验证",
+                "symbols": EXPANDED_SYMBOLS[:5],
+            },
+            {
+                "key": "mega_cap",
+                "label": "Mega Cap (Top 10)",
+                "brief": "前 10 大市值，定价有效，alpha 薄",
+                "symbols": EXPANDED_SYMBOLS[:10],
+            },
+            {
+                "key": "mid_cap",
+                "label": "Mid Cap (11-60)",
+                "brief": "小资金黄金区间，散户多，错误定价多",
+                "symbols": EXPANDED_SYMBOLS[10:60],
+            },
+            {
+                "key": "small_fund",
+                "label": "小资金推荐 (30-80)",
+                "brief": "跳过 mega-cap，专注中小盘高波动",
+                "symbols": EXPANDED_SYMBOLS[10:],
+            },
+            {
+                "key": "expanded",
+                "label": "全市场 (80 symbols)",
+                "brief": "80 个流动永续合约，截面宽度最大",
+                "symbols": EXPANDED_SYMBOLS,
+            },
+        ],
     }
 
 

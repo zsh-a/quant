@@ -160,12 +160,19 @@ export const SearchTab: React.FC<SearchTabProps> = ({
     } catch (e) { setErr(e instanceof Error ? e.message : 'Search submit failed') }
   }, [formula, interval, startTime, endTime, searchSeeds, params, symList, strategy, setErr, searchJobs])
 
-  const DATA_PARAMS = [
-    { key: 'interval',  label: 'Interval',  hint: 'K 线周期' },
-    { key: 'startTime', label: 'Start',     hint: '起始时间' },
-    { key: 'endTime',   label: 'End',       hint: '结束时间' },
-    { key: 'symbols',   label: 'Symbols',   hint: '交易对' },
-  ]
+  // Symbol presets from backend workspace
+  const symbolPresets: Array<{ key: string; label: string; brief: string; symbols: string[] }> =
+    (ws?.defaults as any)?.symbol_presets ?? []
+  const activePreset = useMemo(() => {
+    const current = symList().sort().join(',')
+    return symbolPresets.find(p => [...p.symbols].sort().join(',') === current)?.key ?? 'custom'
+  }, [symbols, symbolPresets, symList])
+
+  const handlePresetChange = useCallback((key: string) => {
+    if (key === 'custom') return
+    const preset = symbolPresets.find(p => p.key === key)
+    if (preset) setSymbols(preset.symbols.join(','))
+  }, [symbolPresets, setSymbols])
 
   return (
     <div className="space-y-6">
@@ -208,27 +215,80 @@ export const SearchTab: React.FC<SearchTabProps> = ({
         </div>
 
         {/* ── Data scope ── */}
-        <div className="grid gap-4 md:grid-cols-4">
-          {DATA_PARAMS.map(p => (
-            <div key={p.key} className="space-y-1.5">
-              <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-                title={p.hint}>
-                {p.label}<Info className="size-3 opacity-40" />
-              </label>
-              {p.key === 'interval' ? (
-                <select value={interval} onChange={e => setInterval(e.target.value)}
-                  className="h-10 w-full rounded-xl border border-border bg-input px-3 text-sm text-foreground outline-none">
-                  {intervals.map(i => <option key={i} value={i}>{i}</option>)}
-                </select>
-              ) : p.key === 'startTime' ? (
-                <Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
-              ) : p.key === 'endTime' ? (
-                <Input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
-              ) : (
-                <Input value={symbols} onChange={e => setSymbols(e.target.value)} placeholder="BTCUSDT,ETHUSDT" />
-              )}
-            </div>
-          ))}
+        <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+              title="K 线周期">Interval<Info className="size-3 opacity-40" /></label>
+            <select value={interval} onChange={e => setInterval(e.target.value)}
+              className="h-10 w-full rounded-xl border border-border bg-input px-3 text-sm text-foreground outline-none">
+              {intervals.map(i => <option key={i} value={i}>{i}</option>)}
+            </select>
+          </div>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+              title="起始时间">Start<Info className="size-3 opacity-40" /></label>
+            <Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
+          </div>
+          <div className="space-y-1.5">
+            <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+              title="结束时间">End<Info className="size-3 opacity-40" /></label>
+            <Input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
+          </div>
+        </div>
+
+        {/* ── Symbol preset selector ── */}
+        <div className="space-y-2">
+          <div className="flex items-center gap-3">
+            <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+              title="交易对">Symbols<Info className="size-3 opacity-40" /></label>
+            {symbolPresets.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {symbolPresets.map(p => (
+                  <button key={p.key} onClick={() => handlePresetChange(p.key)}
+                    title={p.brief}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                      activePreset === p.key
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
+                    }`}>
+                    {p.label}
+                  </button>
+                ))}
+                <button onClick={() => {/* keep current custom */}}
+                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    activePreset === 'custom'
+                      ? 'bg-primary text-primary-foreground'
+                      : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
+                  }`}>
+                  Custom
+                </button>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <Input value={symbols} onChange={e => setSymbols(e.target.value)}
+              placeholder="BTCUSDT,ETHUSDT,SOLUSDT"
+              className="flex-1 font-mono text-xs" />
+            <Badge variant="secondary" className="whitespace-nowrap text-[10px]">
+              {symList().length} symbols
+            </Badge>
+          </div>
+          {/* Expandable symbol chips */}
+          {symList().length > 5 && (
+            <details className="group">
+              <summary className="cursor-pointer text-[10px] text-muted-foreground hover:text-foreground transition select-none">
+                <ChevronRight className="inline size-3 transition-transform group-open:rotate-90" />
+                {' '}Show all {symList().length} symbols
+              </summary>
+              <div className="mt-1.5 flex flex-wrap gap-1">
+                {symList().map(s => (
+                  <span key={s} className="rounded bg-secondary/50 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
+                    {s}
+                  </span>
+                ))}
+              </div>
+            </details>
+          )}
         </div>
 
         {/* ── Search params (collapsible) ── */}

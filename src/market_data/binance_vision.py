@@ -44,6 +44,32 @@ DEFAULT_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT", "DOGEU
 DEFAULT_INTERVAL = "5m"
 DEFAULT_START = "2020-01-01"
 
+# Expanded universe for cross-sectional alpha mining (~80 liquid perpetuals).
+# Selected for sustained 24h volume > $10M on Binance USD-M futures.
+# Excludes stablecoins and de-pegged tokens.
+EXPANDED_SYMBOLS = [
+    # Mega-cap (top 10 by market cap — useful as hedges, less alpha)
+    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
+    "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "TRXUSDT", "DOTUSDT",
+    # Large-cap (11-30)
+    "LINKUSDT", "MATICUSDT", "SHIBUSDT", "LTCUSDT", "BCHUSDT",
+    "NEARUSDT", "UNIUSDT", "APTUSDT", "ICPUSDT", "ETCUSDT",
+    "FILUSDT", "STXUSDT", "ATOMUSDT", "IMXUSDT", "RENDERUSDT",
+    "OPUSDT", "ARBUSDT", "INJUSDT", "SUIUSDT", "SEIUSDT",
+    # Mid-cap (31-60) — sweet spot for small-fund alpha
+    "FTMUSDT", "GRTUSDT", "THETAUSDT", "AAVEUSDT", "MKRUSDT",
+    "ALGOUSDT", "SANDUSDT", "MANAUSDT", "AXSUSDT", "SNXUSDT",
+    "CRVUSDT", "LDOUSDT", "DYDXUSDT", "RNDRUSDT", "CFXUSDT",
+    "AGLDUSDT", "APEUSDT", "MASKUSDT", "GMXUSDT", "WOOUSDT",
+    "PENDLEUSDT", "TIAUSDT", "JUPUSDT", "WUSDT", "ENAUSDT",
+    "WLDUSDT", "PYTHUSDT", "JTOUSDT", "ONDOUSDT", "EIGENUSDT",
+    # Small-cap high-volume (61-80) — highest alpha potential
+    "PEOPLEUSDT", "LRCUSDT", "BLURUSDT", "ORBSUSDT", "STRKUSDT",
+    "MOVRUSDT", "1000PEPEUSDT", "1000FLOKIUSDT", "1000BONKUSDT", "WIFUSDT",
+    "NEIROUSDT", "MEMEUSDT", "BRETTUSDT", "POPCATUSDT", "ACTUSDT",
+    "TRUMPUSDT", "COOKIEUSDT", "MOVEUSDT", "LAYERUSDT", "BANUSDT",
+]
+
 TABLE = "crypto_data.futures_5m"
 
 # ---------------------------------------------------------------------------
@@ -112,6 +138,74 @@ class BinanceVisionSyncer:
         self.client.command(_CREATE_TABLE_SQL)
 
     # -- public API ---------------------------------------------------------
+
+    def discover_liquid_symbols(
+        self,
+        min_volume_usd: float = 10_000_000,
+        max_symbols: int = 100,
+        skip_top_n: int = 0,
+    ) -> list[dict[str, Any]]:
+        """Auto-discover liquid USD-M perpetual futures from Binance API.
+
+        Returns symbols sorted by 24h quote volume descending, filtered by
+        ``min_volume_usd``.  Use ``skip_top_n`` to exclude the top-N most
+        liquid symbols (e.g. skip_top_n=10 for small-fund strategies that
+        avoid mega-caps where alpha is thin).
+
+        Returns list of {"symbol": str, "volume_24h_usd": float}.
+        """
+        # Fetch exchange info for active USDT perpetuals
+        try:
+            info_resp = self.session.get(
+                "https://fapi.binance.com/fapi/v1/exchangeInfo",
+                timeout=self._timeout,
+            )
+            info_resp.raise_for_status()
+            exchange_info = info_resp.json()
+        except Exception as e:
+            logger.warning("discover_liquid_symbols: exchangeInfo failed: {}", e)
+            return []
+
+        active_symbols = {
+            s["symbol"]
+            for s in exchange_info.get("symbols", [])
+            if s.get("status") == "TRADING"
+            and s.get("contractType") == "PERPETUAL"
+            and s["symbol"].endswith("USDT")
+        }
+
+        # Fetch 24h volume
+        try:
+            ticker_resp = self.session.get(
+                "https://fapi.binance.com/fapi/v1/ticker/24hr",
+                timeout=self._timeout,
+            )
+            ticker_resp.raise_for_status()
+            tickers = ticker_resp.json()
+        except Exception as e:
+            logger.warning("discover_liquid_symbols: ticker/24hr failed: {}", e)
+            return []
+
+        # Filter and sort by quote volume
+        ranked: list[dict[str, Any]] = []
+        for t in tickers:
+            sym = t.get("symbol", "")
+            if sym not in active_symbols:
+                continue
+            vol = float(t.get("quoteVolume", 0))
+            if vol >= min_volume_usd:
+                ranked.append({"symbol": sym, "volume_24h_usd": round(vol, 2)})
+
+        ranked.sort(key=lambda x: x["volume_24h_usd"], reverse=True)
+
+        # Apply skip and limit
+        result = ranked[skip_top_n: skip_top_n + max_symbols]
+        logger.info(
+            "discover_liquid_symbols: found {} active perpetuals, {} pass volume filter, "
+            "returning {} (skip_top={})",
+            len(active_symbols), len(ranked), len(result), skip_top_n,
+        )
+        return result
 
     def sync(
         self,
@@ -553,6 +647,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sp = sub.add_parser("sync", help="Download & ingest (incremental)")
     sp.add_argument("--symbols", help="Comma-separated, e.g. BTCUSDT,ETHUSDT")
+    sp.add_argument("--expanded", action="store_true", help="Use EXPANDED_SYMBOLS (~80 liquid futures)")
     sp.add_argument("--interval", default=DEFAULT_INTERVAL, help="Kline interval (default: 5m)")
     sp.add_argument("--start", help="Start date, e.g. 2020-01-01")
     sp.add_argument("--end", help="End date")
@@ -560,6 +655,15 @@ def _build_parser() -> argparse.ArgumentParser:
 
     st = sub.add_parser("status", help="Show latest synced time per symbol")
     st.add_argument("--symbols", help="Comma-separated")
+
+    dc = sub.add_parser("discover", help="Auto-discover liquid perpetuals from Binance API")
+    dc.add_argument("--min-volume", type=float, default=10_000_000,
+                     help="Min 24h quote volume in USD (default: 10M)")
+    dc.add_argument("--max-symbols", type=int, default=100, help="Max symbols to return")
+    dc.add_argument("--skip-top", type=int, default=0,
+                    help="Skip top N symbols (small-fund: skip mega-caps)")
+    dc.add_argument("--sync", action="store_true",
+                    help="Also sync discovered symbols after listing")
 
     return p
 
@@ -576,6 +680,9 @@ def main(argv: list[str] | None = None) -> int:
     symbols = _split_symbols(getattr(args, "symbols", None))
 
     if args.command == "sync":
+        # --expanded overrides default symbols with EXPANDED_SYMBOLS
+        if getattr(args, "expanded", False) and not symbols:
+            symbols = EXPANDED_SYMBOLS
 
         def _on_progress(e: dict) -> None:
             print(
@@ -588,10 +695,29 @@ def main(argv: list[str] | None = None) -> int:
             interval=args.interval,
             start=args.start,
             end=getattr(args, "end", None),
-            progress=_on_progress if args.verbose else None,
+            progress=_on_progress if getattr(args, "verbose", False) else None,
         )
     elif args.command == "status":
         result = syncer.status(symbols=symbols)
+    elif args.command == "discover":
+        discovered = syncer.discover_liquid_symbols(
+            min_volume_usd=args.min_volume,
+            max_symbols=args.max_symbols,
+            skip_top_n=args.skip_top,
+        )
+        print(f"\n{'#':>3}  {'Symbol':<20}  {'24h Volume (USD)':>20}")
+        print("-" * 50)
+        for i, d in enumerate(discovered, 1):
+            print(f"{i:>3}  {d['symbol']:<20}  ${d['volume_24h_usd']:>18,.0f}")
+        print(f"\nTotal: {len(discovered)} symbols")
+        if getattr(args, "sync", False) and discovered:
+            print("\nStarting sync for discovered symbols...")
+            disc_syms = [d["symbol"] for d in discovered]
+            result = syncer.sync(symbols=disc_syms, progress=lambda e: print(
+                f"  [{e['symbol']}] {e['period']}  +{e['new']}"
+            ))
+            print(json.dumps(result, indent=2, default=str, ensure_ascii=False))
+        return 0
     else:
         raise ValueError(f"Unknown command: {args.command}")
 
