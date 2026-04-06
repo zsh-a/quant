@@ -18,9 +18,11 @@ import httpx
 from loguru import logger
 from openai import OpenAI
 
+import hashlib
+
 from .compiler import FormulaCompiler
 from .dsl import TensorSchema
-from .evolution import BreedingSpec, HeuristicLLMBackend
+from .evolution import BreedingSpec
 from .operators import OperatorRegistry
 
 # ---------------------------------------------------------------------------
@@ -138,6 +140,135 @@ def _normalize_to_snake(formula: str) -> str:
     for pattern, replacement in _CAMEL_PATTERNS:
         formula = pattern.sub(replacement, formula)
     return formula
+
+
+# ---------------------------------------------------------------------------
+# Heuristic (local, deterministic) backend
+# ---------------------------------------------------------------------------
+
+
+class HeuristicLLMBackend:
+    """Deterministic formula generation via mutation, crossover, and template wrapping.
+
+    Lightweight fallback when no LLM API key is available, and also used
+    by SearchOrchestrator to bootstrap initial populations.
+    """
+
+    def __init__(self, registry: OperatorRegistry | None = None, schema: TensorSchema | None = None):
+        self.registry = registry or OperatorRegistry()
+        self.schema = schema or TensorSchema.default_market_schema()
+        self.call_stats = {"initial_population_calls": 0, "offspring_calls": 0}
+
+    @property
+    def backend_name(self) -> str:
+        return "heuristic"
+
+    def generate_offspring(self, spec: BreedingSpec, count: int) -> list[str]:
+        self.call_stats["offspring_calls"] += 1
+        offspring: list[str] = []
+        bases = [spec.parent_a]
+        if spec.parent_b:
+            bases.append(spec.parent_b)
+        attempts = 0
+        max_attempts = max(count * 8, 8)
+        while len(offspring) < count and attempts < max_attempts:
+            base = bases[attempts % len(bases)]
+            if spec.parent_b and attempts % 3 == 0:
+                candidate = self._crossover_formula(spec.parent_a, spec.parent_b, attempts)
+            elif attempts % 3 == 1:
+                candidate = self._mutate_formula(base, attempts)
+            else:
+                candidate = self._wrap_formula(base, spec.objective, attempts)
+            if candidate not in offspring:
+                offspring.append(candidate)
+            attempts += 1
+        if not offspring:
+            offspring.append(self._mutate_formula(spec.parent_a, 0))
+        return offspring
+
+    def generate_initial_population(self, count: int) -> list[str]:
+        self.call_stats["initial_population_calls"] += 1
+        seeds = [
+            "cs_rank(ts_mean(close, 5) - close)",
+            "cs_rank(ts_std(close, 10))",
+            "cs_rank(delta(premium_close, 5))",
+            "cs_rank(ts_zscore(funding_rate, 20))",
+            "cs_rank(delta(open_interest, 10) - ts_mean(delta(open_interest, 10), 20))",
+            "cs_rank(ts_zscore(long_short_ratio, 20))",
+            "cs_rank(div(taker_buy_volume, volume + 1e-12) - 0.5)",
+            "cs_rank(ts_corr(close, taker_buy_volume, 10))",
+        ]
+        generated: list[str] = []
+        attempts = 0
+        while len(generated) < count and attempts < max(count * 4, 8):
+            base = seeds[attempts % len(seeds)]
+            candidate = base if attempts < len(seeds) else self._wrap_formula(base, "bootstrap", attempts)
+            if candidate not in generated:
+                generated.append(candidate)
+            attempts += 1
+        return generated[:count]
+
+    def _mutate_formula(self, formula: str, variant: int = 0) -> str:
+        replacements = [
+            ("ts_mean(", "ts_std("), ("ts_std(", "ts_mean("),
+            ("ts_max(", "ts_rank("), ("ts_rank(", "ts_mean("),
+            ("close", "vwap"), ("close", "mark_close"),
+            ("volume", "turnover"), ("volume", "taker_buy_volume"),
+            ("close", "hlc3(high, low, close)"), ("turnover", "adv_n(turnover, 5)"),
+            ("close", "ohlc4(open, high, low, close)"),
+            ("volatility_n(close, 20)", "atr_n(high, low, close, 14)"),
+            ("funding_rate", "ts_zscore(funding_rate, 20)"),
+            ("open_interest", "delta(open_interest, 5)"),
+            ("close", "premium_close"), ("volume", "trade_count"),
+        ]
+        offset = self._stable_index(formula, len(replacements), salt=f"mutate:{variant}")
+        for idx in range(len(replacements)):
+            source, target = replacements[(offset + idx) % len(replacements)]
+            if source in formula:
+                return formula.replace(source, target, 1)
+        return self._wrap_formula(formula, "mutation fallback", variant)
+
+    def _wrap_formula(self, formula: str, objective: str, variant: int = 0) -> str:
+        wrappers = [
+            f"cs_rank(({formula}) - amihud(close, turnover, 5))",
+            f"cs_rank(({formula}) + atr_n(high, low, close, 5))",
+            f"cs_zscore(decay_linear(({formula}), 3))",
+            f"cs_rank(fillna(({formula}), 0) + cs_demean(vwap))",
+            f"cs_zscore(clip(({formula}), -3, 3) + adv_n(turnover, 10))",
+            f"cs_rank(ts_zscore(({formula}), 5) - volatility_n(close, 10))",
+            f"cs_rank(({formula}) + ts_corr(close, volume, 10))",
+            f"cs_rank(({formula}) - ts_rank(turnover, 20))",
+            f"cs_rank(decay_linear(({formula}), 5) + ts_mean(volume, 10))",
+            f"cs_rank(({formula}) + delta(premium_close, 5))",
+            f"cs_rank(({formula}) - ts_zscore(funding_rate, 20))",
+            f"cs_rank(({formula}) + ts_zscore(long_short_ratio, 20))",
+            f"cs_rank(({formula}) + delta(open_interest, 10))",
+            f"cs_rank(({formula}) - ts_rank(taker_buy_volume, 10))",
+        ]
+        if "turnover" in objective.lower():
+            wrappers.extend([
+                f"cs_rank(decay_linear(({formula}), 5) - spread_ratio(bid_ask_spread, close))",
+                f"cs_rank(fillna(({formula}), 0) - amihud(close, turnover, 10))",
+            ])
+        idx = self._stable_index(formula, len(wrappers), salt=f"wrap:{objective}:{variant}")
+        return wrappers[idx]
+
+    def _crossover_formula(self, parent_a: str, parent_b: str, variant: int = 0) -> str:
+        templates = [
+            f"cs_rank(({parent_a}) + ({parent_b}))",
+            f"cs_rank(({parent_a}) - ({parent_b}))",
+            f"cs_zscore(decay_linear((({parent_a}) + ({parent_b})), 3))",
+            f"cs_rank(max(({parent_a}), ({parent_b})) - volatility_n(close, 10))",
+            f"cs_rank(min(({parent_a}), ({parent_b})) + ts_corr(close, volume, 10))",
+            f"cs_rank((({parent_a}) + atr_n(high, low, close, 5)) - (({parent_b}) + amihud(close, turnover, 5)))",
+            f"cs_rank(ts_mean(({parent_a}), 3) - ts_mean(({parent_b}), 3))",
+        ]
+        idx = self._stable_index(f"{parent_a}|{parent_b}", len(templates), salt=f"cross:{variant}")
+        return templates[idx]
+
+    def _stable_index(self, value: str, modulo: int, salt: str = "") -> int:
+        digest = hashlib.sha256(f"{salt}|{value}".encode("utf-8")).hexdigest()
+        return int(digest[:12], 16) % max(modulo, 1)
 
 
 # ---------------------------------------------------------------------------

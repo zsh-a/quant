@@ -31,8 +31,7 @@ from ..evolution import Individual
 from ..operators import OperatorRegistry, OperatorSpec
 from ..dsl import TensorSchema
 from ..pipeline import Lineage
-from ..search_strategy import SearchContext, build_individual
-from ..strategy_state import StrategySnapshot
+from ..strategy_state import SearchContext, StrategySnapshot, build_individual
 
 
 # ---------------------------------------------------------------------------

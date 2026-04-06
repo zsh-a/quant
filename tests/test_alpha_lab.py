@@ -6,7 +6,8 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.alpha import AlphaService, FormulaCompiler, StackVM, TensorStore
-from src.alpha.evolution import BreedingSpec, FitnessEngine, HeuristicLLMBackend
+from src.alpha.evolution import BreedingSpec, FitnessEngine
+from src.alpha.llm import HeuristicLLMBackend
 from src.alpha.search_strategy import SearchOrchestrator
 from src.alpha.strategies import LLMEvolutionStrategy
 from src.alpha.llm import OpenAILLMBackend

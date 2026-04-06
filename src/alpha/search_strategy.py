@@ -1,45 +1,34 @@
 """
-Pluggable search strategy framework for alpha factor discovery.
+Search orchestrator for alpha factor discovery.
 
-Defines the SearchStrategy protocol, SearchContext shared state, and
-SearchOrchestrator that manages multiple strategies in a unified loop.
-
-Current strategies:
-  - LLMEvolutionStrategy (strategies/llm_evolution.py)
-  - MCTSRefinementStrategy (strategies/mcts_refinement.py)
-  - NeuralFormulaStrategy (strategies/neural_formula.py)
-
-Future strategies (each just implements the same 4-method interface):
-  - DAGEvolutionStrategy (AlphaPROBE)
-  - GrammarGuidedStrategy (AlphaCFG)
-  - SynergyRLStrategy (Synergistic RL)
-  - NeuralGenerativeStrategy (AlphaForge)
-  - DistributionalRLStrategy (AlphaQCM)
+Manages multiple search strategies in a unified loop with:
+  - Quick-screen filtering
+  - Full CPCV evaluation
+  - MAP-Elites archive management
+  - Checkpoint/restore
+  - Pipeline tracing
 """
 
 from __future__ import annotations
 
 import random
 from collections import deque
-from dataclasses import dataclass, field
 from time import perf_counter
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Callable
 
 import numpy as np
 from loguru import logger
 
-from .compiler import BytecodeProgram, FormulaCompiler
-from .dataset import AlphaDataset
+from .compiler import FormulaCompiler
 from .dsl import TensorSchema
 from .evolution import (
     EvalResult,
     FitnessEngine,
-    FitnessPolicy,
-    HeuristicLLMBackend,
     Individual,
     BreedingSpec,
     SearchResult,
 )
+from .llm import HeuristicLLMBackend
 from .operators import OperatorRegistry
 from .pipeline import (
     ArchiveEntry,
@@ -49,100 +38,17 @@ from .pipeline import (
     StageKind,
     StageRecord,
 )
-from .strategy_state import FactorCatalog, FactorCatalogEntry
+from .strategy_state import (
+    FactorCatalog,
+    FactorCatalogEntry,
+    SearchContext,
+    SearchStrategy,
+    build_individual,
+)
 
 
 # ---------------------------------------------------------------------------
-# Shared context
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class SearchContext:
-    """Shared state accessible to all strategies via a single object.
-
-    Strategies read/write population and archive through this context,
-    enabling indirect collaboration without direct coupling.
-    """
-
-    # --- shared collections ---
-    population: deque[Individual]
-    archive: dict[tuple[int, int], Individual]
-    seen_hashes: set[str]
-    all_evaluated: list[Individual]
-    details_by_hash: dict[str, dict[str, Any]]
-
-    # --- infrastructure ---
-    compiler: FormulaCompiler
-    schema: TensorSchema
-    registry: OperatorRegistry
-    fitness_engine: FitnessEngine
-
-    # --- evaluation callbacks ---
-    evaluate_fn: Callable[[list[Individual]], EvalResult]
-    quick_evaluate_fn: Callable[[list[Individual]], EvalResult] | None
-
-    # --- optional enhanced modules ---
-    strategy_memory: Any | None  # StrategyMemory (avoid circular import)
-    knowledge_base: Any | None  # FinancialKnowledgeBase
-    feature_kitchen: Any | None  # FeatureKitchen
-
-    # --- dataset (needed by some strategies like MCTS) ---
-    dataset: AlphaDataset | None = None
-
-    # --- search state ---
-    round_idx: int = 0
-    total_rounds: int = 0
-    total_evaluations: int = 0
-    total_rejected: int = 0
-    batch_size: int = 8
-
-    # --- factor catalog (unified factor tracking) ---
-    factor_catalog: FactorCatalog | None = None
-
-
-# ---------------------------------------------------------------------------
-# Strategy protocol
-# ---------------------------------------------------------------------------
-
-
-@runtime_checkable
-class SearchStrategy(Protocol):
-    """Interface that all search strategies must implement.
-
-    To add a new strategy (e.g. from a paper), implement these 4 methods
-    and register the strategy with SearchOrchestrator.
-    """
-
-    @property
-    def name(self) -> str:
-        """Strategy name for logging and tracing."""
-        ...
-
-    def should_activate(self, ctx: SearchContext) -> bool:
-        """Whether this strategy should run in the current round."""
-        ...
-
-    def generate_candidates(self, ctx: SearchContext) -> list[Individual]:
-        """Generate candidate Individuals (compiled, not yet evaluated).
-
-        The orchestrator handles quick-screen, full evaluation, archive
-        update, and population management.
-        """
-        ...
-
-    def on_evaluation_complete(
-        self, ctx: SearchContext, evaluated: list[Individual]
-    ) -> None:
-        """Callback after evaluation — for internal learning.
-
-        Called with the evaluated individuals (metrics and fitness filled in).
-        """
-        ...
-
-
-# ---------------------------------------------------------------------------
-# Archive helpers (shared across orchestrator)
+# Archive helpers
 # ---------------------------------------------------------------------------
 
 _IC_BINS = (0.0, 0.02, 0.05, float("inf"))
@@ -175,27 +81,6 @@ def archive_update(
         archive[cell] = ind
 
 
-def build_individual(
-    compiler: FormulaCompiler,
-    schema: TensorSchema,
-    formula: str,
-    lineage: Lineage | dict[str, Any],
-) -> Individual | None:
-    """Compile a formula into an Individual, or return None on failure."""
-    try:
-        program = compiler.compile(formula, schema)
-    except ValueError:
-        return None
-    if isinstance(lineage, dict):
-        lineage = Lineage.from_dict(lineage)
-    return Individual(
-        formula=formula,
-        program=program,
-        expr_hash=program.expr_hash,
-        lineage=lineage,
-    )
-
-
 def _sig_corr(a: np.ndarray, b: np.ndarray) -> float:
     """Absolute Pearson correlation between two signature vectors."""
     n = min(len(a), len(b))
@@ -207,83 +92,6 @@ def _sig_corr(a: np.ndarray, b: np.ndarray) -> float:
     if denom < 1e-12:
         return 1.0
     return abs(float((am * bm).sum() / denom))
-
-
-# ---------------------------------------------------------------------------
-# Enumeration Strategy (bulk seeding via programmatic generation)
-# ---------------------------------------------------------------------------
-
-
-class EnumerationStrategy:
-    """Flood the initial population with programmatically enumerated formulas.
-
-    On round 0, generates hundreds of candidates via :class:`FormulaEnumerator`,
-    screens them with a fast IC-only check (no CPCV), and returns the top-K as
-    pre-screened :class:`Individual` objects for the orchestrator to evaluate.
-
-    This is complementary to LLM-based strategies: enumeration provides breadth,
-    LLM provides depth.
-    """
-
-    def __init__(
-        self,
-        max_enumerate: int = 500,
-        top_k: int = 30,
-        min_abs_ic: float = 0.015,
-    ) -> None:
-        self.max_enumerate = max_enumerate
-        self.top_k = top_k
-        self.min_abs_ic = min_abs_ic
-
-    @property
-    def name(self) -> str:
-        return "enumeration"
-
-    def should_activate(self, ctx: SearchContext) -> bool:
-        # Only run on the genesis round for bulk seeding
-        return ctx.round_idx == 0 and ctx.dataset is not None
-
-    def generate_candidates(self, ctx: SearchContext) -> list[Individual]:
-        from .enumerator import FormulaEnumerator
-        from .fast_screen import fast_screen_ic
-
-        # 1. Enumerate formulas
-        enumerator = FormulaEnumerator(compiler=ctx.compiler, schema=ctx.schema)
-        formulas = enumerator.generate(max_count=self.max_enumerate)
-        if not formulas:
-            return []
-
-        # 2. Fast IC screen on the full dataset (no CPCV)
-        from .vm import StackVM
-        vm = StackVM()
-        passed = fast_screen_ic(
-            formulas,
-            ctx.dataset,
-            ctx.compiler,
-            vm,
-            ctx.schema,
-            min_abs_ic=self.min_abs_ic,
-        )
-
-        # 3. Compile top-K into Individuals
-        candidates: list[Individual] = []
-        for formula, ic in passed[:self.top_k]:
-            if len(candidates) >= self.top_k:
-                break
-            ind = build_individual(ctx.compiler, ctx.schema, formula, Lineage(origin="enumeration", screen_ic=round(ic, 5)))
-            if ind and ind.expr_hash not in ctx.seen_hashes:
-                candidates.append(ind)
-
-        logger.info(
-            "enumeration.generate enumerated={} ic_passed={} candidates={}",
-            len(formulas), len(passed), len(candidates),
-        )
-        return candidates
-
-    def on_evaluation_complete(
-        self, ctx: SearchContext, evaluated: list[Individual],
-    ) -> None:
-        pass  # No internal learning needed
 
 
 # ---------------------------------------------------------------------------

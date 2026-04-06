@@ -139,8 +139,7 @@ class AlphaService:
         enum_max: int = 500,
         enum_top_k: int = 30,
     ) -> list:
-        from .search_strategy import EnumerationStrategy
-        from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy, NeuralFormulaStrategy
+        from .strategies import EnumerationStrategy, LLMEvolutionStrategy, MCTSRefinementStrategy, NeuralFormulaStrategy
 
         if mode not in self._STRATEGY_MODES:
             raise ValueError(

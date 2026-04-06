@@ -12,9 +12,9 @@ from typing import Any
 
 from loguru import logger
 
-from ..evolution import BreedingSpec, Individual, LLMBackend
+from ..evolution import BreedingSpec, Individual
 from ..pipeline import Lineage
-from ..search_strategy import SearchContext, build_individual
+from ..strategy_state import SearchContext, build_individual
 
 
 class LLMEvolutionStrategy:
@@ -32,7 +32,7 @@ class LLMEvolutionStrategy:
 
     def __init__(
         self,
-        llm_backend: LLMBackend,
+        llm_backend: Any,
         tournament_size: int = 7,
         batch_size: int | None = None,
     ) -> None:

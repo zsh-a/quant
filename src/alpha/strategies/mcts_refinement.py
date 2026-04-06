@@ -17,7 +17,7 @@ from loguru import logger
 
 import json as _json
 
-from ..search_strategy import SearchContext, build_individual
+from ..strategy_state import SearchContext, build_individual
 from ..evolution import Individual
 from ..pipeline import Lineage
 from ..strategy_state import StrategySnapshot

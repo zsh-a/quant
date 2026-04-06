@@ -2,16 +2,21 @@
 Unified strategy state management abstractions.
 
 Provides:
+  - ``SearchContext`` — shared state accessible to all strategies
+  - ``SearchStrategy`` — protocol that all strategies implement
   - ``StatefulStrategy`` — optional protocol for strategies with saveable state
   - ``StrategySnapshot`` — serialized state from one strategy
   - ``FactorCatalog`` — queryable registry of all factors across strategies
+  - ``build_individual`` — compile a formula into an Individual
 """
 
 from __future__ import annotations
 
-from collections import defaultdict
+from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable
+
+from loguru import logger
 
 
 # ---------------------------------------------------------------------------
@@ -180,3 +185,115 @@ class FactorCatalog:
         while len(self._entries) > self._max_entries:
             removed = self._entries.pop(0)
             self._by_hash.pop(removed.expr_hash, None)
+
+
+# ---------------------------------------------------------------------------
+# Search strategy protocol
+# ---------------------------------------------------------------------------
+
+
+@runtime_checkable
+class SearchStrategy(Protocol):
+    """Interface that all search strategies must implement.
+
+    To add a new strategy (e.g. from a paper), implement these 4 methods
+    and register the strategy with SearchOrchestrator.
+    """
+
+    @property
+    def name(self) -> str:
+        """Strategy name for logging and tracing."""
+        ...
+
+    def should_activate(self, ctx: "SearchContext") -> bool:
+        """Whether this strategy should run in the current round."""
+        ...
+
+    def generate_candidates(self, ctx: "SearchContext") -> list:
+        """Generate candidate Individuals (compiled, not yet evaluated)."""
+        ...
+
+    def on_evaluation_complete(self, ctx: "SearchContext", evaluated: list) -> None:
+        """Callback after evaluation — for internal learning."""
+        ...
+
+
+# ---------------------------------------------------------------------------
+# Shared search context
+# ---------------------------------------------------------------------------
+
+
+@dataclass
+class SearchContext:
+    """Shared state accessible to all strategies via a single object.
+
+    Strategies read/write population and archive through this context,
+    enabling indirect collaboration without direct coupling.
+    """
+
+    # --- shared collections ---
+    population: deque
+    archive: dict[tuple[int, int], Any]  # cell -> Individual
+    seen_hashes: set[str]
+    all_evaluated: list
+    details_by_hash: dict[str, dict[str, Any]]
+
+    # --- infrastructure ---
+    compiler: Any  # FormulaCompiler
+    schema: Any  # TensorSchema
+    registry: Any  # OperatorRegistry
+    fitness_engine: Any  # FitnessEngine
+
+    # --- evaluation callbacks ---
+    evaluate_fn: Callable
+    quick_evaluate_fn: Callable | None
+
+    # --- optional enhanced modules ---
+    strategy_memory: Any | None  # StrategyMemory
+    knowledge_base: Any | None  # FinancialKnowledgeBase
+    feature_kitchen: Any | None  # FeatureKitchen
+
+    # --- dataset (needed by some strategies like MCTS) ---
+    dataset: Any | None = None  # AlphaDataset
+
+    # --- search state ---
+    round_idx: int = 0
+    total_rounds: int = 0
+    total_evaluations: int = 0
+    total_rejected: int = 0
+    batch_size: int = 8
+
+    # --- factor catalog (unified factor tracking) ---
+    factor_catalog: FactorCatalog | None = None
+
+
+# ---------------------------------------------------------------------------
+# Individual builder
+# ---------------------------------------------------------------------------
+
+
+def build_individual(
+    compiler: Any,
+    schema: Any,
+    formula: str,
+    lineage: Any,
+) -> Any | None:
+    """Compile a formula into an Individual, or return None on failure.
+
+    Avoids circular imports by deferring the actual construction.
+    """
+    from .evolution import Individual
+    from .pipeline import Lineage
+
+    try:
+        program = compiler.compile(formula, schema)
+    except (ValueError, SyntaxError):
+        return None
+    if isinstance(lineage, dict):
+        lineage = Lineage.from_dict(lineage)
+    return Individual(
+        formula=formula,
+        program=program,
+        expr_hash=program.expr_hash,
+        lineage=lineage,
+    )
