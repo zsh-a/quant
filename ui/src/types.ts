@@ -206,8 +206,13 @@ export interface AlphaLabDatasetSummary {
 export interface AlphaLabRunSummary {
     run_id: string;
     saved_at?: string;
-    dataset?: Record<string, unknown>;
+    dataset?: { interval?: string; symbols?: string[]; shape?: [number, number] };
     top_results?: number;
+    search_stats?: { total_evaluations?: number; total_rejected?: number; archive_size?: number };
+    timing_seconds?: number;
+    best_fitness?: number;
+    best_sharpe?: number;
+    best_ic?: number;
 }
 
 export interface AlphaLabZooEntry {
@@ -224,11 +229,15 @@ export interface AlphaLabZooEntry {
 
 export interface AlphaLabRunDetail {
     run_id: string;
+    saved_at?: string;
     dataset?: AlphaLabDatasetSummary;
     timing?: Record<string, number>;
-    top_results?: AlphaLabZooEntry[];
+    top_results?: Array<AlphaLabZooEntry & { split_metrics?: { train?: Record<string, number>; valid?: Record<string, number>; test?: Record<string, number> } }>;
     lineage?: Array<Record<string, unknown>>;
     search_stats?: { total_evaluations?: number; total_rejected?: number; archive_size?: number };
+    validation?: Record<string, unknown>;
+    pipeline?: AlphaPipelineRecord;
+    rounds?: Array<Record<string, unknown>>;
 }
 
 export interface AlphaLabSeriesPoint {

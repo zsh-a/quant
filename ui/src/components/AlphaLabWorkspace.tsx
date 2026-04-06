@@ -109,8 +109,12 @@ export const AlphaLabWorkspace: React.FC = () => {
 
         <TabsContent value="search">
           <SearchTab
-            formula={formula} interval={interval} symbols={symbols}
-            startTime={startTime} endTime={endTime} symList={symList}
+            formula={formula}
+            interval={interval} setInterval={setInterval}
+            symbols={symbols} setSymbols={setSymbols}
+            startTime={startTime} setStartTime={setStartTime}
+            endTime={endTime} setEndTime={setEndTime}
+            intervals={intervals} symList={symList}
             ws={ws} onLoadFormula={handleLoadFormula}
             onSearchComplete={() => void loadWorkspace()}
             setErr={setErr}

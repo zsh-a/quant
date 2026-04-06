@@ -53,6 +53,8 @@ class AlphaService:
         neural_sample_batch: int = 512,
         mcts_refinement_frequency: int = 3,
         strategy_memory_path: str | None = "data/alpha_lab/strategy_memory.json",
+        enum_max: int = 500,
+        enum_top_k: int = 30,
     ):
         self.registry = OperatorRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
@@ -90,6 +92,7 @@ class AlphaService:
         # --- Assemble strategies by mode ---
         strategies: list = self._build_strategies(
             strategy, resolved_llm, neural_sample_batch, mcts_refinement_frequency,
+            enum_max=enum_max, enum_top_k=enum_top_k,
         )
 
         # --- Checkpoint manager ---
@@ -133,6 +136,8 @@ class AlphaService:
         llm_backend: Any,
         neural_sample_batch: int,
         mcts_frequency: int,
+        enum_max: int = 500,
+        enum_top_k: int = 30,
     ) -> list:
         from .search_strategy import EnumerationStrategy
         from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy, NeuralFormulaStrategy
@@ -154,7 +159,7 @@ class AlphaService:
 
         # evolution (default) or full
         strategies: list = [
-            EnumerationStrategy(),
+            EnumerationStrategy(max_enumerate=enum_max, top_k=enum_top_k),
             LLMEvolutionStrategy(llm_backend=llm_backend),
         ]
         if mode == "full":

@@ -54,7 +54,13 @@ def _run_search_job(
         _SEARCH_JOBS[job_id]["status"] = "running"
         strategy = params.pop("strategy", "evolution")
         neural_batch = params.pop("neural_batch", 4096)
-        svc = AlphaService(strategy=strategy, neural_sample_batch=neural_batch) if strategy != "evolution" else service
+        enum_max = params.pop("enum_max", 500)
+        enum_top_k = params.pop("enum_top_k", 30)
+        needs_custom_svc = strategy != "evolution" or enum_max != 500 or enum_top_k != 30
+        svc = AlphaService(
+            strategy=strategy, neural_sample_batch=neural_batch,
+            enum_max=enum_max, enum_top_k=enum_top_k,
+        ) if needs_custom_svc else service
         result = svc.search_formulas_on_db(
             **params,
             job_id=job_id,
@@ -110,6 +116,8 @@ class SearchDbRequest(BaseModel):
     embargo_window: int = 0
     strategy: str = "evolution"  # "evolution" | "neural" | "full"
     neural_batch: int = 4096
+    enum_max: int = 500       # max formulas to enumerate (round 0)
+    enum_top_k: int = 30      # top-K from enumeration to keep
 
 
 class CombineZooRequest(BaseModel):
@@ -278,6 +286,13 @@ async def get_search_job(job_id: str):
         response["timing"] = result.get("timing", {})
         response["run_id"] = result.get("persistence", {}).get("run_id")
         response["pipeline"] = result.get("pipeline")
+        response["dataset"] = result.get("dataset")
+        # Per-factor split metrics (train/valid/test) for top results
+        evaluations = result.get("evaluations", {})
+        for tr in response.get("top_results", []):
+            h = tr.get("expr_hash")
+            if h and h in evaluations:
+                tr["split_metrics"] = evaluations[h].get("split_metrics", {})
     if job["error"]:
         response["error"] = job["error"]
     return response

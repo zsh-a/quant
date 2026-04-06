@@ -69,13 +69,22 @@ class AlphaPersistence:
                 payload = json.loads(path.read_text(encoding="utf-8"))
             except Exception:
                 continue
+            top = payload.get("top_results", [])
+            best = max(top, key=lambda x: float(x.get("fitness", 0)), default=None) if top else None
+            search_stats = payload.get("search_stats", {})
+            timing = payload.get("timing", {})
             runs.append(
                 {
                     "run_id": payload.get("run_id"),
                     "saved_at": payload.get("saved_at"),
                     "path": str(path),
                     "dataset": payload.get("dataset", {}),
-                    "top_results": len(payload.get("top_results", [])),
+                    "top_results": len(top),
+                    "search_stats": search_stats,
+                    "timing_seconds": timing.get("overall_seconds"),
+                    "best_fitness": float(best["fitness"]) if best else None,
+                    "best_sharpe": float(best.get("metrics", {}).get("sharpe", 0)) if best else None,
+                    "best_ic": float(best.get("metrics", {}).get("rank_ic", 0)) if best else None,
                 }
             )
             if len(runs) >= limit:

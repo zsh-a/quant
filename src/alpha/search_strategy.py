@@ -480,12 +480,50 @@ class SearchOrchestrator:
                         ) as qs_span:
                             quick_result = quick_evaluate_fn(candidates)
                             screened = []
+                            qs_diag_logged = 0
                             for ind in candidates:
                                 qm = quick_result.metrics_by_hash.get(ind.expr_hash, {})
                                 if self._passes_quick_screen(qm):
                                     screened.append(ind)
                                 else:
                                     quick_rejected += 1
+                                    if qs_diag_logged < 3:
+                                        logger.debug(
+                                            "quick_screen.reject formula={} coverage={:.3f} active={:.3f} inactive={} turnover={:.4f}",
+                                            ind.formula[:50],
+                                            float(qm.get("signal_coverage", -1)),
+                                            float(qm.get("active_bar_ratio", -1)),
+                                            qm.get("inactive", "?"),
+                                            float(qm.get("avg_turnover", -1)),
+                                        )
+                                        qs_diag_logged += 1
+                            if quick_rejected > 0 and len(screened) == 0:
+                                # All rejected — log summary for diagnosis
+                                sample = quick_result.metrics_by_hash
+                                first_hash = next(iter(sample), None)
+                                if first_hash:
+                                    sm = sample[first_hash]
+                                    logger.warning(
+                                        "quick_screen.all_rejected count={} sample_metrics: coverage={:.3f} active={:.3f} inactive={} turnover={:.5f} sharpe={:.4f}",
+                                        quick_rejected,
+                                        float(sm.get("signal_coverage", -1)),
+                                        float(sm.get("active_bar_ratio", -1)),
+                                        sm.get("inactive", "?"),
+                                        float(sm.get("avg_turnover", -1)),
+                                        float(sm.get("sharpe", 0)),
+                                    )
+                                # Force-pass best N to avoid total stall
+                                force_n = min(max(ctx.batch_size, 4), len(candidates))
+                                def _qs_score(ind: Individual) -> float:
+                                    qm = quick_result.metrics_by_hash.get(ind.expr_hash, {})
+                                    return float(qm.get("signal_coverage", 0)) + abs(float(qm.get("rank_ic", 0)))
+                                candidates_ranked = sorted(candidates, key=_qs_score, reverse=True)
+                                screened = candidates_ranked[:force_n]
+                                quick_rejected -= len(screened)
+                                logger.warning(
+                                    "quick_screen.force_pass count={} (best by coverage+IC to prevent search stall)",
+                                    len(screened),
+                                )
                             qs_span.set("passed", len(screened))
                             qs_span.set("rejected", quick_rejected)
 
@@ -734,13 +772,21 @@ class SearchOrchestrator:
             ))
         return entries
 
+    _qs_log_count: int = 0
+
     @staticmethod
     def _passes_quick_screen(metrics: dict[str, float]) -> bool:
-        if float(metrics.get("inactive", 0)) >= 1.0:
+        # Empty metrics dict means evaluation failed entirely — reject
+        if not metrics:
             return False
-        if float(metrics.get("signal_coverage", 1.0)) < 0.30:
+        coverage = float(metrics.get("signal_coverage", 1.0))
+        active = float(metrics.get("active_bar_ratio", 1.0))
+        # Only reject truly degenerate signals:
+        # - signal_coverage < 15%: almost entirely NaN
+        # - active_bar_ratio < 2%: almost no bars with non-zero weights
+        if coverage < 0.15:
             return False
-        if float(metrics.get("active_bar_ratio", 1.0)) < 0.05:
+        if active < 0.02:
             return False
         return True
 
