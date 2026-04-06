@@ -18,7 +18,7 @@ import io
 import json
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, ClassVar
 
 import numpy as np
 import torch
@@ -32,6 +32,7 @@ from ..core.operators import OperatorRegistry, OperatorSpec
 from ..core.dsl import TensorSchema
 from ..search.pipeline import Lineage
 from ..search.context import SearchContext, StrategySnapshot, build_individual
+from .base import BaseStrategy, StrategyMeta
 
 
 # ---------------------------------------------------------------------------
@@ -428,7 +429,7 @@ class TrainingHistory:
 # ---------------------------------------------------------------------------
 
 
-class NeuralFormulaStrategy:
+class NeuralFormulaStrategy(BaseStrategy):
     """AlphaGPT-style neural formula generation.
 
     Core loop (aligned with AlphaGPT engine.py):
@@ -439,6 +440,17 @@ class NeuralFormulaStrategy:
       5. REINFORCE gradient update on the FULL batch
       6. Return top-K unique candidates to orchestrator for CPCV evaluation
     """
+
+    meta: ClassVar[StrategyMeta] = StrategyMeta(
+        registry_name="neural",
+        label="Neural 生成",
+        brief="Transformer 自回归采样 + REINFORCE 训练",
+        detail=(
+            "因果 Transformer 以 RPN 序列方式采样公式，rank-IC 作为 reward。\n"
+            "REINFORCE + 优势归一化梯度更新，探索全新公式空间。"
+        ),
+        always_on=False,
+    )
 
     def __init__(
         self,
@@ -495,10 +507,6 @@ class NeuralFormulaStrategy:
         self._fwd_returns: np.ndarray | None = None
         self._store: Any = None
 
-    @property
-    def name(self) -> str:
-        return "neural_formula"
-
     def should_activate(self, ctx: SearchContext) -> bool:
         return (
             ctx.round_idx >= self._min_round
@@ -530,16 +538,18 @@ class NeuralFormulaStrategy:
 
             # Build Individuals from best unique formulas
             ranked = sorted(all_formulas.items(), key=lambda x: abs(x[1]), reverse=True)
-            candidates: list[Individual] = []
-            for formula, ic in ranked:
-                if len(candidates) >= self._max_candidates:
-                    break
-                ind = build_individual(
-                    ctx.compiler, ctx.schema, formula,
-                    Lineage(origin="neural_formula", screen_ic=round(ic, 5)),
-                )
-                if ind and ind.expr_hash not in ctx.seen_hashes:
-                    candidates.append(ind)
+            ranked_formulas = [f for f, _ic in ranked]
+            ic_by_formula = dict(ranked)
+
+            candidates = self.compile_and_dedup(
+                ctx,
+                ranked_formulas,
+                lineage_fn=lambda f: Lineage(
+                    origin="neural_formula",
+                    screen_ic=round(ic_by_formula.get(f, 0.0), 5),
+                ),
+                limit=self._max_candidates,
+            )
 
             span.set("train_steps", self._train_steps)
             span.set("unique_formulas", len(all_formulas))
@@ -554,17 +564,7 @@ class NeuralFormulaStrategy:
     def on_evaluation_complete(
         self, ctx: SearchContext, evaluated: list[Individual],
     ) -> None:
-        # Record to strategy memory (gradient update already done in _train_step)
-        if ctx.strategy_memory is not None:
-            for ind in evaluated:
-                ctx.strategy_memory.record(
-                    formula=ind.formula,
-                    theme_id="neural_formula",
-                    metrics=ind.metrics,
-                    is_novel=True,
-                    round_idx=ctx.round_idx,
-                    all_fields=ctx.schema.fields,
-                )
+        super().on_evaluation_complete(ctx, evaluated)
 
         # Save history periodically
         if ctx.round_idx == ctx.total_rounds - 1 or (ctx.round_idx + 1) % 5 == 0:
@@ -784,15 +784,13 @@ class NeuralFormulaStrategy:
 
 
 # --- Registry ---
-from .registry import register_strategy  # noqa: E402
+from .registry import register_strategy, StrategyInfra  # noqa: E402
 
 
-@register_strategy("neural")
-def _build_neural(*, registry=None, schema=None, neural_sample_batch=4096, **_kw):
-    from ..core.operators import OperatorRegistry
-    from ..core.dsl import TensorSchema
+@register_strategy(NeuralFormulaStrategy.meta)
+def _build_neural(infra: StrategyInfra):
     return NeuralFormulaStrategy(
-        registry=registry or OperatorRegistry(),
-        schema=schema or TensorSchema.default_market_schema(),
-        sample_batch=neural_sample_batch,
+        registry=infra.registry,
+        schema=infra.schema,
+        sample_batch=infra.neural_sample_batch,
     )

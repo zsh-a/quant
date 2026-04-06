@@ -74,7 +74,6 @@ class AlphaService:
 
         # --- Build LLM backend ---
         from .llm.backends import build_default_llm_backend
-        from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy
 
         resolved_llm = llm_backend or build_default_llm_backend(
             registry=self.registry,
@@ -128,45 +127,18 @@ class AlphaService:
     # Strategy assembly
     # ------------------------------------------------------------------
 
-    # Base strategies always active; extra strategies opt-in via comma-separated string
-    _EXTRA_STRATEGIES = ("mcts", "neural")
-
-    _STRATEGY_INFO: dict[str, dict[str, Any]] = {
-        "enumeration": {
-            "label": "枚举种子",
-            "brief": "Round 0 批量枚举公式 + fast-IC 筛选 top-K",
-            "always_on": True,
-        },
-        "llm_evolution": {
-            "label": "LLM 进化",
-            "brief": "锦标赛选择父代 → LLM 变异/交叉 → CPCV 评估 → MAP-Elites 归档",
-            "always_on": True,
-        },
-        "mcts": {
-            "label": "MCTS 精炼",
-            "brief": "LLM 引导的蒙特卡洛树搜索 (Navigating the Alpha Jungle)",
-            "detail": (
-                "从 archive 精英出发构建搜索树，UCT 选择 + 维度定向精化 + FSA 子树回避。\n"
-                "LLM 生成精化建议，经验证后加入搜索树。动态预算随发现自动增加。"
-            ),
-            "always_on": False,
-        },
-        "neural": {
-            "label": "Neural 生成",
-            "brief": "Transformer 自回归采样 + REINFORCE 训练",
-            "detail": (
-                "因果 Transformer 以 RPN 序列方式采样公式，rank-IC 作为 reward。\n"
-                "REINFORCE + 优势归一化梯度更新，探索全新公式空间。"
-            ),
-            "always_on": False,
-        },
-    }
-
     def get_strategy_modes_info(self) -> list[dict[str, Any]]:
-        """Return available strategies metadata."""
+        """Return available strategies metadata from the registry."""
+        from .strategies.registry import get_all_meta
         return [
-            {"name": name, **info}
-            for name, info in self._STRATEGY_INFO.items()
+            {
+                "name": name,
+                "label": m.label,
+                "brief": m.brief,
+                "detail": m.detail,
+                "always_on": m.always_on,
+            }
+            for name, m in get_all_meta().items()
         ]
 
     def _build_strategies(
@@ -181,32 +153,26 @@ class AlphaService:
         """Build strategy list.
 
         ``strategy`` is a comma-separated string of extra strategies to enable
-        on top of the always-on base (Enumeration + LLMEvolution).
+        on top of the always-on base strategies.
         Examples: ``""``, ``"mcts"``, ``"neural"``, ``"mcts,neural"``.
 
         Legacy mode names are mapped for backwards compatibility:
           ``"evolution"`` → base only
           ``"full"``      → ``"mcts,neural"``
         """
-        from .strategies import EnumerationStrategy, LLMEvolutionStrategy, build_extra_strategies
+        from .strategies.registry import build_strategies, get_all_meta, StrategyInfra
 
         # Normalize legacy mode names
         _LEGACY = {"evolution": "", "full": "mcts,neural"}
         normalized = _LEGACY.get(strategy, strategy)
         extras = {s.strip() for s in normalized.split(",") if s.strip()}
 
-        # Base strategies (always active)
-        base: list = [
-            EnumerationStrategy(max_enumerate=enum_max, top_k=enum_top_k),
-            LLMEvolutionStrategy(llm_backend=llm_backend),
-        ]
+        # always_on strategies are always included
+        all_meta = get_all_meta()
+        always_on = {name for name, m in all_meta.items() if m.always_on}
+        names = always_on | extras
 
-        if not extras:
-            return base
-
-        # Build extra strategies via registry
-        extra = build_extra_strategies(
-            extras,
+        infra = StrategyInfra(
             compiler=self.compiler,
             vm=self.vm,
             schema=self.schema,
@@ -217,7 +183,7 @@ class AlphaService:
             enum_max=enum_max,
             enum_top_k=enum_top_k,
         )
-        return base + extra
+        return build_strategies(names, infra)
 
     def list_operators(self) -> list[dict[str, Any]]:
         return [asdict(spec) for spec in self.registry.list_operators()]

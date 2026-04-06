@@ -11,38 +11,40 @@ for Formulaic Factor Mining" (Shi et al., 2025)
 
 from __future__ import annotations
 
-from typing import Any
+import json as _json
+from typing import Any, ClassVar
 
 from loguru import logger
 
-import json as _json
-
-from ..search.context import SearchContext, build_individual
+from ..search.context import SearchContext, StrategySnapshot
 from ..search.evolution import Individual
 from ..search.pipeline import Lineage
-from ..search.context import StrategySnapshot
+from .base import BaseStrategy, StrategyMeta
 
 
-class MCTSRefinementStrategy:
+class MCTSRefinementStrategy(BaseStrategy):
     """MCTS refinement of archive elites via LLM-guided tree search.
 
     Activates every ``activation_frequency`` rounds.  Takes the top-k
     individuals from the shared archive, seeds a fresh MCTS tree for each,
     and runs the full Algorithm 1 loop.  Discovered candidates are returned
     for the orchestrator to evaluate via CPCV.
-
-    Compared to the old wrapper, this version:
-      - Passes the existing alpha zoo from SearchContext so that the
-        multi-dimensional evaluation can compute percentile ranks.
-      - Seeds the MCTS engine's zoo with archive members for better
-        FSA and diversity scoring from the first iteration.
-      - Reports richer stats including tree depth, budget usage, and
-        per-dimension score distributions.
     """
+
+    meta: ClassVar[StrategyMeta] = StrategyMeta(
+        registry_name="mcts",
+        label="MCTS 精炼",
+        brief="LLM 引导的蒙特卡洛树搜索 (Navigating the Alpha Jungle)",
+        detail=(
+            "从 archive 精英出发构建搜索树，UCT 选择 + 维度定向精化 + FSA 子树回避。\n"
+            "LLM 生成精化建议，经验证后加入搜索树。动态预算随发现自动增加。"
+        ),
+        always_on=False,
+    )
 
     def __init__(
         self,
-        mcts_engine: Any,  # MCTSEngine (avoid circular import)
+        mcts_engine: Any,  # MCTSEngine
         activation_frequency: int = 3,
         top_k_to_refine: int = 2,
         iterations_per_refine: int = 5,
@@ -52,11 +54,6 @@ class MCTSRefinementStrategy:
         self.top_k_to_refine = top_k_to_refine
         self.iterations_per_refine = iterations_per_refine
         self._total_trees_searched: int = 0
-        self._total_zoo_found: int = 0
-
-    @property
-    def name(self) -> str:
-        return "mcts_refinement"
 
     def should_activate(self, ctx: SearchContext) -> bool:
         has_seeds = len(ctx.archive) > 0 or len(ctx.population) > 0
@@ -81,8 +78,7 @@ class MCTSRefinementStrategy:
             pool = sorted(ctx.population, key=lambda x: x.fitness, reverse=True)
         top_members = pool[: self.top_k_to_refine]
 
-        # Seed the MCTS engine's zoo with existing archive formulas for
-        # better percentile ranking and FSA from the start.
+        # Seed the MCTS engine's zoo with existing archive formulas
         self._seed_zoo_from_archive(ctx)
 
         # Pass shared evaluator to engine
@@ -91,9 +87,7 @@ class MCTSRefinementStrategy:
         candidates: list[Individual] = []
         for member in top_members:
             try:
-                # Reset tree but keep zoo (accumulated across refinements)
-                self.mcts_engine.root = None
-                self.mcts_engine._factor_cache.clear()
+                self.mcts_engine.reset_tree()
 
                 self.mcts_engine.run(
                     initial_formula=member.formula,
@@ -102,61 +96,39 @@ class MCTSRefinementStrategy:
                 )
                 self._total_trees_searched += 1
 
-                for formula in self.mcts_engine.get_refined_formulas():
-                    ind = build_individual(
-                        ctx.compiler,
-                        ctx.schema,
-                        formula,
-                        Lineage(
-                            origin="mcts_refinement",
-                            parent_a=member.expr_hash,
-                        ),
-                    )
-                    if ind and ind.expr_hash not in ctx.seen_hashes:
-                        candidates.append(ind)
+                refined = self.mcts_engine.get_refined_formulas()
+                new = self.compile_and_dedup(
+                    ctx,
+                    refined,
+                    lineage_fn=lambda _f, _parent=member: Lineage(
+                        origin="mcts_refinement",
+                        parent_a=_parent.expr_hash,
+                    ),
+                )
+                candidates.extend(new)
             except Exception as e:
                 logger.warning(
                     "MCTS refinement failed for {}: {}",
                     member.formula[:40], e,
                 )
 
-        self._total_zoo_found = len(self.mcts_engine.alpha_zoo)
         logger.info(
             "mcts_refinement.generate trees={} zoo={} candidates={}",
             self._total_trees_searched,
-            self._total_zoo_found,
+            len(self.mcts_engine.alpha_zoo),
             len(candidates),
         )
         return candidates
 
-    def on_evaluation_complete(
-        self, ctx: SearchContext, evaluated: list[Individual],
-    ) -> None:
-        if ctx.strategy_memory is not None:
-            for ind in evaluated:
-                ctx.strategy_memory.record(
-                    formula=ind.formula,
-                    theme_id="mcts_refinement",
-                    metrics=ind.metrics,
-                    is_novel=True,
-                    round_idx=ctx.round_idx,
-                    all_fields=ctx.schema.fields,
-                )
-
     def get_stats(self) -> dict[str, Any]:
-        engine = self.mcts_engine
-        return {
+        stats: dict[str, Any] = {
             "strategy": self.name,
             "activation_frequency": self.activation_frequency,
             "top_k_to_refine": self.top_k_to_refine,
-            "zoo_size": len(engine.alpha_zoo) if engine else 0,
             "total_trees_searched": self._total_trees_searched,
-            "tree_depth": engine._tree_depth() if engine and engine.root else 0,
-            "tree_size": engine._tree_size() if engine and engine.root else 0,
-            "forbidden_subtrees": (
-                engine._forbidden_subtrees[:3] if engine else []
-            ),
         }
+        stats.update(self.mcts_engine.get_search_stats())
+        return stats
 
     # ------------------------------------------------------------------
     # Zoo seeding from archive
@@ -168,30 +140,12 @@ class MCTSRefinementStrategy:
         This gives the multi-dimensional evaluation meaningful percentile
         baselines and provides FSA with enough formulas to detect patterns.
         """
-        from .mcts import AlphaNode
-
-        existing_formulas = {n.formula for n in self.mcts_engine.alpha_zoo}
-        added = 0
-
-        for member in ctx.archive.values():
-            if member.formula in existing_formulas:
-                continue
-            node = AlphaNode(formula=member.formula)
-            node.metrics = dict(member.metrics)
-            node.alpha_score = member.fitness
-            node.visits = 1
-            self.mcts_engine.alpha_zoo.append(node)
-            existing_formulas.add(member.formula)
-            added += 1
-
+        entries = [
+            {"formula": m.formula, "metrics": dict(m.metrics), "fitness": m.fitness}
+            for m in ctx.archive.values()
+        ]
+        added = self.mcts_engine.seed_zoo(entries)
         if added > 0:
-            # Recompute FSA with the seeded zoo
-            from .mcts.engine import compute_forbidden_subtrees
-
-            self.mcts_engine._forbidden_subtrees = compute_forbidden_subtrees(
-                [n.formula for n in self.mcts_engine.alpha_zoo],
-                top_k=self.mcts_engine.fsa_top_k,
-            )
             logger.debug(
                 "mcts_refinement.seed_zoo added={} total={}",
                 added, len(self.mcts_engine.alpha_zoo),
@@ -203,18 +157,7 @@ class MCTSRefinementStrategy:
 
     def save_state(self) -> StrategySnapshot:
         """Serialize the MCTS alpha zoo for warm-starting."""
-        zoo_data = [
-            {
-                "formula": node.formula,
-                "metrics": node.metrics,
-                "eval_scores": node.eval_scores,
-                "alpha_score": node.alpha_score,
-                "visits": node.visits,
-                "name": node.name,
-                "description": node.description,
-            }
-            for node in self.mcts_engine.alpha_zoo
-        ]
+        zoo_data = self.mcts_engine.get_zoo_snapshot()
         return StrategySnapshot(
             strategy_name=self.name,
             round_idx=0,
@@ -223,56 +166,39 @@ class MCTSRefinementStrategy:
             metadata={
                 "zoo_size": len(zoo_data),
                 "total_trees": self._total_trees_searched,
-                "forbidden_subtrees": self.mcts_engine._forbidden_subtrees[:5],
             },
         )
 
     def load_state(self, snapshot: StrategySnapshot) -> None:
         """Restore alpha zoo from a previous checkpoint."""
-        from .mcts.engine import AlphaNode, compute_forbidden_subtrees
-
         zoo_data = _json.loads(snapshot.data.decode("utf-8"))
-        self.mcts_engine.alpha_zoo = []
-        for item in zoo_data:
-            node = AlphaNode(formula=item["formula"])
-            node.metrics = item.get("metrics", {})
-            node.eval_scores = item.get("eval_scores", {})
-            node.alpha_score = item.get("alpha_score", 0.0)
-            node.visits = item.get("visits", 0)
-            node.name = item.get("name", "")
-            node.description = item.get("description", "")
-            self.mcts_engine.alpha_zoo.append(node)
-
-        # Recompute FSA from restored zoo
-        self.mcts_engine._forbidden_subtrees = compute_forbidden_subtrees(
-            [n.formula for n in self.mcts_engine.alpha_zoo],
-            top_k=self.mcts_engine.fsa_top_k,
-        )
+        self.mcts_engine.restore_zoo(zoo_data)
 
         logger.info(
             "mcts_refinement.restored zoo_size={} forbidden={}",
             len(self.mcts_engine.alpha_zoo),
-            len(self.mcts_engine._forbidden_subtrees),
+            len(self.mcts_engine.get_search_stats().get("forbidden_subtrees", [])),
         )
 
 
 # --- Registry ---
-from .registry import register_strategy  # noqa: E402
+from .registry import register_strategy, StrategyInfra  # noqa: E402
 
 
-@register_strategy("mcts")
-def _build_mcts(*, compiler, vm, schema, llm_backend, mcts_frequency=1, **_kw):
+@register_strategy(MCTSRefinementStrategy.meta)
+def _build_mcts(infra: StrategyInfra):
     from .mcts import MCTSEngine, MCTSLLMAdapter
-    llm_adapter = MCTSLLMAdapter(llm_backend)
+    llm_adapter = MCTSLLMAdapter(infra.llm_backend)
     engine = MCTSEngine(
-        compiler=compiler, vm=vm, schema=schema, llm_agent=llm_adapter,
+        compiler=infra.compiler, vm=infra.vm, schema=infra.schema,
+        llm_agent=llm_adapter,
         c_puct=1.0, initial_budget=3, budget_increment=1,
         temperature=1.0, fsa_top_k=3,
         zoo_threshold=0.015, effectiveness_threshold=0.3,
     )
     return MCTSRefinementStrategy(
         mcts_engine=engine,
-        activation_frequency=mcts_frequency,
+        activation_frequency=infra.mcts_frequency,
         top_k_to_refine=3,
         iterations_per_refine=5,
     )

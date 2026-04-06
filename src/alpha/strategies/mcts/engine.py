@@ -559,6 +559,80 @@ class MCTSEngine:
         """Return formulas discovered during the last run."""
         return [node.formula for node in self.alpha_zoo]
 
+    def reset_tree(self) -> None:
+        """Clear the search tree for a fresh run, preserving the zoo."""
+        self.root = None
+        self._factor_cache.clear()
+
+    def seed_zoo(self, entries: list[dict[str, Any]]) -> int:
+        """Add entries to the alpha zoo from external sources (e.g. archive).
+
+        Each entry: ``{"formula": str, "metrics": dict, "fitness": float}``
+        Returns number of entries actually added (skips duplicates).
+        Automatically recomputes FSA forbidden subtrees.
+        """
+        existing = {n.formula for n in self.alpha_zoo}
+        added = 0
+        for entry in entries:
+            formula = entry["formula"]
+            if formula in existing:
+                continue
+            node = AlphaNode(formula=formula)
+            node.metrics = dict(entry.get("metrics", {}))
+            node.alpha_score = entry.get("fitness", 0.0)
+            node.visits = 1
+            self.alpha_zoo.append(node)
+            existing.add(formula)
+            added += 1
+        if added > 0:
+            self._recompute_fsa()
+        return added
+
+    def get_zoo_snapshot(self) -> list[dict[str, Any]]:
+        """Serialize the alpha zoo for checkpointing."""
+        return [
+            {
+                "formula": node.formula,
+                "metrics": node.metrics,
+                "eval_scores": node.eval_scores,
+                "alpha_score": node.alpha_score,
+                "visits": node.visits,
+                "name": node.name,
+                "description": node.description,
+            }
+            for node in self.alpha_zoo
+        ]
+
+    def restore_zoo(self, zoo_data: list[dict[str, Any]]) -> None:
+        """Restore the alpha zoo from a checkpoint snapshot."""
+        self.alpha_zoo = []
+        for item in zoo_data:
+            node = AlphaNode(formula=item["formula"])
+            node.metrics = item.get("metrics", {})
+            node.eval_scores = item.get("eval_scores", {})
+            node.alpha_score = item.get("alpha_score", 0.0)
+            node.visits = item.get("visits", 0)
+            node.name = item.get("name", "")
+            node.description = item.get("description", "")
+            self.alpha_zoo.append(node)
+        self._recompute_fsa()
+
+    def get_search_stats(self) -> dict[str, Any]:
+        """Return tree and zoo statistics."""
+        return {
+            "zoo_size": len(self.alpha_zoo),
+            "tree_depth": self._tree_depth() if self.root else 0,
+            "tree_size": self._tree_size() if self.root else 0,
+            "forbidden_subtrees": self._forbidden_subtrees[:3],
+        }
+
+    def _recompute_fsa(self) -> None:
+        """Recompute FSA forbidden subtrees from the current zoo."""
+        self._forbidden_subtrees = compute_forbidden_subtrees(
+            [n.formula for n in self.alpha_zoo],
+            top_k=self.fsa_top_k,
+        )
+
     # ------------------------------------------------------------------
     # Selection — UCT with virtual expansion action (Section 3)
     # ------------------------------------------------------------------
