@@ -49,6 +49,13 @@ class TensorStore:
         return bool(torch is not None and isinstance(first, torch.Tensor))
 
 
+def to_numpy(value: ArrayLike) -> np.ndarray:
+    """Safely convert any array-like (including CUDA tensors) to numpy."""
+    if torch is not None and isinstance(value, torch.Tensor):
+        return value.detach().cpu().numpy()
+    return np.asarray(value)
+
+
 class SubexprCache:
     """Thread-safe LRU cache for subexpression results.
 

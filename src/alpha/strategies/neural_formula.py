@@ -649,6 +649,10 @@ class NeuralFormulaStrategy:
         close = np.asarray(ds.fields["close"], dtype=np.float32)
         self._fwd_returns = compute_forward_returns(close, periods=5)
         self._store = TensorStore(ds.fields)
+        # Convert to GPU tensors if VM supports it
+        vm = ctx.vm
+        if vm is not None and vm.backend == "torch" and vm.device is not None:
+            self._store = vm._prepare_store(self._store)
 
     def _train_step(self, ctx: SearchContext) -> dict[str, float]:
         """One REINFORCE training step. Returns {formula: ic} for valid formulas."""
@@ -691,7 +695,8 @@ class NeuralFormulaStrategy:
         rewards = torch.full((bs,), _REWARD_INVALID, dtype=torch.float32, device=device)
         valid_formulas: dict[str, float] = {}  # formula → IC
 
-        vm = StackVM()
+        from ..core.vm import to_numpy
+        vm = ctx.vm or StackVM()
         for i, toks in enumerate(raw_tokens):
             dsl = rpn_to_dsl(toks, vocab)
             if dsl is None:
@@ -707,10 +712,7 @@ class NeuralFormulaStrategy:
             except Exception:
                 continue
 
-            if hasattr(alpha, "cpu"):
-                alpha_np = alpha.cpu().numpy()
-            else:
-                alpha_np = np.asarray(alpha, dtype=np.float32)
+            alpha_np = to_numpy(alpha)
 
             # Constant signal check (aligned with AlphaGPT)
             alpha_std = np.nanstd(alpha_np)

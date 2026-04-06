@@ -253,6 +253,9 @@ class SearchContext:
     knowledge_base: Any | None  # FinancialKnowledgeBase
     feature_kitchen: Any | None  # FeatureKitchen
 
+    # --- VM (needed by strategies for fast screening) ---
+    vm: Any | None = None  # StackVM
+
     # --- dataset (needed by some strategies like MCTS) ---
     dataset: Any | None = None  # AlphaDataset
 

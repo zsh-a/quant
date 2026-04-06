@@ -13,8 +13,9 @@ def compute_rank_ic(alpha: np.ndarray, forward_returns: np.ndarray) -> float:
     Both inputs are 2D arrays of shape (time, symbols).
     Returns the average per-row correlation across time steps.
     """
-    alpha_np = np.asarray(alpha, dtype=float)
-    returns_np = np.asarray(forward_returns, dtype=float)
+    from ..core.vm import to_numpy
+    alpha_np = to_numpy(alpha).astype(float)
+    returns_np = to_numpy(forward_returns).astype(float)
     mask = ~np.isnan(alpha_np) & ~np.isnan(returns_np)
     valid_counts = np.sum(mask, axis=1)
     if not np.any(valid_counts >= 2):
@@ -57,6 +58,9 @@ def compute_ic_metrics(
     Returns dict with rank_ic, ic_ir, ic_std, rank_ic_{n}d for each window,
     ic_decay, and turnover_proxy.
     """
+    from ..core.vm import to_numpy
+    alpha = to_numpy(alpha).astype(float)
+    close = to_numpy(close).astype(float)
     fwd_windows = fwd_windows or [1, 5, 10]
     primary_window = fwd_windows[1] if len(fwd_windows) > 1 else fwd_windows[0]
 

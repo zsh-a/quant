@@ -908,22 +908,28 @@ class MCTSEngine:
 
         return True
 
+    def _prepare_store(self, dataset: AlphaDataset) -> TensorStore:
+        """Create a TensorStore, converting to torch if VM uses GPU."""
+        store = TensorStore(dataset.fields)
+        if self.vm.backend == "torch" and self.vm.device is not None:
+            store = self.vm._prepare_store(store)
+        return store
+
     def _add_to_zoo(self, node: AlphaNode, dataset: AlphaDataset) -> None:
         """Add a node to the alpha zoo with diversity check (correlation < 0.8)."""
+        from ...core.vm import to_numpy
         try:
             program = self.compiler.compile(node.formula, self.schema)
-            store = TensorStore(dataset.fields)
-            factor_values = np.asarray(self.vm.run(program, store), dtype=float)
-            factor_flat = factor_values.flatten()
-            factor_flat = factor_flat[~np.isnan(factor_flat)]
+            store = self._prepare_store(dataset)
+            factor_values = to_numpy(self.vm.run(program, store)).flatten()
+            factor_flat = factor_values[~np.isnan(factor_values)]
 
             for existing in self.alpha_zoo:
                 if existing.formula in self._factor_cache:
                     existing_flat = self._factor_cache[existing.formula]
                 else:
                     ex_program = self.compiler.compile(existing.formula, self.schema)
-                    ex_values = np.asarray(self.vm.run(ex_program, store), dtype=float)
-                    existing_flat = ex_values.flatten()
+                    existing_flat = to_numpy(self.vm.run(ex_program, store)).flatten()
                     existing_flat = existing_flat[~np.isnan(existing_flat)]
                     self._factor_cache[existing.formula] = existing_flat
 
@@ -949,9 +955,10 @@ class MCTSEngine:
             return 0.0
 
         try:
+            from ...core.vm import to_numpy
             program = self.compiler.compile(formula, self.schema)
-            store = TensorStore(dataset.fields)
-            factor_values = np.asarray(self.vm.run(program, store), dtype=float)
+            store = self._prepare_store(dataset)
+            factor_values = to_numpy(self.vm.run(program, store))
             factor_flat = factor_values.flatten()
             factor_flat = factor_flat[~np.isnan(factor_flat)]
 
@@ -995,10 +1002,10 @@ class MCTSEngine:
     ) -> dict[str, float]:
         """Evaluate a formula on a dataset and return IC metrics."""
         try:
+            from ...core.vm import to_numpy
             program = self.compiler.compile(formula, self.schema)
-            store = TensorStore(dataset.fields)
-            alpha = self.vm.run(program, store)
-            alpha_np = np.asarray(alpha, dtype=float)
+            store = self._prepare_store(dataset)
+            alpha_np = to_numpy(self.vm.run(program, store))
             close = dataset.fields["close"]
             metrics = compute_ic_metrics(alpha_np, close, fwd_windows=[1, 5, 10])
             return metrics

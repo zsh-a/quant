@@ -75,6 +75,8 @@ class FactorCombiner:
         stored rank_ic is below the threshold, reducing peak memory.
         """
         store = TensorStore(dataset.fields)
+        if self.vm.backend == "torch" and self.vm.device is not None:
+            store = self.vm._prepare_store(store)
         # Batch-compile and run via VM shared cache for memory efficiency.
         programs = []
         entries_with_program = []
@@ -100,11 +102,9 @@ class FactorCombiner:
         raw_outputs = self.vm.run_batch(programs, store)
 
         signals: list[FactorSignal] = []
+        from ..core.vm import to_numpy
         for entry, program, raw in zip(entries_with_program, programs, raw_outputs):
-            if hasattr(raw, "cpu"):
-                arr = raw.cpu().numpy()
-            else:
-                arr = np.asarray(raw, dtype=np.float32)
+            arr = to_numpy(raw).astype(np.float32)
             signals.append(
                 FactorSignal(
                     formula=entry.get("formula", ""),

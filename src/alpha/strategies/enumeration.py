@@ -51,7 +51,7 @@ class EnumerationStrategy:
         if not formulas:
             return []
 
-        vm = StackVM()
+        vm = ctx.vm or StackVM()
         passed = fast_screen_ic(
             formulas,
             ctx.dataset,
