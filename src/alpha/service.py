@@ -168,9 +168,19 @@ class AlphaService:
             mcts_engine = MCTSEngine(
                 compiler=self.compiler, vm=self.vm,
                 schema=self.schema, llm_agent=llm_adapter,
+                # Paper hyperparameters (Section G)
+                c_puct=1.0,
+                initial_budget=3,
+                budget_increment=1,
+                temperature=1.0,
+                fsa_top_k=3,
+                zoo_threshold=0.015,
+                effectiveness_threshold=0.3,
             )
             strategies.append(MCTSRefinementStrategy(
-                mcts_engine=mcts_engine, activation_frequency=mcts_frequency,
+                mcts_engine=mcts_engine,
+                activation_frequency=mcts_frequency,
+                iterations_per_refine=5,
             ))
             strategies.append(NeuralFormulaStrategy(
                 registry=self.registry, schema=self.schema,
