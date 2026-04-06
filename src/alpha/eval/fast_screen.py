@@ -47,12 +47,24 @@ def fast_screen_ic(
 
     t0 = perf_counter()
 
+    # Subsample dataset for screening: rank IC is stable at ~25K rows,
+    # and VM execution scales linearly with T.  Use at most 30K rows.
+    _MAX_SCREEN_ROWS = 30_000
+    T_full = dataset.fields["close"].shape[0]
+    if T_full > _MAX_SCREEN_ROWS:
+        # Take the last _MAX_SCREEN_ROWS rows (most recent data matters more)
+        offset = T_full - _MAX_SCREEN_ROWS
+        screen_fields = {k: v[offset:] for k, v in dataset.fields.items()}
+        logger.info("fast_screen: subsampled T={} → {}", T_full, _MAX_SCREEN_ROWS)
+    else:
+        screen_fields = dataset.fields
+
     # Prepare store — convert to torch for GPU path
-    store = TensorStore(dataset.fields)
+    store = TensorStore(screen_fields)
     if vm.backend == "torch" and vm.device is not None:
         store = vm._prepare_store(store)
 
-    close_np = np.asarray(dataset.fields["close"], dtype=np.float32)
+    close_np = np.asarray(screen_fields["close"], dtype=np.float32)
     fwd_returns_np = compute_forward_returns(close_np, periods=fwd_period)
 
     # Compile all formulas first (cheap, ~5ms total)
@@ -87,10 +99,16 @@ def fast_screen_ic(
         programs = [prog for _, prog in chunk]
         chunk_formulas = [f for f, _ in chunk]
 
+        chunk_t0 = perf_counter()
         try:
             alphas = vm.run_batch(programs, store)
         except Exception:
             continue
+        vm_ms = (perf_counter() - chunk_t0) * 1000
+        logger.info(
+            "fast_screen: chunk [{}/{}] vm={:.0f}ms n={}",
+            min(start + chunk_size, len(compiled)), len(compiled), vm_ms, len(chunk),
+        )
 
         if use_gpu and alphas and isinstance(alphas[0], _torch.Tensor):
             # --- GPU batched rank IC ---
@@ -152,11 +170,7 @@ def fast_screen_ic(
 
             del alphas
 
-        if (start + chunk_size) % (chunk_size * 4) == 0 or start + chunk_size >= len(compiled):
-            logger.info(
-                "fast_screen: progress {}/{} passed={}",
-                min(start + chunk_size, len(compiled)), len(compiled), len(results),
-            )
+        # (per-chunk progress already logged above)
 
     results.sort(key=lambda x: abs(x[1]), reverse=True)
 

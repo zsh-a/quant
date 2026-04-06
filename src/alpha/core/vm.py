@@ -621,26 +621,61 @@ class StackVM:
         result[window - 1:] = reduced
         return result
 
+    def _pool1d_sum(self, x_2d: Any, window: int) -> Any:
+        """Rolling sum via avg_pool1d. Input (T, S), output (T-W+1, S)."""
+        # avg_pool1d expects (N, C, L); we use (S, 1, T)
+        pooled = torch.nn.functional.avg_pool1d(
+            x_2d.T.unsqueeze(1), window, stride=1,
+        )
+        return pooled.squeeze(1).T * window  # avg * W = sum
+
     def _rolling_torch(self, arr: ArrayLike, window: int, reducer: str) -> ArrayLike:
         data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
+        T = data.shape[0]
         result = torch.full_like(data, torch.nan)
-        if window <= 0 or data.shape[0] < window:
+        if window <= 0 or T < window:
             return result
-        windows = data.unfold(0, window, 1)
-        if reducer == "mean":
-            reduced = self._torch_nanmean(windows, dim=-1)
-        elif reducer == "std":
-            reduced = self._torch_nanstd(windows, dim=-1)
-        elif reducer == "sum":
-            reduced = self._torch_nansum(windows, dim=-1)
-        elif reducer == "max":
-            reduced = self._torch_nanmax(windows, dim=-1)
-        elif reducer == "min":
-            reduced = self._torch_nanmin(windows, dim=-1)
-        else:
-            raise ValueError(f"Unsupported rolling reducer: {reducer}")
-        result[window - 1:] = reduced
-        return result
+
+        valid = ~torch.isnan(data)
+        clean = torch.where(valid, data, torch.zeros_like(data))
+
+        if reducer in ("mean", "sum"):
+            r_sum = self._pool1d_sum(clean, window)
+            r_cnt = self._pool1d_sum(valid.float(), window)
+            if reducer == "sum":
+                reduced = torch.where(r_cnt > 0, r_sum, torch.full_like(r_sum, torch.nan))
+            else:
+                reduced = r_sum / r_cnt.clamp(min=1).to(data.dtype)
+                reduced = torch.where(r_cnt > 0, reduced, torch.full_like(reduced, torch.nan))
+            result[window - 1:] = reduced
+            return result
+
+        if reducer == "std":
+            r_sum = self._pool1d_sum(clean, window)
+            r_sum2 = self._pool1d_sum(clean * clean, window)
+            r_cnt = self._pool1d_sum(valid.float(), window)
+            n = r_cnt.clamp(min=1).to(data.dtype)
+            mean = r_sum / n
+            var = (r_sum2 / n - mean * mean).clamp(min=0)
+            reduced = torch.where(r_cnt > 0, torch.sqrt(var), torch.full_like(var, torch.nan))
+            result[window - 1:] = reduced
+            return result
+
+        if reducer in ("max", "min"):
+            fill = -torch.inf if reducer == "max" else torch.inf
+            filled = torch.where(valid, data, torch.full_like(data, fill))
+            x = filled.T.unsqueeze(1)  # (S, 1, T)
+            if reducer == "max":
+                pooled = torch.nn.functional.max_pool1d(x, window, stride=1)
+            else:
+                pooled = -torch.nn.functional.max_pool1d(-x, window, stride=1)
+            reduced = pooled.squeeze(1).T
+            all_nan_cnt = self._pool1d_sum((~valid).float(), window)
+            reduced = torch.where(all_nan_cnt >= window, torch.full_like(reduced, torch.nan), reduced)
+            result[window - 1:] = reduced
+            return result
+
+        raise ValueError(f"Unsupported rolling reducer: {reducer}")
 
     # --- rolling pair ---
 
@@ -679,26 +714,28 @@ class StackVM:
         result = torch.full_like(x, torch.nan)
         if window <= 1 or x.shape[0] < window:
             return result
-        x_windows = x.unfold(0, window, 1)
-        y_windows = y.unfold(0, window, 1)
-        valid = (~torch.isnan(x_windows)) & (~torch.isnan(y_windows))
-        count = valid.sum(dim=-1)
-        x_safe = torch.where(valid, x_windows, torch.zeros_like(x_windows))
-        y_safe = torch.where(valid, y_windows, torch.zeros_like(y_windows))
-        x_mean = x_safe.sum(dim=-1) / count.clamp(min=1).to(dtype=x.dtype)
-        y_mean = y_safe.sum(dim=-1) / count.clamp(min=1).to(dtype=y.dtype)
-        centered_x = torch.where(valid, x_windows - x_mean.unsqueeze(-1), torch.zeros_like(x_windows))
-        centered_y = torch.where(valid, y_windows - y_mean.unsqueeze(-1), torch.zeros_like(y_windows))
-        cov = (centered_x * centered_y).sum(dim=-1) / count.clamp(min=1).to(dtype=x.dtype)
+
+        valid = (~torch.isnan(x)) & (~torch.isnan(y))
+        xc = torch.where(valid, x, torch.zeros_like(x))
+        yc = torch.where(valid, y, torch.zeros_like(y))
+        ps = self._pool1d_sum
+
+        cnt = ps(valid.float(), window)
+        n = cnt.clamp(min=1).to(x.dtype)
+        sx, sy, sxy = ps(xc, window), ps(yc, window), ps(xc * yc, window)
+        mx, my = sx / n, sy / n
+        cov = sxy / n - mx * my
+
         if reducer == "cov":
             reduced = cov
         elif reducer == "corr":
-            x_std = torch.sqrt((centered_x * centered_x).sum(dim=-1) / count.clamp(min=1).to(dtype=x.dtype))
-            y_std = torch.sqrt((centered_y * centered_y).sum(dim=-1) / count.clamp(min=1).to(dtype=y.dtype))
-            reduced = cov / (x_std * y_std + 1e-12)
+            vx = (ps(xc * xc, window) / n - mx * mx).clamp(min=0)
+            vy = (ps(yc * yc, window) / n - my * my).clamp(min=0)
+            reduced = cov / (torch.sqrt(vx * vy) + 1e-12)
         else:
             raise ValueError(f"Unsupported rolling pair reducer: {reducer}")
-        reduced = torch.where(count > 0, reduced, torch.full_like(reduced, torch.nan))
+
+        reduced = torch.where(cnt > 0, reduced, torch.full_like(reduced, torch.nan))
         result[window - 1:] = reduced
         return result
 
@@ -724,13 +761,19 @@ class StackVM:
         result = torch.full_like(data, torch.nan)
         if window <= 0 or data.shape[0] < window:
             return result
-        windows = data.unfold(0, window, 1)
+
+        # O(T) via F.conv1d (native CUDA convolution kernel)
+        valid = ~torch.isnan(data)
+        clean = torch.where(valid, data, torch.zeros_like(data))
         weights = torch.arange(1, window + 1, device=data.device, dtype=data.dtype)
-        valid = ~torch.isnan(windows)
-        weighted = torch.where(valid, windows * weights, torch.zeros_like(windows))
-        denom = torch.where(valid, weights, torch.zeros_like(windows)).sum(dim=-1)
-        reduced = weighted.sum(dim=-1) / denom.clamp(min=1e-12)
-        reduced = torch.where(denom > 0, reduced, torch.full_like(reduced, torch.nan))
+        kernel = weights.flip(0).reshape(1, 1, -1)  # (1, 1, W)
+
+        x = clean.T.unsqueeze(1)  # (S, 1, T)
+        weighted_sum = torch.nn.functional.conv1d(x, kernel).squeeze(1).T  # (T-W+1, S)
+        v = valid.float().T.unsqueeze(1)
+        weight_denom = torch.nn.functional.conv1d(v, kernel).squeeze(1).T
+        reduced = weighted_sum / weight_denom.clamp(min=1e-12)
+        reduced = torch.where(weight_denom > 0, reduced, torch.full_like(reduced, torch.nan))
         result[window - 1:] = reduced
         return result
 
@@ -756,23 +799,12 @@ class StackVM:
         return result
 
     def _ts_ema_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
+        # Run EMA on CPU (sequential operation — Python for-loop on GPU
+        # launches 30K+ CUDA kernels and is ~100x slower than CPU).
         data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
-        alpha = 2.0 / (window + 1)
-        result = torch.full_like(data, torch.nan)
-        if data.shape[0] == 0:
-            return result
-        result[0] = data[0]
-        for i in range(1, data.shape[0]):
-            prev = result[i - 1]
-            cur = data[i]
-            nan_prev = torch.isnan(prev)
-            nan_cur = torch.isnan(cur)
-            result[i] = torch.where(
-                nan_cur,
-                prev,
-                torch.where(nan_prev, cur, alpha * cur + (1 - alpha) * prev),
-            )
-        return result
+        data_np = data.detach().cpu().numpy().astype(np.float64)
+        result_np = self._ts_ema_numpy(data_np, window)
+        return torch.as_tensor(result_np.astype(np.float32), device=data.device)
 
     # --- ts_winsorize (NEW) ---
 
@@ -815,25 +847,13 @@ class StackVM:
         return result
 
     def _ts_argextreme_torch(self, arr: ArrayLike, window: int, mode: str) -> ArrayLike:
+        # Fall back to CPU — argmax/argmin over sliding window has no efficient
+        # GPU primitive and unfold creates a huge (T, S, W) intermediate tensor.
         data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
-        result = torch.full_like(data, torch.nan)
-        if window <= 0 or data.shape[0] < window:
-            return result
-        windows = data.unfold(0, window, 1)
-        valid = ~torch.isnan(windows)
-        if mode == "max":
-            safe = torch.where(valid, windows, torch.full_like(windows, -torch.inf))
-            indices = torch.argmax(safe, dim=-1)
-        elif mode == "min":
-            safe = torch.where(valid, windows, torch.full_like(windows, torch.inf))
-            indices = torch.argmin(safe, dim=-1)
-        else:
-            raise ValueError(f"Unsupported argextreme mode: {mode}")
-        counts = valid.sum(dim=-1)
-        scaled = indices.to(dtype=data.dtype) / max(window - 1, 1)
-        scaled = torch.where(counts > 0, scaled, torch.full_like(scaled, torch.nan))
-        result[window - 1:] = scaled
-        return result
+        result_np = self._ts_argextreme_numpy(
+            data.detach().cpu().numpy(), window, mode,
+        )
+        return torch.as_tensor(result_np.astype(np.float32), device=data.device)
 
     # --- ts_rank ---
 
@@ -853,6 +873,13 @@ class StackVM:
         return result
 
     def _ts_rank_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
+        # Fall back to CPU — ts_rank needs per-window comparison that
+        # unfold expands to (T, S, W) on GPU; CPU numpy is faster.
+        data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
+        result_np = self._ts_rank_numpy(data.detach().cpu().numpy(), window)
+        return torch.as_tensor(result_np.astype(np.float32), device=data.device)
+
+    def _ts_rank_torch_UNUSED(self, arr: ArrayLike, window: int) -> ArrayLike:
         data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
         result = torch.full_like(data, torch.nan)
         if window <= 1 or data.shape[0] < window:
