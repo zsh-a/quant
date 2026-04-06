@@ -321,13 +321,20 @@ class AlphaService:
             "metrics": result.summary(),
         }
 
+    def _prepare_store(self, dataset: AlphaDataset) -> TensorStore:
+        """Create a TensorStore, converting to torch if VM uses GPU backend."""
+        store = TensorStore(dataset.fields)
+        if self.vm.backend == "torch" and self.vm.device is not None:
+            store = self.vm._prepare_store(store)
+        return store
+
     def evaluate_formula_from_dataset(
         self,
         formula: str,
         dataset: AlphaDataset,
         summary_only: bool = False,
     ) -> dict[str, Any]:
-        store = TensorStore(dataset.fields)
+        store = self._prepare_store(dataset)
         program = self._compile_cached(formula)
         alpha = self.vm.run(program, store)
         evaluation = self._build_dataset_evaluation(program, alpha, dataset, store)
@@ -343,7 +350,7 @@ class AlphaService:
         dataset: AlphaDataset,
         summary_only: bool = False,
     ) -> dict[str, dict[str, Any]]:
-        store = TensorStore(dataset.fields)
+        store = self._prepare_store(dataset)
         programs = [self._compile_cached(formula) for formula in formulas]
         alphas = self.vm.run_batch(programs, store)
         results: dict[str, dict[str, Any]] = {}
@@ -880,7 +887,7 @@ class AlphaService:
             timing_breakdown = self._new_evaluation_timing()
 
         store_start = perf_counter()
-        store = TensorStore(dataset.fields)
+        store = self._prepare_store(dataset)
         timing_breakdown["tensor_store_seconds"] += perf_counter() - store_start
 
         compile_start = perf_counter()
@@ -898,6 +905,42 @@ class AlphaService:
         timing_breakdown["vm_run_seconds"] += perf_counter() - vm_start
         timing_breakdown["dataset_eval_calls"] += 1
         timing_breakdown["formula_evaluations"] += len(population)
+
+        # Use batched GPU pipeline when possible (avoids 500× per-formula overhead)
+        try:
+            import torch as _torch
+            if (
+                len(alphas) > 1
+                and isinstance(alphas[0], _torch.Tensor)
+                and alphas[0].is_cuda
+            ):
+                # Chunk to avoid GPU OOM: ~50MB per formula for 114K×5 float32
+                T, S = alphas[0].shape
+                gpu_free = _torch.cuda.mem_get_info()[0] if _torch.cuda.is_available() else 0
+                # Each formula needs ~T*S*4*10 bytes (alpha + weights + intermediates)
+                bytes_per_formula = T * S * 4 * 12
+                chunk_size = max(8, min(len(alphas), int(gpu_free * 0.6 / max(bytes_per_formula, 1))))
+
+                if chunk_size >= len(alphas):
+                    return self._batch_evaluate_gpu(
+                        population, programs, alphas, dataset, store, timing_breakdown,
+                    )
+                # Process in chunks, merge results
+                merged: dict[str, dict] = {"metrics_by_hash": {}, "signatures_by_hash": {}, "details_by_hash": {}}
+                for start in range(0, len(alphas), chunk_size):
+                    end = min(start + chunk_size, len(alphas))
+                    chunk_result = self._batch_evaluate_gpu(
+                        population[start:end], programs[start:end],
+                        alphas[start:end], dataset, store, timing_breakdown,
+                    )
+                    for key in merged:
+                        merged[key].update(chunk_result[key])
+                    _torch.cuda.empty_cache()
+                return merged
+        except Exception:
+            pass
+
+        # Fallback: per-formula evaluation
         metrics_by_hash: dict[str, dict[str, float]] = {}
         signatures_by_hash: dict[str, list[float]] = {}
         details_by_hash: dict[str, dict[str, Any]] = {}
@@ -923,6 +966,253 @@ class AlphaService:
             "signatures_by_hash": signatures_by_hash,
             "details_by_hash": details_by_hash,
         }
+
+    def _batch_evaluate_gpu(
+        self,
+        population: list[Any],
+        programs: list[Any],
+        alphas: list[Any],
+        dataset: Any,
+        store: Any,
+        timing_breakdown: dict[str, Any],
+    ) -> dict[str, dict[str, Any]]:
+        """Batch-evaluate all formulas on GPU using 3D tensor ops."""
+        import torch
+
+        N = len(alphas)
+        stacked = torch.stack(alphas)  # (N, T, S)
+        T, S = alphas[0].shape
+
+        # --- 1. Batch signal transform: (N, T, S) → (N, T, S) weights ---
+        signal_start = perf_counter()
+        scores = stacked.clone()
+        if dataset.liquidity_mask is not None:
+            liq = torch.as_tensor(
+                np.asarray(dataset.liquidity_mask, dtype=bool),
+                device=scores.device, dtype=torch.bool,
+            )
+            scores = torch.where(liq.unsqueeze(0), scores, torch.full_like(scores, torch.nan))
+        if dataset.session_mask is not None:
+            sess = torch.as_tensor(
+                np.asarray(dataset.session_mask, dtype=bool),
+                device=scores.device, dtype=torch.bool,
+            )
+            scores = torch.where(sess.unsqueeze(0), scores, torch.zeros_like(scores))
+
+        valid = ~torch.isnan(scores)
+        valid_counts = valid.sum(dim=2, keepdim=True)  # (N, T, 1)
+        safe_scores = torch.where(valid, scores, torch.zeros_like(scores))
+        row_means = safe_scores.sum(dim=2, keepdim=True) / valid_counts.clamp(min=1).float()
+        centered = scores - row_means
+        empty = (valid_counts == 0)
+        centered = torch.where(empty, torch.zeros_like(centered), centered)
+        abs_c = torch.where(torch.isnan(centered), torch.zeros_like(centered), torch.abs(centered))
+        denom = abs_c.sum(dim=2, keepdim=True)
+        weights = centered / (denom + 1e-12)
+        weights = torch.where(torch.isnan(weights), torch.zeros_like(weights), weights)
+        from .risk.models import MarketContext as _MC
+        max_w = _MC().max_abs_weight
+        max_turnover = _MC().max_turnover_per_bar
+        weights = torch.clamp(weights, -max_w, max_w)
+        timing_breakdown["signal_transform_seconds"] += perf_counter() - signal_start
+
+        # --- 2. Batch rule overlay (turnover limit) ---
+        # Use numba on CPU (compiled C loop is >>10x faster than Python for-loop on GPU)
+        overlay_start = perf_counter()
+        try:
+            from .risk.models import _apply_turnover_limit_numba
+            _has_numba = True
+        except ImportError:
+            _has_numba = False
+        device = weights.device
+        if _has_numba:
+            w_cpu = weights.cpu().numpy()  # (N, T, S)
+            for i in range(N):
+                w_cpu[i] = _apply_turnover_limit_numba(
+                    np.ascontiguousarray(w_cpu[i]), max_turnover,
+                )
+            weights = torch.as_tensor(w_cpu, device=device, dtype=torch.float32)
+        else:
+            for t in range(1, T):
+                delta = torch.clamp(
+                    weights[:, t] - weights[:, t - 1],
+                    -max_turnover, max_turnover,
+                )
+                weights[:, t] = weights[:, t - 1] + delta
+        timing_breakdown["rule_overlay_seconds"] += perf_counter() - overlay_start
+
+        # --- 3. Batch simulate ---
+        backtest_start = perf_counter()
+        close = store.get_field("close")  # (T, S) GPU tensor
+        forward_returns = torch.zeros_like(close)
+        forward_returns[:-1] = close[1:] / (close[:-1] + 1e-12) - 1.0
+        forward_returns = torch.clamp(forward_returns, -0.5, 0.5)
+
+        # Position returns: (N, T)
+        position_returns = torch.nansum(
+            weights * forward_returns.unsqueeze(0), dim=2,
+        ).clamp(-0.5, 0.5)
+
+        # Turnover: (N, T)
+        prev_weights = torch.cat([torch.zeros_like(weights[:, :1, :]), weights[:, :-1, :]], dim=1)
+        trade_sizes = torch.abs(weights - prev_weights)  # (N, T, S)
+        turnover = torch.nansum(trade_sizes, dim=2)  # (N, T)
+
+        # Costs (inline to handle 3D correctly)
+        cost = CostModel()
+        fees = turnover * (cost.taker_fee_bps / 10000.0)  # (N, T)
+        slippage_base = trade_sizes * (cost.slippage_bps / 10000.0)  # (N, T, S)
+        spread_field = store.get_field("bid_ask_spread")  # (T, S)
+        spread_ratio = torch.abs(spread_field) / (torch.abs(close) + 1e-12)  # (T, S)
+        slippage_spread = trade_sizes * spread_ratio.unsqueeze(0) * cost.spread_weight
+        slippage_impact = trade_sizes.pow(2) * (cost.impact_coefficient_bps / 10000.0)
+        total_slippage = torch.nansum(slippage_base + slippage_spread + slippage_impact, dim=2)  # (N, T)
+        funding_rate = store.get_field("funding_rate")  # (T, S)
+        funding = torch.nansum(torch.abs(weights) * funding_rate.unsqueeze(0), dim=2)  # (N, T)
+
+        net_returns = position_returns - fees - total_slippage - funding  # (N, T)
+        equity_curve = torch.cumprod(1.0 + torch.nan_to_num(net_returns, nan=0.0), dim=1)  # (N, T)
+        timing_breakdown["backtest_seconds"] += perf_counter() - backtest_start
+
+        # --- 4. Batch metrics on GPU ---
+        fitness_start = perf_counter()
+        # Summary stats: (N,)
+        mean_ret = torch.nanmean(net_returns, dim=1)
+        # nan-safe std
+        nr_safe = torch.nan_to_num(net_returns, nan=0.0)
+        std_ret = nr_safe.std(dim=1)
+        sharpe = mean_ret / (std_ret + 1e-12)
+        final_equity = equity_curve[:, -1]
+        total_return = final_equity - 1.0
+        avg_turnover = torch.nanmean(turnover, dim=1)
+        peak = torch.cummax(equity_curve, dim=1).values
+        drawdown = torch.where(peak > 1e-12, 1.0 - equity_curve / peak, torch.zeros_like(equity_curve))
+        max_drawdown = torch.clamp(drawdown.max(dim=1).values, 0.0, 1.0)
+
+        # Rank IC: batch cross-sectional correlation
+        alpha_ic = stacked[:, :-1, :]  # (N, T-1, S)
+        ret_ic = forward_returns[:-1, :].unsqueeze(0).expand_as(alpha_ic)  # (N, T-1, S)
+        ic_mask = ~torch.isnan(alpha_ic) & ~torch.isnan(ret_ic)
+        ic_counts = ic_mask.sum(dim=2)  # (N, T-1)
+        safe_a = torch.where(ic_mask, alpha_ic, torch.zeros_like(alpha_ic))
+        safe_r = torch.where(ic_mask, ret_ic, torch.zeros_like(ret_ic))
+        ic_denom = ic_counts.clamp(min=1).float()
+        a_mean = safe_a.sum(dim=2) / ic_denom  # (N, T-1)
+        r_mean = safe_r.sum(dim=2) / ic_denom
+        ca = torch.where(ic_mask, alpha_ic - a_mean.unsqueeze(2), torch.zeros_like(alpha_ic))
+        cr = torch.where(ic_mask, ret_ic - r_mean.unsqueeze(2), torch.zeros_like(ret_ic))
+        cov = (ca * cr).sum(dim=2)  # (N, T-1)
+        va = (ca * ca).sum(dim=2)
+        vr = (cr * cr).sum(dim=2)
+        valid_rows = (ic_counts >= 3) & (va > 1e-12) & (vr > 1e-12)
+        corr = cov / (torch.sqrt(va * vr) + 1e-24)
+        corr = torch.clamp(corr, -1.0, 1.0)
+        corr_safe = torch.where(valid_rows, corr, torch.zeros_like(corr))
+        valid_row_cnt = valid_rows.float().sum(dim=1).clamp(min=1)
+        rank_ic = corr_safe.sum(dim=1) / valid_row_cnt  # (N,)
+
+        # Coverage & activity
+        signal_coverage = (~stacked.isnan()).float().mean(dim=(1, 2))  # (N,)
+        active_rows = (weights.abs().sum(dim=2) > 1e-9)  # (N, T)
+        active_bar_ratio = active_rows.float().mean(dim=1)  # (N,)
+        effective_bars = active_rows.float().sum(dim=1)  # (N,)
+
+        # Transfer to CPU once (single batch transfer)
+        cpu_data = torch.stack([
+            rank_ic, sharpe, total_return, avg_turnover, max_drawdown,
+            std_ret, final_equity, signal_coverage, active_bar_ratio, effective_bars,
+        ]).cpu().numpy()  # (10, N)
+        timing_breakdown["fitness_seconds"] += perf_counter() - fitness_start
+
+        # --- 5. Build per-formula result dicts ---
+        metrics_by_hash: dict[str, dict[str, float]] = {}
+        signatures_by_hash: dict[str, list[float]] = {}
+        details_by_hash: dict[str, dict[str, Any]] = {}
+
+        # Batch alpha signatures on CPU
+        sig_start = perf_counter()
+        stacked_cpu = stacked.cpu().numpy()  # single transfer
+        timing_breakdown["signature_seconds"] += perf_counter() - sig_start
+
+        for i, individual in enumerate(population):
+            ric = float(cpu_data[0, i])
+            sh = float(cpu_data[1, i])
+            tr = float(cpu_data[2, i])
+            at = float(cpu_data[3, i])
+            md = float(cpu_data[4, i])
+            vol = float(cpu_data[5, i])
+            fe = float(cpu_data[6, i])
+            sc = float(cpu_data[7, i])
+            abr = float(cpu_data[8, i])
+            eb = float(cpu_data[9, i])
+
+            is_inactive = abr < 0.10 or at < 0.005
+            pnl_per_turn = tr / (at + 1e-12) if not is_inactive else 0.0
+            tail_adj = tr - md
+            tail_ratio = tail_adj / max(vol, 1e-6)
+            activity_score = self._clip_unit(min(abr / 0.60, 1.0) * min(at / 0.05, 1.0))
+            turnover_penalty = self._clip_unit((at - 0.60) / 0.40)
+            coverage_penalty = self._clip_unit((0.50 - sc) / 0.50)
+            pnl_eff = self._clip_unit(float(np.log1p(max(pnl_per_turn, 0.0)) / np.log1p(10.0)))
+            complexity = self._formula_complexity_metrics(programs[i])
+
+            metrics: dict[str, float] = {
+                "sharpe": sh,
+                "total_return": tr,
+                "avg_turnover": at,
+                "volatility": vol,
+                "max_drawdown": md,
+                "final_equity": fe,
+                "rank_ic": ric,
+                "rank_ic_abs": abs(ric),
+                "pnl_per_turnover": pnl_per_turn,
+                "pnl_efficiency_score": pnl_eff,
+                "activity_score": activity_score,
+                "tail_ratio": tail_ratio,
+                "tail_penalty_adjusted_return": tail_adj,
+                "turnover_penalty": turnover_penalty,
+                "coverage_penalty": coverage_penalty,
+                "train_valid_gap_penalty": 0.0,
+                "valid_test_gap_penalty": 0.0,
+                "signal_coverage": sc,
+                "active_bar_ratio": abr,
+                "effective_bars": eb,
+                "inactive": 1.0 if is_inactive else 0.0,
+            }
+            metrics.update(complexity)
+
+            # Alpha signature from pre-transferred CPU array
+            alpha_cpu = stacked_cpu[i]
+            sig = self._build_alpha_signature_from_numpy(alpha_cpu)
+
+            metrics_by_hash[individual.expr_hash] = metrics
+            signatures_by_hash[individual.expr_hash] = sig
+            details_by_hash[individual.expr_hash] = {
+                "formula": individual.formula,
+                "metrics": metrics,
+                "alpha_signature": sig,
+            }
+
+        return {
+            "metrics_by_hash": metrics_by_hash,
+            "signatures_by_hash": signatures_by_hash,
+            "details_by_hash": details_by_hash,
+        }
+
+    def _build_alpha_signature_from_numpy(self, alpha_np: np.ndarray, max_points: int = 200) -> list[float]:
+        """Build signature from a pre-transferred numpy array (avoids redundant GPU→CPU)."""
+        data = np.nan_to_num(alpha_np, nan=0.0, posinf=0.0, neginf=0.0)
+        if data.size == 0:
+            return []
+        row_mean = np.mean(data, axis=1)
+        row_std = np.std(data, axis=1)
+        col_mean = np.mean(data, axis=0)
+        if len(row_mean) > max_points:
+            step = len(row_mean) / max_points
+            indices = np.clip((np.arange(max_points) * step).astype(int), 0, len(row_mean) - 1)
+            row_mean = row_mean[indices]
+            row_std = row_std[indices]
+        return np.concatenate([row_mean, row_std, col_mean]).astype(np.float32).tolist()
 
     def evaluate_population_on_validation_plan(
         self,
@@ -1378,9 +1668,14 @@ class AlphaService:
         store: TensorStore,
         timing_breakdown: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        alpha_np = np.asarray(alpha, dtype=float)
-        nan_ratio = float(np.mean(np.isnan(alpha_np))) if alpha_np.size else 1.0
-        alpha_std = float(np.nanstd(alpha_np)) if alpha_np.size else 0.0
+        if hasattr(alpha, 'isnan'):  # torch tensor
+            nan_ratio = float(alpha.isnan().float().mean()) if alpha.numel() else 1.0
+            _valid = alpha[~alpha.isnan()]
+            alpha_std = float(_valid.std()) if _valid.numel() > 1 else 0.0
+        else:
+            alpha_np = np.asarray(alpha, dtype=float)
+            nan_ratio = float(np.mean(np.isnan(alpha_np))) if alpha_np.size else 1.0
+            alpha_std = float(np.nanstd(alpha_np)) if alpha_np.size else 0.0
         if nan_ratio > 0.95 or alpha_std < 1e-12:
             self._degenerate_count += 1
             if self._degenerate_count <= self._degenerate_limit:
@@ -1390,9 +1685,14 @@ class AlphaService:
                     nan_ratio,
                     alpha_std,
                 )
-        close_np = np.asarray(store.get_field("close"), dtype=float)
-        close_nan = float(np.mean(np.isnan(close_np))) if close_np.size else 1.0
-        liq_true = float(np.mean(dataset.liquidity_mask)) if dataset.liquidity_mask.size else 0.0
+        close_field = store.get_field("close")
+        if hasattr(close_field, 'isnan'):
+            close_nan = float(close_field.isnan().float().mean()) if close_field.numel() else 1.0
+        else:
+            close_np = np.asarray(close_field, dtype=float)
+            close_nan = float(np.mean(np.isnan(close_np))) if close_np.size else 1.0
+        liq_mask = dataset.liquidity_mask
+        liq_true = float(np.mean(np.asarray(liq_mask))) if np.asarray(liq_mask).size else 0.0
         if (close_nan > 0.5 or liq_true < 0.5) and not self._data_quality_logged:
             self._data_quality_logged = True
             logger.warning(
