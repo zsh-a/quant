@@ -32,10 +32,11 @@ LOG_PATH = "logs/quant.log"
 JSON_LOG_PATH = "logs/quant.jsonl"
 
 # Human-readable format for console
+# Compact: timestamp | LEVEL | module - message | context
 CONSOLE_FORMAT = (
     "<green>{time:HH:mm:ss}</green> | "
     "<level>{level: <8}</level> | "
-    "<cyan>{extra[name]}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+    "<cyan>{extra[name]}</cyan> - "
     "<level>{message}</level>"
     "{extra[context_str]}"
 )
@@ -100,7 +101,6 @@ def _configure_stdlib_logging(level: str) -> None:
     managed_loggers = (
         "uvicorn",
         "uvicorn.error",
-        "uvicorn.access",
         "fastapi",
         "celery",
         "celery.app.trace",
@@ -113,6 +113,13 @@ def _configure_stdlib_logging(level: str) -> None:
         managed_logger.handlers = [handler]
         managed_logger.propagate = False
         managed_logger.setLevel(level)
+
+    # Suppress uvicorn.access — our logging_middleware already logs requests
+    # with richer context (duration, request_id, session_id).
+    uvicorn_access = logging.getLogger("uvicorn.access")
+    uvicorn_access.handlers = []
+    uvicorn_access.propagate = False
+    uvicorn_access.setLevel(logging.CRITICAL)
 
 
 def json_serializer(record: Dict[str, Any]) -> str:
@@ -340,13 +347,29 @@ def log_error_with_context(error: Exception, context: Dict[str, Any]) -> None:
     )
 
 
+# Paths that are polled frequently — log at DEBUG to reduce noise.
+_QUIET_PATHS = frozenset({"/sessions", "/monitoring/health"})
+_QUIET_PREFIXES = ("/alpha-lab/search-jobs/",)
+
+
 def log_api_request(
     method: str, path: str, status_code: int, duration_ms: float, **kwargs
 ) -> None:
-    """Log API request for monitoring."""
-    level = "INFO" if status_code < 400 else "WARNING" if status_code < 500 else "ERROR"
+    """Log API request for monitoring.
+
+    High-frequency polling endpoints (search-job status, sessions, health)
+    are logged at DEBUG to keep the console readable.
+    """
+    if status_code >= 500:
+        level = "ERROR"
+    elif status_code >= 400:
+        level = "WARNING"
+    elif path in _QUIET_PATHS or any(path.startswith(p) for p in _QUIET_PREFIXES):
+        level = "DEBUG"
+    else:
+        level = "INFO"
     getattr(logger, level.lower())(
-        f"API: {method} {path} -> {status_code} ({duration_ms:.0f}ms)",
+        f"API {method} {path} {status_code} ({duration_ms:.0f}ms)",
         api_method=method,
         api_path=path,
         api_status=status_code,

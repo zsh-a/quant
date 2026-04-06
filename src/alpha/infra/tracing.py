@@ -141,57 +141,81 @@ class LoguruCollector:
 
     Shows hierarchy via indentation (depth derived from parent chain)
     and formats each span kind with its most useful attributes.
+
+    All messages carry the ``alpha.trace`` prefix for easy grep filtering.
     """
 
+    _PREFIX = "alpha.trace"
+
+    # Kind → (icon, key attributes to show)
+    _KIND_FMT: dict[str, str] = {
+        "llm":    "LLM",
+        "breed":  "BREED",
+        "eval":   "EVAL",
+        "search": "SEARCH",
+        "mcts":   "MCTS",
+    }
+
     def __init__(self) -> None:
-        self._depth: dict[str, int] = {}  # span_id → nesting depth
+        self._depth: dict[str, int] = {}
 
     def on_span_end(self, span: Span) -> None:
         depth = 0
         if span.parent_id and span.parent_id in self._depth:
             depth = self._depth[span.parent_id] + 1
         self._depth[span.span_id] = depth
-        # Limit cache
         if len(self._depth) > 500:
-            oldest = list(self._depth)[:200]
-            for k in oldest:
+            for k in list(self._depth)[:200]:
                 del self._depth[k]
 
-        indent = "│ " * depth
+        indent = "  " * depth
         a = span.attributes
         ms = f"{span.duration_ms:.0f}ms"
+        tag = self._KIND_FMT.get(span.kind, span.kind.upper() if span.kind else "SPAN")
 
+        # Build key=value detail string per kind
+        parts: list[str] = [ms]
         if span.kind == "llm":
-            tokens = a.get("total_tokens", "?")
+            tokens = a.get("total_tokens")
+            if tokens:
+                parts.append(f"tokens={tokens}")
             cost = a.get("estimated_cost_usd")
-            cost_s = f" ${cost:.4f}" if cost else ""
-            line = f"{indent}⚡ {span.operation}  {ms}  tokens={tokens}{cost_s}"
+            if cost:
+                parts.append(f"${cost:.4f}")
         elif span.kind == "breed":
-            gen = a.get("generated", a.get("finalized", "?"))
-            line = f"{indent}🧬 {span.operation}  {ms}  generated={gen}"
+            gen = a.get("generated", a.get("finalized"))
+            if gen is not None:
+                parts.append(f"generated={gen}")
         elif span.kind == "eval":
-            count = a.get("count", "?")
+            count = a.get("count")
+            if count is not None:
+                parts.append(f"n={count}")
             best = a.get("best_fitness")
-            extra = f"  best={best:.4f}" if best is not None else ""
-            line = f"{indent}📊 {span.operation}  {ms}  n={count}{extra}"
+            if best is not None:
+                parts.append(f"best={best:.4f}")
         elif span.kind == "search":
-            # Round or top-level search
-            arch = a.get("archive", a.get("archive_size"))
+            for key in ("archive", "archive_size"):
+                v = a.get(key)
+                if v is not None:
+                    parts.append(f"archive={v}")
+                    break
             bf = a.get("best_fitness")
-            rej = a.get("rejected", a.get("total_rejected"))
-            parts = [ms]
-            if arch is not None:
-                parts.append(f"archive={arch}")
             if bf is not None:
                 parts.append(f"best={bf}")
+            rej = a.get("rejected", a.get("total_rejected"))
             if rej:
                 parts.append(f"rejected={rej}")
-            line = f"{indent}🔍 {span.operation}  {'  '.join(parts)}"
-        else:
-            line = f"{indent}● {span.operation}  {ms}"
+        elif span.kind == "mcts":
+            for key in ("iteration", "child_score", "zoo_size", "budget"):
+                v = a.get(key)
+                if v is not None:
+                    parts.append(f"{key}={v}")
+
+        detail = "  ".join(parts)
+        line = f"{self._PREFIX} [{tag}] {indent}{span.operation}  {detail}"
 
         if span.status == "error":
-            logger.warning(f"{line}  ✗ {span.error}")
+            logger.warning(f"{line}  ERR: {span.error}")
         else:
             logger.info(line)
 

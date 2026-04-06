@@ -686,6 +686,15 @@ class AlphaService:
 
             timing["overall_seconds"] = perf_counter() - overall_start
 
+            # Log degenerate signal summary if any were suppressed
+            if self._degenerate_count > 0:
+                logger.info(
+                    "alpha.eval degenerate_total={} (details at DEBUG level)",
+                    self._degenerate_count,
+                )
+                self._degenerate_count = 0
+                self._data_quality_logged = False
+
             # 7. Summary on top-level span (visible in Langfuse dashboard)
             search_span.set("total_evaluations", search_result.total_evaluations)
             search_span.set("total_rejected", search_result.total_rejected)
@@ -1356,6 +1365,11 @@ class AlphaService:
             "call_stats": dict(getattr(backend, "call_stats", {})),
         }
 
+    # Rate-limit degenerate signal warnings: log first N, then suppress until summary
+    _degenerate_count: int = 0
+    _degenerate_limit: int = 3
+    _data_quality_logged: bool = False
+
     def _build_dataset_evaluation(
         self,
         program: BytecodeProgram,
@@ -1364,29 +1378,27 @@ class AlphaService:
         store: TensorStore,
         timing_breakdown: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
-        # --- diagnostic: trace data quality at each stage ---
         alpha_np = np.asarray(alpha, dtype=float)
         nan_ratio = float(np.mean(np.isnan(alpha_np))) if alpha_np.size else 1.0
         alpha_std = float(np.nanstd(alpha_np)) if alpha_np.size else 0.0
         if nan_ratio > 0.95 or alpha_std < 1e-12:
-            logger.warning(
-                "alpha.eval signal_degenerate formula={} shape={} nan_ratio={:.2%} std={:.2e}",
-                program.normalized_formula[:60],
-                alpha_np.shape,
-                nan_ratio,
-                alpha_std,
-            )
+            self._degenerate_count += 1
+            if self._degenerate_count <= self._degenerate_limit:
+                logger.debug(
+                    "alpha.eval degenerate formula={} nan={:.0%} std={:.1e}",
+                    program.normalized_formula[:50],
+                    nan_ratio,
+                    alpha_std,
+                )
         close_np = np.asarray(store.get_field("close"), dtype=float)
         close_nan = float(np.mean(np.isnan(close_np))) if close_np.size else 1.0
         liq_true = float(np.mean(dataset.liquidity_mask)) if dataset.liquidity_mask.size else 0.0
-        sess_true = float(np.mean(dataset.session_mask)) if dataset.session_mask.size else 0.0
-        if close_nan > 0.5 or liq_true < 0.5:
+        if (close_nan > 0.5 or liq_true < 0.5) and not self._data_quality_logged:
+            self._data_quality_logged = True
             logger.warning(
-                "alpha.eval data_quality formula={} close_nan={:.2%} liquidity_mask_true={:.2%} session_mask_true={:.2%}",
-                program.normalized_formula[:40],
+                "alpha.eval data_quality close_nan={:.0%} liquidity={:.0%}",
                 close_nan,
                 liq_true,
-                sess_true,
             )
 
         market_ctx = MarketContext(
