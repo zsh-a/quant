@@ -12,6 +12,8 @@ Base strategies (always active, ``always_on=True``):
 Extra strategies (opt-in via strategy="mcts", "neural", etc.):
     MCTSRefinementStrategy — LLM-guided MCTS refinement of archive elites
     NeuralFormulaStrategy  — Transformer + REINFORCE on RPN token sequences
+    AlphaForgeStrategy     — Generative-Predictive surrogate model (AlphaForge)
+    AlphaPROBEStrategy     — DAG Bayesian retrieval + evolution (AlphaPROBE)
 
 Strategy registry:
     @register_strategy(StrategyMeta(...)) decorator for adding new strategies.
@@ -34,6 +36,8 @@ from .enumeration import EnumerationStrategy
 from .llm_evolution import LLMEvolutionStrategy
 from .mcts_refinement import MCTSRefinementStrategy
 from .neural_formula import NeuralFormulaStrategy
+from .alpha_forge import AlphaForgeStrategy
+from .alpha_probe import AlphaPROBEStrategy
 
 __all__ = [
     # Base class and metadata
@@ -52,4 +56,6 @@ __all__ = [
     "LLMEvolutionStrategy",
     "MCTSRefinementStrategy",
     "NeuralFormulaStrategy",
+    "AlphaForgeStrategy",
+    "AlphaPROBEStrategy",
 ]

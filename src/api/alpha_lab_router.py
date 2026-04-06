@@ -222,7 +222,7 @@ async def get_workspace(
     return {
         "operators": service.list_operators(),
         "defaults": _workspace_defaults(),
-        "strategies_info": strategies_info,
+        "strategy_modes_info": strategies_info,
         "runs": service.list_runs(limit=run_limit),
         "zoo": service.list_zoo(limit=zoo_limit),
         "engine": {

@@ -128,18 +128,61 @@ class AlphaService:
     # ------------------------------------------------------------------
 
     def get_strategy_modes_info(self) -> list[dict[str, Any]]:
-        """Return available strategies metadata from the registry."""
+        """Return strategy modes for frontend StrategyModeInfo selector.
+
+        Builds composite "modes" from the registry:
+        - Each non-always_on strategy becomes a selectable mode
+        - always_on strategies are included in every mode's strategy list
+        - A "full" mode combines all strategies
+        - Preset modes (evolution, neural, mcts) preserved for compatibility
+        """
         from .strategies.registry import get_all_meta
-        return [
-            {
-                "name": name,
+
+        all_meta = get_all_meta()
+        always_on = [name for name, m in all_meta.items() if m.always_on]
+        extras = {name: m for name, m in all_meta.items() if not m.always_on}
+
+        # Default params per strategy type
+        _BASE_PARAMS = ["gens", "topK", "nSplits"]
+        _STRATEGY_PARAMS: dict[str, list[str]] = {
+            "mcts": ["enumMax", "enumTopK"],
+            "neural": ["neuralBatch"],
+        }
+
+        modes: list[dict[str, Any]] = []
+
+        # 1) Base evolution mode (always_on strategies only)
+        modes.append({
+            "mode": "evolution",
+            "label": "Evolution (LLM + Enum)",
+            "brief": "LLM 驱动的进化搜索 + 程序化枚举",
+            "detail": "Round 0: 枚举种子 → 后续轮次: LLM 进化 + CPCV 评估。",
+            "strategies": list(always_on),
+            "params": ["popSize", "offspring", *_BASE_PARAMS, "enumMax", "enumTopK"],
+        })
+
+        # 2) Each extra strategy as its own mode
+        for name, m in extras.items():
+            modes.append({
+                "mode": name,
                 "label": m.label,
                 "brief": m.brief,
                 "detail": m.detail,
-                "always_on": m.always_on,
-            }
-            for name, m in get_all_meta().items()
-        ]
+                "strategies": [*always_on, name],
+                "params": [*_BASE_PARAMS, *_STRATEGY_PARAMS.get(name, [])],
+            })
+
+        # 3) Full mode (all strategies combined)
+        modes.append({
+            "mode": "full",
+            "label": "Full (All Strategies)",
+            "brief": "组合所有搜索策略，多策略协作",
+            "detail": "枚举 + LLM 进化 + " + " + ".join(m.label for m in extras.values()),
+            "strategies": [*always_on, *extras.keys()],
+            "params": ["popSize", "offspring", *_BASE_PARAMS, "enumMax", "enumTopK", "neuralBatch"],
+        })
+
+        return modes
 
     def _build_strategies(
         self,
