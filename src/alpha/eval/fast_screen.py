@@ -55,7 +55,7 @@ def fast_screen_ic(
         # Take the last _MAX_SCREEN_ROWS rows (most recent data matters more)
         offset = T_full - _MAX_SCREEN_ROWS
         screen_fields = {k: v[offset:] for k, v in dataset.fields.items()}
-        logger.info("fast_screen: subsampled T={} → {}", T_full, _MAX_SCREEN_ROWS)
+        logger.debug("fast_screen: subsampled T={} → {}", T_full, _MAX_SCREEN_ROWS)
     else:
         screen_fields = dataset.fields
 
@@ -78,8 +78,7 @@ def fast_screen_ic(
     if not compiled:
         return []
 
-    compile_ms = (perf_counter() - t0) * 1000
-    logger.info("fast_screen: compiled={} in {:.0f}ms", len(compiled), compile_ms)
+    logger.debug("fast_screen: compiled={} in {:.0f}ms", len(compiled), (perf_counter() - t0) * 1000)
 
     # Check if GPU batch path is available
     use_gpu = (
@@ -105,7 +104,7 @@ def fast_screen_ic(
         except Exception:
             continue
         vm_ms = (perf_counter() - chunk_t0) * 1000
-        logger.info(
+        logger.debug(
             "fast_screen: chunk [{}/{}] vm={:.0f}ms n={}",
             min(start + chunk_size, len(compiled)), len(compiled), vm_ms, len(chunk),
         )
@@ -153,24 +152,18 @@ def fast_screen_ic(
         else:
             # --- CPU fallback (per-formula) ---
             from .metrics import compute_rank_ic
+            from ..core.vm import to_numpy
 
             for formula, alpha_raw in zip(chunk_formulas, alphas):
-                if hasattr(alpha_raw, "cpu"):
-                    alpha = alpha_raw.cpu().numpy()
-                else:
-                    alpha = np.asarray(alpha_raw, dtype=np.float32)
-
+                alpha = to_numpy(alpha_raw)
                 coverage = float(np.isfinite(alpha).mean()) if alpha.size else 0.0
                 if coverage < min_coverage:
                     continue
-
                 ic = compute_rank_ic(alpha, fwd_returns_np)
                 if abs(ic) >= min_abs_ic:
                     results.append((formula, ic))
 
             del alphas
-
-        # (per-chunk progress already logged above)
 
     results.sort(key=lambda x: abs(x[1]), reverse=True)
 

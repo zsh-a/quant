@@ -907,43 +907,28 @@ class AlphaService:
         timing_breakdown["vm_run_seconds"] += _vm_ms / 1000
         timing_breakdown["dataset_eval_calls"] += 1
         timing_breakdown["formula_evaluations"] += len(population)
-        logger.info("alpha.eval vm.run_batch  {:.0f}ms  n={}", _vm_ms, len(programs))
+        logger.debug("alpha.eval vm.run_batch  {:.0f}ms  n={}", _vm_ms, len(programs))
 
-        # Use batched GPU pipeline when possible (avoids 500× per-formula overhead)
+        # Use batched GPU pipeline when possible
         try:
             import torch as _torch
-            _is_gpu = (
+            if (
                 len(alphas) > 1
                 and isinstance(alphas[0], _torch.Tensor)
                 and alphas[0].is_cuda
-            )
-            logger.info(
-                "alpha.eval.population n={} gpu={} alpha_type={} store_torch={}",
-                len(alphas), _is_gpu,
-                type(alphas[0]).__name__ if alphas else "?",
-                store.uses_torch() if hasattr(store, 'uses_torch') else "?",
-            )
-            if _is_gpu:
-                # Chunk to avoid GPU OOM: ~50MB per formula for 114K×5 float32
+            ):
                 T, S = alphas[0].shape
                 gpu_free = _torch.cuda.mem_get_info()[0] if _torch.cuda.is_available() else 0
-                # Each formula needs ~T*S*4*10 bytes (alpha + weights + intermediates)
                 bytes_per_formula = T * S * 4 * 12
                 chunk_size = max(8, min(len(alphas), int(gpu_free * 0.6 / max(bytes_per_formula, 1))))
-                logger.info(
-                    "alpha.eval.gpu_batch n={} chunk={} gpu_free_mb={} bytes_per={}",
-                    len(alphas), chunk_size, gpu_free // (1024 * 1024), bytes_per_formula,
-                )
 
                 if chunk_size >= len(alphas):
                     return self._batch_evaluate_gpu(
                         population, programs, alphas, dataset, store, timing_breakdown,
                     )
-                # Process in chunks, merge results
                 merged: dict[str, dict] = {"metrics_by_hash": {}, "signatures_by_hash": {}, "details_by_hash": {}}
                 for start in range(0, len(alphas), chunk_size):
                     end = min(start + chunk_size, len(alphas))
-                    logger.info("alpha.eval.gpu_chunk [{}/{}]", end, len(alphas))
                     chunk_result = self._batch_evaluate_gpu(
                         population[start:end], programs[start:end],
                         alphas[start:end], dataset, store, timing_breakdown,
@@ -954,18 +939,14 @@ class AlphaService:
                 return merged
         except Exception as exc:
             logger.warning("alpha.eval.gpu_batch FAILED, falling back to CPU: {}", exc)
-            import traceback
-            logger.debug("alpha.eval.gpu_batch traceback:\n{}", traceback.format_exc())
+            logger.debug("alpha.eval.gpu_batch traceback:", exc_info=True)
 
         # Fallback: per-formula evaluation
-        logger.info("alpha.eval.cpu_fallback n={}", len(population))
         metrics_by_hash: dict[str, dict[str, float]] = {}
         signatures_by_hash: dict[str, list[float]] = {}
         details_by_hash: dict[str, dict[str, Any]] = {}
 
-        for i, (individual, alpha) in enumerate(zip(population, alphas)):
-            if i % 50 == 0:
-                logger.info("alpha.eval.cpu_progress {}/{}", i, len(population))
+        for individual, alpha in zip(population, alphas):
             evaluation = self._build_dataset_evaluation(
                 individual.program,
                 alpha,
@@ -1001,7 +982,7 @@ class AlphaService:
 
         N = len(alphas)
         T, S = alphas[0].shape
-        logger.info("alpha.eval.gpu START n={} T={} S={}", N, T, S)
+        _gpu_t0 = perf_counter()
         stacked = torch.stack(alphas)  # (N, T, S)
 
         # --- 1. Batch signal transform: (N, T, S) → (N, T, S) weights ---
@@ -1035,9 +1016,7 @@ class AlphaService:
         max_w = _MC().max_abs_weight
         max_turnover = _MC().max_turnover_per_bar
         weights = torch.clamp(weights, -max_w, max_w)
-        _sig_ms = (perf_counter() - signal_start) * 1000
-        timing_breakdown["signal_transform_seconds"] += _sig_ms / 1000
-        logger.info("alpha.eval.gpu signal_transform  {:.0f}ms", _sig_ms)
+        timing_breakdown["signal_transform_seconds"] += perf_counter() - signal_start
 
         # --- 2. Batch rule overlay (turnover limit) ---
         # Use numba on CPU (compiled C loop is >>10x faster than Python for-loop on GPU)
@@ -1062,9 +1041,7 @@ class AlphaService:
                     -max_turnover, max_turnover,
                 )
                 weights[:, t] = weights[:, t - 1] + delta
-        _ovl_ms = (perf_counter() - overlay_start) * 1000
-        timing_breakdown["rule_overlay_seconds"] += _ovl_ms / 1000
-        logger.info("alpha.eval.gpu rule_overlay  {:.0f}ms  numba={}", _ovl_ms, _has_numba)
+        timing_breakdown["rule_overlay_seconds"] += perf_counter() - overlay_start
 
         # --- 3. Batch simulate ---
         backtest_start = perf_counter()
@@ -1097,9 +1074,7 @@ class AlphaService:
 
         net_returns = position_returns - fees - total_slippage - funding  # (N, T)
         equity_curve = torch.cumprod(1.0 + torch.nan_to_num(net_returns, nan=0.0), dim=1)  # (N, T)
-        _bt_ms = (perf_counter() - backtest_start) * 1000
-        timing_breakdown["backtest_seconds"] += _bt_ms / 1000
-        logger.info("alpha.eval.gpu simulate  {:.0f}ms", _bt_ms)
+        timing_breakdown["backtest_seconds"] += perf_counter() - backtest_start
 
         # --- 4. Batch metrics on GPU ---
         fitness_start = perf_counter()
@@ -1149,9 +1124,7 @@ class AlphaService:
             rank_ic, sharpe, total_return, avg_turnover, max_drawdown,
             std_ret, final_equity, signal_coverage, active_bar_ratio, effective_bars,
         ]).cpu().numpy()  # (10, N)
-        _fit_ms = (perf_counter() - fitness_start) * 1000
-        timing_breakdown["fitness_seconds"] += _fit_ms / 1000
-        logger.info("alpha.eval.gpu metrics  {:.0f}ms", _fit_ms)
+        timing_breakdown["fitness_seconds"] += perf_counter() - fitness_start
 
         # --- 5. Build per-formula result dicts ---
         metrics_by_hash: dict[str, dict[str, float]] = {}
@@ -1222,7 +1195,7 @@ class AlphaService:
                 "alpha_signature": sig,
             }
 
-        logger.info("alpha.eval.gpu DONE n={}", N)
+        logger.debug("alpha.eval.gpu n={} {:.0f}ms", N, (perf_counter() - _gpu_t0) * 1000)
         return {
             "metrics_by_hash": metrics_by_hash,
             "signatures_by_hash": signatures_by_hash,
@@ -1923,9 +1896,8 @@ class AlphaService:
         return signature.astype(np.float32).tolist()
 
     def _to_numpy(self, value: Any) -> np.ndarray:
-        if hasattr(value, "detach") and hasattr(value, "cpu"):
-            return value.detach().cpu().numpy()
-        return np.asarray(value, dtype=float)
+        from .core.vm import to_numpy
+        return to_numpy(value)
 
     def _to_serializable_list(self, value: Any) -> list[Any]:
         return self._to_numpy(value).tolist()

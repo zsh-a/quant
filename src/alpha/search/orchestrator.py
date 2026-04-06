@@ -285,12 +285,10 @@ class SearchOrchestrator:
                     quick_rejected = 0
                     if quick_evaluate_fn and len(candidates) > 1:
                         qs_start = perf_counter()
-                        logger.info("quick_screen.start n={}", len(candidates))
                         with tracer.start_span(
                             "quick_screen", kind="eval", count=len(candidates),
                         ) as qs_span:
                             quick_result = quick_evaluate_fn(candidates)
-                            logger.info("quick_screen.evaluated  {:.0f}ms", (perf_counter() - qs_start) * 1000)
                             screened = []
                             qs_diag_logged = 0
                             for ind in candidates:
@@ -383,7 +381,6 @@ class SearchOrchestrator:
 
                     # 5. Full evaluate
                     if screened:
-                        logger.info("full_evaluate.start n={}", len(screened))
                         eval_start = perf_counter()
                         with tracer.start_span(
                             "evaluate", kind="eval", count=len(screened),
@@ -391,7 +388,6 @@ class SearchOrchestrator:
                             self._evaluate_and_update(ctx, screened, strategy_name=strategy_name)
                             best = max((ind.fitness for ind in screened), default=-999)
                             eval_span.set("best_fitness", round(best, 4))
-                            logger.info("full_evaluate.done  {:.0f}ms  best={:.4f}", (perf_counter() - eval_start) * 1000, best)
 
                         eval_stage = StageRecord(
                             kind=StageKind.EVALUATE,

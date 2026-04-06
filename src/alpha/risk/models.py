@@ -141,7 +141,7 @@ class SignalTransformer:
         return self._to_target_weights_numpy(alpha, market_ctx)
 
     def _to_target_weights_numpy(self, alpha: ArrayLike, market_ctx: MarketContext) -> np.ndarray:
-        scores = np.asarray(alpha, dtype=float).copy()
+        scores = _to_numpy(alpha).astype(float).copy()
         if market_ctx.liquidity_mask is not None:
             scores = np.where(np.asarray(market_ctx.liquidity_mask, dtype=bool), scores, np.nan)
         if market_ctx.session_mask is not None:
@@ -438,6 +438,5 @@ def _as_torch(value: ArrayLike, like: Any, dtype: Any | None = None) -> Any:
 
 
 def _to_numpy(value: ArrayLike) -> np.ndarray:
-    if _is_torch(value):
-        return value.detach().cpu().numpy()
-    return np.asarray(value)
+    from ..core.vm import to_numpy
+    return to_numpy(value)

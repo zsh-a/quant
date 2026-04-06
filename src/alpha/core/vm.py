@@ -799,11 +799,9 @@ class StackVM:
         return result
 
     def _ts_ema_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
-        # Run EMA on CPU (sequential operation — Python for-loop on GPU
-        # launches 30K+ CUDA kernels and is ~100x slower than CPU).
+        # EMA is inherently sequential — CPU numpy is faster than 30K CUDA kernel launches.
         data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
-        data_np = data.detach().cpu().numpy().astype(np.float64)
-        result_np = self._ts_ema_numpy(data_np, window)
+        result_np = self._ts_ema_numpy(to_numpy(data).astype(np.float64), window)
         return torch.as_tensor(result_np.astype(np.float32), device=data.device)
 
     # --- ts_winsorize (NEW) ---
@@ -847,12 +845,9 @@ class StackVM:
         return result
 
     def _ts_argextreme_torch(self, arr: ArrayLike, window: int, mode: str) -> ArrayLike:
-        # Fall back to CPU — argmax/argmin over sliding window has no efficient
-        # GPU primitive and unfold creates a huge (T, S, W) intermediate tensor.
+        # argmax/argmin over sliding window — no efficient GPU primitive.
         data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
-        result_np = self._ts_argextreme_numpy(
-            data.detach().cpu().numpy(), window, mode,
-        )
+        result_np = self._ts_argextreme_numpy(to_numpy(data), window, mode)
         return torch.as_tensor(result_np.astype(np.float32), device=data.device)
 
     # --- ts_rank ---
@@ -873,27 +868,10 @@ class StackVM:
         return result
 
     def _ts_rank_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
-        # Fall back to CPU — ts_rank needs per-window comparison that
-        # unfold expands to (T, S, W) on GPU; CPU numpy is faster.
+        # ts_rank needs per-window comparison — CPU numpy is faster than GPU unfold.
         data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
-        result_np = self._ts_rank_numpy(data.detach().cpu().numpy(), window)
+        result_np = self._ts_rank_numpy(to_numpy(data), window)
         return torch.as_tensor(result_np.astype(np.float32), device=data.device)
-
-    def _ts_rank_torch_UNUSED(self, arr: ArrayLike, window: int) -> ArrayLike:
-        data = arr if isinstance(arr, torch.Tensor) else self._as_torch_tensor(arr)
-        result = torch.full_like(data, torch.nan)
-        if window <= 1 or data.shape[0] < window:
-            return result
-        windows = data.unfold(0, window, 1)
-        history = windows[..., :-1]
-        last = windows[..., -1:].expand_as(history)
-        valid = (~torch.isnan(history)) & (~torch.isnan(last))
-        counts = valid.sum(dim=-1)
-        better = (valid & (last > history)).sum(dim=-1)
-        ranked = better.to(dtype=data.dtype) / counts.clamp(min=1).to(dtype=data.dtype)
-        ranked = torch.where(counts > 0, ranked, torch.full_like(ranked, torch.nan))
-        result[window - 1:] = ranked
-        return result
 
     # --- cs_rank ---
 
