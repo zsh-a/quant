@@ -358,6 +358,15 @@ export interface AlphaLabTrainingHistory {
     plot_available: boolean;
 }
 
+export interface StrategyModeInfo {
+    mode: string;
+    label: string;
+    brief: string;
+    detail: string;
+    strategies: string[];
+    params: string[];
+}
+
 export interface AlphaLabWorkspace {
     operators: AlphaLabOperator[];
     defaults: AlphaLabWorkspaceDefaults;
@@ -365,6 +374,7 @@ export interface AlphaLabWorkspace {
     zoo: AlphaLabZooEntry[];
     engine?: AlphaLabEngineInfo;
     strategy_modes?: string[];
+    strategy_modes_info?: StrategyModeInfo[];
 }
 
 /* ── Strategy State Management ──────────────────────────────────────── */

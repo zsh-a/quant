@@ -183,10 +183,12 @@ async def get_workspace(
     run_limit: int = Query(default=8, ge=1, le=50),
     zoo_limit: int = Query(default=50, ge=1, le=200),
 ):
+    modes_info = service.get_strategy_modes_info()
     return {
         "operators": service.list_operators(),
         "defaults": _workspace_defaults(),
-        "strategy_modes": ["evolution", "neural", "full"],
+        "strategy_modes": [m["mode"] for m in modes_info],
+        "strategy_modes_info": modes_info,
         "runs": service.list_runs(limit=run_limit),
         "zoo": service.list_zoo(limit=zoo_limit),
         "engine": {

@@ -3,7 +3,7 @@
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, ChevronRight, Info, Loader2, Settings2, Zap } from 'lucide-react'
-import type { AlphaLabSearchJob, AlphaLabWorkspace as WorkspacePayload } from '../../types'
+import type { AlphaLabSearchJob, AlphaLabWorkspace as WorkspacePayload, StrategyModeInfo } from '../../types'
 import { SectionCard } from '../layout/SectionCard'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
@@ -12,38 +12,31 @@ import { LLMAnalysis } from './LLMAnalysis'
 import { toISO, SEARCH_POLL_MS } from './shared'
 import { alphaApi } from '../../utils/alphaApi'
 
-/* ── Strategy descriptions ─────────────────────────────────────────── */
+/* ── Strategy descriptions (fallback when backend unavailable) ────── */
 
-const STRATEGY_INFO: Record<string, { label: string; brief: string; detail: string }> = {
-  evolution: {
-    label: 'Evolution (LLM + Enum)',
+const FALLBACK_MODES: StrategyModeInfo[] = [
+  {
+    mode: 'evolution', label: 'Evolution (LLM + Enum)',
     brief: 'LLM 驱动的进化搜索 + 程序化枚举',
-    detail:
-      'Round 0: 通过程序枚举生成大量候选公式，经 fast-IC 筛选后保留 top-K 作为种子。\n' +
-      '后续轮次: 锦标赛选择 top-2 父代 → LLM 生成变异/交叉后代 → CPCV 全量评估 → MAP-Elites 归档。\n' +
-      'Strategy Memory (UCB1 bandit) 持续追踪哪些主题/算子/特征有效，反馈到下一轮 LLM prompt。',
+    detail: 'Round 0: 枚举种子 → 后续轮次: LLM 进化 + CPCV 评估。',
+    strategies: ['enumeration', 'llm_evolution'],
+    params: ['popSize', 'offspring', 'gens', 'topK', 'nSplits', 'enumMax', 'enumTopK'],
   },
-  neural: {
-    label: 'Neural (Transformer + RL)',
+  {
+    mode: 'neural', label: 'Neural (Transformer + RL)',
     brief: 'Transformer 自回归生成 + REINFORCE 训练',
-    detail:
-      '使用因果 Transformer 模型以 RPN 序列方式自回归采样公式。\n' +
-      '每步采样大量批次 (默认 4096)，全部解码→编译→VM 执行→计算 rank-IC 作为 reward。\n' +
-      'REINFORCE + 优势归一化 进行梯度更新，LoRD 正则化防止过拟合。\n' +
-      '返回 top-K 独特候选给 orchestrator 做全量 CPCV 评估。',
+    detail: 'Causal Transformer + RPN 序列生成 + REINFORCE 强化学习。',
+    strategies: ['neural_formula'],
+    params: ['gens', 'topK', 'nSplits', 'neuralBatch'],
   },
-  full: {
-    label: 'Full (All Strategies)',
+  {
+    mode: 'full', label: 'Full (All Strategies)',
     brief: '枚举 + LLM 进化 + MCTS 精炼 + Neural 生成',
-    detail:
-      '组合所有搜索策略:\n' +
-      '- Enumeration: Round 0 批量枚举种子\n' +
-      '- LLM Evolution: 每轮 LLM 生成变异后代\n' +
-      '- MCTS Refinement: 每 N 轮对 archive 精英做树搜索局部优化\n' +
-      '- Neural Formula: Transformer + RL 自回归生成\n' +
-      '多策略协作，枚举提供广度，LLM 提供深度，MCTS 做局部精炼，Neural 探索全新空间。',
+    detail: '组合所有搜索策略，多策略协作。',
+    strategies: ['enumeration', 'llm_evolution', 'mcts_refinement', 'neural_formula'],
+    params: ['popSize', 'offspring', 'gens', 'topK', 'nSplits', 'enumMax', 'enumTopK', 'neuralBatch'],
   },
-}
+]
 
 /* ── Param definition ──────────────────────────────────────────────── */
 
@@ -64,18 +57,15 @@ const DATA_PARAMS: ParamDef[] = [
   { key: 'symbols',   label: 'Symbols',   hint: '搜索覆盖的交易对，逗号分隔' },
 ]
 
-const SEARCH_PARAMS: ParamDef[] = [
-  { key: 'popSize',   label: 'Pop Size',       hint: '初始种群大小，种子+启发式填充', min: 2, max: 32 },
-  { key: 'offspring',  label: 'Offspring/Round', hint: '每轮 LLM 生成的变异公式数量', min: 1, max: 16 },
-  { key: 'gens',       label: 'Generations',     hint: '进化迭代轮数，更多轮=更深搜索', min: 1, max: 20 },
-  { key: 'topK',       label: 'Top-K',           hint: '最终保留的最优因子数量', min: 1, max: 20 },
-  { key: 'nSplits',    label: 'CPCV Folds',      hint: '交叉验证折数，更多折=更稳健但更慢', min: 2, max: 10 },
-  { key: 'enumMax',    label: 'Enum Total',      hint: 'Round 0 程序化枚举的公式总数', min: 50, max: 5000, step: 100,
-    show: (s) => s === 'evolution' || s === 'full' },
-  { key: 'enumTopK',   label: 'Enum Top-K',      hint: '枚举后经 fast-IC 筛选保留的数量', min: 5, max: 200,
-    show: (s) => s === 'evolution' || s === 'full' },
-  { key: 'neuralBatch', label: 'Neural Batch',   hint: '每步 Transformer 采样的 RPN 序列数', min: 64, max: 8192,
-    show: (s) => s === 'neural' || s === 'full' },
+const ALL_SEARCH_PARAMS: ParamDef[] = [
+  { key: 'popSize',    label: 'Pop Size',        hint: '初始种群大小，种子+启发式填充', min: 2, max: 32 },
+  { key: 'offspring',  label: 'Offspring/Round',  hint: '每轮 LLM 生成的变异公式数量', min: 1, max: 16 },
+  { key: 'gens',       label: 'Generations',      hint: '进化迭代轮数，更多轮=更深搜索', min: 1, max: 20 },
+  { key: 'topK',       label: 'Top-K',            hint: '最终保留的最优因子数量', min: 1, max: 20 },
+  { key: 'nSplits',    label: 'CPCV Folds',       hint: '交叉验证折数，更多折=更稳健但更慢', min: 2, max: 10 },
+  { key: 'enumMax',    label: 'Enum Total',       hint: 'Round 0 程序化枚举的公式总数', min: 50, max: 5000, step: 100 },
+  { key: 'enumTopK',   label: 'Enum Top-K',       hint: '枚举后经 fast-IC 筛选保留的数量', min: 5, max: 200 },
+  { key: 'neuralBatch', label: 'Neural Batch',    hint: '每步 Transformer 采样的 RPN 序列数', min: 64, max: 8192 },
 ]
 
 /* ── Labeled input with tooltip ────────────────────────────────────── */
@@ -127,6 +117,17 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   const [showAdvanced, setShowAdvanced] = useState(false)
   const pollRef = useRef<ReturnType<typeof globalThis.setInterval> | null>(null)
 
+  // Strategy modes loaded from backend (or fallback)
+  const modes: StrategyModeInfo[] = ws?.strategy_modes_info?.length
+    ? ws.strategy_modes_info
+    : FALLBACK_MODES
+  const info = modes.find(m => m.mode === strategy) ?? modes[0]
+  // Visible search params: only those listed in the current mode's params
+  const visibleParams = useMemo(() => {
+    const allowed = new Set(info.params)
+    return ALL_SEARCH_PARAMS.filter(p => allowed.has(p.key))
+  }, [info.params])
+
   // Search params with defaults
   const [params, setParams] = useState<Record<string, number>>({
     popSize: 6, offspring: 3, gens: 3, topK: 5, nSplits: 5,
@@ -137,15 +138,15 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   }, [])
 
   const isActive = searchJob?.status === 'pending' || searchJob?.status === 'running'
-  const info = STRATEGY_INFO[strategy] ?? STRATEGY_INFO.evolution
 
-  // Estimated search volume
+  // Estimated search volume based on active strategies
   const estimatedVolume = useMemo(() => {
-    const enumPart = (strategy === 'evolution' || strategy === 'full') ? params.enumTopK : 0
-    const llmPart = (strategy !== 'neural') ? params.gens * params.offspring : 0
-    const neuralPart = (strategy === 'neural' || strategy === 'full') ? params.gens * 30 : 0
+    const strats = new Set(info.strategies)
+    const enumPart = strats.has('enumeration') ? params.enumTopK : 0
+    const llmPart = strats.has('llm_evolution') ? params.gens * params.offspring : 0
+    const neuralPart = strats.has('neural_formula') ? params.gens * 30 : 0
     return enumPart + llmPart + neuralPart
-  }, [strategy, params])
+  }, [info.strategies, params])
 
   const handleSearch = useCallback(async () => {
     try {
@@ -192,8 +193,8 @@ export const SearchTab: React.FC<SearchTabProps> = ({
               <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Strategy</label>
               <select value={strategy} onChange={e => setStrategy(e.target.value)}
                 className="h-10 w-full rounded-xl border border-border bg-input px-3 text-sm text-foreground outline-none">
-                {(ws?.strategy_modes ?? ['evolution', 'neural', 'full']).map(m => (
-                  <option key={m} value={m}>{STRATEGY_INFO[m]?.label ?? m}</option>
+                {modes.map(m => (
+                  <option key={m.mode} value={m.mode}>{m.label}</option>
                 ))}
               </select>
             </div>
@@ -209,6 +210,11 @@ export const SearchTab: React.FC<SearchTabProps> = ({
             <summary className="flex cursor-pointer items-center gap-2 px-4 py-2.5 text-xs font-medium text-muted-foreground hover:text-foreground transition select-none">
               <ChevronRight className="size-3.5 transition-transform group-open:rotate-90" />
               Algorithm Details
+              <span className="ml-auto flex gap-1">
+                {info.strategies.map(s => (
+                  <span key={s} className="rounded-full bg-secondary/60 px-1.5 py-0.5 text-[10px]">{s.replace('_', ' ')}</span>
+                ))}
+              </span>
             </summary>
             <div className="border-t border-border/30 px-4 py-3 text-xs text-muted-foreground/90 whitespace-pre-line leading-relaxed">
               {info.detail}
@@ -252,7 +258,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
           </summary>
           <div className="mt-3 space-y-3">
             <div className="grid gap-4 grid-cols-2 md:grid-cols-4 xl:grid-cols-4">
-              {SEARCH_PARAMS.filter(p => !p.show || p.show(strategy)).map(p => (
+              {visibleParams.map(p => (
                 <ParamInput key={p.key} def={p} value={params[p.key]} onChange={v => setParam(p.key, v)} />
               ))}
             </div>
@@ -266,7 +272,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
               <div className="border-t border-border/20 px-3 py-2">
                 <table className="w-full text-[11px]">
                   <tbody>
-                    {SEARCH_PARAMS.filter(p => !p.show || p.show(strategy)).map(p => (
+                    {visibleParams.map(p => (
                       <tr key={p.key} className="border-b border-border/10 last:border-0">
                         <td className="py-1 pr-3 font-medium text-foreground/80 whitespace-nowrap">{p.label}</td>
                         <td className="py-1 text-muted-foreground">{p.hint}</td>
