@@ -521,18 +521,42 @@ async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
 
 
 @router.get("/tracing/summary")
-async def get_tracing_summary():
-    return _memory_collector.summary()
+async def get_tracing_summary(trace_id: str | None = None):
+    return _memory_collector.summary(trace_id=trace_id)
 
 
 @router.get("/tracing/spans")
 async def get_tracing_spans(
     kind: str | None = None,
+    trace_id: str | None = None,
     limit: int = Query(default=50, ge=1, le=200),
 ):
-    spans = _memory_collector.find(kind=kind) if kind else _memory_collector.spans
+    spans = _memory_collector.find(kind=kind, trace_id=trace_id)
     recent = spans[-limit:]
-    return {"spans": [s.to_dict() for s in reversed(recent)], "total": len(spans)}
+    return {
+        "spans": [s.to_dict() for s in reversed(recent)],
+        "total": len(spans),
+        "trace_id": trace_id or _memory_collector.latest_trace_id,
+        "trace_ids": _memory_collector.trace_ids,
+    }
+
+
+@router.get("/tracing/traces")
+async def get_tracing_traces():
+    """List all available traces with summary info."""
+    traces = []
+    for tid in _memory_collector.trace_ids:
+        spans = _memory_collector.find(trace_id=tid)
+        root = next((s for s in spans if s.parent_id is None), None)
+        traces.append({
+            "trace_id": tid,
+            "operation": root.operation if root else "unknown",
+            "start_time": root.start_time if root else None,
+            "duration_ms": root.duration_ms if root else 0,
+            "span_count": len(spans),
+            "status": root.status if root else "unknown",
+        })
+    return {"traces": list(reversed(traces))}
 
 
 # --- Neural strategy ---

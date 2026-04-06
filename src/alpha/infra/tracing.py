@@ -29,6 +29,7 @@ import time
 import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 from typing import Any, Callable, Protocol
 
 from loguru import logger
@@ -220,12 +221,18 @@ class LoguruCollector:
             logger.info(line)
 
 
+def _epoch_to_datetime(epoch: float | None) -> datetime | None:
+    if epoch is None:
+        return None
+    return datetime.fromtimestamp(epoch, tz=timezone.utc)
+
+
 class LangfuseCollector:
     """Sends spans to Langfuse with proper trace → span → generation hierarchy.
 
-    Top-level spans (no parent) create a Langfuse *trace*.
-    LLM spans become Langfuse *generations* (with token/cost metadata).
-    All other spans become Langfuse *spans* nested under their parent.
+    Uses explicit ``id`` / ``parent_observation_id`` so that Langfuse
+    reconstructs the full tree regardless of emission order (inner spans
+    are emitted before their parents due to context-manager semantics).
     """
 
     def __init__(
@@ -237,8 +244,7 @@ class LangfuseCollector:
     ) -> None:
         self.enabled = enabled
         self._client = None
-        self._traces: dict[str, Any] = {}   # trace_id → Langfuse trace object
-        self._obs: dict[str, Any] = {}       # span_id → Langfuse observation
+        self._traces: dict[str, Any] = {}  # trace_id → Langfuse trace object
         if not enabled:
             return
         resolved_pk = public_key or os.getenv("LANGFUSE_PUBLIC_KEY")
@@ -271,102 +277,133 @@ class LangfuseCollector:
             except Exception:
                 pass
 
+    def _get_trace(self, span: Span) -> Any:
+        """Get or create a Langfuse trace for the given trace_id."""
+        if span.trace_id not in self._traces:
+            trace = self._client.trace(
+                id=span.trace_id,
+                name="alpha_search",
+            )
+            self._traces[span.trace_id] = trace
+            if len(self._traces) > 200:
+                del self._traces[next(iter(self._traces))]
+        return self._traces[span.trace_id]
+
     def _send(self, span: Span) -> None:
         _NATIVE = {"model", "prompt_tokens", "completion_tokens", "total_tokens",
                     "estimated_cost_usd", "temperature", "input", "output"}
         metadata = {k: v for k, v in span.attributes.items() if k not in _NATIVE}
         level = "ERROR" if span.status == "error" else "DEFAULT"
 
-        parent = self._resolve_parent(span)
+        trace = self._get_trace(span)
+
+        # When root span closes, update the trace name with the actual operation
+        if span.parent_id is None:
+            trace.update(name=span.operation, metadata=metadata)
 
         if span.kind == "llm":
-            obs = parent.start_observation(
+            trace.generation(
+                id=span.span_id,
                 name=span.operation,
-                as_type="generation",
+                parent_observation_id=span.parent_id,
+                start_time=_epoch_to_datetime(span.start_time),
+                end_time=_epoch_to_datetime(span.end_time),
                 input=span.attributes.get("input"),
                 output=span.attributes.get("output"),
                 model=span.attributes.get("model"),
                 model_parameters={"temperature": span.attributes.get("temperature")},
+                usage={
+                    "input": span.attributes.get("prompt_tokens") or 0,
+                    "output": span.attributes.get("completion_tokens") or 0,
+                    "total": span.attributes.get("total_tokens") or 0,
+                },
                 metadata=metadata,
                 level=level,
                 status_message=span.error,
             )
-            obs.update(usage_details={
-                "input": span.attributes.get("prompt_tokens") or 0,
-                "output": span.attributes.get("completion_tokens") or 0,
-                "total": span.attributes.get("total_tokens") or 0,
-            })
-            obs.end()
         else:
             name = span.operation if span.kind == "search" else f"{span.kind}.{span.operation}"
-            obs = parent.start_observation(
+            trace.span(
+                id=span.span_id,
                 name=name,
-                as_type="span",
+                parent_observation_id=span.parent_id,
+                start_time=_epoch_to_datetime(span.start_time),
+                end_time=_epoch_to_datetime(span.end_time),
                 metadata=metadata,
                 level=level,
                 status_message=span.error,
             )
-            obs.end()
-
-        self._obs[span.span_id] = obs
-
-        # Evict old entries
-        if len(self._obs) > 500:
-            for k in list(self._obs)[:250]:
-                del self._obs[k]
-
-    def _resolve_parent(self, span: Span) -> Any:
-        # Nest under parent observation if available
-        if span.parent_id and span.parent_id in self._obs:
-            return self._obs[span.parent_id]
-        # Create or reuse a top-level trace
-        if span.trace_id not in self._traces:
-            obs = self._client.start_observation(
-                name=span.operation,
-                as_type="span",
-                metadata={"trace_id": span.trace_id, "kind": span.kind},
-            )
-            self._traces[span.trace_id] = obs
-            if len(self._traces) > 200:
-                del self._traces[next(iter(self._traces))]
-        return self._traces[span.trace_id]
 
 
 class InMemoryCollector:
-    """Collects spans in memory for testing / analysis."""
+    """Collects spans in memory for testing / analysis.
+
+    Spans are grouped by ``trace_id`` so callers can retrieve a single
+    search run without noise from previous runs.
+    """
+
+    _MAX_TRACES = 20  # keep last N traces to bound memory
 
     def __init__(self) -> None:
         self.spans: list[Span] = []
+        self._traces: dict[str, list[Span]] = {}  # trace_id → spans
 
     def on_span_end(self, span: Span) -> None:
         self.spans.append(span)
+        self._traces.setdefault(span.trace_id, []).append(span)
+        # Evict oldest traces if too many
+        if len(self._traces) > self._MAX_TRACES:
+            oldest = next(iter(self._traces))
+            evicted = self._traces.pop(oldest)
+            self.spans = [s for s in self.spans if s.trace_id != oldest]
 
     def clear(self) -> None:
         self.spans.clear()
+        self._traces.clear()
 
-    def find(self, operation: str | None = None, kind: str | None = None) -> list[Span]:
-        result = self.spans
+    @property
+    def trace_ids(self) -> list[str]:
+        """All known trace IDs, oldest first."""
+        return list(self._traces.keys())
+
+    @property
+    def latest_trace_id(self) -> str | None:
+        """The most recent trace ID, or None."""
+        return list(self._traces.keys())[-1] if self._traces else None
+
+    def find(
+        self,
+        operation: str | None = None,
+        kind: str | None = None,
+        trace_id: str | None = None,
+    ) -> list[Span]:
+        if trace_id:
+            result = self._traces.get(trace_id, [])
+        else:
+            result = self.spans
         if operation:
             result = [s for s in result if s.operation == operation]
         if kind:
             result = [s for s in result if s.kind == kind]
         return result
 
-    def summary(self) -> dict[str, Any]:
-        """Aggregate statistics across collected spans."""
-        llm_spans = self.find(kind="llm")
+    def summary(self, trace_id: str | None = None) -> dict[str, Any]:
+        """Aggregate statistics, optionally scoped to a single trace."""
+        spans = self._traces.get(trace_id, self.spans) if trace_id else self.spans
+        llm_spans = [s for s in spans if s.kind == "llm"]
         total_tokens = sum(s.attributes.get("total_tokens", 0) or 0 for s in llm_spans)
         total_cost = sum(s.attributes.get("estimated_cost_usd", 0) or 0 for s in llm_spans)
         total_latency = sum(s.duration_ms for s in llm_spans)
         errors = sum(1 for s in llm_spans if s.status == "error")
         return {
+            "trace_id": trace_id or self.latest_trace_id,
             "llm_calls": len(llm_spans),
             "llm_errors": errors,
             "total_tokens": total_tokens,
             "total_cost_usd": round(total_cost, 6),
             "total_latency_ms": round(total_latency, 1),
             "avg_latency_ms": round(total_latency / len(llm_spans), 1) if llm_spans else 0,
-            "total_spans": len(self.spans),
+            "total_spans": len(spans),
         }
 
 
