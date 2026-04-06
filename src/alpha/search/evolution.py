@@ -43,10 +43,39 @@ class FitnessPolicy:
     pnl_efficiency_cap: float = 10.0
     tail_ratio_scale: float = 2.0
 
+    def relaxed(self) -> "FitnessPolicy":
+        """Return a lenient variant for warm-start rounds.
+
+        Relaxes rejection thresholds so that mediocre-but-non-degenerate
+        formulas can enter the archive, giving MCTS and evolution useful
+        seeds to refine.
+        """
+        return FitnessPolicy(
+            min_active_bar_ratio=0.02,
+            min_signal_coverage=0.15,
+            min_avg_turnover=0.001,
+            min_test_sharpe=-0.5,
+            max_negative_test_ratio=0.80,
+            reject_score=-8.0,  # much lower: allow up to 12 violations before reject
+            sharpe_scale=self.sharpe_scale,
+            test_sharpe_scale=self.test_sharpe_scale,
+            rank_ic_scale=self.rank_ic_scale,
+            pnl_efficiency_cap=self.pnl_efficiency_cap,
+            tail_ratio_scale=self.tail_ratio_scale,
+        )
+
 
 class FitnessEngine:
     def __init__(self, policy: FitnessPolicy | None = None):
         self.policy = policy or FitnessPolicy()
+        self._normal_policy = self.policy
+        self._warm_policy = self.policy.relaxed()
+        self._warm = False
+
+    def set_warm(self, enabled: bool) -> None:
+        """Switch between normal and warm-start (relaxed) policy."""
+        self._warm = enabled
+        self.policy = self._warm_policy if enabled else self._normal_policy
 
     def _clip(self, value: float, lo: float, hi: float) -> float:
         return float(np.clip(value, lo, hi))
@@ -56,6 +85,32 @@ class FitnessEngine:
             return float(metrics.get(key, default))
         except (TypeError, ValueError):
             return float(default)
+
+    def rejection_reasons(self, metrics: dict[str, float]) -> list[str]:
+        """Return human-readable list of rejection reasons (empty if none)."""
+        reasons: list[str] = []
+        active_bar_ratio = self._safe(metrics, "active_bar_ratio")
+        signal_coverage = self._safe(metrics, "signal_coverage", 1.0)
+        avg_turnover = self._safe(metrics, "avg_turnover")
+        test_sharpe = self._safe(metrics, "test_sharpe")
+        negative_test_ratio = self._safe(metrics, "negative_test_ratio")
+        inactive = self._safe(metrics, "inactive")
+
+        if inactive >= 1.0 or active_bar_ratio < self.policy.min_active_bar_ratio:
+            reasons.append(
+                f"active_bar_ratio={active_bar_ratio:.3f}<{self.policy.min_active_bar_ratio}"
+                if active_bar_ratio < self.policy.min_active_bar_ratio
+                else f"inactive={inactive:.2f}>=1.0"
+            )
+        if signal_coverage < self.policy.min_signal_coverage:
+            reasons.append(f"signal_coverage={signal_coverage:.3f}<{self.policy.min_signal_coverage}")
+        if avg_turnover < self.policy.min_avg_turnover:
+            reasons.append(f"avg_turnover={avg_turnover:.4f}<{self.policy.min_avg_turnover}")
+        if test_sharpe < self.policy.min_test_sharpe:
+            reasons.append(f"test_sharpe={test_sharpe:.3f}<{self.policy.min_test_sharpe}")
+        if negative_test_ratio > self.policy.max_negative_test_ratio:
+            reasons.append(f"neg_test_ratio={negative_test_ratio:.2f}>{self.policy.max_negative_test_ratio}")
+        return reasons
 
     def score(self, metrics: dict[str, float]) -> float:
         active_bar_ratio = self._safe(metrics, "active_bar_ratio")

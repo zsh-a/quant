@@ -73,7 +73,7 @@ def archive_update(
     ind: Individual,
     reject_score: float = -5.0,
 ) -> None:
-    if ind.fitness <= reject_score:
+    if ind.fitness < reject_score:
         return
     cell = archive_cell(ind)
     existing = archive.get(cell)
@@ -232,9 +232,31 @@ class SearchOrchestrator:
         prefetch_future: Future | None = None
         prefetch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="llm_prefetch")
 
+        # --- warm-start: relax fitness thresholds while archive is empty ---
+        _warm_start_active = False
+        _WARM_MAX_ROUNDS = 3
+
         for round_idx in range(rounds):
             round_start = perf_counter()
             ctx.round_idx = round_idx
+
+            # Enable warm-start during early rounds when archive is empty.
+            # Once the archive has entries, warm-start is disabled permanently.
+            if not ctx.archive and round_idx < _WARM_MAX_ROUNDS:
+                if not _warm_start_active:
+                    self.fitness_engine.set_warm(True)
+                    _warm_start_active = True
+                    logger.info(
+                        "search.warm_start enabled (archive empty at round {})",
+                        round_idx,
+                    )
+            elif _warm_start_active:
+                self.fitness_engine.set_warm(False)
+                _warm_start_active = False
+                logger.info(
+                    "search.warm_start disabled (archive={} round={})",
+                    len(ctx.archive), round_idx,
+                )
 
             round_ctx = tracer.start_span(
                 f"round_{round_idx}", kind="search",
@@ -431,6 +453,28 @@ class SearchOrchestrator:
             round_rec.duration_ms = (perf_counter() - round_start) * 1000
             round_rec.archive_snapshot = self._build_archive_snapshot(ctx.archive, limit=5)
 
+            # Force-seed: if archive is still empty after warm-start rounds
+            # exhausted, push the best candidate from population regardless of
+            # fitness score.  This ensures downstream strategies (MCTS) have at
+            # least one seed to work with.
+            if (
+                not ctx.archive
+                and ctx.population
+                and round_idx == _WARM_MAX_ROUNDS - 1
+            ):
+                best_pop = max(ctx.population, key=lambda x: x.fitness)
+                cell = archive_cell(best_pop)
+                ctx.archive[cell] = best_pop
+                logger.warning(
+                    "search.force_seed archive was empty after {} warm-start "
+                    "rounds; injected best from population: {} fitness={:.3f}",
+                    _WARM_MAX_ROUNDS,
+                    best_pop.formula[:50],
+                    best_pop.fitness,
+                )
+                round_info["archive_size"] = len(ctx.archive)
+                round_rec.archive_size = len(ctx.archive)
+
             round_span.set("archive", len(ctx.archive))
             round_span.set("best_fitness", round(round_info["best_fitness"], 4))
             round_ctx.__exit__(None, None, None)
@@ -462,6 +506,10 @@ class SearchOrchestrator:
                 )
 
         prefetch_executor.shutdown(wait=False)
+
+        # Ensure warm-start is off after search completes
+        if _warm_start_active:
+            self.fitness_engine.set_warm(False)
 
         pipeline.total_evaluations = ctx.total_evaluations
         pipeline.total_rejected = ctx.total_rejected
@@ -539,18 +587,23 @@ class SearchOrchestrator:
         # Diagnostic: log fitness distribution for rejected batches
         if individuals:
             best_ind = max(individuals, key=lambda x: x.fitness)
-            rejected = sum(1 for x in individuals if x.fitness <= self.fitness_engine.policy.reject_score)
+            reject_threshold = self.fitness_engine.policy.reject_score
+            rejected = sum(1 for x in individuals if x.fitness < reject_threshold)
             if rejected == len(individuals):
                 m = best_ind.metrics
+                reasons = self.fitness_engine.rejection_reasons(m)
                 logger.warning(
                     "evaluate.all_rejected n={} best_fitness={:.2f} formula={} "
                     "sharpe={:.3f} test_sharpe={:.3f} rank_ic={:.4f} "
-                    "active={:.2f} turnover={:.4f} coverage={:.2f} inactive={}",
+                    "active={:.2f} turnover={:.4f} coverage={:.2f} inactive={} "
+                    "neg_test_ratio={:.2f} reasons=[{}]",
                     len(individuals), best_ind.fitness, best_ind.formula[:60],
                     float(m.get("sharpe", 0)), float(m.get("test_sharpe", 0)),
                     float(m.get("rank_ic", 0)), float(m.get("active_bar_ratio", 0)),
                     float(m.get("avg_turnover", 0)), float(m.get("signal_coverage", 0)),
                     m.get("inactive", "?"),
+                    float(m.get("negative_test_ratio", 0)),
+                    ", ".join(reasons) if reasons else "none",
                 )
 
         # Evict oldest entries to cap memory (archive retains the best)

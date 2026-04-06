@@ -323,14 +323,19 @@ def compute_multi_dim_scores(
     zoo_irs = [abs(m.get("ic_ir", 0)) for m in zoo_metrics]
     scores["stability"] = _percentile_rank(ic_ir, zoo_irs) * E_MAX
 
-    # Turnover: lower turnover is better.
-    # _percentile_rank returns fraction beaten (with lower value) → high means
-    # many have lower turnover → we are WORSE → invert for score.
+    # Turnover: lower turnover is better, BUT near-zero turnover indicates
+    # a degenerate signal (constant ranking).  Clamp to a minimum so that
+    # degenerate signals don't get a perfect score.
+    _MIN_HEALTHY_TURNOVER = 0.005
     zoo_turnovers = [
         m.get("turnover_proxy", m.get("avg_turnover", 0.5))
         for m in zoo_metrics
     ]
-    scores["turnover"] = (1 - _percentile_rank(turnover, zoo_turnovers)) * E_MAX
+    if turnover < _MIN_HEALTHY_TURNOVER:
+        # Degenerate: signal barely changes → cap at half-score
+        scores["turnover"] = E_MAX * 0.5
+    else:
+        scores["turnover"] = (1 - _percentile_rank(turnover, zoo_turnovers)) * E_MAX
 
     # Diversity: lower correlation is better → same inversion as turnover.
     zoo_corrs = [m.get("max_zoo_corr", 0.0) for m in zoo_metrics]
@@ -523,8 +528,27 @@ class MCTSEngine:
                         k: round(v, 2) for k, v in child.eval_scores.items()
                     })
 
+                    # Log detailed child info for diagnostics
+                    logger.info(
+                        "mcts.child formula={} rank_ic={:.4f} ic_ir={:.3f} "
+                        "turnover={:.3f} scores=[E={:.1f} S={:.1f} T={:.1f} "
+                        "D={:.1f} O={:.1f}] S(f)={:.2f}",
+                        child.formula[:60],
+                        child_metrics.get("rank_ic", 0),
+                        child_metrics.get("ic_ir", 0),
+                        child_metrics.get("turnover_proxy",
+                                          child_metrics.get("avg_turnover", 0)),
+                        child.eval_scores.get("effectiveness", 0),
+                        child.eval_scores.get("stability", 0),
+                        child.eval_scores.get("turnover", 0),
+                        child.eval_scores.get("diversity", 0),
+                        child.eval_scores.get("overfitting", 0),
+                        child.alpha_score,
+                    )
+
                     # Zoo update (lines 31-34)
-                    if self._passes_effectiveness_check(child, val_ds):
+                    zoo_pass = self._passes_effectiveness_check(child, val_ds)
+                    if zoo_pass:
                         self._add_to_zoo(child, dataset)
                         # Update FSA forbidden subtrees
                         self._forbidden_subtrees = compute_forbidden_subtrees(
@@ -535,6 +559,16 @@ class MCTSEngine:
                             "zoo_add",
                             formula=child.formula[:60],
                             zoo_size=len(self.alpha_zoo),
+                        )
+                    else:
+                        logger.debug(
+                            "mcts.zoo_reject formula={} rank_ic={:.4f} "
+                            "ic_ir={:.3f} turnover={:.3f}",
+                            child.formula[:40],
+                            abs(child_metrics.get("rank_ic", 0)),
+                            abs(child_metrics.get("ic_ir", 0)),
+                            child_metrics.get("turnover_proxy",
+                                              child_metrics.get("avg_turnover", 0)),
                         )
 
                     # Dynamic budget (lines 35-38)
@@ -563,8 +597,46 @@ class MCTSEngine:
         tracer.flush()
 
     def get_refined_formulas(self) -> list[str]:
-        """Return formulas discovered during the last run."""
+        """Return zoo formulas discovered during the last run."""
         return [node.formula for node in self.alpha_zoo]
+
+    def get_tree_formulas(self) -> list[str]:
+        """Return ALL formulas from the search tree (not just zoo).
+
+        On weak data, tree children may not pass zoo thresholds but can
+        still be useful candidates for the orchestrator's evaluation.
+        Results are sorted by alpha_score descending.
+        """
+        if self.root is None:
+            return []
+        nodes: list[AlphaNode] = []
+        stack = [self.root]
+        while stack:
+            node = stack.pop()
+            nodes.append(node)
+            stack.extend(node.children)
+        nodes.sort(key=lambda n: n.alpha_score, reverse=True)
+        return [n.formula for n in nodes]
+
+    def get_tree_node_metrics(self) -> dict[str, dict[str, float]]:
+        """Return {formula: metrics} for all tree nodes and zoo members.
+
+        Used by MCTSRefinementStrategy to detect negative-IC formulas
+        that need sign-flipping.
+        """
+        result: dict[str, dict[str, float]] = {}
+        # Tree nodes
+        if self.root is not None:
+            stack = [self.root]
+            while stack:
+                node = stack.pop()
+                result[node.formula] = node.metrics
+                stack.extend(node.children)
+        # Zoo members (may overlap with tree)
+        for node in self.alpha_zoo:
+            if node.formula not in result:
+                result[node.formula] = node.metrics
+        return result
 
     def reset_tree(self) -> None:
         """Clear the search tree for a fresh run, preserving the zoo."""

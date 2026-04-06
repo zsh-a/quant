@@ -96,10 +96,39 @@ class MCTSRefinementStrategy(BaseStrategy):
                 )
                 self._total_trees_searched += 1
 
-                refined = self.mcts_engine.get_refined_formulas()
+                # Harvest from zoo first, then tree (for non-zoo children).
+                # On weak data, tree children may not pass zoo thresholds
+                # but are still useful candidates for the orchestrator.
+                zoo_formulas = set(self.mcts_engine.get_refined_formulas())
+                tree_formulas = self.mcts_engine.get_tree_formulas()
+                # Deduplicate: zoo formulas first (higher priority), then
+                # remaining tree formulas in score order.
+                seen: set[str] = set()
+                ordered: list[str] = []
+                for f in list(zoo_formulas) + tree_formulas:
+                    if f not in seen:
+                        seen.add(f)
+                        ordered.append(f)
+
+                # For formulas with negative rank_ic, add a sign-flipped
+                # variant (neg(...)).  MCTS uses abs(IC) internally, but the
+                # downstream fitness engine backtests with the original sign.
+                # Flipping ensures high-|IC| negative-direction formulas are
+                # also tested in the correct direction.
+                augmented: list[str] = []
+                node_metrics = self.mcts_engine.get_tree_node_metrics()
+                for f in ordered:
+                    augmented.append(f)
+                    ic = node_metrics.get(f, {}).get("rank_ic", 0)
+                    if ic < -0.005:
+                        flipped = f"neg({f})"
+                        if flipped not in seen:
+                            augmented.append(flipped)
+                            seen.add(flipped)
+
                 new = self.compile_and_dedup(
                     ctx,
-                    refined,
+                    augmented,
                     lineage_fn=lambda _f, _parent=member: Lineage(
                         origin="mcts_refinement",
                         parent_a=_parent.expr_hash,
