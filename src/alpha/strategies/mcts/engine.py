@@ -281,7 +281,11 @@ def compute_forbidden_subtrees(
 
 
 def _percentile_rank(value: float, zoo_values: list[float]) -> float:
-    """R(f, m, F_zoo) = fraction of zoo members with metric < value (Eq. 6)."""
+    """Fraction of zoo members with metric value strictly below *value*.
+
+    NOT the paper's R (Eq. 6) which counts m(f) < m(f').  This function
+    returns the complement: higher return means *value* beats more members.
+    """
     if not zoo_values:
         return 0.5
     below = sum(1 for v in zoo_values if v < value)
@@ -310,24 +314,27 @@ def compute_multi_dim_scores(
 
     scores: dict[str, float] = {}
 
-    # Effectiveness: higher rank_ic is better
+    # Effectiveness: higher rank_ic is better.
+    # _percentile_rank returns fraction beaten → high = good → score directly.
     zoo_ics = [abs(m.get("rank_ic", 0)) for m in zoo_metrics]
-    scores["effectiveness"] = (1 - _percentile_rank(rank_ic, zoo_ics)) * E_MAX
+    scores["effectiveness"] = _percentile_rank(rank_ic, zoo_ics) * E_MAX
 
-    # Stability: higher ic_ir is better
+    # Stability: higher ic_ir is better.
     zoo_irs = [abs(m.get("ic_ir", 0)) for m in zoo_metrics]
-    scores["stability"] = (1 - _percentile_rank(ic_ir, zoo_irs)) * E_MAX
+    scores["stability"] = _percentile_rank(ic_ir, zoo_irs) * E_MAX
 
-    # Turnover: lower turnover is better, so rank is inverted
+    # Turnover: lower turnover is better.
+    # _percentile_rank returns fraction beaten (with lower value) → high means
+    # many have lower turnover → we are WORSE → invert for score.
     zoo_turnovers = [
         m.get("turnover_proxy", m.get("avg_turnover", 0.5))
         for m in zoo_metrics
     ]
-    scores["turnover"] = _percentile_rank(turnover, zoo_turnovers) * E_MAX
+    scores["turnover"] = (1 - _percentile_rank(turnover, zoo_turnovers)) * E_MAX
 
-    # Diversity: lower correlation is better
+    # Diversity: lower correlation is better → same inversion as turnover.
     zoo_corrs = [m.get("max_zoo_corr", 0.0) for m in zoo_metrics]
-    scores["diversity"] = _percentile_rank(diversity_corr, zoo_corrs) * E_MAX
+    scores["diversity"] = (1 - _percentile_rank(diversity_corr, zoo_corrs)) * E_MAX
 
     # Overfitting Risk: from LLM assessment (0-10 scale, higher = less risk)
     if overfitting_score is not None:
@@ -854,7 +861,7 @@ class MCTSEngine:
             corr = self._get_formula_correlation(node.formula, zoo_node.formula)
             zoo_with_corr.append((zoo_node, corr))
 
-        k = 1  # Paper uses 1 few-shot example
+        k = 3  # Paper: top-k exemplars (Section D, k=3)
 
         if target_dim in ("effectiveness", "stability"):
             # Filter: remove top-eta% most correlated (Section D, eta=50%)
@@ -957,10 +964,12 @@ class MCTSEngine:
         """Check if a node meets the effectiveness criteria for zoo entry (Section G).
 
         Basic criteria:
-          - RankIC >= 0.015
-          - RankIR >= 0.3
+          - RankIC >= zoo_threshold (0.015)
+          - RankIR >= effectiveness_threshold (0.3)
+          - R_RankIC <= 0.95 and R_RankIR <= 0.95 (not top-5% outlier)
+          - Daily turnover <= 1.6
           - Validated on out-of-sample data
-          - Max correlation with zoo < 0.8
+          - Max correlation with zoo < 0.8 (checked in _add_to_zoo)
         """
         train_ic = abs(node.metrics.get("rank_ic", 0))
         train_ir = abs(node.metrics.get("ic_ir", 0))
@@ -968,6 +977,23 @@ class MCTSEngine:
         if train_ic < self.zoo_threshold:
             return False
         if train_ir < self.effectiveness_threshold:
+            return False
+
+        # Percentile upper bounds — reject outliers (Section G)
+        zoo_metrics = [n.metrics for n in self.alpha_zoo]
+        if zoo_metrics:
+            zoo_ics = [abs(m.get("rank_ic", 0)) for m in zoo_metrics]
+            zoo_irs = [abs(m.get("ic_ir", 0)) for m in zoo_metrics]
+            if _percentile_rank(train_ic, zoo_ics) > 0.95:
+                return False
+            if _percentile_rank(train_ir, zoo_irs) > 0.95:
+                return False
+
+        # Turnover constraint (Section G: daily turnover <= 1.6)
+        turnover = node.metrics.get(
+            "turnover_proxy", node.metrics.get("avg_turnover", 0.5),
+        )
+        if turnover > 1.6:
             return False
 
         # Validate on held-out data
@@ -1201,7 +1227,7 @@ class MCTSLLMAdapter:
             return ""
 
     # ------------------------------------------------------------------
-    # 1. Generate refined alpha (Figure 18 + Eq. 3-5)
+    # 1. Generate refined alpha — two-step process (Eq. 4-5)
     # ------------------------------------------------------------------
 
     def generate_refined_alpha(
@@ -1216,27 +1242,29 @@ class MCTSLLMAdapter:
     ) -> tuple[str, str]:
         """Generate a refinement suggestion and a new formula.
 
-        This is a two-step process (Eq. 4-5):
-          1. d_{s,i*} ~ p_LLM(.|s, i*, F_zoo)  — refinement suggestion
-          2. f_new ~ p_LLM(.|d_{s,i*}, f_s)    — concrete formula
+        Two-step process per the paper (Eq. 4-5):
+          Step 1: d_{s,i*} ~ p_LLM(.|s, i*, F_zoo)  — refinement suggestion
+          Step 2: f_new ~ p_LLM(.|d_{s,i*}, f_s)    — concrete formula
+
+        Separating suggestion from formula generation reduces instruction-
+        following complexity and improves formula quality.
 
         Returns (suggestion, formula).
         """
+        # --- Build shared context blocks ---
         dim_desc = _DIMENSION_DESCRIPTIONS.get(target_dimension, "")
 
-        # Build score summary
         score_lines = []
         for dim in EVAL_DIMENSIONS:
             s = eval_scores.get(dim, 0)
             score_lines.append(f"  {dim}: {s:.1f}/{E_MAX}")
         scores_text = "\n".join(score_lines)
 
-        # Build refinement history text
         history = context.get("refinement_history", [])
         history_text = ""
         if history:
             steps = []
-            for i, h in enumerate(history[-5:]):  # Last 5 steps
+            for i, h in enumerate(history[-5:]):
                 steps.append(
                     f"  Step {i+1}: {h.get('parent_formula', '?')[:40]} -> "
                     f"{h.get('child_formula', '?')[:40]} "
@@ -1244,7 +1272,6 @@ class MCTSLLMAdapter:
                 )
             history_text = "Refinement history:\n" + "\n".join(steps)
 
-        # Build sibling info
         siblings_text = ""
         siblings = context.get("siblings", [])
         if siblings:
@@ -1254,7 +1281,6 @@ class MCTSLLMAdapter:
             ]
             siblings_text = "Sibling attempts (avoid similar formulas):\n" + "\n".join(sib_lines)
 
-        # Build exemplar text
         exemplar_text = ""
         if exemplars:
             ex_lines = []
@@ -1268,7 +1294,6 @@ class MCTSLLMAdapter:
                 + "\n".join(ex_lines)
             )
 
-        # Build FSA constraint
         fsa_text = ""
         if forbidden_subtrees:
             fsa_text = (
@@ -1277,20 +1302,14 @@ class MCTSLLMAdapter:
                 + "\n".join(f"  - {s}" for s in forbidden_subtrees)
             )
 
-        # Error feedback for retry
-        error_text = ""
-        if error_feedback:
-            error_text = (
-                f"\nPrevious attempt failed with error: {error_feedback}\n"
-                "Fix the error and generate a valid formula."
-            )
+        # ---------------------------------------------------------------
+        # Step 1 (Eq. 4): Generate refinement suggestion  d_{s,i*}
+        # ---------------------------------------------------------------
+        suggestion_prompt = f"""\
+Task: Generate a refinement suggestion for an alpha factor.
 
-        prompt = f"""\
-Task: Refine an alpha factor for quantitative investment.
-
-Available Data Fields: {_FIELDS_REF}
-
-Available Operators: {_OPERATORS_REF}
+You are a quantitative finance expert. Analyze the alpha factor below and
+propose a specific, actionable improvement for the **{target_dimension}** dimension.
 
 Original alpha expression:
   {parent_formula}
@@ -1304,6 +1323,55 @@ Target dimension for improvement: {target_dimension}
 {history_text}
 {siblings_text}
 {exemplar_text}
+
+Provide your response in JSON format:
+{{
+  "name": "short_descriptive_name",
+  "description": "One sentence explaining the investment intuition of the improved alpha.",
+  "suggestion": "2-3 sentence refinement suggestion explaining WHAT to change and WHY it improves {target_dimension}."
+}}
+
+Output ONLY the JSON, no markdown fences or extra text."""
+
+        raw_suggestion = self._chat(
+            [{"role": "user", "content": suggestion_prompt}],
+            temperature=1.0,
+        )
+        suggestion_data = self._parse_json_response(raw_suggestion)
+        suggestion = suggestion_data.get("suggestion", "")
+        name = suggestion_data.get("name", "")
+        description = suggestion_data.get("description", "")
+
+        if not suggestion:
+            return "", ""
+
+        # ---------------------------------------------------------------
+        # Step 2 (Eq. 5): Generate refined formula  f_new
+        # ---------------------------------------------------------------
+        error_text = ""
+        if error_feedback:
+            error_text = (
+                f"\nPrevious attempt failed with error: {error_feedback}\n"
+                "Fix the error and generate a valid formula."
+            )
+
+        formula_prompt = f"""\
+Task: Generate an improved alpha formula based on the refinement suggestion below.
+
+Available Data Fields: {_FIELDS_REF}
+
+Available Operators: {_OPERATORS_REF}
+
+Original alpha expression:
+  {parent_formula}
+
+Alpha Portrait:
+  Name: {name}
+  Description: {description}
+
+Refinement Suggestion:
+  {suggestion}
+
 {fsa_text}
 {error_text}
 
@@ -1313,65 +1381,54 @@ Alpha Requirements:
 3. All lookback windows must be concrete integer values (e.g., 20, not a variable).
 4. No more than 3 nested levels of operators.
 5. Output must be a valid Python expression using ONLY the listed fields and operators.
-6. Use descriptive variable logic that captures a clear financial intuition.
+6. The formula MUST reflect the refinement suggestion above.
 
-Provide your response in the following JSON format:
+Provide your response in JSON format:
 {{
-  "name": "short_descriptive_name",
-  "description": "One sentence explaining the investment intuition.",
-  "suggestion": "1-2 sentence refinement suggestion for the {target_dimension} dimension.",
   "formula": "the_refined_alpha_formula_as_python_expression"
 }}
 
 Output ONLY the JSON, no markdown fences or extra text."""
 
-        messages = [{"role": "user", "content": prompt}]
-        raw = self._chat(messages, temperature=0.8)
+        raw_formula = self._chat(
+            [{"role": "user", "content": formula_prompt}],
+            temperature=0.8,
+        )
+        formula_data = self._parse_json_response(raw_formula)
+        formula = formula_data.get("formula", "")
 
-        # Parse response
-        suggestion, formula = self._parse_refinement_response(raw, parent_formula)
+        if not formula:
+            # Fallback: try to extract any formula-like expression
+            match = re.search(r'[a-z_]+\([^)]*\)', raw_formula)
+            if match:
+                formula = match.group(0)
+
+        formula = formula.strip().strip("`\"' \n")
         return suggestion, formula
 
-    def _parse_refinement_response(
-        self,
-        raw: str,
-        fallback_formula: str,
-    ) -> tuple[str, str]:
-        """Parse JSON response from refinement LLM call."""
+    def _parse_json_response(self, raw: str) -> dict[str, Any]:
+        """Extract a JSON object from an LLM response."""
         if not raw:
-            return "", ""
+            return {}
 
-        # Try to extract JSON from response
         raw_clean = raw.strip()
-        # Remove markdown fences if present
         if raw_clean.startswith("```"):
             lines = raw_clean.split("\n")
             lines = [l for l in lines if not l.strip().startswith("```")]
             raw_clean = "\n".join(lines)
 
         try:
-            data = json.loads(raw_clean)
-            suggestion = data.get("suggestion", "")
-            formula = data.get("formula", "")
-            # Basic cleanup
-            formula = formula.strip().strip("`\"' \n")
-            return suggestion, formula
+            return json.loads(raw_clean)
         except json.JSONDecodeError:
-            # Fallback: try to find a formula-like expression
-            # Look for formula field
-            match = re.search(r'"formula"\s*:\s*"([^"]+)"', raw)
-            if match:
-                formula = match.group(1).strip()
-                suggestion_match = re.search(r'"suggestion"\s*:\s*"([^"]+)"', raw)
-                suggestion = suggestion_match.group(1) if suggestion_match else ""
-                return suggestion, formula
+            pass
 
-            # Last resort: look for any parenthesized expression
-            match = re.search(r'[a-z_]+\([^)]*\)', raw)
+        # Fallback: regex extraction of known fields
+        result: dict[str, str] = {}
+        for key in ("name", "description", "suggestion", "formula"):
+            match = re.search(rf'"{key}"\s*:\s*"([^"]+)"', raw)
             if match:
-                return "", match.group(0)
-
-            return "", ""
+                result[key] = match.group(1)
+        return result
 
     # ------------------------------------------------------------------
     # 2. Overfitting risk assessment (Figure 17)
