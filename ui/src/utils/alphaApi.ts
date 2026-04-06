@@ -61,6 +61,9 @@ export const alphaApi = {
   getSearchJob: (jobId: string) =>
     request<AlphaLabSearchJob>(`/alpha-lab/search-jobs/${jobId}`),
 
+  listSearchJobs: () =>
+    request<{ jobs: AlphaLabSearchJob[] }>('/alpha-lab/search-jobs'),
+
   getSearchPipeline: (jobId: string) =>
     request<{ pipeline: AlphaPipelineRecord | null }>(`/alpha-lab/search-jobs/${jobId}/pipeline`),
 

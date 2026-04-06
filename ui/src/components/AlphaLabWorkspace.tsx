@@ -12,6 +12,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { Activity, Cpu, Database, LibraryBig, Workflow, Zap } from 'lucide-react'
 
 import type { AlphaLabWorkspace as WorkspacePayload } from '../types'
+import { useSearchJobs } from '../hooks/useSearchJobs'
 import { MetricCard } from './layout/MetricCard'
 import { Badge } from './ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
@@ -61,11 +62,15 @@ export const AlphaLabWorkspace: React.FC = () => {
 
   useEffect(() => { void loadWorkspace() }, [loadWorkspace])
 
+  // Multi-job manager — survives page refresh via backend recovery
+  const searchJobs = useSearchJobs(() => void loadWorkspace())
+
   const handleLoadFormula = useCallback((f: string) => {
     setFormula(f); setTab('research')
   }, [])
 
   const engineLabel = ws?.engine ? `${ws.engine.backend}${ws.engine.triton ? ' · Triton' : ''} · ${ws.engine.device}` : 'loading'
+  const activeCount = searchJobs.jobs.filter(j => j.status === 'pending' || j.status === 'running').length
 
   return (
     <div className="space-y-6">
@@ -88,7 +93,10 @@ export const AlphaLabWorkspace: React.FC = () => {
       <Tabs value={tab} onValueChange={v => setTab(v as Tab)}>
         <TabsList>
           <TabsTrigger value="research"><Activity className="mr-1.5 size-3.5" />Research</TabsTrigger>
-          <TabsTrigger value="search"><Zap className="mr-1.5 size-3.5" />Search</TabsTrigger>
+          <TabsTrigger value="search">
+            <Zap className="mr-1.5 size-3.5" />Search
+            {activeCount > 0 && <Badge variant="info" className="ml-1.5 text-[10px] px-1.5 py-0">{activeCount}</Badge>}
+          </TabsTrigger>
           <TabsTrigger value="factors"><LibraryBig className="mr-1.5 size-3.5" />Factors</TabsTrigger>
           <TabsTrigger value="history"><Workflow className="mr-1.5 size-3.5" />History</TabsTrigger>
           <TabsTrigger value="monitor"><Cpu className="mr-1.5 size-3.5" />Monitor</TabsTrigger>
@@ -116,7 +124,7 @@ export const AlphaLabWorkspace: React.FC = () => {
             endTime={endTime} setEndTime={setEndTime}
             intervals={intervals} symList={symList}
             ws={ws} onLoadFormula={handleLoadFormula}
-            onSearchComplete={() => void loadWorkspace()}
+            searchJobs={searchJobs}
             setErr={setErr}
           />
         </TabsContent>

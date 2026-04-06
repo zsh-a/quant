@@ -267,6 +267,7 @@ export interface AlphaLabSearchJob {
     job_id: string;
     status: 'pending' | 'running' | 'completed' | 'failed';
     created_at?: string;
+    strategy?: string;
     error?: string;
     run_id?: string;
     top_results?: AlphaLabZooEntry[];

@@ -302,10 +302,16 @@ async def get_search_job(job_id: str):
 
 @router.get("/search-jobs")
 async def list_search_jobs():
-    """List all search jobs."""
+    """List all search jobs (newest first)."""
     jobs = []
     for job_id, job in sorted(_SEARCH_JOBS.items(), key=lambda x: x[1].get("created_at", ""), reverse=True):
-        entry: dict[str, Any] = {"job_id": job_id, "status": job["status"], "created_at": job.get("created_at")}
+        params = job.get("params", {})
+        entry: dict[str, Any] = {
+            "job_id": job_id,
+            "status": job["status"],
+            "created_at": job.get("created_at"),
+            "strategy": params.get("strategy", "evolution"),
+        }
         if job["error"]:
             entry["error"] = job["error"]
         if job["status"] == "completed" and job["result"]:
