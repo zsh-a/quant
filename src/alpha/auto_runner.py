@@ -19,7 +19,7 @@ import yaml
 from loguru import logger
 from pydantic import BaseModel, Field
 
-from .risk import RiskConfig
+from .risk.models import RiskConfig
 from .service import AlphaService
 
 
@@ -383,7 +383,7 @@ def _generate_feedback_seeds(
     count: int,
     objective: str,
 ) -> list[str]:
-    from .evolution import BreedingSpec
+    from .search.evolution import BreedingSpec
 
     ranked = sorted(
         [e for e in entries if e.get("formula")],

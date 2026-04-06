@@ -18,7 +18,7 @@ from typing import Any
 
 from loguru import logger
 
-from .strategy_state import FactorCatalog, StatefulStrategy, StrategySnapshot
+from .context import FactorCatalog, StatefulStrategy, StrategySnapshot
 
 
 # ---------------------------------------------------------------------------

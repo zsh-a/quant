@@ -20,8 +20,18 @@
 src/
   api/            # FastAPI routers, WebSocket, event bus
   core/           # Trading engine, brokers, data streams, risk manager
-  alpha/          # Alpha factor DSL, VM, search strategies, LLM integration
-    strategies/   # Neural formula, LLM evolution, MCTS refinement
+  alpha/          # Alpha factor discovery module
+    core/         #   DSL, compiler, VM, operators, dataset
+    eval/         #   Metrics, screening, validation, GPU acceleration
+    search/       #   Orchestrator, context, pipeline, evolution, checkpoints
+    strategies/   #   Pluggable strategies (LLM, MCTS, Neural, Enumeration)
+      mcts/       #     LLM-guided MCTS engine (paper implementation)
+    llm/          #   LLM backends (Heuristic, OpenAI) and context
+    knowledge/    #   Financial themes, feature engineering, strategy memory
+    risk/         #   Risk models, signal transformation, factor combination
+    infra/        #   Persistence and tracing
+    service.py    #   AlphaService — top-level API
+    cli.py        #   CLI commands
   strategies/     # Trading strategy registry and templates
   portfolio/      # Multi-strategy portfolio management
   market_data/    # ClickHouse DB, data processors (akshare, baostock, tdx, crypto)
@@ -96,7 +106,7 @@ make clean_all                         # Remove .pth, runs/, .log files
 ### Core Modules
 
 1. **Trading Engine** (`src/core/engine.py`): Bar-by-bar simulation loop. Order types: `NEXT_OPEN`, `IMMEDIATE_OPEN`, `IMMEDIATE_CLOSE`.
-2. **Alpha Search** (`src/alpha/`): DSL compiler -> StackVM bytecode -> vectorized evaluation. Search strategies: LLM evolution, MCTS refinement, neural formula (transformer RPN), enumeration.
+2. **Alpha Search** (`src/alpha/`): DSL compiler → StackVM bytecode → vectorized evaluation. Strategies: LLM evolution, LLM-guided MCTS (paper: "Navigating the Alpha Jungle"), neural formula (Transformer+REINFORCE), enumeration.
 3. **Market Data** (`src/market_data/`): Multi-source pipeline (Akshare, Baostock, TDX, CCXT/Binance). ClickHouse storage with chunked loading.
 4. **Task Queue** (`src/tasks/`): Celery queues - `backtest`, `default`, `automation`. Redis broker.
 
@@ -144,7 +154,7 @@ Health check: `GET /monitoring/health`
 - **Config access**: Use `get_settings()`, `get_broker_config()`, etc. from `src/config/settings.py`
 - **Logging**: Use `loguru` via `src/utils/logging_config.py`
 - **Session DB**: SQLite via `session_db.py` at project root
-- **Alpha formulas**: Python expression syntax, compiled to bytecode via `src/alpha/compiler.py`
+- **Alpha formulas**: Python expression syntax, compiled to bytecode via `src/alpha/core/compiler.py`
 
 ## Documentation
 

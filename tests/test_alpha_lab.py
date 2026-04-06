@@ -6,14 +6,14 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.alpha import AlphaService, FormulaCompiler, StackVM, TensorStore
-from src.alpha.evolution import BreedingSpec, FitnessEngine
-from src.alpha.llm import HeuristicLLMBackend
-from src.alpha.search_strategy import SearchOrchestrator
+from src.alpha.search.evolution import BreedingSpec, FitnessEngine
+from src.alpha.llm.backends import HeuristicLLMBackend
+from src.alpha.search.orchestrator import SearchOrchestrator
 from src.alpha.strategies import LLMEvolutionStrategy
-from src.alpha.llm import OpenAILLMBackend
-from src.alpha.persistence import AlphaPersistence
-from src.alpha.risk import CostModel, ExecutionSimulator, MarketContext, RuleOverlay
-from src.alpha.validation import CPCVValidator
+from src.alpha.llm.backends import OpenAILLMBackend
+from src.alpha.infra.persistence import AlphaPersistence
+from src.alpha.risk.models import CostModel, ExecutionSimulator, MarketContext, RuleOverlay
+from src.alpha.eval.validation import CPCVValidator
 from src.market_data.ccxt_adapter import CcxtCryptoDataAdapter, PROVIDER_SPECS
 
 

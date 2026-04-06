@@ -12,9 +12,9 @@ from typing import Any
 
 from loguru import logger
 
-from ..evolution import Individual
-from ..pipeline import Lineage
-from ..strategy_state import SearchContext, build_individual
+from ..search.evolution import Individual
+from ..search.pipeline import Lineage
+from ..search.context import SearchContext, build_individual
 
 
 class EnumerationStrategy:
@@ -42,9 +42,9 @@ class EnumerationStrategy:
         return ctx.round_idx == 0 and ctx.dataset is not None
 
     def generate_candidates(self, ctx: SearchContext) -> list[Individual]:
-        from ..enumerator import FormulaEnumerator
-        from ..fast_screen import fast_screen_ic
-        from ..vm import StackVM
+        from ..search.enumerator import FormulaEnumerator
+        from ..eval.fast_screen import fast_screen_ic
+        from ..core.vm import StackVM
 
         enumerator = FormulaEnumerator(compiler=ctx.compiler, schema=ctx.schema)
         formulas = enumerator.generate(max_count=self.max_enumerate)

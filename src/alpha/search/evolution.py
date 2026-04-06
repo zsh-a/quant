@@ -6,7 +6,7 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from .compiler import BytecodeProgram
+from ..core.compiler import BytecodeProgram
 from .pipeline import Lineage, PipelineRecord
 
 

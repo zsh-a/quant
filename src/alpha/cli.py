@@ -16,7 +16,7 @@ import json
 from datetime import UTC, datetime
 from typing import Any
 
-from .risk import RiskConfig
+from .risk.models import RiskConfig
 from .service import AlphaService
 
 

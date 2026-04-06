@@ -1,6 +1,24 @@
 # Alpha Search System
 
-The alpha search system discovers quantitative trading factors (alpha formulas) through a combination of LLM-driven evolution, neural network generation, and Monte Carlo Tree Search.
+The alpha search system discovers quantitative trading factors (alpha formulas) through a combination of LLM-driven evolution, LLM-guided MCTS, neural network generation, and programmatic enumeration.
+
+## Module Structure
+
+```
+src/alpha/
+  core/           — DSL, compiler, VM, operators, dataset
+  eval/           — Metrics, screening, validation, GPU acceleration
+  search/         — Orchestrator, context, pipeline, evolution, checkpoints
+  strategies/     — Pluggable strategy implementations
+    mcts/         —   LLM-guided MCTS engine (paper algorithm)
+  llm/            — LLM backends (Heuristic, OpenAI) and context
+  knowledge/      — Financial themes, feature engineering, strategy memory
+  risk/           — Risk models, signal transformation, factor combination
+  infra/          — Persistence and tracing
+  service.py      — AlphaService (top-level API)
+  cli.py          — CLI commands
+  auto_runner.py  — Auto-search runner
+```
 
 ## Pipeline Overview
 
@@ -23,7 +41,7 @@ Formula String
 
 ## DSL (Domain-Specific Language)
 
-**File**: `src/alpha/dsl.py`, `src/alpha/operators.py`
+**File**: `src/alpha/core/dsl.py`, `src/alpha/core/operators.py`
 
 Formulas are Python expressions operating on market data tensors. Example:
 
@@ -33,21 +51,18 @@ cs_rank(ts_mean(close, 20) - ts_mean(close, 5))
 
 ### Available Fields
 
-OHLCV: `open`, `high`, `low`, `close`, `volume`
-Crypto: `mark_price`, `premium`, `open_interest`, `sentiment_*`
+OHLCV: `open`, `high`, `low`, `close`, `volume`, `turnover`, `vwap`
+Crypto: `mark_open/high/low/close`, `premium_open/high/low/close`, `funding_rate`, `open_interest`, `long_short_ratio`, `taker_buy_volume`, `taker_long_short_vol_ratio`
 
-### Operators (50+)
+### Operators (60+)
 
 | Category | Operators |
 |----------|-----------|
-| Unary | `abs`, `log`, `sign`, `sqrt`, `sigmoid`, `neg`, `power` |
-| Binary | `add`, `sub`, `mul`, `div`, `max`, `min`, `pow` |
-| Comparison | `gt`, `ge`, `lt`, `le`, `eq`, `ne` → mask |
-| Logical | `and`, `or`, `not` (mask only) |
+| Math | `abs`, `log`, `sign`, `sqrt`, `sigmoid`, `neg`, `div`, `power` |
 | Time-series | `ts_mean`, `ts_std`, `ts_max`, `ts_min`, `ts_rank`, `ts_zscore`, `ts_ema`, `ts_corr`, `ts_cov`, `decay_linear`, `delay`, `delta`, `returns_n`, `log_return`, `ts_argmax`, `ts_argmin`, `ts_winsorize` |
 | Cross-section | `cs_rank`, `cs_zscore`, `cs_demean`, `cs_scale` |
 | Domain | `oi_delta`, `funding_delta`, `spread_ratio`, `adv_n`, `amihud`, `hlc3`, `ohlc4`, `true_range`, `atr_n`, `volatility_n` |
-| Control | `where`, `clip`, `fillna` |
+| Control | `where`, `clip`, `fillna`, `max`, `min` |
 
 ### Type System
 
@@ -57,7 +72,7 @@ Crypto: `mark_price`, `premium`, `open_interest`, `sentiment_*`
 
 ## Compiler
 
-**File**: `src/alpha/compiler.py`
+**File**: `src/alpha/core/compiler.py`
 
 ```
 FormulaCompiler.compile(formula_string) → BytecodeProgram
@@ -69,7 +84,7 @@ Outputs normalized formula hash (SHA256) for deduplication.
 
 ## StackVM
 
-**File**: `src/alpha/vm.py`
+**File**: `src/alpha/core/vm.py`
 
 Register-based virtual machine executing compiled bytecode on market data.
 
@@ -80,7 +95,7 @@ Register-based virtual machine executing compiled bytecode on market data.
 
 ## Evaluation
 
-**File**: `src/alpha/evaluation.py`
+**File**: `src/alpha/eval/metrics.py`
 
 ### Metrics
 
@@ -93,11 +108,11 @@ Register-based virtual machine executing compiled bytecode on market data.
 | `turnover_proxy` | 1 - \|autocorrelation\| | Trading cost indicator |
 | `fitness` | rank_ic² / ic_std | Archive ranking score |
 
-CPCV (Combinatorial Purged Cross-Validation) with `n_splits`, `purge_window`, `embargo_window` for robust out-of-sample evaluation.
+CPCV (Combinatorial Purged Cross-Validation) via `src/alpha/eval/validation.py` with `n_splits`, `purge_window`, `embargo_window` for robust out-of-sample evaluation.
 
 ## Search Strategies
 
-All strategies implement the `SearchStrategy` protocol:
+All strategies implement the `SearchStrategy` protocol (`src/alpha/search/context.py`):
 
 ```python
 class SearchStrategy(Protocol):
@@ -120,31 +135,38 @@ Main search driver. Uses tournament selection + LLM mutation.
 
 **RL feedback loop**: After evaluation, `record_evaluation_result()` updates strategy memory (winning themes & operators). Memory fed back into prompts for next round.
 
-### 2. MCTS Refinement (`src/alpha/strategies/mcts_refinement.py`, `src/alpha/mcts.py`)
+### 2. MCTS Refinement (`src/alpha/strategies/mcts_refinement.py`, `src/alpha/strategies/mcts/`)
 
-Activates every N rounds. Refines archive elites via UCT tree search.
+LLM-guided Monte Carlo Tree Search, implementing "Navigating the Alpha Jungle" (Shi et al., 2025).
 
-**MCTS loop**: Select (UCT) → Expand (LLM suggests refinement) → Evaluate (VM + rank_ic) → Backpropagate
+Activates every N rounds. Refines archive elites via tree search with:
 
-Zoo management: deduplicates via 0.95 correlation threshold. Adds high-IC candidates (train IC > 5%, val IC > 2%) to zoo.
+- **UCT Selection with Virtual Expansion**: Any node (not just leaves) can be expanded via virtual expansion action `a_e` with `N_s' = 1 + |C(s)|`
+- **Dimension-Targeted Refinement**: Softmax sampling `P(i*=i|s) = Softmax((e_max - E_s)/T)` selects weakest dimension (Effectiveness, Stability, Turnover, Diversity, Overfitting) for improvement
+- **Multi-Dimensional Evaluation**: Percentile ranking against zoo `e_i(f) = (1 - R(f, m_i, F_zoo)) * e_max`, with LLM overfitting risk assessment
+- **Backpropagation**: `Q(s_k, a_k) ← max(Q(s_k, a_k), S(f_new))` (max reward, not average)
+- **Frequent Subtree Avoidance (FSA)**: Mines frequent root genes from zoo formulas, instructs LLM to avoid common motifs for structural diversity
+- **Dynamic Search Budget**: Budget increases when new high scores are found
+
+Zoo criteria: RankIC ≥ 0.015, RankIR ≥ 0.3, correlation < 0.8.
 
 ### 3. Neural Formula (`src/alpha/strategies/neural_formula.py`)
 
 Transformer-based RPN (Reverse Polish Notation) generator, AlphaGPT-style.
 
-- **Vocabulary**: 50+ operators, 12 fields, 6 window sizes → tokens
+- **Vocabulary**: 60+ operators, fields, window sizes → tokens
 - **Model**: Causal Transformer (64D, 4 heads, 2 layers, RMSNorm)
 - **Generation**: Autoregressive sampling with vectorized action masking (GPU-friendly)
 - **Training**: REINFORCE with normalized advantage
 - **Rewards**: Invalid RPN → -5.0, constant signal → -2.0, valid → |rank_ic| × 20.0
 
-### 4. Enumeration (`src/alpha/search_strategy.py`)
+### 4. Enumeration (`src/alpha/strategies/enumeration.py`)
 
-Round 0 only. Programmatic formula enumeration with IC-only fast screen.
+Round 0 only. Programmatic formula generation via `FormulaEnumerator` + fast IC screening.
 
 ## SearchOrchestrator
 
-**File**: `src/alpha/search_strategy.py`
+**File**: `src/alpha/search/orchestrator.py`
 
 Coordinates multiple strategies in a round-based loop:
 
@@ -163,11 +185,13 @@ for each round:
 
 **Pipeline overlap**: Prefetches next round's LLM candidates while current round evaluates.
 
+**Checkpointing**: Periodic snapshots of strategy state + factor catalog via `src/alpha/search/checkpoint.py`.
+
 ## LLM Integration
 
-**File**: `src/alpha/llm.py`, `src/alpha/llm_context.py`
+**File**: `src/alpha/llm/backends.py`, `src/alpha/llm/context.py`
 
-`OpenAILLMBackend` connects to any OpenAI-compatible API.
+`OpenAILLMBackend` connects to any OpenAI-compatible API. `HeuristicLLMBackend` provides deterministic fallback.
 
 **Prompt construction**:
 1. Field reference (OHLCV, crypto-specific)
@@ -179,6 +203,14 @@ for each round:
 
 **LLMContext**: Builds pipeline summaries for LLM analysis of search health and bottleneck detection.
 
+## Adding a New Strategy
+
+1. Create `src/alpha/strategies/my_strategy.py`
+2. Implement the `SearchStrategy` protocol (4 methods: `name`, `should_activate`, `generate_candidates`, `on_evaluation_complete`)
+3. Optionally implement `StatefulStrategy` for checkpoint/restore
+4. Register in `src/alpha/strategies/__init__.py`
+5. Add to `AlphaService._build_strategies()` in `src/alpha/service.py`
+
 ## Service Layer
 
 **File**: `src/alpha/service.py`
@@ -187,7 +219,7 @@ for each round:
 
 | Method | Purpose |
 |--------|---------|
-| `list_operators()` | All 50+ available operators |
+| `list_operators()` | All 60+ available operators |
 | `validate_formula(formula)` | Parse + type-check |
 | `compile_formula(formula)` | Return bytecode + validation |
 | `evaluate_formula(formula, fields)` | Run on raw data, return weights + metrics |
@@ -198,7 +230,7 @@ for each round:
 
 ## GPU Acceleration
 
-**Files**: `src/alpha/gpu_evaluation.py`, `src/alpha/gpu_ops.py`, `src/alpha/triton_kernels.py`
+**Files**: `src/alpha/eval/gpu_metrics.py`, `src/alpha/eval/gpu_ops.py`, `src/alpha/eval/triton_kernels.py`
 
 Optional GPU acceleration via PyTorch and Triton custom kernels for:
 - Vectorized operator execution

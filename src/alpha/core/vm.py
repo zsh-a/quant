@@ -13,7 +13,7 @@ except Exception:  # pragma: no cover - torch is optional for this scaffold
     torch = None
 
 try:
-    from .gpu_ops import (
+    from ..eval.gpu_ops import (
         TRITON_AVAILABLE as _TRITON_OK,
         rolling_mean_std as _triton_rolling_mean_std,
         rolling_reduce as _triton_rolling_reduce,

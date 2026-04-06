@@ -1,109 +1,107 @@
 """Unified alpha factor discovery module.
 
-Pluggable strategy framework for alpha formula mining with:
-- LLM-driven evolution + RL feedback loop
-- LLM-guided MCTS refinement
-- Neural formula generation (Transformer + REINFORCE)
-- Programmatic enumeration with fast IC screening
-- Financial knowledge base + derived feature catalog
-- Multi-factor combination and portfolio-level risk management
+Subpackages:
+  core/       — DSL, compiler, VM, operators, dataset
+  eval/       — Metrics, screening, validation, GPU acceleration
+  search/     — Orchestrator, context, pipeline, evolution, checkpoints
+  strategies/ — Pluggable strategy implementations (LLM, MCTS, Neural, Enum)
+  llm/        — LLM backends (Heuristic, OpenAI) and context building
+  knowledge/  — Financial themes, feature engineering, strategy memory
+  risk/       — Risk models, signal transformation, factor combination
+  infra/      — Persistence and tracing
 """
 
-# --- Core DSL / Compiler / VM ---
-from .compiler import BytecodeProgram, FormulaCompiler, Instruction
-from .dsl import ASTNode, FormulaParser, TensorSchema, TypeChecker, ValidationReport
-from .operators import OperatorRegistry, OperatorSpec
-from .vm import StackVM, TensorStore
-
-# --- Data ---
-from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
-
-# --- Evaluation ---
-from .evaluation import compute_forward_returns, compute_ic_metrics, compute_rank_ic
-from .gpu_evaluation import compute_ic_metrics_gpu, compute_rank_ic_batch_gpu, compute_rank_ic_gpu
-from .gpu_ops import TRITON_AVAILABLE as triton_available
-from .fast_screen import fast_screen_ic
-
-# --- Evolution primitives ---
-from .evolution import BreedingSpec, EvalResult, FitnessEngine, FitnessPolicy, Individual, SearchResult
-from .pipeline import ArchiveEntry, Lineage, PipelineRecord, RoundRecord, StageKind, StageRecord
-
-# --- Strategy framework ---
-from .strategy_state import (
-    FactorCatalog, FactorCatalogEntry, SearchContext, SearchStrategy,
-    StatefulStrategy, StrategySnapshot, build_individual,
+# --- Core ---
+from .core import (
+    ASTNode, AlphaDataset, BytecodeProgram, CryptoMinuteDatasetLoader,
+    FormulaCompiler, FormulaParser, Instruction, OperatorRegistry, OperatorSpec,
+    StackVM, TensorSchema, TensorStore, TypeChecker, ValidationReport,
 )
-from .search_strategy import SearchOrchestrator
 
-# --- LLM backends ---
-from .llm import HeuristicLLMBackend
+# --- Eval ---
+from .eval import (
+    TRITON_AVAILABLE as triton_available,
+    CPCVValidator, ValidationFold,
+    compute_forward_returns, compute_ic_metrics, compute_rank_ic,
+    compute_ic_metrics_gpu, compute_rank_ic_batch_gpu, compute_rank_ic_gpu,
+    fast_screen_ic,
+)
 
-# --- Search strategies ---
-from .strategies import EnumerationStrategy, LLMEvolutionStrategy, MCTSRefinementStrategy, NeuralFormulaStrategy
-from .mcts import AlphaNode, MCTSEngine, MCTSLLMAdapter
+# --- Search ---
+from .search import (
+    ArchiveEntry, BreedingSpec, CheckpointManager, EvalResult,
+    FactorCatalog, FactorCatalogEntry, FitnessEngine, FitnessPolicy,
+    FormulaEnumerator, Individual, Lineage, PipelineRecord, RoundRecord,
+    SearchCheckpoint, SearchContext, SearchOrchestrator, SearchResult,
+    SearchStrategy, StageKind, StageRecord, StatefulStrategy, StrategySnapshot,
+    build_individual,
+)
 
-# --- Knowledge & memory ---
-from .feature_kitchen import DerivedFeature, FeatureKitchen
-from .financial_knowledge import FeatureGroup, FinancialKnowledgeBase, FinancialTheme
-from .strategy_memory import StrategyMemory
-from .enumerator import FormulaEnumerator
+# --- LLM ---
+from .llm import HeuristicLLMBackend, OpenAILLMBackend
 
-# --- Infrastructure ---
-from .checkpoint import CheckpointManager, SearchCheckpoint
-from .persistence import AlphaPersistence, PersistedRun
-from .combination import FactorCombiner, FactorSignal
-from .validation import CPCVValidator, ValidationFold
-from .tracing import InMemoryCollector, LangfuseCollector, Span, SpanCollector, tracer
+# --- Strategies ---
+from .strategies import (
+    EnumerationStrategy, LLMEvolutionStrategy,
+    MCTSRefinementStrategy, NeuralFormulaStrategy,
+)
+from .strategies.mcts import AlphaNode, MCTSEngine, MCTSLLMAdapter
+
+# --- Knowledge ---
+from .knowledge import (
+    DerivedFeature, FeatureGroup, FeatureKitchen,
+    FinancialKnowledgeBase, FinancialTheme, StrategyMemory,
+)
 
 # --- Risk ---
 from .risk import (
-    BacktestResult, CostModel, ExecutionSimulator, MarketContext,
-    PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer,
+    BacktestResult, CostModel, ExecutionSimulator, FactorCombiner, FactorSignal,
+    MarketContext, PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer,
 )
 
-# --- Service (top-level API) ---
+# --- Infra ---
+from .infra import (
+    AlphaPersistence, InMemoryCollector, LangfuseCollector,
+    PersistedRun, Span, SpanCollector, tracer,
+)
+
+# --- Service ---
 from .service import AlphaService
 
 __all__ = [
     # Core
-    "ASTNode", "BytecodeProgram", "FormulaCompiler", "FormulaParser",
-    "Instruction", "OperatorRegistry", "OperatorSpec", "StackVM",
-    "TensorSchema", "TensorStore", "TypeChecker", "ValidationReport",
-    # Data
-    "AlphaDataset", "CryptoMinuteDatasetLoader",
-    # Evaluation
+    "ASTNode", "AlphaDataset", "BytecodeProgram", "CryptoMinuteDatasetLoader",
+    "FormulaCompiler", "FormulaParser", "Instruction", "OperatorRegistry",
+    "OperatorSpec", "StackVM", "TensorSchema", "TensorStore",
+    "TypeChecker", "ValidationReport",
+    # Eval
+    "triton_available", "CPCVValidator", "ValidationFold",
     "compute_forward_returns", "compute_ic_metrics", "compute_rank_ic",
     "compute_ic_metrics_gpu", "compute_rank_ic_batch_gpu", "compute_rank_ic_gpu",
-    "triton_available", "fast_screen_ic",
-    # Evolution
-    "BreedingSpec", "EvalResult", "FitnessEngine", "FitnessPolicy",
-    "Individual", "SearchResult",
-    # Pipeline
-    "ArchiveEntry", "Lineage", "PipelineRecord", "RoundRecord",
-    "StageKind", "StageRecord",
-    # Strategy framework
-    "build_individual", "FactorCatalog", "FactorCatalogEntry",
-    "SearchContext", "SearchOrchestrator", "SearchStrategy",
-    "StatefulStrategy", "StrategySnapshot",
+    "fast_screen_ic",
+    # Search
+    "ArchiveEntry", "BreedingSpec", "CheckpointManager", "EvalResult",
+    "FactorCatalog", "FactorCatalogEntry", "FitnessEngine", "FitnessPolicy",
+    "FormulaEnumerator", "Individual", "Lineage", "PipelineRecord",
+    "RoundRecord", "SearchCheckpoint", "SearchContext", "SearchOrchestrator",
+    "SearchResult", "SearchStrategy", "StageKind", "StageRecord",
+    "StatefulStrategy", "StrategySnapshot", "build_individual",
     # LLM
-    "HeuristicLLMBackend",
+    "HeuristicLLMBackend", "OpenAILLMBackend",
     # Strategies
-    "EnumerationStrategy", "LLMEvolutionStrategy",
-    "MCTSRefinementStrategy", "NeuralFormulaStrategy",
-    "AlphaNode", "MCTSEngine", "MCTSLLMAdapter",
+    "AlphaNode", "EnumerationStrategy", "LLMEvolutionStrategy",
+    "MCTSEngine", "MCTSLLMAdapter", "MCTSRefinementStrategy",
+    "NeuralFormulaStrategy",
     # Knowledge
     "DerivedFeature", "FeatureGroup", "FeatureKitchen",
-    "FinancialKnowledgeBase", "FinancialTheme",
-    "FormulaEnumerator", "StrategyMemory",
-    # Infrastructure
-    "AlphaPersistence", "CheckpointManager", "CPCVValidator",
-    "FactorCombiner", "FactorSignal", "InMemoryCollector",
-    "LangfuseCollector", "PersistedRun", "SearchCheckpoint",
-    "Span", "SpanCollector", "tracer", "ValidationFold",
+    "FinancialKnowledgeBase", "FinancialTheme", "StrategyMemory",
     # Risk
-    "BacktestResult", "CostModel", "ExecutionSimulator",
-    "MarketContext", "PortfolioManager", "RiskConfig",
+    "BacktestResult", "CostModel", "ExecutionSimulator", "FactorCombiner",
+    "FactorSignal", "MarketContext", "PortfolioManager", "RiskConfig",
     "RuleOverlay", "SignalTransformer",
+    # Infra
+    "AlphaPersistence", "InMemoryCollector", "LangfuseCollector",
+    "PersistedRun", "Span", "SpanCollector", "tracer",
     # Service
     "AlphaService",
 ]

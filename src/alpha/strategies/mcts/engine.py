@@ -29,11 +29,11 @@ from typing import Any, Optional
 import numpy as np
 from loguru import logger
 
-from .compiler import FormulaCompiler
-from .dataset import AlphaDataset
-from .dsl import TensorSchema
-from .evaluation import compute_forward_returns, compute_ic_metrics, compute_rank_ic
-from .vm import StackVM, TensorStore
+from ...core.compiler import FormulaCompiler
+from ...core.dataset import AlphaDataset
+from ...core.dsl import TensorSchema
+from ...eval.metrics import compute_forward_returns, compute_ic_metrics, compute_rank_ic
+from ...core.vm import StackVM, TensorStore
 
 
 # ---------------------------------------------------------------------------
@@ -425,7 +425,7 @@ class MCTSEngine:
 
         Implements Algorithm 1 lines 1-40.
         """
-        from .tracing import tracer
+        from ...infra.tracing import tracer
 
         n_t = dataset.shape()[0]
         train_end = int(n_t * train_ratio)
@@ -617,7 +617,7 @@ class MCTSEngine:
         2. LLM generates refinement suggestion + new formula
         3. Validate and retry if invalid
         """
-        from .tracing import tracer
+        from ...infra.tracing import tracer
 
         # 1. Dimension-targeted refinement suggestion (lines 10-12)
         target_dim = self._sample_dimension(node)

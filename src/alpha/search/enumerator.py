@@ -14,8 +14,8 @@ from typing import Any
 
 from loguru import logger
 
-from .compiler import FormulaCompiler
-from .dsl import TensorSchema
+from ..core.compiler import FormulaCompiler
+from ..core.dsl import TensorSchema
 
 
 # ---------------------------------------------------------------------------
@@ -63,7 +63,7 @@ class FormulaEnumerator:
         schema: TensorSchema | None = None,
         seed: int = 42,
     ):
-        from .operators import OperatorRegistry
+        from ..core.operators import OperatorRegistry
 
         registry = OperatorRegistry()
         self.compiler = compiler or FormulaCompiler(registry)

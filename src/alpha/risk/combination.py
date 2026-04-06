@@ -16,15 +16,15 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from .compiler import BytecodeProgram, FormulaCompiler
-from .dataset import AlphaDataset
-from .dsl import TensorSchema
-from .operators import OperatorRegistry
-from .vm import StackVM, TensorStore
+from ..core.compiler import BytecodeProgram, FormulaCompiler
+from ..core.dataset import AlphaDataset
+from ..core.dsl import TensorSchema
+from ..core.operators import OperatorRegistry
+from ..core.vm import StackVM, TensorStore
 
 try:
     import torch
-    from .gpu_ops import TRITON_AVAILABLE as _TRITON_OK, cs_rank as _triton_cs_rank, factor_correlation_matrix as _triton_factor_corr
+    from ..eval.gpu_ops import TRITON_AVAILABLE as _TRITON_OK, cs_rank as _triton_cs_rank, factor_correlation_matrix as _triton_factor_corr
 except Exception:  # pragma: no cover
     torch = None
     _TRITON_OK = False

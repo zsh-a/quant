@@ -10,10 +10,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any
 
-from .pipeline import ArchiveEntry, PipelineRecord, StageKind
+from ..search.pipeline import ArchiveEntry, PipelineRecord, StageKind
 
 if TYPE_CHECKING:
-    from .strategy_memory import StrategyMemory
+    from ..knowledge.memory import StrategyMemory
 
 
 def build_pipeline_summary(

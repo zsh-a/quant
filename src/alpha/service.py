@@ -11,24 +11,24 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from .combination import FactorCombiner
-from .compiler import BytecodeProgram, FormulaCompiler
-from .dataset import AlphaDataset, CryptoMinuteDatasetLoader
-from .dsl import TensorSchema
-from .evolution import EvalResult, Individual
-from .feature_kitchen import FeatureKitchen
-from .financial_knowledge import FinancialKnowledgeBase
-from .operators import OperatorRegistry
-from .persistence import AlphaPersistence
-from .risk import CostModel, ExecutionSimulator, MarketContext, PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer
-from .search_strategy import SearchOrchestrator
-from .strategy_memory import StrategyMemory
-from .validation import CPCVValidator, ValidationFold
-from .vm import StackVM, TensorStore
+from .risk.combination import FactorCombiner
+from .core.compiler import BytecodeProgram, FormulaCompiler
+from .core.dataset import AlphaDataset, CryptoMinuteDatasetLoader
+from .core.dsl import TensorSchema
+from .search.evolution import EvalResult, Individual
+from .knowledge.features import FeatureKitchen
+from .knowledge.themes import FinancialKnowledgeBase
+from .core.operators import OperatorRegistry
+from .infra.persistence import AlphaPersistence
+from .risk.models import CostModel, ExecutionSimulator, MarketContext, PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer
+from .search.orchestrator import SearchOrchestrator
+from .knowledge.memory import StrategyMemory
+from .eval.validation import CPCVValidator, ValidationFold
+from .core.vm import StackVM, TensorStore
 
 try:
     import torch as _torch
-    from .gpu_evaluation import compute_ic_metrics_gpu as _gpu_ic_metrics
+    from .eval.gpu_metrics import compute_ic_metrics_gpu as _gpu_ic_metrics
 except Exception:  # pragma: no cover
     _torch = None
 
@@ -73,7 +73,7 @@ class AlphaService:
         self.strategy_memory.load()
 
         # --- Build LLM backend ---
-        from .llm import build_default_llm_backend
+        from .llm.backends import build_default_llm_backend
         from .strategies import LLMEvolutionStrategy, MCTSRefinementStrategy
 
         resolved_llm = llm_backend or build_default_llm_backend(
@@ -96,7 +96,7 @@ class AlphaService:
         )
 
         # --- Checkpoint manager ---
-        from .checkpoint import CheckpointManager
+        from .search.checkpoint import CheckpointManager
         self.checkpoint_manager = CheckpointManager()
 
         # --- Search orchestrator ---
@@ -162,7 +162,7 @@ class AlphaService:
             LLMEvolutionStrategy(llm_backend=llm_backend),
         ]
         if mode == "full":
-            from .mcts import MCTSEngine, MCTSLLMAdapter
+            from .strategies.mcts import MCTSEngine, MCTSLLMAdapter
             llm_adapter = MCTSLLMAdapter(llm_backend)
             mcts_engine = MCTSEngine(
                 compiler=self.compiler, vm=self.vm,
@@ -484,7 +484,7 @@ class AlphaService:
         on_stage_complete: Any = None,
         on_round_complete: Any = None,
     ) -> dict[str, Any]:
-        from .tracing import tracer
+        from .infra.tracing import tracer
 
         overall_start = perf_counter()
         timing: dict[str, Any] = {}
@@ -691,7 +691,7 @@ class AlphaService:
         fwd = np.zeros_like(close_np)
         fwd[:-1] = close_np[1:] / (close_np[:-1] + 1e-12) - 1.0
         fwd = np.clip(fwd, -0.5, 0.5)
-        from .evaluation import compute_rank_ic
+        from .eval.metrics import compute_rank_ic
         rank_ic = compute_rank_ic(combined_signal[:-1], fwd[:-1])
 
         result: dict[str, Any] = {

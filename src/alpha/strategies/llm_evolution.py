@@ -12,9 +12,9 @@ from typing import Any
 
 from loguru import logger
 
-from ..evolution import BreedingSpec, Individual
-from ..pipeline import Lineage
-from ..strategy_state import SearchContext, build_individual
+from ..search.evolution import BreedingSpec, Individual
+from ..search.pipeline import Lineage
+from ..search.context import SearchContext, build_individual
 
 
 class LLMEvolutionStrategy:

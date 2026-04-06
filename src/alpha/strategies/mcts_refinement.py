@@ -17,10 +17,10 @@ from loguru import logger
 
 import json as _json
 
-from ..strategy_state import SearchContext, build_individual
-from ..evolution import Individual
-from ..pipeline import Lineage
-from ..strategy_state import StrategySnapshot
+from ..search.context import SearchContext, build_individual
+from ..search.evolution import Individual
+from ..search.pipeline import Lineage
+from ..search.context import StrategySnapshot
 
 
 class MCTSRefinementStrategy:
@@ -156,7 +156,7 @@ class MCTSRefinementStrategy:
         This gives the multi-dimensional evaluation meaningful percentile
         baselines and provides FSA with enough formulas to detect patterns.
         """
-        from ..mcts import AlphaNode
+        from .mcts import AlphaNode
 
         existing_formulas = {n.formula for n in self.mcts_engine.alpha_zoo}
         added = 0
@@ -174,7 +174,7 @@ class MCTSRefinementStrategy:
 
         if added > 0:
             # Recompute FSA with the seeded zoo
-            from ..mcts import compute_forbidden_subtrees
+            from .mcts.engine import compute_forbidden_subtrees
 
             self.mcts_engine._forbidden_subtrees = compute_forbidden_subtrees(
                 [n.formula for n in self.mcts_engine.alpha_zoo],
@@ -217,7 +217,7 @@ class MCTSRefinementStrategy:
 
     def load_state(self, snapshot: StrategySnapshot) -> None:
         """Restore alpha zoo from a previous checkpoint."""
-        from ..mcts import AlphaNode, compute_forbidden_subtrees
+        from .mcts.engine import AlphaNode, compute_forbidden_subtrees
 
         zoo_data = _json.loads(snapshot.data.decode("utf-8"))
         self.mcts_engine.alpha_zoo = []

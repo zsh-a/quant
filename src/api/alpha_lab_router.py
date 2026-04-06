@@ -14,8 +14,8 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from src.alpha import AlphaService
-from src.alpha.pipeline import RoundRecord, StageRecord
-from src.alpha.tracing import InMemoryCollector, tracer
+from src.alpha.search.pipeline import RoundRecord, StageRecord
+from src.alpha.infra.tracing import InMemoryCollector, tracer
 from src.config.settings import get_alpha_lab_config, get_bitget_config, get_crypto_market_config
 
 router = APIRouter(prefix="/alpha-lab", tags=["alpha-lab"])
@@ -423,8 +423,8 @@ class AnalyzeSearchRequest(BaseModel):
 @router.post("/search-jobs/{job_id}/analyze")
 async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
     """Send pipeline state to LLM for analysis."""
-    from src.alpha.llm_context import build_analysis_prompt, build_pipeline_summary
-    from src.alpha.pipeline import ArchiveEntry
+    from src.alpha.llm.context import build_analysis_prompt, build_pipeline_summary
+    from src.alpha.search.pipeline import ArchiveEntry
 
     job = _SEARCH_JOBS.get(job_id)
     if not job:
@@ -453,7 +453,7 @@ async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
         ))
 
     # Build pipeline record from serialized data
-    from src.alpha.pipeline import PipelineRecord, RoundRecord as RR, StageRecord as SR, StageKind
+    from src.alpha.search.pipeline import PipelineRecord, RoundRecord as RR, StageRecord as SR, StageKind
     pr = PipelineRecord(
         job_id=pipeline_data.get("job_id", job_id),
         total_evaluations=pipeline_data.get("total_evaluations", 0),
@@ -558,7 +558,7 @@ async def get_neural_plot():
 @router.get("/strategy-state")
 async def get_strategy_state():
     """Get current state of all registered strategies."""
-    from src.alpha.strategy_state import StatefulStrategy
+    from src.alpha.search.context import StatefulStrategy
 
     strategies_info: list[dict[str, Any]] = []
     for strategy in service.search_engine.strategies:
@@ -692,13 +692,13 @@ async def get_factor_catalog(
         if not pipeline:
             continue
         # Rebuild catalog from pipeline rounds
-        from src.alpha.strategy_state import FactorCatalog, FactorCatalogEntry
+        from src.alpha.search.context import FactorCatalog, FactorCatalogEntry
         catalog = FactorCatalog()
         # Try to load from checkpoint if available
         ckpt = service.checkpoint_manager.latest_checkpoint(job_id)
         if ckpt:
             try:
-                from src.alpha.checkpoint import SearchCheckpoint
+                from src.alpha.search.checkpoint import SearchCheckpoint
                 saved = SearchCheckpoint.load(ckpt)
                 catalog = FactorCatalog.from_json_list(saved.factor_catalog_json)
             except Exception:
@@ -751,9 +751,9 @@ async def get_factor_catalog_stats():
         ckpt = service.checkpoint_manager.latest_checkpoint(job_id)
         if ckpt:
             try:
-                from src.alpha.checkpoint import SearchCheckpoint
+                from src.alpha.search.checkpoint import SearchCheckpoint
                 saved = SearchCheckpoint.load(ckpt)
-                from src.alpha.strategy_state import FactorCatalog
+                from src.alpha.search.context import FactorCatalog
                 catalog = FactorCatalog.from_json_list(saved.factor_catalog_json)
                 stats["strategies"] = catalog.stats_by_strategy()
                 stats["total_factors"] = len(catalog)

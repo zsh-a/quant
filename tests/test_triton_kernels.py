@@ -20,7 +20,7 @@ except ImportError:
 
 try:
     import triton  # noqa: F401
-    from src.alpha.gpu_ops import (
+    from src.alpha.eval.gpu_ops import (
         TRITON_AVAILABLE,
         batch_rank_ic,
         cs_rank,
@@ -438,7 +438,7 @@ def test_vm_triton_backend_produces_valid_output():
         "decay_linear(close, 5)",
     ]
 
-    from src.alpha.dsl import TensorSchema
+    from src.alpha.core.dsl import TensorSchema
 
     schema = TensorSchema(frozenset(["close", "volume"]))
 
@@ -457,7 +457,7 @@ def test_vm_triton_backend_produces_valid_output():
 def test_vm_triton_batch_matches_serial():
     """Test that batch execution matches serial execution with Triton."""
     from src.alpha import FormulaCompiler, OperatorRegistry, StackVM, TensorStore
-    from src.alpha.dsl import TensorSchema
+    from src.alpha.core.dsl import TensorSchema
 
     registry = OperatorRegistry()
     compiler = FormulaCompiler(registry)
@@ -509,8 +509,8 @@ def test_vm_triton_batch_matches_serial():
 @requires_triton
 def test_gpu_evaluation_ic_metrics():
     """Test GPU IC metrics computation."""
-    from src.alpha.gpu_evaluation import compute_ic_metrics_gpu, compute_rank_ic_gpu
-    from src.alpha.evaluation import compute_ic_metrics, compute_rank_ic
+    from src.alpha.eval.gpu_metrics import compute_ic_metrics_gpu, compute_rank_ic_gpu
+    from src.alpha.eval.metrics import compute_ic_metrics, compute_rank_ic
 
     T, S = 256, 32
     rng = np.random.default_rng(42)

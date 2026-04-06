@@ -20,10 +20,10 @@ from openai import OpenAI
 
 import hashlib
 
-from .compiler import FormulaCompiler
-from .dsl import TensorSchema
-from .evolution import BreedingSpec
-from .operators import OperatorRegistry
+from ..core.compiler import FormulaCompiler
+from ..core.dsl import TensorSchema
+from ..search.evolution import BreedingSpec
+from ..core.operators import OperatorRegistry
 
 # ---------------------------------------------------------------------------
 # Shared DSL reference (injected into every prompt)
@@ -333,7 +333,7 @@ class OpenAILLMBackend:
     # -- public API ---------------------------------------------------------
 
     def generate_initial_population(self, count: int) -> list[str]:
-        from .tracing import tracer
+        from ..infra.tracing import tracer
 
         # Over-generate: ask LLM for 2x then take best after validation.
         # This reduces fallback to heuristic and improves diversity.
@@ -351,7 +351,7 @@ class OpenAILLMBackend:
             return finalized
 
     def generate_offspring(self, spec: BreedingSpec, count: int) -> list[str]:
-        from .tracing import tracer
+        from ..infra.tracing import tracer
 
         request_count = min(count * 2, 16)
         with tracer.start_span("evolution", kind="breed",
@@ -509,7 +509,7 @@ Output exactly {count} items:
     # -- LLM call -----------------------------------------------------------
 
     def _call_llm(self, user_prompt: str, temperature: float, kind: str) -> str:
-        from .tracing import prompt_hash, tracer
+        from ..infra.tracing import prompt_hash, tracer
 
         messages = [{"role": "user", "content": user_prompt}]
         with tracer.start_span(kind, kind="llm", model=self.model_name,

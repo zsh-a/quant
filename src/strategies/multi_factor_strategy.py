@@ -11,11 +11,11 @@ import numpy as np
 from typing import Dict, List, Optional, Any
 from src.core.base import Strategy, Bar
 from src.strategies.registry import StrategyRegistry
-from src.alpha.persistence import AlphaPersistence as AlphaZooPersistence
-from src.alpha.operators import OperatorRegistry as _OperatorRegistry
-from src.alpha.compiler import FormulaCompiler as _FormulaCompiler
-from src.alpha.dsl import TensorSchema as _TensorSchema
-from src.alpha.vm import StackVM as _StackVM, TensorStore as _TensorStore
+from src.alpha.infra.persistence import AlphaPersistence as AlphaZooPersistence
+from src.alpha.core.operators import OperatorRegistry as _OperatorRegistry
+from src.alpha.core.compiler import FormulaCompiler as _FormulaCompiler
+from src.alpha.core.dsl import TensorSchema as _TensorSchema
+from src.alpha.core.vm import StackVM as _StackVM, TensorStore as _TensorStore
 from loguru import logger
 
 

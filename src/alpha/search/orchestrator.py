@@ -19,8 +19,8 @@ from typing import Any, Callable
 import numpy as np
 from loguru import logger
 
-from .compiler import FormulaCompiler
-from .dsl import TensorSchema
+from ..core.compiler import FormulaCompiler
+from ..core.dsl import TensorSchema
 from .evolution import (
     EvalResult,
     FitnessEngine,
@@ -28,8 +28,8 @@ from .evolution import (
     BreedingSpec,
     SearchResult,
 )
-from .llm import HeuristicLLMBackend
-from .operators import OperatorRegistry
+from ..llm import HeuristicLLMBackend
+from ..core.operators import OperatorRegistry
 from .pipeline import (
     ArchiveEntry,
     Lineage,
@@ -38,7 +38,7 @@ from .pipeline import (
     StageKind,
     StageRecord,
 )
-from .strategy_state import (
+from .context import (
     FactorCatalog,
     FactorCatalogEntry,
     SearchContext,
@@ -152,7 +152,7 @@ class SearchOrchestrator:
     ) -> SearchResult:
         """Execute the search loop with all registered strategies."""
         from pathlib import Path
-        from .tracing import tracer
+        from ..infra.tracing import tracer
 
         overall_start = perf_counter()
         pipeline = PipelineRecord(job_id=job_id)

@@ -9,11 +9,11 @@ from __future__ import annotations
 import numpy as np
 from loguru import logger
 
-from .compiler import FormulaCompiler
-from .dataset import AlphaDataset
-from .dsl import TensorSchema
-from .evaluation import compute_forward_returns, compute_rank_ic
-from .vm import StackVM, TensorStore
+from ..core.compiler import FormulaCompiler
+from ..core.dataset import AlphaDataset
+from ..core.dsl import TensorSchema
+from .metrics import compute_forward_returns, compute_rank_ic
+from ..core.vm import StackVM, TensorStore
 
 _CHUNK_SIZE = 64  # formulas per VM batch — keeps peak memory bounded
 

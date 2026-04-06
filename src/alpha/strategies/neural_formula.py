@@ -27,11 +27,11 @@ import torch.nn.functional as F
 from loguru import logger
 from torch.distributions import Categorical
 
-from ..evolution import Individual
-from ..operators import OperatorRegistry, OperatorSpec
-from ..dsl import TensorSchema
-from ..pipeline import Lineage
-from ..strategy_state import SearchContext, StrategySnapshot, build_individual
+from ..search.evolution import Individual
+from ..core.operators import OperatorRegistry, OperatorSpec
+from ..core.dsl import TensorSchema
+from ..search.pipeline import Lineage
+from ..search.context import SearchContext, StrategySnapshot, build_individual
 
 
 # ---------------------------------------------------------------------------
@@ -511,7 +511,7 @@ class NeuralFormulaStrategy:
     # ------------------------------------------------------------------
 
     def generate_candidates(self, ctx: SearchContext) -> list[Individual]:
-        from ..tracing import tracer
+        from ..infra.tracing import tracer
 
         with tracer.start_span(
             "neural_generate", kind="search",
@@ -643,8 +643,8 @@ class NeuralFormulaStrategy:
         """Build forward-returns cache from dataset for internal IC evaluation."""
         if self._fwd_returns is not None:
             return
-        from ..evaluation import compute_forward_returns
-        from ..vm import TensorStore
+        from ..eval.metrics import compute_forward_returns
+        from ..core.vm import TensorStore
         ds = ctx.dataset
         close = np.asarray(ds.fields["close"], dtype=np.float32)
         self._fwd_returns = compute_forward_returns(close, periods=5)
@@ -652,8 +652,8 @@ class NeuralFormulaStrategy:
 
     def _train_step(self, ctx: SearchContext) -> dict[str, float]:
         """One REINFORCE training step. Returns {formula: ic} for valid formulas."""
-        from ..evaluation import compute_rank_ic
-        from ..vm import StackVM
+        from ..eval.metrics import compute_rank_ic
+        from ..core.vm import StackVM
 
         self._model.train()
         bs = self._sample_batch

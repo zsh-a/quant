@@ -10,8 +10,8 @@ sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.alpha.auto_runner import load_auto_search_config
 from src.alpha.cli import build_parser, run_command
-from src.alpha.dataset import CryptoMinuteDatasetLoader
-from src.alpha.persistence import AlphaPersistence
+from src.alpha.core.dataset import CryptoMinuteDatasetLoader
+from src.alpha.infra.persistence import AlphaPersistence
 from src.alpha.service import AlphaService
 
 START = datetime(2026, 3, 27, 0, 0, tzinfo=UTC)
