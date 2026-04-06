@@ -78,6 +78,7 @@ class FactorCatalogEntry:
     fitness: float = 0.0
     evaluated: bool = False
     lineage: dict[str, Any] = field(default_factory=dict)
+    parent_hashes: list[str] = field(default_factory=list)
     extra: dict[str, Any] = field(default_factory=dict)
 
 
@@ -159,6 +160,75 @@ class FactorCatalog:
                 ),
             }
         return result
+
+    # --- retrieval (for strategies) ---
+
+    def top_k(self, k: int = 20) -> list[FactorCatalogEntry]:
+        """Top-K evaluated factors by fitness."""
+        return sorted(
+            (e for e in self._entries if e.evaluated),
+            key=lambda e: e.fitness, reverse=True,
+        )[:k]
+
+    def diverse_top_k(
+        self,
+        k: int = 20,
+        max_corr: float = 0.7,
+        signal_fn: Any = None,
+    ) -> list[FactorCatalogEntry]:
+        """Top-K with pairwise correlation filtering.
+
+        ``signal_fn(expr_hash) -> np.ndarray | None`` provides the alpha
+        signal for correlation checks. If None, skips diversity filtering.
+        """
+        candidates = self.top_k(k=k * 3)
+        if signal_fn is None or not candidates:
+            return candidates[:k]
+
+        import numpy as _np
+        selected: list[FactorCatalogEntry] = []
+        selected_signals: list[_np.ndarray] = []
+        for entry in candidates:
+            if len(selected) >= k:
+                break
+            sig = signal_fn(entry.expr_hash)
+            if sig is None:
+                continue
+            flat = sig.flatten()
+            flat = flat[~_np.isnan(flat)]
+            if flat.size < 100:
+                continue
+            # Check correlation against already selected
+            too_similar = False
+            for prev in selected_signals:
+                min_len = min(len(flat), len(prev))
+                corr = _np.corrcoef(flat[:min_len], prev[:min_len])[0, 1]
+                if abs(corr) > max_corr:
+                    too_similar = True
+                    break
+            if not too_similar:
+                selected.append(entry)
+                selected_signals.append(flat)
+        return selected
+
+    def lineage_parents(self, expr_hash: str) -> list[FactorCatalogEntry]:
+        """All ancestors of a factor (walk parent_hashes recursively)."""
+        visited: set[str] = set()
+        result: list[FactorCatalogEntry] = []
+        queue = list(self._by_hash[expr_hash].parent_hashes) if expr_hash in self._by_hash else []
+        while queue:
+            h = queue.pop(0)
+            if h in visited or h not in self._by_hash:
+                continue
+            visited.add(h)
+            entry = self._by_hash[h]
+            result.append(entry)
+            queue.extend(entry.parent_hashes)
+        return result
+
+    def lineage_children(self, expr_hash: str) -> list[FactorCatalogEntry]:
+        """All factors that have this factor as a parent."""
+        return [e for e in self._entries if expr_hash in e.parent_hashes]
 
     # --- serialization ---
 
@@ -253,8 +323,9 @@ class SearchContext:
     knowledge_base: Any | None  # FinancialKnowledgeBase
     feature_kitchen: Any | None  # FeatureKitchen
 
-    # --- VM (needed by strategies for fast screening) ---
+    # --- VM and evaluator (for strategies that need fast screening) ---
     vm: Any | None = None  # StackVM
+    evaluator: Any | None = None  # FormulaEvaluator
 
     # --- dataset (needed by some strategies like MCTS) ---
     dataset: Any | None = None  # AlphaDataset

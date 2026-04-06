@@ -170,6 +170,13 @@ class SearchOrchestrator:
                 start_round = saved_state.get("round_idx", -1) + 1
                 logger.info("search.resume from round={}", start_round)
 
+        # Build shared evaluator for strategies
+        evaluator = None
+        if dataset is not None:
+            from .evaluator import FormulaEvaluator
+            _eval_vm = vm or StackVM()
+            evaluator = FormulaEvaluator(self.compiler, _eval_vm, self.schema, dataset)
+
         # Build context
         ctx = SearchContext(
             population=deque(maxlen=self._population_cap),
@@ -187,6 +194,7 @@ class SearchOrchestrator:
             knowledge_base=self.knowledge_base,
             feature_kitchen=self.feature_kitchen,
             vm=vm,
+            evaluator=evaluator,
             dataset=dataset,
             round_idx=0,
             total_rounds=rounds,
@@ -518,9 +526,32 @@ class SearchOrchestrator:
                     fitness=ind.fitness,
                     evaluated=True,
                     lineage=ind.lineage.to_dict() if isinstance(ind.lineage, Lineage) else {},
+                    parent_hashes=[
+                        h for h in [
+                            getattr(ind.lineage, "parent_a", None),
+                            getattr(ind.lineage, "parent_b", None),
+                        ] if h
+                    ] if isinstance(ind.lineage, Lineage) else [],
                 ))
 
         ctx.total_evaluations += len(individuals)
+
+        # Diagnostic: log fitness distribution for rejected batches
+        if individuals:
+            best_ind = max(individuals, key=lambda x: x.fitness)
+            rejected = sum(1 for x in individuals if x.fitness <= self.fitness_engine.policy.reject_score)
+            if rejected == len(individuals):
+                m = best_ind.metrics
+                logger.warning(
+                    "evaluate.all_rejected n={} best_fitness={:.2f} formula={} "
+                    "sharpe={:.3f} test_sharpe={:.3f} rank_ic={:.4f} "
+                    "active={:.2f} turnover={:.4f} coverage={:.2f} inactive={}",
+                    len(individuals), best_ind.fitness, best_ind.formula[:60],
+                    float(m.get("sharpe", 0)), float(m.get("test_sharpe", 0)),
+                    float(m.get("rank_ic", 0)), float(m.get("active_bar_ratio", 0)),
+                    float(m.get("avg_turnover", 0)), float(m.get("signal_coverage", 0)),
+                    m.get("inactive", "?"),
+                )
 
         # Evict oldest entries to cap memory (archive retains the best)
         while len(ctx.all_evaluated) > self._MAX_EVALUATED_HISTORY:

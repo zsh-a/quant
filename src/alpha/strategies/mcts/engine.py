@@ -408,6 +408,7 @@ class MCTSEngine:
         self.alpha_zoo: list[AlphaNode] = []
         self._forbidden_subtrees: list[str] = []
         self._factor_cache: dict[str, np.ndarray] = {}
+        self.evaluator: Any = None  # FormulaEvaluator, set by MCTSRefinementStrategy
 
     # ------------------------------------------------------------------
     # Public API
@@ -1001,6 +1002,8 @@ class MCTSEngine:
         dataset: AlphaDataset,
     ) -> dict[str, float]:
         """Evaluate a formula on a dataset and return IC metrics."""
+        if self.evaluator is not None:
+            return self.evaluator.eval_metrics(formula, fwd_windows=[1, 5, 10])
         try:
             from ...core.vm import to_numpy
             program = self.compiler.compile(formula, self.schema)

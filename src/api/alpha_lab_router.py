@@ -52,15 +52,16 @@ def _run_search_job(
 
     try:
         _SEARCH_JOBS[job_id]["status"] = "running"
-        strategy = params.pop("strategy", "evolution")
+        strategy = params.pop("strategy", "")
         neural_batch = params.pop("neural_batch", 4096)
         enum_max = params.pop("enum_max", 500)
         enum_top_k = params.pop("enum_top_k", 30)
-        needs_custom_svc = strategy != "evolution" or enum_max != 500 or enum_top_k != 30
+        logger.info("alpha.search creating service strategy={!r}", strategy)
         svc = AlphaService(
             strategy=strategy, neural_sample_batch=neural_batch,
             enum_max=enum_max, enum_top_k=enum_top_k,
-        ) if needs_custom_svc else service
+        )
+        logger.info("alpha.search strategies={}", [s.name for s in svc.search_engine.strategies])
         result = svc.search_formulas_on_db(
             **params,
             job_id=job_id,
@@ -114,7 +115,7 @@ class SearchDbRequest(BaseModel):
     n_splits: int = 5
     purge_window: int = 0
     embargo_window: int = 0
-    strategy: str = "evolution"  # "evolution" | "neural" | "full"
+    strategy: str = ""  # extra strategies: "mcts", "neural", "mcts,neural"
     neural_batch: int = 4096
     enum_max: int = 500       # max formulas to enumerate (round 0)
     enum_top_k: int = 30      # top-K from enumeration to keep
@@ -169,7 +170,7 @@ def _workspace_defaults() -> dict[str, object]:
             "cs_rank(ts_std(close, 10))",
             "cs_rank(ts_zscore(funding_rate, 20))",
         ],
-        "strategy_modes": ["evolution", "neural", "full"],
+        "extra_strategies": ["mcts", "neural"],
     }
 
 
@@ -183,12 +184,11 @@ async def get_workspace(
     run_limit: int = Query(default=8, ge=1, le=50),
     zoo_limit: int = Query(default=50, ge=1, le=200),
 ):
-    modes_info = service.get_strategy_modes_info()
+    strategies_info = service.get_strategy_modes_info()
     return {
         "operators": service.list_operators(),
         "defaults": _workspace_defaults(),
-        "strategy_modes": [m["mode"] for m in modes_info],
-        "strategy_modes_info": modes_info,
+        "strategies_info": strategies_info,
         "runs": service.list_runs(limit=run_limit),
         "zoo": service.list_zoo(limit=zoo_limit),
         "engine": {

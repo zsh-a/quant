@@ -43,34 +43,38 @@ class EnumerationStrategy:
 
     def generate_candidates(self, ctx: SearchContext) -> list[Individual]:
         from ..search.enumerator import FormulaEnumerator
-        from ..eval.fast_screen import fast_screen_ic
-        from ..core.vm import StackVM
 
         enumerator = FormulaEnumerator(compiler=ctx.compiler, schema=ctx.schema)
         formulas = enumerator.generate(max_count=self.max_enumerate)
         if not formulas:
             return []
 
-        vm = ctx.vm or StackVM()
-        passed = fast_screen_ic(
-            formulas,
-            ctx.dataset,
-            ctx.compiler,
-            vm,
-            ctx.schema,
-            min_abs_ic=self.min_abs_ic,
-        )
+        # Use shared evaluator if available, else fall back to fast_screen_ic
+        if ctx.evaluator is not None:
+            passed = [
+                (f, ic) for f, ic in ctx.evaluator.eval_ic_batch(formulas)
+                if abs(ic) >= self.min_abs_ic
+            ]
+            passed.sort(key=lambda x: abs(x[1]), reverse=True)
+        else:
+            from ..eval.fast_screen import fast_screen_ic
+            from ..core.vm import StackVM
+            vm = ctx.vm or StackVM()
+            passed = fast_screen_ic(
+                formulas, ctx.dataset, ctx.compiler, vm, ctx.schema,
+                min_abs_ic=self.min_abs_ic,
+            )
 
         candidates: list[Individual] = []
         for formula, ic in passed[: self.top_k]:
-            if len(candidates) >= self.top_k:
-                break
             ind = build_individual(
                 ctx.compiler, ctx.schema, formula,
                 Lineage(origin="enumeration", screen_ic=round(ic, 5)),
             )
             if ind and ind.expr_hash not in ctx.seen_hashes:
                 candidates.append(ind)
+            if len(candidates) >= self.top_k:
+                break
 
         logger.info(
             "enumeration.generate enumerated={} ic_passed={} candidates={}",
@@ -82,3 +86,12 @@ class EnumerationStrategy:
         self, ctx: SearchContext, evaluated: list[Individual],
     ) -> None:
         pass
+
+
+# --- Registry ---
+from .registry import register_strategy  # noqa: E402
+
+
+@register_strategy("enumeration")
+def _build_enumeration(*, enum_max: int = 500, enum_top_k: int = 30, **_kw):
+    return EnumerationStrategy(max_enumerate=enum_max, top_k=enum_top_k)

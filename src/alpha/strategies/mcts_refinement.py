@@ -59,22 +59,34 @@ class MCTSRefinementStrategy:
         return "mcts_refinement"
 
     def should_activate(self, ctx: SearchContext) -> bool:
-        return (
+        has_seeds = len(ctx.archive) > 0 or len(ctx.population) > 0
+        active = (
             ctx.round_idx > 0
             and ctx.round_idx % self.activation_frequency == 0
-            and len(ctx.archive) > 0
+            and has_seeds
             and ctx.dataset is not None
         )
+        logger.info(
+            "mcts.should_activate={} round={} archive={} population={} dataset={}",
+            active, ctx.round_idx, len(ctx.archive), len(ctx.population),
+            ctx.dataset is not None,
+        )
+        return active
 
     def generate_candidates(self, ctx: SearchContext) -> list[Individual]:
-        top_members = sorted(
-            ctx.archive.values(), key=lambda x: x.fitness, reverse=True,
-        )
-        top_members = top_members[: self.top_k_to_refine]
+        # Prefer archive members; fall back to population if archive is empty
+        if ctx.archive:
+            pool = sorted(ctx.archive.values(), key=lambda x: x.fitness, reverse=True)
+        else:
+            pool = sorted(ctx.population, key=lambda x: x.fitness, reverse=True)
+        top_members = pool[: self.top_k_to_refine]
 
         # Seed the MCTS engine's zoo with existing archive formulas for
         # better percentile ranking and FSA from the start.
         self._seed_zoo_from_archive(ctx)
+
+        # Pass shared evaluator to engine
+        self.mcts_engine.evaluator = ctx.evaluator
 
         candidates: list[Individual] = []
         for member in top_members:
@@ -242,3 +254,25 @@ class MCTSRefinementStrategy:
             len(self.mcts_engine.alpha_zoo),
             len(self.mcts_engine._forbidden_subtrees),
         )
+
+
+# --- Registry ---
+from .registry import register_strategy  # noqa: E402
+
+
+@register_strategy("mcts")
+def _build_mcts(*, compiler, vm, schema, llm_backend, mcts_frequency=1, **_kw):
+    from .mcts import MCTSEngine, MCTSLLMAdapter
+    llm_adapter = MCTSLLMAdapter(llm_backend)
+    engine = MCTSEngine(
+        compiler=compiler, vm=vm, schema=schema, llm_agent=llm_adapter,
+        c_puct=1.0, initial_budget=3, budget_increment=1,
+        temperature=1.0, fsa_top_k=3,
+        zoo_threshold=0.015, effectiveness_threshold=0.3,
+    )
+    return MCTSRefinementStrategy(
+        mcts_engine=engine,
+        activation_frequency=mcts_frequency,
+        top_k_to_refine=3,
+        iterations_per_refine=5,
+    )

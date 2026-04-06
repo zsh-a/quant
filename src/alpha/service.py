@@ -128,151 +128,96 @@ class AlphaService:
     # Strategy assembly
     # ------------------------------------------------------------------
 
-    _STRATEGY_MODES = ("evolution", "neural", "mcts", "full")
+    # Base strategies always active; extra strategies opt-in via comma-separated string
+    _EXTRA_STRATEGIES = ("mcts", "neural")
 
-    _STRATEGY_MODE_INFO: dict[str, dict[str, Any]] = {
-        "evolution": {
-            "label": "Evolution (LLM + Enum)",
-            "brief": "LLM 驱动的进化搜索 + 程序化枚举",
-            "detail": (
-                "Round 0: 通过程序枚举生成大量候选公式，经 fast-IC 筛选后保留 top-K 作为种子。\n"
-                "后续轮次: 锦标赛选择 top-2 父代 → LLM 生成变异/交叉后代 → CPCV 全量评估 → MAP-Elites 归档。\n"
-                "Strategy Memory (UCB1 bandit) 持续追踪哪些主题/算子/特征有效，反馈到下一轮 LLM prompt。"
-            ),
-            "strategies": ["enumeration", "llm_evolution"],
-            "params": ["popSize", "offspring", "gens", "topK", "nSplits", "enumMax", "enumTopK"],
+    _STRATEGY_INFO: dict[str, dict[str, Any]] = {
+        "enumeration": {
+            "label": "枚举种子",
+            "brief": "Round 0 批量枚举公式 + fast-IC 筛选 top-K",
+            "always_on": True,
         },
-        "neural": {
-            "label": "Neural (Transformer + RL)",
-            "brief": "Transformer 自回归生成 + REINFORCE 训练",
-            "detail": (
-                "使用因果 Transformer 模型以 RPN 序列方式自回归采样公式。\n"
-                "每步采样大量批次 (默认 4096)，全部解码→编译→VM 执行→计算 rank-IC 作为 reward。\n"
-                "REINFORCE + 优势归一化 进行梯度更新，LoRD 正则化防止过拟合。\n"
-                "返回 top-K 独特候选给 orchestrator 做全量 CPCV 评估。"
-            ),
-            "strategies": ["neural_formula"],
-            "params": ["gens", "topK", "nSplits", "neuralBatch"],
+        "llm_evolution": {
+            "label": "LLM 进化",
+            "brief": "锦标赛选择父代 → LLM 变异/交叉 → CPCV 评估 → MAP-Elites 归档",
+            "always_on": True,
         },
         "mcts": {
-            "label": "MCTS (LLM-Guided Tree Search)",
-            "brief": "LLM 引导的蒙特卡洛树搜索，论文 Navigating the Alpha Jungle",
+            "label": "MCTS 精炼",
+            "brief": "LLM 引导的蒙特卡洛树搜索 (Navigating the Alpha Jungle)",
             "detail": (
-                "实现论文 \"Navigating the Alpha Jungle\" (Shi et al., 2025) 的完整算法:\n"
-                "Round 0: 程序枚举种子填充初始 archive。\n"
-                "后续每轮: 从 archive 精英出发构建搜索树，UCT 选择 + 虚拟扩展动作使任意节点可展开。\n"
-                "维度定向精化: Softmax 采样最弱评估维度 (Effectiveness/Stability/Turnover/Diversity/Overfitting)。\n"
-                "LLM 生成精化建议 + 具体公式，经验证后加入搜索树。\n"
-                "多维评估: 对 zoo 做百分位排名，LLM 评估过拟合风险。\n"
-                "频繁子树回避 (FSA): 挖掘 zoo 中高频根基因，指导 LLM 避开常见结构以增加多样性。\n"
-                "动态预算: 发现新高分时自动增加搜索预算。"
+                "从 archive 精英出发构建搜索树，UCT 选择 + 维度定向精化 + FSA 子树回避。\n"
+                "LLM 生成精化建议，经验证后加入搜索树。动态预算随发现自动增加。"
             ),
-            "strategies": ["enumeration", "mcts_refinement"],
-            "params": ["gens", "topK", "nSplits", "enumMax", "enumTopK"],
+            "always_on": False,
         },
-        "full": {
-            "label": "Full (All Strategies)",
-            "brief": "枚举 + LLM 进化 + MCTS 精炼 + Neural 生成",
+        "neural": {
+            "label": "Neural 生成",
+            "brief": "Transformer 自回归采样 + REINFORCE 训练",
             "detail": (
-                "组合所有搜索策略:\n"
-                "- Enumeration: Round 0 批量枚举种子\n"
-                "- LLM Evolution: 每轮 LLM 生成变异后代\n"
-                "- MCTS Refinement: 每 N 轮对 archive 精英做 LLM 引导的树搜索优化\n"
-                "- Neural Formula: Transformer + RL 自回归生成\n"
-                "多策略协作，枚举提供广度，LLM 提供深度，MCTS 做局部精炼，Neural 探索全新空间。"
+                "因果 Transformer 以 RPN 序列方式采样公式，rank-IC 作为 reward。\n"
+                "REINFORCE + 优势归一化梯度更新，探索全新公式空间。"
             ),
-            "strategies": ["enumeration", "llm_evolution", "mcts_refinement", "neural_formula"],
-            "params": ["popSize", "offspring", "gens", "topK", "nSplits", "enumMax", "enumTopK", "neuralBatch"],
+            "always_on": False,
         },
     }
 
     def get_strategy_modes_info(self) -> list[dict[str, Any]]:
-        """Return structured metadata for all available strategy modes."""
+        """Return available strategies metadata."""
         return [
-            {"mode": mode, **self._STRATEGY_MODE_INFO[mode]}
-            for mode in self._STRATEGY_MODES
-            if mode in self._STRATEGY_MODE_INFO
+            {"name": name, **info}
+            for name, info in self._STRATEGY_INFO.items()
         ]
 
     def _build_strategies(
         self,
-        mode: str,
+        strategy: str,
         llm_backend: Any,
         neural_sample_batch: int,
         mcts_frequency: int,
         enum_max: int = 500,
         enum_top_k: int = 30,
     ) -> list:
-        from .strategies import EnumerationStrategy, LLMEvolutionStrategy, MCTSRefinementStrategy, NeuralFormulaStrategy
+        """Build strategy list.
 
-        if mode not in self._STRATEGY_MODES:
-            raise ValueError(
-                f"Unknown strategy mode {mode!r}, choose from {self._STRATEGY_MODES}"
-            )
+        ``strategy`` is a comma-separated string of extra strategies to enable
+        on top of the always-on base (Enumeration + LLMEvolution).
+        Examples: ``""``, ``"mcts"``, ``"neural"``, ``"mcts,neural"``.
 
-        if mode == "neural":
-            return [
-                NeuralFormulaStrategy(
-                    registry=self.registry,
-                    schema=self.schema,
-                    sample_batch=neural_sample_batch,
-                    min_round=0,
-                ),
-            ]
+        Legacy mode names are mapped for backwards compatibility:
+          ``"evolution"`` → base only
+          ``"full"``      → ``"mcts,neural"``
+        """
+        from .strategies import EnumerationStrategy, LLMEvolutionStrategy, build_extra_strategies
 
-        if mode == "mcts":
-            from .strategies.mcts import MCTSEngine, MCTSLLMAdapter
-            llm_adapter = MCTSLLMAdapter(llm_backend)
-            mcts_engine = MCTSEngine(
-                compiler=self.compiler, vm=self.vm,
-                schema=self.schema, llm_agent=llm_adapter,
-                c_puct=1.0,
-                initial_budget=3,
-                budget_increment=1,
-                temperature=1.0,
-                fsa_top_k=3,
-                zoo_threshold=0.015,
-                effectiveness_threshold=0.3,
-            )
-            return [
-                EnumerationStrategy(max_enumerate=enum_max, top_k=enum_top_k),
-                MCTSRefinementStrategy(
-                    mcts_engine=mcts_engine,
-                    activation_frequency=1,       # every round
-                    top_k_to_refine=3,
-                    iterations_per_refine=5,
-                ),
-            ]
+        # Normalize legacy mode names
+        _LEGACY = {"evolution": "", "full": "mcts,neural"}
+        normalized = _LEGACY.get(strategy, strategy)
+        extras = {s.strip() for s in normalized.split(",") if s.strip()}
 
-        # evolution (default) or full
-        strategies: list = [
+        # Base strategies (always active)
+        base: list = [
             EnumerationStrategy(max_enumerate=enum_max, top_k=enum_top_k),
             LLMEvolutionStrategy(llm_backend=llm_backend),
         ]
-        if mode == "full":
-            from .strategies.mcts import MCTSEngine, MCTSLLMAdapter
-            llm_adapter = MCTSLLMAdapter(llm_backend)
-            mcts_engine = MCTSEngine(
-                compiler=self.compiler, vm=self.vm,
-                schema=self.schema, llm_agent=llm_adapter,
-                c_puct=1.0,
-                initial_budget=3,
-                budget_increment=1,
-                temperature=1.0,
-                fsa_top_k=3,
-                zoo_threshold=0.015,
-                effectiveness_threshold=0.3,
-            )
-            strategies.append(MCTSRefinementStrategy(
-                mcts_engine=mcts_engine,
-                activation_frequency=mcts_frequency,
-                iterations_per_refine=5,
-            ))
-            strategies.append(NeuralFormulaStrategy(
-                registry=self.registry, schema=self.schema,
-                sample_batch=neural_sample_batch,
-            ))
-        return strategies
+
+        if not extras:
+            return base
+
+        # Build extra strategies via registry
+        extra = build_extra_strategies(
+            extras,
+            compiler=self.compiler,
+            vm=self.vm,
+            schema=self.schema,
+            registry=self.registry,
+            llm_backend=llm_backend,
+            neural_sample_batch=neural_sample_batch,
+            mcts_frequency=mcts_frequency,
+            enum_max=enum_max,
+            enum_top_k=enum_top_k,
+        )
+        return base + extra
 
     def list_operators(self) -> list[dict[str, Any]]:
         return [asdict(spec) for spec in self.registry.list_operators()]

@@ -162,3 +162,12 @@ class LLMEvolutionStrategy:
             if ind and ind.expr_hash not in ctx.seen_hashes:
                 offspring.append(ind)
         return offspring
+
+
+# --- Registry ---
+from .registry import register_strategy  # noqa: E402
+
+
+@register_strategy("llm_evolution")
+def _build_llm_evolution(*, llm_backend, **_kw):
+    return LLMEvolutionStrategy(llm_backend=llm_backend)

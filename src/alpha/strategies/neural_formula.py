@@ -695,37 +695,50 @@ class NeuralFormulaStrategy:
         rewards = torch.full((bs,), _REWARD_INVALID, dtype=torch.float32, device=device)
         valid_formulas: dict[str, float] = {}  # formula → IC
 
-        from ..core.vm import to_numpy
-        vm = ctx.vm or StackVM()
+        # Collect valid DSL strings first, then batch-evaluate
+        dsl_by_idx: dict[int, str] = {}
         for i, toks in enumerate(raw_tokens):
             dsl = rpn_to_dsl(toks, vocab)
-            if dsl is None:
-                continue  # invalid RPN → keep _REWARD_INVALID
+            if dsl is not None:
+                dsl_by_idx[i] = dsl
 
-            try:
-                program = ctx.compiler.compile(dsl, ctx.schema)
-            except ValueError:
-                continue  # compile error → keep _REWARD_INVALID
-
-            try:
-                alpha = vm.run(program, self._store)
-            except Exception:
-                continue
-
-            alpha_np = to_numpy(alpha)
-
-            # Constant signal check (aligned with AlphaGPT)
-            alpha_std = np.nanstd(alpha_np)
-            if alpha_std < 1e-6:
-                rewards[i] = _REWARD_CONSTANT
-                continue
-
-            ic = compute_rank_ic(alpha_np, self._fwd_returns)
-            rewards[i] = abs(ic) * _IC_REWARD_SCALE
-            valid_formulas[dsl] = ic
-
-            if abs(ic) > abs(self._best_ic):
-                self._best_ic = ic
+        # Use shared evaluator for batch IC if available
+        if ctx.evaluator is not None and dsl_by_idx:
+            batch_results = dict(ctx.evaluator.eval_ic_batch(
+                list(dsl_by_idx.values()), min_coverage=0.05,
+            ))
+            for i, dsl in dsl_by_idx.items():
+                ic = batch_results.get(dsl)
+                if ic is None:
+                    continue
+                if abs(ic) < 1e-9:
+                    rewards[i] = _REWARD_CONSTANT
+                    continue
+                rewards[i] = abs(ic) * _IC_REWARD_SCALE
+                valid_formulas[dsl] = ic
+                if abs(ic) > abs(self._best_ic):
+                    self._best_ic = ic
+                    self._best_formula = dsl
+        else:
+            # Fallback: per-formula evaluation
+            from ..core.vm import to_numpy
+            vm = ctx.vm or StackVM()
+            for i, dsl in dsl_by_idx.items():
+                try:
+                    program = ctx.compiler.compile(dsl, ctx.schema)
+                    alpha = vm.run(program, self._store)
+                except Exception:
+                    continue
+                alpha_np = to_numpy(alpha)
+                alpha_std = np.nanstd(alpha_np)
+                if alpha_std < 1e-6:
+                    rewards[i] = _REWARD_CONSTANT
+                    continue
+                ic = compute_rank_ic(alpha_np, self._fwd_returns)
+                rewards[i] = abs(ic) * _IC_REWARD_SCALE
+                valid_formulas[dsl] = ic
+                if abs(ic) > abs(self._best_ic):
+                    self._best_ic = ic
                 self._best_formula = dsl
 
         # 3. Normalize advantage (AlphaGPT style)
@@ -768,3 +781,18 @@ class NeuralFormulaStrategy:
             )
 
         return valid_formulas
+
+
+# --- Registry ---
+from .registry import register_strategy  # noqa: E402
+
+
+@register_strategy("neural")
+def _build_neural(*, registry=None, schema=None, neural_sample_batch=4096, **_kw):
+    from ..core.operators import OperatorRegistry
+    from ..core.dsl import TensorSchema
+    return NeuralFormulaStrategy(
+        registry=registry or OperatorRegistry(),
+        schema=schema or TensorSchema.default_market_schema(),
+        sample_batch=neural_sample_batch,
+    )
