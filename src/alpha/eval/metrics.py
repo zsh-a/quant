@@ -133,3 +133,102 @@ def compute_ic_metrics(
     }
     metrics.update(per_window)
     return metrics
+
+
+def compute_quantile_returns(
+    alpha: np.ndarray,
+    close: np.ndarray,
+    n_quantiles: int = 5,
+    periods: int = 1,
+) -> dict[str, Any]:
+    """分层回测：按因子值分 N 组，计算每组的累计收益和统计指标。
+
+    Args:
+        alpha: (T, S) 因子值矩阵
+        close: (T, S) 收盘价矩阵
+        n_quantiles: 分组数量（默认 5 = 五分位）
+        periods: 收益计算周期
+
+    Returns:
+        dict with:
+          quantile_returns: list of per-group cumulative return series
+          quantile_stats: per-group 年化收益/夏普/最大回撤
+          long_short_series: Q_top - Q_bottom 累计收益
+          monotonicity: 单调性得分 (1.0 = 完美单调)
+    """
+    fwd = compute_forward_returns(close, periods)
+    T, S = alpha.shape
+
+    # Per-timestep quantile assignment
+    group_returns = [[] for _ in range(n_quantiles)]
+
+    for t in range(T - periods):
+        a_row = alpha[t]
+        r_row = fwd[t]
+        valid = ~np.isnan(a_row) & ~np.isnan(r_row)
+        n_valid = valid.sum()
+        if n_valid < n_quantiles:
+            for g in range(n_quantiles):
+                group_returns[g].append(0.0)
+            continue
+
+        # Rank → quantile assignment
+        ranks = np.full(S, np.nan)
+        valid_idx = np.where(valid)[0]
+        order = np.argsort(a_row[valid_idx])
+        ranks[valid_idx[order]] = np.linspace(0, 1, len(order))
+
+        for g in range(n_quantiles):
+            lo = g / n_quantiles
+            hi = (g + 1) / n_quantiles
+            if g == n_quantiles - 1:
+                in_group = valid & (ranks >= lo) & (ranks <= hi)
+            else:
+                in_group = valid & (ranks >= lo) & (ranks < hi)
+            n_in = in_group.sum()
+            if n_in > 0:
+                group_returns[g].append(float(np.nanmean(r_row[in_group])))
+            else:
+                group_returns[g].append(0.0)
+
+    # Cumulative equity per group
+    quantile_equity = []
+    quantile_stats = []
+    for g in range(n_quantiles):
+        rets = np.array(group_returns[g])
+        equity = np.cumprod(1.0 + np.nan_to_num(rets, nan=0.0))
+        quantile_equity.append(equity.tolist())
+        mean_r = float(np.mean(rets))
+        std_r = float(np.std(rets))
+        peak = np.maximum.accumulate(equity)
+        dd = np.where(peak > 1e-12, 1.0 - equity / peak, 0.0)
+        quantile_stats.append({
+            "group": g + 1,
+            "total_return": float(equity[-1] - 1.0) if equity.size else 0.0,
+            "annual_return": mean_r * 252,
+            "annual_sharpe": mean_r / (std_r + 1e-12) * np.sqrt(252),
+            "max_drawdown": float(np.max(dd)) if dd.size else 0.0,
+        })
+
+    # Long-short: top group - bottom group
+    top_rets = np.array(group_returns[-1])
+    bot_rets = np.array(group_returns[0])
+    ls_rets = top_rets - bot_rets
+    ls_equity = np.cumprod(1.0 + np.nan_to_num(ls_rets, nan=0.0))
+
+    # Monotonicity: Spearman correlation of group_index vs group_total_return
+    group_total_returns = [s["total_return"] for s in quantile_stats]
+    if len(group_total_returns) >= 3:
+        from scipy.stats import spearmanr
+        mono_corr, _ = spearmanr(range(n_quantiles), group_total_returns)
+        monotonicity = float(mono_corr) if np.isfinite(mono_corr) else 0.0
+    else:
+        monotonicity = 0.0
+
+    return {
+        "n_quantiles": n_quantiles,
+        "quantile_equity": quantile_equity,
+        "quantile_stats": quantile_stats,
+        "long_short_equity": ls_equity.tolist(),
+        "monotonicity": monotonicity,
+    }

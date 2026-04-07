@@ -1,7 +1,7 @@
 /**
  * Research tab — formula editing, validation, and single-formula analysis.
  */
-import React, { useCallback, useState } from 'react'
+import React, { useCallback, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, CheckCircle2, Loader2, Save } from 'lucide-react'
 import type { AlphaLabEvaluationSummary, AlphaLabValidationReport, AlphaLabWorkspace as WorkspacePayload } from '../../types'
 import { SectionCard } from '../layout/SectionCard'
@@ -9,9 +9,16 @@ import { EmptyState } from '../layout/EmptyState'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { MiniChart, MetricGrid } from './MiniChart'
+import { QuantileChart } from './QuantileChart'
 import { toISO } from './shared'
 import { DataScopeSection } from './DataScopeSection'
 import { alphaApi } from '../../utils/alphaApi'
+
+const EVAL_METHOD_LABELS: Record<string, string> = {
+  long_short: '多空对冲',
+  long_only: '纯多头 Top-K',
+  quantile: '分层回测',
+}
 
 const METRIC_KEYS = ['sharpe', 'rank_ic', 'ic_ir', 'total_return', 'max_drawdown', 'avg_turnover', 'signal_coverage', 'pnl_per_turnover'] as const
 const IC_DETAIL_KEYS = ['rank_ic_1d', 'rank_ic_5d', 'rank_ic_10d', 'ic_decay', 'ic_std', 'turnover_proxy'] as const
@@ -126,16 +133,28 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
       {analysis ? (
         <SectionCard title="Analysis">
           <div className="space-y-4">
-            <MetricGrid metrics={analysis.metrics} keys={METRIC_KEYS} />
-            {(analysis.metrics.rank_ic_1d != null || analysis.metrics.ic_decay != null) && (
-              <MetricGrid metrics={analysis.metrics} keys={IC_DETAIL_KEYS} />
-            )}
+            {/* Eval method + badges */}
             <div className="flex flex-wrap gap-2">
+              {analysis.metrics.eval_method && (
+                <Badge variant="info">{EVAL_METHOD_LABELS[analysis.metrics.eval_method as any] ?? analysis.metrics.eval_method}</Badge>
+              )}
               {analysis.backend && <Badge>{analysis.backend}</Badge>}
               {analysis.device && <Badge>{analysis.device}</Badge>}
               {analysis.dataset?.shape && <Badge>{analysis.dataset.shape[0]} x {analysis.dataset.shape[1]}</Badge>}
               {analysis.expr_hash && <Badge variant="info" className="font-mono text-[10px]">{analysis.expr_hash.slice(0, 12)}</Badge>}
             </div>
+
+            <MetricGrid metrics={analysis.metrics} keys={METRIC_KEYS} />
+            {(analysis.metrics.rank_ic_1d != null || analysis.metrics.ic_decay != null) && (
+              <MetricGrid metrics={analysis.metrics} keys={IC_DETAIL_KEYS} />
+            )}
+
+            {/* Quantile analysis (分层回测) */}
+            {analysis.quantile_analysis && (
+              <QuantileChart analysis={analysis.quantile_analysis} />
+            )}
+
+            {/* Equity / Drawdown / Turnover charts */}
             <div className="grid gap-4 lg:grid-cols-2">
               <MiniChart data={analysis.equity_series ?? []} label="Equity Curve" height={200} />
               <MiniChart data={analysis.drawdown_series ?? []} label="Drawdown" color="#f43f5e" height={200} pct />

@@ -224,6 +224,7 @@ class CryptoMinuteDatasetLoader:
         interval: str = "5m",
         min_quote_volume: float = 0.0,
         blocked_utc_hours: list[int] | set[int] | tuple[int, ...] | None = None,
+        **kwargs,
     ) -> AlphaDataset:
         client = self._get_client()
         upper_symbols = [s.upper() for s in symbols]

@@ -245,6 +245,22 @@ export interface AlphaLabSeriesPoint {
     v: number;
 }
 
+export interface QuantileStat {
+    group: number;
+    total_return: number;
+    annual_return: number;
+    annual_sharpe: number;
+    max_drawdown: number;
+}
+
+export interface QuantileAnalysis {
+    n_quantiles: number;
+    quantile_equity: number[][];
+    quantile_stats: QuantileStat[];
+    long_short_equity: number[];
+    monotonicity: number;
+}
+
 export interface AlphaLabEvaluationSummary {
     dataset?: AlphaLabDatasetSummary;
     backend?: string;
@@ -255,6 +271,7 @@ export interface AlphaLabEvaluationSummary {
     equity_series?: AlphaLabSeriesPoint[];
     drawdown_series?: AlphaLabSeriesPoint[];
     turnover_series?: AlphaLabSeriesPoint[];
+    quantile_analysis?: QuantileAnalysis;
 }
 
 export interface AlphaLabEngineInfo {

@@ -43,6 +43,16 @@ if numba is not None:
         return out
 
 
+from enum import Enum
+
+
+class EvalMethod(str, Enum):
+    """Factor evaluation / backtesting method."""
+    LONG_SHORT = "long_short"       # 多空对冲 (crypto default)
+    LONG_ONLY = "long_only"         # 纯多头 top-K 等权
+    QUANTILE = "quantile"           # 分层回测 (A股行业标准)
+
+
 @dataclass
 class MarketContext:
     liquidity_mask: ArrayLike | None = None
@@ -135,10 +145,45 @@ class BacktestResult:
 
 
 class SignalTransformer:
-    def to_target_weights(self, alpha: ArrayLike, market_ctx: MarketContext) -> ArrayLike:
+    def to_target_weights(
+        self,
+        alpha: ArrayLike,
+        market_ctx: MarketContext,
+        method: EvalMethod = EvalMethod.LONG_SHORT,
+        top_pct: float = 0.2,
+    ) -> ArrayLike:
+        if method == EvalMethod.LONG_ONLY:
+            return self._to_long_only_numpy(_to_numpy(alpha), market_ctx, top_pct)
         if _is_torch(alpha):
             return self._to_target_weights_torch(alpha, market_ctx)
         return self._to_target_weights_numpy(alpha, market_ctx)
+
+    def _to_long_only_numpy(
+        self, alpha: np.ndarray, market_ctx: MarketContext, top_pct: float = 0.2,
+    ) -> np.ndarray:
+        """Long-only equal-weight: buy top *top_pct* stocks by alpha."""
+        scores = alpha.astype(float).copy()
+        if market_ctx.liquidity_mask is not None:
+            scores = np.where(np.asarray(market_ctx.liquidity_mask, dtype=bool), scores, np.nan)
+        if market_ctx.session_mask is not None:
+            scores = np.where(np.asarray(market_ctx.session_mask, dtype=bool), scores, np.nan)
+
+        T, S = scores.shape
+        weights = np.zeros((T, S), dtype=float)
+        for t in range(T):
+            row = scores[t]
+            valid = ~np.isnan(row)
+            n_valid = valid.sum()
+            if n_valid < 2:
+                continue
+            k = max(int(n_valid * top_pct), 1)
+            # Top-k by alpha (descending)
+            threshold = np.nanpercentile(row[valid], 100 * (1 - top_pct))
+            selected = valid & (row >= threshold)
+            n_selected = selected.sum()
+            if n_selected > 0:
+                weights[t, selected] = 1.0 / n_selected
+        return weights
 
     def _to_target_weights_numpy(self, alpha: ArrayLike, market_ctx: MarketContext) -> np.ndarray:
         scores = _to_numpy(alpha).astype(float).copy()

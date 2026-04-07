@@ -35,6 +35,10 @@ class MarketProfile:
     # 前端 symbol preset 列表，每项 dict: key, label, brief, symbols/universe
     symbol_presets: tuple[dict, ...] = ()
 
+    # 可用的因子评测方法及默认方法
+    eval_methods: tuple[str, ...] = ("long_short",)
+    default_eval_method: str = "long_short"
+
 
 # ---------------------------------------------------------------------------
 # Profile registry
@@ -147,6 +151,8 @@ register_profile(MarketProfile(
     supported_intervals=("5m", "15m", "1h", "4h"),
     persona="You are a senior crypto quant researcher.",
     mutation_replacements=_CRYPTO_MUTATIONS,
+    eval_methods=("long_short",),
+    default_eval_method="long_short",
 ))
 
 
@@ -260,4 +266,6 @@ register_profile(MarketProfile(
     persona="You are a senior A-share (中国 A 股) quant researcher.",
     mutation_replacements=_ASTOCK_MUTATIONS,
     symbol_presets=_ASTOCK_SYMBOL_PRESETS,
+    eval_methods=("long_only", "quantile", "long_short"),
+    default_eval_method="quantile",
 ))

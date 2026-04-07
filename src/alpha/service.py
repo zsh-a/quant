@@ -1639,12 +1639,16 @@ class AlphaService:
                 liq_true,
             )
 
+        from .risk.models import EvalMethod
+
+        eval_method = EvalMethod(self.market_profile.default_eval_method)
+
         market_ctx = MarketContext(
             liquidity_mask=dataset.liquidity_mask,
             session_mask=dataset.session_mask,
         )
         signal_start = perf_counter()
-        target_weights = self.signal_transformer.to_target_weights(alpha, market_ctx)
+        target_weights = self.signal_transformer.to_target_weights(alpha, market_ctx, method=eval_method)
         if timing_breakdown is not None:
             timing_breakdown["signal_transform_seconds"] += perf_counter() - signal_start
 
@@ -1661,6 +1665,7 @@ class AlphaService:
 
         fitness_start = perf_counter()
         metrics = self._build_fitness_metrics(program, alpha, wrapped_weights, store.get_field("close"), result.summary())
+        metrics["eval_method"] = eval_method.value
         if timing_breakdown is not None:
             timing_breakdown["fitness_seconds"] += perf_counter() - fitness_start
 
@@ -1674,7 +1679,7 @@ class AlphaService:
         drawdown_series = self._build_drawdown_series(equity_np, max_points=500)
         turnover_series = self._downsample_series(turnover_np, max_points=500)
 
-        return {
+        payload: dict[str, Any] = {
             "program": program.to_dict(),
             "metrics": metrics,
             "alpha_signature": alpha_signature,
@@ -1687,6 +1692,15 @@ class AlphaService:
             "backend": self.vm.backend,
             "device": str(self.vm.device) if self.vm.device is not None else "numpy",
         }
+
+        # 分层回测 (quantile analysis)
+        if eval_method in (EvalMethod.QUANTILE, EvalMethod.LONG_ONLY):
+            from .eval.metrics import compute_quantile_returns
+            alpha_np = self._to_numpy(alpha)
+            close_np = self._to_numpy(store.get_field("close"))
+            payload["quantile_analysis"] = compute_quantile_returns(alpha_np, close_np)
+
+        return payload
 
     def _new_evaluation_timing(self) -> dict[str, Any]:
         return {
@@ -1708,7 +1722,7 @@ class AlphaService:
 
     def _summarize_evaluation_payload(self, payload: dict[str, Any]) -> dict[str, Any]:
         program = payload.get("program", {})
-        return {
+        summary: dict[str, Any] = {
             "dataset": payload.get("dataset"),
             "backend": payload.get("backend"),
             "device": payload.get("device"),
@@ -1722,6 +1736,9 @@ class AlphaService:
             "drawdown_series": payload.get("drawdown_series", []),
             "turnover_series": payload.get("turnover_series", []),
         }
+        if "quantile_analysis" in payload:
+            summary["quantile_analysis"] = payload["quantile_analysis"]
+        return summary
 
     def list_runs(self, limit: int = 20) -> list[dict[str, Any]]:
         return self.persistence.list_runs(limit=limit)
