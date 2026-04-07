@@ -6,7 +6,7 @@ The alpha search system discovers quantitative trading factors (alpha formulas) 
 
 ```
 src/alpha/
-  core/           — DSL, compiler, VM, operators, dataset
+  core/           — DSL, compiler, VM, operators, dataset, market profiles
   eval/           — Metrics, screening, validation, GPU acceleration
   search/         — Orchestrator, context, pipeline, evolution, checkpoints
   strategies/     — Pluggable strategy implementations
@@ -20,12 +20,52 @@ src/alpha/
   auto_runner.py  — Auto-search runner
 ```
 
+## Multi-Market Architecture
+
+**File**: `src/alpha/core/market.py`
+
+The system supports multiple markets via `MarketProfile`. Each profile bundles:
+- `TensorSchema` — available fields for formula type-checking
+- `field_aliases` — shorthand alias resolution (e.g., `pe` → `peTTM`)
+- `field_descriptions` — LLM prompt field reference
+- `seeds` — initial seed formulas for heuristic population
+- `mutation_replacements` — formula mutation table for heuristic backend
+- `persona` — LLM system prompt persona
+- `supported_intervals` — valid data intervals
+- `symbol_presets` — predefined stock universe presets (e.g., index constituents)
+
+Available markets: `crypto` (5m–4h futures), `a_share` (daily).
+
+### A-Share Universe Presets
+
+A-share loader supports `universe` parameter — an index code that resolves to constituent stocks via `stock_data.index_stocks`:
+
+| Preset | Index Code | Description |
+|--------|-----------|-------------|
+| 沪深 300 | `000300` | 大盘蓝筹，定价有效 |
+| 中证 500 | `000905` | 中盘股，alpha 空间适中 |
+| 中证 1000 | `000852` | 小盘股，因子收益高 |
+| 中证全指 | `000985` | 全 A 股可投资范围 |
+| 创业板 50 | `399673` | 科技成长板块 |
+
+Usage: pass `universe="000300"` in API requests, or use `symbols` list for custom stock pools.
+
+### Adding a New Market
+
+1. Register a `MarketProfile` in `src/alpha/core/market.py`
+2. Implement a `DatasetLoader` in `src/alpha/core/dataset.py`
+3. Add loader class to `AlphaService._LOADER_MAP`
+
 ## Pipeline Overview
 
 ```
+MarketProfile (schema, aliases, loader)
+  ↓
+DatasetLoader.load(symbols, time_range) → AlphaDataset
+  ↓
 Formula String
   → [FormulaParser] AST
-  → [TypeChecker] validated AST
+  → [TypeChecker + field_aliases] validated AST
   → [FormulaCompiler] BytecodeProgram (instruction list + expr_hash)
   → [StackVM] + TensorStore → alpha signal matrix (time × symbols)
   → [Evaluation] → metrics (rank_ic, sharpe, turnover, fitness)
@@ -49,10 +89,30 @@ Formulas are Python expressions operating on market data tensors. Example:
 cs_rank(ts_mean(close, 20) - ts_mean(close, 5))
 ```
 
-### Available Fields
+### Available Fields (per market)
 
-OHLCV: `open`, `high`, `low`, `close`, `volume`, `turnover`, `vwap`
-Crypto: `mark_open/high/low/close`, `premium_open/high/low/close`, `funding_rate`, `open_interest`, `long_short_ratio`, `taker_buy_volume`, `taker_long_short_vol_ratio`
+Fields are defined per market via `MarketProfile` (`src/alpha/core/market.py`). Each market registers a `TensorSchema` with its available fields.
+
+**Crypto futures** (`market="crypto"`):
+
+| Category | Fields |
+|----------|--------|
+| Price | `open`, `high`, `low`, `close`, `volume`, `turnover`, `vwap`, `bid_ask_spread` |
+| Volume detail | `trade_count`, `taker_buy_volume`, `taker_buy_quote_volume` |
+| Mark price | `mark_open`, `mark_high`, `mark_low`, `mark_close` |
+| Premium index | `premium_open`, `premium_high`, `premium_low`, `premium_close` |
+| Market metrics | `funding_rate`, `open_interest`, `open_interest_value`, `long_short_ratio`, `taker_long_short_vol_ratio`, `top_trader_long_short_ratio`, `top_trader_long_short_position_ratio` |
+
+**A-share daily** (`market="a_share"`):
+
+| Category | Fields |
+|----------|--------|
+| Price (前复权) | `open`, `high`, `low`, `close`, `preclose`, `vwap` |
+| Volume / activity | `volume`, `amount`, `turnover` (= amount), `turn` (换手率 %) |
+| Fundamental | `peTTM` (市盈率 TTM), `pbMRQ` (市净率 MRQ), `pctChg` (涨跌幅 %) |
+| Status | `adjfactor` (复权因子), `isST` (ST 标记) |
+
+Field aliases (e.g., `pe` → `peTTM`, `oi` → `open_interest`) are configured per market in `MarketProfile.field_aliases`.
 
 ### Operators (60+)
 
@@ -193,13 +253,14 @@ for each round:
 
 `OpenAILLMBackend` connects to any OpenAI-compatible API. `HeuristicLLMBackend` provides deterministic fallback.
 
-**Prompt construction**:
-1. Field reference (OHLCV, crypto-specific)
-2. Operator catalog with signatures
-3. Financial themes (volatility compression, sentiment extremes, whale behavior)
-4. Strategy memory feedback (RL: what worked in past rounds)
-5. Feature kitchen (derived building blocks)
-6. Rules (AST depth ≤ 5, valid Python, safe division)
+**Prompt construction** (market-aware via `MarketProfile`):
+1. Persona (crypto quant / A股量化 researcher) — from `profile.persona`
+2. Field reference — from `profile.field_descriptions` or knowledge base
+3. Operator catalog with signatures
+4. Financial themes (market-specific)
+5. Strategy memory feedback (RL: what worked in past rounds)
+6. Feature kitchen (derived building blocks)
+7. Rules (AST depth ≤ 5, valid Python, safe division)
 
 **LLMContext**: Builds pipeline summaries for LLM analysis of search health and bottleneck detection.
 
@@ -215,18 +276,24 @@ for each round:
 
 **File**: `src/alpha/service.py`
 
-`AlphaService` provides the public API:
+`AlphaService(market="crypto")` provides the public API. The `market` parameter selects the `MarketProfile`, which configures the schema, compiler, dataset loader, and LLM persona.
 
 | Method | Purpose |
 |--------|---------|
 | `list_operators()` | All 60+ available operators |
-| `validate_formula(formula)` | Parse + type-check |
+| `validate_formula(formula)` | Parse + type-check (market-aware aliases) |
 | `compile_formula(formula)` | Return bytecode + validation |
 | `evaluate_formula(formula, fields)` | Run on raw data, return weights + metrics |
 | `evaluate_formula_from_db(formula, symbols, dates)` | Load from ClickHouse, evaluate |
 | `search_formulas_on_db(symbols, dates, ...)` | Full search loop with CPCV |
 | `combine_factors_from_db(symbols, dates, method)` | IC-weighted combination of zoo factors |
 | `benchmark_vm(formulas)` | Throughput benchmarking |
+
+**Dataset Loaders** (`src/alpha/core/dataset.py`):
+- `CryptoMinuteDatasetLoader` — loads from `crypto_data.futures_5m`, supports 5m–4h intervals
+- `AShareDailyDatasetLoader` — loads from `stock_data.stock_daily`, daily only, forward-adjusted prices. Accepts `universe` (index code) and `exclude_st` kwargs.
+
+Both satisfy the `DatasetLoader` protocol: `load(symbols, start_time, end_time, interval, **kwargs) → AlphaDataset`.
 
 ## GPU Acceleration
 

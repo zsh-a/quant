@@ -14,12 +14,21 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from src.alpha import AlphaService
+from src.alpha.core.market import list_market_types
 from src.alpha.search.pipeline import RoundRecord, StageRecord
 from src.alpha.infra.tracing import InMemoryCollector, tracer
 from src.config.settings import get_alpha_lab_config, get_bitget_config, get_crypto_market_config
 
 router = APIRouter(prefix="/alpha-lab", tags=["alpha-lab"])
-service = AlphaService()
+
+# Lazy per-market service instances
+_services: dict[str, AlphaService] = {}
+
+
+def _get_service(market: str = "crypto") -> AlphaService:
+    if market not in _services:
+        _services[market] = AlphaService(market=market)
+    return _services[market]
 
 _memory_collector = InMemoryCollector()
 tracer.add_collector(_memory_collector)
@@ -52,13 +61,14 @@ def _run_search_job(
 
     try:
         _SEARCH_JOBS[job_id]["status"] = "running"
+        market = params.pop("market", "crypto")
         strategy = params.pop("strategy", "")
         neural_batch = params.pop("neural_batch", 4096)
         enum_max = params.pop("enum_max", 500)
         enum_top_k = params.pop("enum_top_k", 30)
-        logger.info("alpha.search creating service strategy={!r}", strategy)
+        logger.info("alpha.search creating service strategy={!r} market={!r}", strategy, market)
         svc = AlphaService(
-            strategy=strategy, neural_sample_batch=neural_batch,
+            market=market, strategy=strategy, neural_sample_batch=neural_batch,
             enum_max=enum_max, enum_top_k=enum_top_k,
         )
         logger.info("alpha.search strategies={}", [s.name for s in svc.search_engine.strategies])
@@ -87,23 +97,29 @@ class CompileRequest(BaseModel):
 
 
 class EvaluateDbRequest(BaseModel):
+    market: str = "crypto"
     formula: str
     symbols: list[str] = Field(default_factory=lambda: get_crypto_market_config().default_symbols)
+    universe: str | None = None  # A-share: 指数代码，如 "000300" (沪深300)
     start_time: datetime
     end_time: datetime
     interval: str = Field(default_factory=lambda: get_crypto_market_config().default_interval)
     min_quote_volume: float = 0.0
     blocked_utc_hours: list[int] = Field(default_factory=list)
+    exclude_st: bool = False
     summary_only: bool = True
 
 
 class SearchDbRequest(BaseModel):
+    market: str = "crypto"
     symbols: list[str] = Field(default_factory=lambda: get_crypto_market_config().default_symbols)
+    universe: str | None = None  # A-share: 指数代码，如 "000300" (沪深300)
     start_time: datetime
     end_time: datetime
     interval: str = "5m"
     min_quote_volume: float = 0.0
     blocked_utc_hours: list[int] = Field(default_factory=list)
+    exclude_st: bool = False
     seeds: list[str] = Field(default_factory=list)
     population_size: int = 8
     offspring_count: int = 4
@@ -122,7 +138,9 @@ class SearchDbRequest(BaseModel):
 
 
 class CombineZooRequest(BaseModel):
+    market: str = "crypto"
     symbols: list[str] = Field(default_factory=lambda: get_crypto_market_config().default_symbols)
+    universe: str | None = None  # A-share: 指数代码
     start_time: datetime
     end_time: datetime
     interval: str = "5m"
@@ -160,12 +178,28 @@ def _normalize_blocked_hours(values: list[int] | None) -> list[int] | None:
 
 def _workspace_defaults() -> dict[str, object]:
     from src.market_data.binance_vision import EXPANDED_SYMBOLS
+    from src.alpha.core.market import get_market_profile
 
     crypto_market = get_crypto_market_config()
+    crypto_profile = get_market_profile("crypto")
+    a_share_profile = get_market_profile("a_share")
     return {
         "alpha_lab": get_alpha_lab_config().model_dump(),
         "bitget": get_bitget_config().model_dump(),
         "crypto_market": crypto_market.model_dump(),
+        "available_markets": list_market_types(),
+        "market_presets": {
+            "crypto": {
+                "intervals": list(crypto_profile.supported_intervals),
+                "sample_formulas": list(crypto_profile.seeds[:3]),
+                "symbol_presets": list(crypto_profile.symbol_presets) if crypto_profile.symbol_presets else [],
+            },
+            "a_share": {
+                "intervals": list(a_share_profile.supported_intervals),
+                "sample_formulas": list(a_share_profile.seeds[:3]),
+                "symbol_presets": list(a_share_profile.symbol_presets),
+            },
+        },
         "intervals": ["5m", "15m", "1h", "4h"],
         "sample_formulas": [
             "cs_rank(ts_mean(close, 5) - close)",
@@ -218,30 +252,32 @@ async def get_workspace(
     run_limit: int = Query(default=8, ge=1, le=50),
     zoo_limit: int = Query(default=50, ge=1, le=200),
 ):
-    strategies_info = service.get_strategy_modes_info()
+    svc = _get_service()
+    strategies_info = svc.get_strategy_modes_info()
     return {
-        "operators": service.list_operators(),
+        "operators": svc.list_operators(),
         "defaults": _workspace_defaults(),
         "strategy_modes_info": strategies_info,
-        "runs": service.list_runs(limit=run_limit),
-        "zoo": service.list_zoo(limit=zoo_limit),
+        "runs": svc.list_runs(limit=run_limit),
+        "zoo": svc.list_zoo(limit=zoo_limit),
         "engine": {
-            "backend": service.vm.backend,
-            "device": str(service.vm.device) if service.vm.device is not None else "cpu",
-            "triton": getattr(service.vm, "use_triton", False),
+            "backend": svc.vm.backend,
+            "device": str(svc.vm.device) if svc.vm.device is not None else "cpu",
+            "triton": getattr(svc.vm, "use_triton", False),
         },
+        "available_markets": list_market_types(),
     }
 
 
 @router.post("/validate")
 async def validate_formula(request: CompileRequest):
-    return service.validate_formula(request.formula)
+    return _get_service().validate_formula(request.formula)
 
 
 @router.post("/compile")
 async def compile_formula(request: CompileRequest):
     try:
-        return service.compile_formula(request.formula)
+        return _get_service().compile_formula(request.formula)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
@@ -249,7 +285,7 @@ async def compile_formula(request: CompileRequest):
 @router.post("/evaluate-db")
 async def evaluate_formula_from_db(request: EvaluateDbRequest):
     try:
-        return service.evaluate_formula_from_db(
+        return _get_service(request.market).evaluate_formula_from_db(
             formula=request.formula,
             symbols=request.symbols,
             start_time=request.start_time,
@@ -258,6 +294,8 @@ async def evaluate_formula_from_db(request: EvaluateDbRequest):
             min_quote_volume=request.min_quote_volume,
             blocked_utc_hours=_normalize_blocked_hours(request.blocked_utc_hours),
             summary_only=request.summary_only,
+            exclude_st=request.exclude_st,
+            universe=request.universe,
         )
     except (ValueError, KeyError) as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -271,6 +309,7 @@ async def submit_search(request: SearchDbRequest, background_tasks: BackgroundTa
     """Submit a GA search job. Returns immediately with a job_id for polling."""
     job_id = str(uuid.uuid4())[:12]
     params = {
+        "market": request.market,
         "symbols": request.symbols,
         "start_time": request.start_time,
         "end_time": request.end_time,
@@ -288,6 +327,8 @@ async def submit_search(request: SearchDbRequest, background_tasks: BackgroundTa
         "purge_window": request.purge_window,
         "embargo_window": request.embargo_window,
         "blocked_utc_hours": _normalize_blocked_hours(request.blocked_utc_hours),
+        "exclude_st": request.exclude_st,
+        "universe": request.universe,
         "strategy": request.strategy,
         "neural_batch": request.neural_batch,
     }
@@ -361,26 +402,26 @@ async def list_search_jobs():
 
 @router.get("/runs")
 async def list_runs(limit: int = Query(default=20, ge=1, le=100)):
-    return {"runs": service.list_runs(limit=limit)}
+    return {"runs": _get_service().list_runs(limit=limit)}
 
 
 @router.get("/runs/{run_id}")
 async def get_run(run_id: str):
     try:
-        return service.load_run(run_id)
+        return _get_service().load_run(run_id)
     except FileNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.get("/zoo")
 async def list_zoo(limit: int = Query(default=50, ge=1, le=200)):
-    return {"entries": service.list_zoo(limit=limit)}
+    return {"entries": _get_service().list_zoo(limit=limit)}
 
 
 @router.post("/zoo")
 async def save_formula_to_zoo(request: SaveZooRequest):
     try:
-        return service.save_formula_to_zoo(
+        return _get_service().save_formula_to_zoo(
             formula=request.formula,
             fitness=request.fitness,
             metrics=request.metrics,
@@ -399,13 +440,14 @@ async def save_formula_to_zoo(request: SaveZooRequest):
 @router.post("/combine-zoo")
 async def combine_factors_from_zoo(request: CombineZooRequest):
     try:
-        return service.combine_factors_from_db(
+        return _get_service(request.market).combine_factors_from_db(
             symbols=request.symbols,
             start_time=request.start_time,
             end_time=request.end_time,
             interval=request.interval,
             min_quote_volume=request.min_quote_volume,
             blocked_utc_hours=_normalize_blocked_hours(request.blocked_utc_hours),
+            universe=request.universe,
             method=request.method,
             max_factors=request.max_factors,
             min_abs_ic=request.min_abs_ic,
@@ -529,14 +571,14 @@ async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
     summary = build_pipeline_summary(
         pipeline=pr,
         archive=archive_entries,
-        strategy_memory=getattr(service, "strategy_memory", None),
+        strategy_memory=getattr(_get_service(), "strategy_memory", None),
     )
     prompt = build_analysis_prompt(summary, request.instruction)
 
     # Call LLM for analysis (use the same backend as formula generation)
     analysis = ""
     try:
-        llm = getattr(service, "_llm_backend", None)
+        llm = getattr(_get_service(), "_llm_backend", None)
         if llm and hasattr(llm, "_call_llm"):
             analysis = llm._call_llm(prompt, temperature=0.3, tag="analysis")
         else:
@@ -627,7 +669,7 @@ async def get_strategy_state():
     from src.alpha.search.context import StatefulStrategy
 
     strategies_info: list[dict[str, Any]] = []
-    for strategy in service.search_engine.strategies:
+    for strategy in _get_service().search_engine.strategies:
         info: dict[str, Any] = {
             "name": strategy.name,
             "stateful": isinstance(strategy, StatefulStrategy),
@@ -643,10 +685,11 @@ async def get_strategy_state():
 
     # Strategy memory summary
     memory_summary = None
-    if service.strategy_memory:
+    svc = _get_service()
+    if svc.strategy_memory:
         memory_summary = {
-            "themes": service.strategy_memory.get_theme_summary(),
-            "operators": service.strategy_memory.get_operator_summary(),
+            "themes": svc.strategy_memory.get_theme_summary(),
+            "operators": svc.strategy_memory.get_operator_summary(),
         }
 
     return {
@@ -660,7 +703,7 @@ async def list_checkpoints():
     """List all available checkpoints across jobs."""
     from pathlib import Path
 
-    ckpt_dir = Path(service.checkpoint_manager._dir)
+    ckpt_dir = Path(_get_service().checkpoint_manager._dir)
     if not ckpt_dir.exists():
         return {"checkpoints": []}
 
@@ -695,7 +738,7 @@ async def get_job_checkpoints(job_id: str):
     """List checkpoints for a specific job."""
     from pathlib import Path
 
-    job_dir = Path(service.checkpoint_manager._dir) / job_id
+    job_dir = Path(_get_service().checkpoint_manager._dir) / job_id
     if not job_dir.exists():
         return {"checkpoints": []}
 
@@ -761,7 +804,7 @@ async def get_factor_catalog(
         from src.alpha.search.context import FactorCatalog, FactorCatalogEntry
         catalog = FactorCatalog()
         # Try to load from checkpoint if available
-        ckpt = service.checkpoint_manager.latest_checkpoint(job_id)
+        ckpt = _get_service().checkpoint_manager.latest_checkpoint(job_id)
         if ckpt:
             try:
                 from src.alpha.search.checkpoint import SearchCheckpoint
@@ -814,7 +857,7 @@ async def get_factor_catalog_stats():
         result = job.get("result")
         if not result:
             continue
-        ckpt = service.checkpoint_manager.latest_checkpoint(job_id)
+        ckpt = _get_service().checkpoint_manager.latest_checkpoint(job_id)
         if ckpt:
             try:
                 from src.alpha.search.checkpoint import SearchCheckpoint

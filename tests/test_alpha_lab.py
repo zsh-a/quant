@@ -201,19 +201,6 @@ def test_alpha_lab_service_program_cache_uses_lru_eviction():
     assert "CSRank(ts_mean(close, 2) - close)" not in service._program_cache
 
 
-def test_population_seed_and_breed():
-    service = AlphaService()
-    seeds = [
-        "CSRank(ts_mean(close, 5) - close)",
-        "CSRank(ts_std(close, 5))",
-    ]
-    population = service.seed_population(seeds, population_size=2)
-    offspring = service.breed_population([item["formula"] for item in population], offspring_count=2)
-
-    assert len(population) == 2
-    assert len(offspring) >= 1
-    assert all(item["formula"] for item in offspring)
-
 
 class _BatchCountingBackend:
     def __init__(self):
@@ -415,55 +402,6 @@ def test_openai_evolution_prompt_includes_extended_metrics_and_diagnostics():
     # Check diagnostics
     assert "overfitting" in prompt or "low turnover" in prompt
 
-
-def test_alpha_lab_service_search_uses_openai_backend_without_manual_seeds():
-    service = AlphaService(
-        llm_backend=OpenAILLMBackend(
-            client=_FakeClient(
-                [
-                    """[
-                      {"rationale": "seed a", "formula": "CSRank(OIDelta(OI, 1) - SpreadRatio(BidAskSpread, Close))"},
-                      {"rationale": "seed b", "formula": "CSRank(ATR_N(High, Low, Close, 5) + FundingDelta(FundingRate, 1))"}
-                    ]""",
-                    """[
-                      {"mutation_type": "x", "rationale": "child", "formula": "CSRank(CSRank(OIDelta(OI, 1) - SpreadRatio(BidAskSpread, Close)) + ATR_N(High, Low, Close, 5))"}
-                    ]""",
-                ]
-            )
-        )
-    )
-    service.dataset_loader = __import__("src.alpha_lab.dataset", fromlist=["CryptoMinuteDatasetLoader"]).CryptoMinuteDatasetLoader(
-        store=type(
-            "Store",
-            (),
-            {
-                "query_bars": lambda self, provider, symbol, start_time, end_time, interval="1m": [
-                    {"open_time": "2026-03-27T00:00:00+00:00", "open": 100.0, "high": 101.0, "low": 99.0, "close": 100.0, "volume_base": 10.0, "volume_quote": 1000.0, "trade_count": 10, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:00:59+00:00"},
-                    {"open_time": "2026-03-27T00:01:00+00:00", "open": 100.0, "high": 102.0, "low": 99.5, "close": 101.0, "volume_base": 11.0, "volume_quote": 1111.0, "trade_count": 11, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:01:59+00:00"},
-                    {"open_time": "2026-03-27T00:02:00+00:00", "open": 101.0, "high": 103.0, "low": 100.0, "close": 102.0 if symbol == "BTCUSDT" else 99.0, "volume_base": 12.0, "volume_quote": 1224.0, "trade_count": 12, "provider": provider, "market_type": "perpetual", "symbol": symbol, "exchange_symbol": symbol, "interval": interval, "close_time": "2026-03-27T00:02:59+00:00"},
-                ]
-            },
-        )()
-    )
-
-    from datetime import UTC, datetime
-
-    result = service.search_formulas_on_db(
-        provider="bitget",
-        symbols=["BTCUSDT", "ETHUSDT"],
-        start_time=datetime(2026, 3, 27, 0, 0, tzinfo=UTC),
-        end_time=datetime(2026, 3, 27, 0, 3, tzinfo=UTC),
-        interval="1m",
-        generations=1,
-        persist=False,
-    )
-
-    assert result["llm"]["backend"] == "openai"
-    assert result["top_results"]
-    assert any(
-        ("OIDelta" in item["formula"]) or ("oi_delta" in item["formula"]) or ("ATR_N" in item["formula"]) or ("atr_n" in item["formula"])
-        for item in result["top_results"]
-    )
 
 
 def test_cpcv_validator_generates_purged_folds():

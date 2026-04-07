@@ -21,7 +21,7 @@ src/
   api/            # FastAPI routers, WebSocket, event bus
   core/           # Trading engine, brokers, data streams, risk manager
   alpha/          # Alpha factor discovery module
-    core/         #   DSL, compiler, VM, operators, dataset
+    core/         #   DSL, compiler, VM, operators, dataset, market profiles
     eval/         #   Metrics, screening, validation, GPU acceleration
     search/       #   Orchestrator, context, pipeline, evolution, checkpoints
     strategies/   #   Pluggable strategies (LLM, MCTS, Neural, Enumeration)
@@ -106,7 +106,7 @@ make clean_all                         # Remove .pth, runs/, .log files
 ### Core Modules
 
 1. **Trading Engine** (`src/core/engine.py`): Bar-by-bar simulation loop. Order types: `NEXT_OPEN`, `IMMEDIATE_OPEN`, `IMMEDIATE_CLOSE`.
-2. **Alpha Search** (`src/alpha/`): DSL compiler → StackVM bytecode → vectorized evaluation. Strategies: LLM evolution, LLM-guided MCTS (paper: "Navigating the Alpha Jungle"), neural formula (Transformer+REINFORCE), enumeration.
+2. **Alpha Search** (`src/alpha/`): Multi-market (crypto futures, A-shares) DSL compiler → StackVM bytecode → vectorized evaluation. Market profiles (`MarketType`/`MarketProfile`) configure schema, data loader, field aliases, and LLM persona per market. Strategies: LLM evolution, LLM-guided MCTS (paper: "Navigating the Alpha Jungle"), neural formula (Transformer+REINFORCE), enumeration.
 3. **Market Data** (`src/market_data/`): Multi-source pipeline (Akshare, Baostock, TDX, CCXT/Binance). ClickHouse storage with chunked loading.
 4. **Task Queue** (`src/tasks/`): Celery queues - `backtest`, `default`, `automation`. Redis broker.
 
@@ -155,6 +155,7 @@ Health check: `GET /monitoring/health`
 - **Logging**: Use `loguru` via `src/utils/logging_config.py`
 - **Session DB**: SQLite via `session_db.py` at project root
 - **Alpha formulas**: Python expression syntax, compiled to bytecode via `src/alpha/core/compiler.py`
+- **Alpha markets**: Multi-market via `MarketProfile` (`src/alpha/core/market.py`). Use `AlphaService(market="crypto")` or `AlphaService(market="a_share")`. API requests accept `market` field.
 
 ## Documentation
 

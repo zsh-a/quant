@@ -13,9 +13,11 @@ Subpackages:
 
 # --- Core ---
 from .core import (
-    ASTNode, AlphaDataset, BytecodeProgram, CryptoMinuteDatasetLoader,
-    FormulaCompiler, FormulaParser, Instruction, OperatorRegistry, OperatorSpec,
+    ASTNode, AlphaDataset, AShareDailyDatasetLoader, BytecodeProgram,
+    CryptoMinuteDatasetLoader, DatasetLoader, FormulaCompiler, FormulaParser,
+    Instruction, MarketProfile, MarketType, OperatorRegistry, OperatorSpec,
     StackVM, TensorSchema, TensorStore, TypeChecker, ValidationReport,
+    get_market_profile, list_market_types,
 )
 
 # --- Eval ---
@@ -70,10 +72,12 @@ from .service import AlphaService
 
 __all__ = [
     # Core
-    "ASTNode", "AlphaDataset", "BytecodeProgram", "CryptoMinuteDatasetLoader",
-    "FormulaCompiler", "FormulaParser", "Instruction", "OperatorRegistry",
-    "OperatorSpec", "StackVM", "TensorSchema", "TensorStore",
-    "TypeChecker", "ValidationReport",
+    "ASTNode", "AlphaDataset", "AShareDailyDatasetLoader", "BytecodeProgram",
+    "CryptoMinuteDatasetLoader", "DatasetLoader", "FormulaCompiler",
+    "FormulaParser", "Instruction", "MarketProfile", "MarketType",
+    "OperatorRegistry", "OperatorSpec", "StackVM", "TensorSchema",
+    "TensorStore", "TypeChecker", "ValidationReport",
+    "get_market_profile", "list_market_types",
     # Eval
     "triton_available", "CPCVValidator", "ValidationFold",
     "compute_forward_returns", "compute_ic_metrics", "compute_rank_ic",

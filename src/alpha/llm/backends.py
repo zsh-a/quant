@@ -22,6 +22,7 @@ import hashlib
 
 from ..core.compiler import FormulaCompiler
 from ..core.dsl import TensorSchema
+from ..core.market import MarketProfile
 from ..search.evolution import BreedingSpec
 from ..core.operators import OperatorRegistry
 
@@ -154,9 +155,15 @@ class HeuristicLLMBackend:
     by SearchOrchestrator to bootstrap initial populations.
     """
 
-    def __init__(self, registry: OperatorRegistry | None = None, schema: TensorSchema | None = None):
+    def __init__(
+        self,
+        registry: OperatorRegistry | None = None,
+        schema: TensorSchema | None = None,
+        market_profile: MarketProfile | None = None,
+    ):
         self.registry = registry or OperatorRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
+        self._market_profile = market_profile
         self.call_stats = {"initial_population_calls": 0, "offspring_calls": 0}
 
     @property
@@ -188,16 +195,19 @@ class HeuristicLLMBackend:
 
     def generate_initial_population(self, count: int) -> list[str]:
         self.call_stats["initial_population_calls"] += 1
-        seeds = [
-            "cs_rank(ts_mean(close, 5) - close)",
-            "cs_rank(ts_std(close, 10))",
-            "cs_rank(delta(premium_close, 5))",
-            "cs_rank(ts_zscore(funding_rate, 20))",
-            "cs_rank(delta(open_interest, 10) - ts_mean(delta(open_interest, 10), 20))",
-            "cs_rank(ts_zscore(long_short_ratio, 20))",
-            "cs_rank(div(taker_buy_volume, volume + 1e-12) - 0.5)",
-            "cs_rank(ts_corr(close, taker_buy_volume, 10))",
-        ]
+        if self._market_profile is not None:
+            seeds = list(self._market_profile.seeds)
+        else:
+            seeds = [
+                "cs_rank(ts_mean(close, 5) - close)",
+                "cs_rank(ts_std(close, 10))",
+                "cs_rank(delta(premium_close, 5))",
+                "cs_rank(ts_zscore(funding_rate, 20))",
+                "cs_rank(delta(open_interest, 10) - ts_mean(delta(open_interest, 10), 20))",
+                "cs_rank(ts_zscore(long_short_ratio, 20))",
+                "cs_rank(div(taker_buy_volume, volume + 1e-12) - 0.5)",
+                "cs_rank(ts_corr(close, taker_buy_volume, 10))",
+            ]
         generated: list[str] = []
         attempts = 0
         while len(generated) < count and attempts < max(count * 4, 8):
@@ -209,18 +219,21 @@ class HeuristicLLMBackend:
         return generated[:count]
 
     def _mutate_formula(self, formula: str, variant: int = 0) -> str:
-        replacements = [
-            ("ts_mean(", "ts_std("), ("ts_std(", "ts_mean("),
-            ("ts_max(", "ts_rank("), ("ts_rank(", "ts_mean("),
-            ("close", "vwap"), ("close", "mark_close"),
-            ("volume", "turnover"), ("volume", "taker_buy_volume"),
-            ("close", "hlc3(high, low, close)"), ("turnover", "adv_n(turnover, 5)"),
-            ("close", "ohlc4(open, high, low, close)"),
-            ("volatility_n(close, 20)", "atr_n(high, low, close, 14)"),
-            ("funding_rate", "ts_zscore(funding_rate, 20)"),
-            ("open_interest", "delta(open_interest, 5)"),
-            ("close", "premium_close"), ("volume", "trade_count"),
-        ]
+        if self._market_profile is not None and self._market_profile.mutation_replacements:
+            replacements = list(self._market_profile.mutation_replacements)
+        else:
+            replacements = [
+                ("ts_mean(", "ts_std("), ("ts_std(", "ts_mean("),
+                ("ts_max(", "ts_rank("), ("ts_rank(", "ts_mean("),
+                ("close", "vwap"), ("close", "mark_close"),
+                ("volume", "turnover"), ("volume", "taker_buy_volume"),
+                ("close", "hlc3(high, low, close)"), ("turnover", "adv_n(turnover, 5)"),
+                ("close", "ohlc4(open, high, low, close)"),
+                ("volatility_n(close, 20)", "atr_n(high, low, close, 14)"),
+                ("funding_rate", "ts_zscore(funding_rate, 20)"),
+                ("open_interest", "delta(open_interest, 5)"),
+                ("close", "premium_close"), ("volume", "trade_count"),
+            ]
         offset = self._stable_index(formula, len(replacements), salt=f"mutate:{variant}")
         for idx in range(len(replacements)):
             source, target = replacements[(offset + idx) % len(replacements)]
@@ -292,9 +305,11 @@ class OpenAILLMBackend:
         strategy_memory: Any | None = None,
         knowledge_base: Any | None = None,
         feature_kitchen: Any | None = None,
+        market_profile: MarketProfile | None = None,
     ):
         self.registry = registry or OperatorRegistry()
         self.schema = schema or TensorSchema.default_market_schema()
+        self._market_profile = market_profile
         self.compiler = FormulaCompiler(self.registry)
         self.model_name = model_name or os.getenv("ALPHA_LAB_LLM_MODEL", "gpt-4.1-mini")
         self.base_url = base_url or os.getenv("ALPHA_LAB_LLM_BASE_URL")
@@ -310,6 +325,7 @@ class OpenAILLMBackend:
         }
         self.fallback_backend = fallback_backend or HeuristicLLMBackend(
             registry=self.registry, schema=self.schema,
+            market_profile=market_profile,
         )
         self.client = client or OpenAI(
             base_url=self.base_url, api_key=self.api_key,
@@ -398,6 +414,8 @@ class OpenAILLMBackend:
         # --- Feature groups (organized by financial meaning) ---
         if self.knowledge_base is not None:
             feature_section = self.knowledge_base.build_feature_groups_prompt()
+        elif self._market_profile is not None:
+            feature_section = self._market_profile.field_descriptions
         else:
             feature_section = _FIELDS
 
@@ -411,8 +429,10 @@ class OpenAILLMBackend:
         if self.strategy_memory is not None:
             feedback_section = "\n" + self.strategy_memory.build_feedback_summary() + "\n"
 
+        persona = self._market_profile.persona if self._market_profile else "You are a senior crypto quant researcher."
+
         return f"""\
-You are a senior crypto quant researcher.  Generate {count} diverse alpha factor formulas.
+{persona}  Generate {count} diverse alpha factor formulas.
 
 {feature_section}
 
@@ -435,6 +455,8 @@ Output exactly {count} items:
         # --- Feature reference ---
         if self.knowledge_base is not None:
             feature_section = self.knowledge_base.build_feature_groups_prompt()
+        elif self._market_profile is not None:
+            feature_section = self._market_profile.field_descriptions
         else:
             feature_section = _FIELDS
 
@@ -690,10 +712,11 @@ def build_default_llm_backend(
     strategy_memory: Any | None = None,
     knowledge_base: Any | None = None,
     feature_kitchen: Any | None = None,
+    market_profile: MarketProfile | None = None,
 ) -> Any:
     requested = (backend_name or "auto").lower()
     if requested == "heuristic":
-        return HeuristicLLMBackend(registry=registry, schema=schema)
+        return HeuristicLLMBackend(registry=registry, schema=schema, market_profile=market_profile)
     resolved_key = api_key or os.getenv("ALPHA_LAB_LLM_API_KEY")
     if requested == "openai" or (requested == "auto" and resolved_key):
         return OpenAILLMBackend(
@@ -702,5 +725,6 @@ def build_default_llm_backend(
             strategy_memory=strategy_memory,
             knowledge_base=knowledge_base,
             feature_kitchen=feature_kitchen,
+            market_profile=market_profile,
         )
-    return HeuristicLLMBackend(registry=registry, schema=schema)
+    return HeuristicLLMBackend(registry=registry, schema=schema, market_profile=market_profile)

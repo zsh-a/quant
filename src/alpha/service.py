@@ -13,8 +13,9 @@ from loguru import logger
 
 from .risk.combination import FactorCombiner
 from .core.compiler import BytecodeProgram, FormulaCompiler
-from .core.dataset import AlphaDataset, CryptoMinuteDatasetLoader
+from .core.dataset import AlphaDataset, AShareDailyDatasetLoader, CryptoMinuteDatasetLoader
 from .core.dsl import TensorSchema
+from .core.market import MarketType, get_market_profile
 from .search.evolution import EvalResult, Individual
 from .knowledge.features import FeatureKitchen
 from .knowledge.themes import FinancialKnowledgeBase
@@ -42,6 +43,7 @@ DEFAULT_DB_SEEDS = [
 class AlphaService:
     def __init__(
         self,
+        market: str = "crypto",
         schema: TensorSchema | None = None,
         llm_backend: Any | None = None,
         llm_backend_name: str = "auto",
@@ -56,9 +58,10 @@ class AlphaService:
         enum_max: int = 500,
         enum_top_k: int = 30,
     ):
+        self.market_profile = get_market_profile(market)
         self.registry = OperatorRegistry()
-        self.schema = schema or TensorSchema.default_market_schema()
-        self.compiler = FormulaCompiler(self.registry)
+        self.schema = schema or self.market_profile.schema
+        self.compiler = FormulaCompiler(self.registry, field_aliases=self.market_profile.field_aliases)
         self.vm = StackVM()
         self.vm.enable_persistent_cache(max_entries=1024)
 
@@ -85,6 +88,7 @@ class AlphaService:
             strategy_memory=self.strategy_memory,
             knowledge_base=self.knowledge_base,
             feature_kitchen=self.feature_kitchen,
+            market_profile=self.market_profile,
         )
         self.llm_backend = resolved_llm
 
@@ -114,7 +118,7 @@ class AlphaService:
         self.rule_overlay = RuleOverlay()
         self.portfolio_manager = PortfolioManager()
         self.execution = ExecutionSimulator()
-        self.dataset_loader = CryptoMinuteDatasetLoader()
+        self.dataset_loader = self._create_loader()
         self.persistence = AlphaPersistence()
         self.combiner = FactorCombiner(compiler=self.compiler, vm=self.vm, schema=self.schema)
         self.validator = CPCVValidator()
@@ -122,6 +126,21 @@ class AlphaService:
         self._program_cache: OrderedDict[str, BytecodeProgram] = OrderedDict()
         self._program_cache_lock = threading.Lock()
         self._complexity_cache: dict[str, dict[str, float]] = {}
+
+    # ------------------------------------------------------------------
+    # Loader factory
+    # ------------------------------------------------------------------
+
+    _LOADER_MAP = {
+        MarketType.CRYPTO: CryptoMinuteDatasetLoader,
+        MarketType.A_SHARE: AShareDailyDatasetLoader,
+    }
+
+    def _create_loader(self):
+        cls = self._LOADER_MAP.get(self.market_profile.market_type)
+        if cls is None:
+            raise ValueError(f"No dataset loader for market: {self.market_profile.market_type}")
+        return cls()
 
     # ------------------------------------------------------------------
     # Strategy assembly
@@ -232,16 +251,31 @@ class AlphaService:
         return [asdict(spec) for spec in self.registry.list_operators()]
 
     def validate_formula(self, formula: str) -> dict[str, Any]:
-        report = self.registry.validate_formula(formula, self.schema)
+        report = self._validate_with_aliases(formula)
         return asdict(report)
 
     def compile_formula(self, formula: str) -> dict[str, Any]:
         program = self._compile_cached(formula)
-        report = self.registry.validate_formula(formula, self.schema)
+        report = self._validate_with_aliases(formula)
         return {
             "validation": asdict(report),
             "program": program.to_dict(),
         }
+
+    def _validate_with_aliases(self, formula: str):
+        """Validate using the market-aware compiler (with correct field aliases)."""
+        from .core.dsl import FormulaParser, ValidationReport, normalize_formula
+        import hashlib
+
+        parser = FormulaParser(self.registry)
+        try:
+            parsed = parser.parse(formula)
+            typed = self.compiler.checker.infer(parsed, self.schema)
+            normalized = normalize_formula(parsed)
+            ast_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
+            return ValidationReport(ok=True, normalized_formula=normalized, errors=[], ast_hash=ast_hash, ast_tree=typed.to_dict())
+        except ValueError as exc:
+            return ValidationReport(ok=False, normalized_formula=formula.strip(), errors=[str(exc)])
 
     def evaluate_formula(
         self,
@@ -328,6 +362,7 @@ class AlphaService:
         min_quote_volume: float = 0.0,
         blocked_utc_hours: list[int] | None = None,
         summary_only: bool = False,
+        **loader_kwargs,
     ) -> dict[str, Any]:
         dataset = self.dataset_loader.load(
             symbols=symbols,
@@ -336,6 +371,7 @@ class AlphaService:
             interval=interval,
             min_quote_volume=min_quote_volume,
             blocked_utc_hours=blocked_utc_hours,
+            **loader_kwargs,
         )
         return self.evaluate_formula_from_dataset(formula=formula, dataset=dataset, summary_only=summary_only)
 
@@ -349,6 +385,7 @@ class AlphaService:
         min_quote_volume: float = 0.0,
         blocked_utc_hours: list[int] | None = None,
         summary_only: bool = False,
+        **loader_kwargs,
     ) -> dict[str, dict[str, Any]]:
         dataset = self.dataset_loader.load(
             symbols=symbols,
@@ -357,6 +394,7 @@ class AlphaService:
             interval=interval,
             min_quote_volume=min_quote_volume,
             blocked_utc_hours=blocked_utc_hours,
+            **loader_kwargs,
         )
         return self.evaluate_formulas_from_dataset(formulas=formulas, dataset=dataset, summary_only=summary_only)
 
@@ -531,6 +569,7 @@ class AlphaService:
         job_id: str = "",
         on_stage_complete: Any = None,
         on_round_complete: Any = None,
+        **loader_kwargs,
     ) -> dict[str, Any]:
         from .infra.tracing import tracer
 
@@ -550,6 +589,7 @@ class AlphaService:
                     symbols=symbols, start_time=start_time,
                     end_time=end_time, interval=interval,
                     min_quote_volume=min_quote_volume, blocked_utc_hours=blocked_utc_hours,
+                    **loader_kwargs,
                 )
 
             # 2. Validation plan
@@ -689,6 +729,7 @@ class AlphaService:
         zoo_limit: int = 50,
         risk_config: RiskConfig | None = None,
         summary_only: bool = False,
+        **loader_kwargs,
     ) -> dict[str, Any]:
         """
         Load market data, pick factors from zoo, combine, apply risk management, and evaluate.
@@ -702,6 +743,7 @@ class AlphaService:
             end_time=end_time,
             interval=interval,
             min_quote_volume=min_quote_volume,
+            **loader_kwargs,
             blocked_utc_hours=blocked_utc_hours,
         )
         load_seconds = perf_counter() - overall_start

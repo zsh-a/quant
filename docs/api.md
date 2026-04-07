@@ -185,8 +185,11 @@ Base URL: `http://localhost:8000`
 
 ### SearchDbRequest
 
+All alpha-lab request models accept a `market` field (`"crypto"` or `"a_share"`, default `"crypto"`) which selects the market-specific schema, data source, and LLM persona.
+
 ```json
 {
+  "market": "crypto",
   "symbols": ["BTCUSDT", "ETHUSDT"],
   "start_time": "2024-01-01",
   "end_time": "2024-06-01",
@@ -200,15 +203,45 @@ Base URL: `http://localhost:8000`
 }
 ```
 
+A-share example (沪深 300 成分股):
+```json
+{
+  "market": "a_share",
+  "universe": "000300",
+  "start_time": "2023-01-01",
+  "end_time": "2024-01-01",
+  "interval": "1d",
+  "exclude_st": true,
+  "population_size": 16,
+  "generations": 10
+}
+```
+
+`universe` 通过指数代码自动解析成分股，支持: `000300` (沪深300), `000905` (中证500), `000852` (中证1000), `000985` (中证全指), `399673` (创业板50) 等。也可忽略 `universe` 直接传 `symbols` 列表。
+
 ### EvaluateDbRequest
 
 ```json
 {
+  "market": "crypto",
   "formula": "cs_rank(ts_mean(close, 20) - ts_mean(close, 5))",
   "symbols": ["BTCUSDT"],
   "start_time": "2024-01-01",
   "end_time": "2024-06-01",
   "interval": "1h"
+}
+```
+
+A-share example (中证 500 成分股):
+```json
+{
+  "market": "a_share",
+  "formula": "cs_rank(neg(ts_zscore(peTTM, 20)))",
+  "universe": "000905",
+  "start_time": "2023-01-01",
+  "end_time": "2024-01-01",
+  "interval": "1d",
+  "exclude_st": true
 }
 ```
 

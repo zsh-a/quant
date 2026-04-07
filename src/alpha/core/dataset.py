@@ -3,7 +3,7 @@ from __future__ import annotations
 import gc
 from dataclasses import dataclass
 from datetime import UTC, datetime
-from typing import Any
+from typing import Any, Protocol, runtime_checkable
 
 import numpy as np
 import pandas as pd
@@ -147,6 +147,20 @@ class AlphaDataset:
             liquidity_mask=self.liquidity_mask[selected],
             session_mask=self.session_mask[selected],
         )
+
+
+@runtime_checkable
+class DatasetLoader(Protocol):
+    """Unified interface for loading alpha datasets from any market."""
+
+    def load(
+        self,
+        symbols: list[str],
+        start_time: datetime,
+        end_time: datetime,
+        interval: str = "1d",
+        **kwargs,
+    ) -> AlphaDataset: ...
 
 
 _FUTURES_TABLE = "crypto_data.futures_5m"
@@ -388,3 +402,197 @@ class CryptoMinuteDatasetLoader:
         aggregated = aggregated.dropna(subset=["open", "high", "low", "close"], how="any").reset_index()
         aggregated["symbol"] = symbol
         return aggregated
+
+
+# ---------------------------------------------------------------------------
+# A-share daily loader
+# ---------------------------------------------------------------------------
+
+_STOCK_TABLE = "stock_data.stock_daily"
+
+_STOCK_SELECT_COLUMNS = [
+    "date", "code",
+    "open", "high", "low", "close", "preclose",
+    "volume", "amount", "turn", "pctChg",
+    "peTTM", "pbMRQ",
+    "tradestatus", "isST", "adjfactor",
+]
+
+_STOCK_PRICE_COLS = ["open", "high", "low", "close", "preclose"]
+
+_STOCK_PIVOT_COLUMNS = [
+    "open", "high", "low", "close", "preclose",
+    "volume", "amount", "turn", "pctChg",
+    "peTTM", "pbMRQ", "isST", "adjfactor",
+]
+
+
+class AShareDailyDatasetLoader:
+    """Load alpha datasets from stock_data.stock_daily in ClickHouse."""
+
+    def __init__(self, client=None):
+        self._client = client
+
+    def _get_client(self):
+        if self._client is None:
+            self._client = create_clickhouse_client()
+        return self._client
+
+    def load(
+        self,
+        symbols: list[str],
+        start_time: datetime,
+        end_time: datetime,
+        interval: str = "1d",
+        exclude_st: bool = False,
+        universe: str | None = None,
+        **kwargs,
+    ) -> AlphaDataset:
+        if interval != "1d":
+            raise ValueError(f"A-share data only supports daily interval ('1d'), got {interval!r}")
+
+        client = self._get_client()
+
+        # universe 优先：根据指数代码查成分股
+        if universe:
+            symbols = self._resolve_universe(client, universe)
+            if not symbols:
+                raise ValueError(f"No constituent stocks found for index {universe!r}")
+            logger.info("alpha.dataset.a_share universe={} resolved {} symbols", universe, len(symbols))
+
+        start_str = start_time.strftime("%Y-%m-%d")
+        end_str = end_time.strftime("%Y-%m-%d")
+        cols = ", ".join(_STOCK_SELECT_COLUMNS)
+
+        if symbols:
+            codes_clause = ",".join(f"'{s}'" for s in symbols)
+            where_symbols = f"AND code IN ({codes_clause})"
+        else:
+            where_symbols = ""
+
+        result = client.query(
+            f"SELECT {cols} FROM {_STOCK_TABLE} FINAL "
+            f"WHERE date >= '{start_str}' AND date <= '{end_str}' "
+            f"{where_symbols} "
+            f"ORDER BY date, code"
+        )
+
+        if not result.result_rows:
+            raise ValueError("No A-share data found for the requested symbols/time range")
+
+        df = pd.DataFrame(result.result_rows, columns=result.column_names)
+        df["date"] = pd.to_datetime(df["date"])
+
+        # --- Forward-adjust prices (前复权) ---
+        # Normalize adjfactor so that the latest date = 1.0
+        latest_adj = df.groupby("code")["adjfactor"].transform("last")
+        adj_ratio = df["adjfactor"] / latest_adj
+        for col in _STOCK_PRICE_COLS:
+            df[col] = df[col] * adj_ratio
+
+        # Filter ST stocks if requested
+        if exclude_st:
+            df = df[df["isST"] != 1].reset_index(drop=True)
+
+        # Sort and dedup
+        sort_idx = np.lexsort([df["code"].values, df["date"].values])
+        df = df.iloc[sort_idx].reset_index(drop=True)
+        df = df.drop_duplicates(subset=["date", "code"], keep="last")
+
+        timestamps = sorted(df["date"].drop_duplicates().tolist())
+        resolved_symbols = sorted(df["code"].drop_duplicates().tolist())
+
+        # --- Build field arrays ---
+        fields = self._build_fields_direct(df, timestamps, resolved_symbols)
+
+        tradestatus_arr = self._build_single_field(df, timestamps, resolved_symbols, "tradestatus")
+
+        del df
+        gc.collect()
+
+        # Derived fields
+        fields["vwap"] = np.divide(fields["amount"], fields["volume"] + 1e-12)
+        fields["turnover"] = fields["amount"].copy()
+
+        # isST as float
+        np.nan_to_num(fields["isST"], copy=False, nan=0.0)
+
+        # Masks
+        volume_valid = ~np.isnan(fields["volume"]) & (fields["volume"] > 0)
+        trading = ~np.isnan(tradestatus_arr) & (tradestatus_arr == 1)
+        liquidity_mask = volume_valid & trading
+
+        T, N = fields["close"].shape
+        session_mask = np.ones((T, N), dtype=bool)
+
+        logger.info(
+            "alpha.dataset.a_share loaded symbols={} timestamps={} interval={} dtype={}",
+            len(resolved_symbols), len(timestamps), interval, _DTYPE.__name__,
+        )
+
+        return AlphaDataset(
+            interval=interval,
+            symbols=resolved_symbols,
+            timestamps=[ts.strftime("%Y-%m-%d") for ts in timestamps],
+            fields=fields,
+            liquidity_mask=liquidity_mask,
+            session_mask=session_mask,
+        )
+
+    def _build_fields_direct(
+        self,
+        df: pd.DataFrame,
+        timestamps: list,
+        symbols: list[str],
+    ) -> dict[str, np.ndarray]:
+        """Build field arrays using vectorized pd.Categorical indexing."""
+        n_time = len(timestamps)
+        n_sym = len(symbols)
+
+        row_codes = pd.Categorical(df["date"], categories=timestamps).codes
+        col_codes = pd.Categorical(df["code"], categories=symbols).codes
+        valid_mask = (row_codes >= 0) & (col_codes >= 0)
+        valid_rows = row_codes[valid_mask]
+        valid_cols = col_codes[valid_mask]
+
+        fields: dict[str, np.ndarray] = {}
+        for col in _STOCK_PIVOT_COLUMNS:
+            arr = np.full((n_time, n_sym), np.nan, dtype=_DTYPE)
+            if col in df.columns:
+                np_vals = np.asarray(df[col].values[valid_mask], dtype=_DTYPE)
+                arr[valid_rows, valid_cols] = np_vals
+            fields[col] = arr
+
+        return fields
+
+    def _build_single_field(
+        self,
+        df: pd.DataFrame,
+        timestamps: list,
+        symbols: list[str],
+        column: str,
+    ) -> np.ndarray:
+        """Build a single field array (for non-exported fields like tradestatus)."""
+        n_time = len(timestamps)
+        n_sym = len(symbols)
+        row_codes = pd.Categorical(df["date"], categories=timestamps).codes
+        col_codes = pd.Categorical(df["code"], categories=symbols).codes
+        valid_mask = (row_codes >= 0) & (col_codes >= 0)
+        arr = np.full((n_time, n_sym), np.nan, dtype=_DTYPE)
+        if column in df.columns:
+            np_vals = np.asarray(df[column].values[valid_mask], dtype=_DTYPE)
+            arr[row_codes[valid_mask], col_codes[valid_mask]] = np_vals
+        return arr
+
+    @staticmethod
+    def _resolve_universe(client, universe: str) -> list[str]:
+        """Resolve index code(s) to constituent stock codes via stock_data.index_stocks."""
+        codes = [c.strip() for c in universe.split(",") if c.strip()]
+        codes_clause = ",".join(f"'{c}'" for c in codes)
+        result = client.query(
+            f"SELECT DISTINCT code FROM stock_data.index_stocks "
+            f"WHERE `index` IN ({codes_clause})"
+        )
+        if not result.result_rows:
+            return []
+        return sorted(row[0] for row in result.result_rows)

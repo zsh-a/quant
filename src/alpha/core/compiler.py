@@ -48,10 +48,11 @@ class FormulaCompiler:
         registry: OperatorRegistry | None = None,
         parser: FormulaParser | None = None,
         checker: TypeChecker | None = None,
+        field_aliases: dict[str, str] | None = None,
     ):
         self.registry = registry or OperatorRegistry()
         self.parser = parser or FormulaParser(self.registry)
-        self.checker = checker or TypeChecker(self.registry)
+        self.checker = checker or TypeChecker(self.registry, field_aliases=field_aliases)
         self._next_register = 0
         self._instructions: list[Instruction] = []
 

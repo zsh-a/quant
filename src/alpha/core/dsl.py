@@ -57,15 +57,16 @@ class TensorSchema:
         return cls(
             fields=frozenset(
                 {
-                    "open",
-                    "high",
-                    "low",
-                    "close",
-                    "volume",
-                    "amount",
-                    "vwap",
+                    # Core OHLCV
+                    "open", "high", "low", "close", "volume",
+                    "amount", "turnover", "vwap",
+                    # A-share specific
+                    "preclose", "turn", "pctChg",
+                    "peTTM", "pbMRQ",
+                    "adjfactor", "isST",
                 }
             ),
+            masks=frozenset({"liquidity_mask", "session_mask"}),
         )
 
 
@@ -151,40 +152,9 @@ class FormulaParser:
 
 
 class TypeChecker:
-    def __init__(self, registry: "OperatorRegistry"):
+    def __init__(self, registry: "OperatorRegistry", field_aliases: dict[str, str] | None = None):
         self.registry = registry
-        self.field_aliases = {
-            "oi": "open_interest",
-            "openinterest": "open_interest",
-            "oivalue": "open_interest_value",
-            "openinterestvalue": "open_interest_value",
-            "fundingrate": "funding_rate",
-            "bidaskspread": "bid_ask_spread",
-            "tradecount": "trade_count",
-            "trades": "trade_count",
-            "takerbuyvolume": "taker_buy_volume",
-            "takerbuyquotevolume": "taker_buy_quote_volume",
-            "markopen": "mark_open",
-            "markhigh": "mark_high",
-            "marklow": "mark_low",
-            "markclose": "mark_close",
-            "mark": "mark_close",
-            "premiumopen": "premium_open",
-            "premiumhigh": "premium_high",
-            "premiumlow": "premium_low",
-            "premiumclose": "premium_close",
-            "premium": "premium_close",
-            "basis": "premium_close",
-            "lsratio": "long_short_ratio",
-            "longshort": "long_short_ratio",
-            "longshortratio": "long_short_ratio",
-            "takerlsratio": "taker_long_short_vol_ratio",
-            "takerlongshortvol": "taker_long_short_vol_ratio",
-            "takerlongshortratio": "taker_long_short_vol_ratio",
-            "takerlongshorvolratio": "taker_long_short_vol_ratio",
-            "toptraderlongshortratio": "top_trader_long_short_ratio",
-            "toptraderlongshortpositionratio": "top_trader_long_short_position_ratio",
-        }
+        self.field_aliases = field_aliases if field_aliases is not None else {}
 
     def infer(self, ast_node: ASTNode, schema: TensorSchema) -> ASTNode:
         if ast_node.kind == "name":
