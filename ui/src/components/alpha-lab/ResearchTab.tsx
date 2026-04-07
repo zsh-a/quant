@@ -3,14 +3,14 @@
  */
 import React, { useCallback, useState } from 'react'
 import { Activity, AlertTriangle, CheckCircle2, Loader2, Save } from 'lucide-react'
-import type { AlphaLabEvaluationSummary, AlphaLabValidationReport } from '../../types'
+import type { AlphaLabEvaluationSummary, AlphaLabValidationReport, AlphaLabWorkspace as WorkspacePayload } from '../../types'
 import { SectionCard } from '../layout/SectionCard'
 import { EmptyState } from '../layout/EmptyState'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
-import { Input } from '../ui/input'
 import { MiniChart, MetricGrid } from './MiniChart'
-import { fmt, toISO } from './shared'
+import { toISO } from './shared'
+import { DataScopeSection } from './DataScopeSection'
 import { alphaApi } from '../../utils/alphaApi'
 
 const METRIC_KEYS = ['sharpe', 'rank_ic', 'ic_ir', 'total_return', 'max_drawdown', 'avg_turnover', 'signal_coverage', 'pnl_per_turnover'] as const
@@ -30,6 +30,12 @@ interface ResearchTabProps {
   intervals: string[]
   samples: string[]
   symList: () => string[]
+  market: string
+  universe: string | null
+  setUniverse: (v: string | null) => void
+  excludeST: boolean
+  setExcludeST: (v: boolean) => void
+  ws: WorkspacePayload | null
   onSaved: () => void
   setErr: (e: string | null) => void
 }
@@ -37,7 +43,8 @@ interface ResearchTabProps {
 export const ResearchTab: React.FC<ResearchTabProps> = ({
   formula, setFormula, interval, setInterval, symbols, setSymbols,
   startTime, setStartTime, endTime, setEndTime,
-  intervals, samples, symList, onSaved, setErr,
+  intervals, samples, symList, market, universe, setUniverse,
+  excludeST, setExcludeST, ws, onSaved, setErr,
 }) => {
   const [validation, setValidation] = useState<AlphaLabValidationReport | null>(null)
   const [analysis, setAnalysis] = useState<AlphaLabEvaluationSummary | null>(null)
@@ -58,14 +65,16 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
     try {
       setAnalyzing(true); setErr(null)
       const r = await alphaApi.evaluateDb({
-        formula, interval, symbols: symList(),
+        formula, interval, symbols: symList(), market,
         start_time: toISO(startTime), end_time: toISO(endTime), summary_only: true,
+        ...(universe ? { universe } : {}),
+        ...(excludeST ? { exclude_st: true } : {}),
       })
       setAnalysis(r)
       if (r.normalized_formula) setValidation({ ok: true, normalized_formula: r.normalized_formula, errors: [], warnings: [] })
     } catch (e) { setAnalysis(null); setErr(e instanceof Error ? e.message : 'Analysis failed') }
     finally { setAnalyzing(false) }
-  }, [formula, interval, symList, startTime, endTime, setErr])
+  }, [formula, interval, symList, startTime, endTime, market, universe, excludeST, setErr])
 
   const handleSave = useCallback(async () => {
     try {
@@ -87,27 +96,16 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
               className="rounded-full border border-border/80 bg-secondary/60 px-3 py-1 text-xs font-mono text-muted-foreground transition hover:text-foreground">{s}</button>
           ))}</div>
         )}
-        <div className="grid gap-4 md:grid-cols-4">
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Interval</label>
-            <select value={interval} onChange={e => setInterval(e.target.value)}
-              className="h-10 w-full rounded-xl border border-border bg-input px-3 text-sm text-foreground outline-none">
-              {intervals.map(i => <option key={i} value={i}>{i}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Start</label>
-            <Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">End</label>
-            <Input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Symbols</label>
-            <Input value={symbols} onChange={e => setSymbols(e.target.value)} placeholder="BTCUSDT,ETHUSDT" />
-          </div>
-        </div>
+        <DataScopeSection
+          interval={interval} setInterval={setInterval}
+          symbols={symbols} setSymbols={setSymbols}
+          startTime={startTime} setStartTime={setStartTime}
+          endTime={endTime} setEndTime={setEndTime}
+          intervals={intervals} symList={symList}
+          market={market} universe={universe} setUniverse={setUniverse}
+          excludeST={excludeST} setExcludeST={setExcludeST}
+          ws={ws}
+        />
         <div className="flex flex-wrap items-center gap-3">
           <Button variant="outline" onClick={() => void handleValidate()} disabled={validating || !formula.trim()}>
             {validating ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}Validate</Button>

@@ -591,7 +591,7 @@ class AShareDailyDatasetLoader:
         codes_clause = ",".join(f"'{c}'" for c in codes)
         result = client.query(
             f"SELECT DISTINCT code FROM stock_data.index_stocks "
-            f"WHERE `index` IN ({codes_clause})"
+            f"WHERE index IN ({codes_clause})"
         )
         if not result.result_rows:
             return []

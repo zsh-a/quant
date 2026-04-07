@@ -51,7 +51,7 @@ export const alphaApi = {
   evaluateDb: (params: {
     formula: string; symbols: string[]; start_time: string; end_time: string;
     interval?: string; min_quote_volume?: number; blocked_utc_hours?: number[];
-    summary_only?: boolean;
+    summary_only?: boolean; market?: string; universe?: string; exclude_st?: boolean;
   }) => post<AlphaLabEvaluationSummary>('/alpha-lab/evaluate-db', params),
 
   // Search

@@ -34,15 +34,42 @@ export const AlphaLabWorkspace: React.FC = () => {
   const [booted, setBooted] = useState(false)
 
   // Shared data params (used across Research, Search, Factors)
+  const [market, setMarket] = useState('crypto')
   const [formula, setFormula] = useState('')
   const [interval, setInterval] = useState('5m')
   const [symbols, setSymbols] = useState('BTCUSDT,ETHUSDT,SOLUSDT')
+  const [universe, setUniverse] = useState<string | null>(null)
+  const [excludeST, setExcludeST] = useState(false)
   const [startTime, setStartTime] = useState(() => dtLocal(new Date(Date.now() - 7 * 86400_000)))
   const [endTime, setEndTime] = useState(() => dtLocal(new Date()))
 
-  const intervals = useMemo(() => ws?.defaults.intervals ?? ['5m', '15m', '1h', '4h'], [ws])
-  const samples = useMemo(() => ws?.defaults.sample_formulas ?? [], [ws])
+  const availableMarkets: string[] = (ws?.defaults as any)?.available_markets ?? ['crypto']
+  const marketPresets = useMemo(() => (ws?.defaults as any)?.market_presets ?? {}, [ws])
+  const currentMarketPreset = useMemo(() => marketPresets[market] ?? {}, [marketPresets, market])
+  const intervals = useMemo(() => currentMarketPreset.intervals ?? ws?.defaults.intervals ?? ['5m', '15m', '1h', '4h'], [currentMarketPreset, ws])
+  const samples = useMemo(() => currentMarketPreset.sample_formulas ?? ws?.defaults.sample_formulas ?? [], [currentMarketPreset, ws])
   const symList = useCallback(() => symbols.split(',').map(s => s.trim()).filter(Boolean), [symbols])
+
+  // When market changes, reset interval/symbols/universe to defaults
+  const handleMarketChange = useCallback((m: string) => {
+    setMarket(m)
+    const preset = marketPresets[m] ?? {}
+    const newIntervals = preset.intervals ?? []
+    setInterval(newIntervals[0] ?? '1d')
+    setFormula(preset.sample_formulas?.[0] ?? 'cs_rank(ts_mean(close, 5) - close)')
+    if (m === 'a_share') {
+      setSymbols('')
+      setUniverse('000300')
+      setExcludeST(true)
+      setStartTime(dtLocal(new Date(Date.now() - 365 * 86400_000)))
+    } else {
+      const cm = ws?.defaults.crypto_market as Record<string, any>
+      setSymbols(Array.isArray(cm?.default_symbols) ? cm.default_symbols.join(',') : 'BTCUSDT,ETHUSDT,SOLUSDT')
+      setUniverse(null)
+      setExcludeST(false)
+      setStartTime(dtLocal(new Date(Date.now() - 7 * 86400_000)))
+    }
+  }, [marketPresets, ws])
 
   const loadWorkspace = useCallback(async () => {
     try {
@@ -51,7 +78,9 @@ export const AlphaLabWorkspace: React.FC = () => {
       setWs(data)
       if (!booted) {
         const cm = data.defaults.crypto_market as Record<string, any>
-        setInterval(data.defaults.intervals?.includes('5m') ? '5m' : data.defaults.intervals?.[0] ?? '5m')
+        const mp = (data.defaults as any)?.market_presets?.crypto ?? {}
+        const defaultIntervals = mp.intervals ?? data.defaults.intervals ?? ['5m']
+        setInterval(defaultIntervals.includes('5m') ? '5m' : defaultIntervals[0] ?? '5m')
         setSymbols(Array.isArray(cm?.default_symbols) && cm.default_symbols.length > 0 ? cm.default_symbols.join(',') : 'BTCUSDT,ETHUSDT,SOLUSDT')
         setFormula(data.zoo[0]?.formula ?? data.defaults.sample_formulas?.[0] ?? 'cs_rank(ts_mean(close, 5) - close)')
         setBooted(true)
@@ -74,7 +103,19 @@ export const AlphaLabWorkspace: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      {/* Overview cards */}
+      {/* Market selector + overview cards */}
+      <div className="flex items-center gap-3 mb-2">
+        {availableMarkets.length > 1 && availableMarkets.map(m => (
+          <button key={m} onClick={() => handleMarketChange(m)}
+            className={`rounded-full px-4 py-1.5 text-sm font-medium transition-colors ${
+              market === m
+                ? 'bg-primary text-primary-foreground shadow-sm'
+                : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
+            }`}>
+            {m === 'crypto' ? 'Crypto' : m === 'a_share' ? 'A 股' : m}
+          </button>
+        ))}
+      </div>
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard label="Engine" value={ws?.operators.length ?? 0} hint={engineLabel}
           trend={<span className="inline-flex items-center gap-2"><Cpu className="size-4" />
@@ -110,6 +151,9 @@ export const AlphaLabWorkspace: React.FC = () => {
             startTime={startTime} setStartTime={setStartTime}
             endTime={endTime} setEndTime={setEndTime}
             intervals={intervals} samples={samples} symList={symList}
+            market={market} universe={universe} setUniverse={setUniverse}
+            excludeST={excludeST} setExcludeST={setExcludeST}
+            ws={ws}
             onSaved={() => { void loadWorkspace(); setTab('factors') }}
             setErr={setErr}
           />
@@ -123,6 +167,8 @@ export const AlphaLabWorkspace: React.FC = () => {
             startTime={startTime} setStartTime={setStartTime}
             endTime={endTime} setEndTime={setEndTime}
             intervals={intervals} symList={symList}
+            market={market} universe={universe} setUniverse={setUniverse}
+            excludeST={excludeST} setExcludeST={setExcludeST}
             ws={ws} onLoadFormula={handleLoadFormula}
             searchJobs={searchJobs}
             setErr={setErr}
@@ -133,6 +179,7 @@ export const AlphaLabWorkspace: React.FC = () => {
           <FactorsTab
             ws={ws} interval={interval} symbols={symbols}
             startTime={startTime} endTime={endTime} symList={symList}
+            market={market} universe={universe} excludeST={excludeST}
             loading={loading} onLoadFormula={handleLoadFormula}
             onRefresh={() => void loadWorkspace()} setErr={setErr}
           />

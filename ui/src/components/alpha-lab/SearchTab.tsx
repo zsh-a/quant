@@ -5,7 +5,7 @@
  * useSearchJobs (in workspace) and survives page refresh via backend recovery.
  */
 import React, { useCallback, useMemo, useState } from 'react'
-import { ChevronDown, ChevronRight, Info, Loader2, Settings2, X, Zap } from 'lucide-react'
+import { ChevronRight, Info, Loader2, Settings2, X, Zap } from 'lucide-react'
 import type { AlphaLabSearchJob, AlphaLabWorkspace as WorkspacePayload, StrategyModeInfo } from '../../types'
 import type { SearchJobsState } from '../../hooks/useSearchJobs'
 import { SectionCard } from '../layout/SectionCard'
@@ -14,6 +14,7 @@ import { Input } from '../ui/input'
 import { Badge } from '../ui/badge'
 import { SearchProgress } from './SearchProgress'
 import { LLMAnalysis } from './LLMAnalysis'
+import { DataScopeSection } from './DataScopeSection'
 import { toISO } from './shared'
 
 /* ── Strategy descriptions (fallback when backend unavailable) ────── */
@@ -103,6 +104,11 @@ interface SearchTabProps {
   setEndTime: (v: string) => void
   intervals: string[]
   symList: () => string[]
+  market: string
+  universe: string | null
+  setUniverse: (v: string | null) => void
+  excludeST: boolean
+  setExcludeST: (v: boolean) => void
   ws: WorkspacePayload | null
   onLoadFormula: (f: string) => void
   searchJobs: SearchJobsState
@@ -112,7 +118,8 @@ interface SearchTabProps {
 export const SearchTab: React.FC<SearchTabProps> = ({
   formula, interval, setInterval, symbols, setSymbols,
   startTime, setStartTime, endTime, setEndTime,
-  intervals, symList, ws, onLoadFormula, searchJobs, setErr,
+  intervals, symList, market, universe, setUniverse,
+  excludeST, setExcludeST, ws, onLoadFormula, searchJobs, setErr,
 }) => {
   const [searchSeeds, setSearchSeeds] = useState('')
   const [strategy, setStrategy] = useState<string>('evolution')
@@ -152,27 +159,15 @@ export const SearchTab: React.FC<SearchTabProps> = ({
       const seeds = searchSeeds.split('\n').map(s => s.trim()).filter(Boolean)
       if (formula.trim() && !seeds.includes(formula.trim())) seeds.unshift(formula.trim())
       await searchJobs.submit({
-        symbols: symList(), start_time: toISO(startTime), end_time: toISO(endTime), interval, seeds,
+        market, symbols: symList(), start_time: toISO(startTime), end_time: toISO(endTime), interval, seeds,
         population_size: params.popSize, offspring_count: params.offspring, generations: params.gens,
         top_k: params.topK, n_splits: params.nSplits, persist: true, strategy,
         neural_batch: params.neuralBatch, enum_max: params.enumMax, enum_top_k: params.enumTopK,
+        ...(universe ? { universe } : {}),
+        ...(excludeST ? { exclude_st: true } : {}),
       })
     } catch (e) { setErr(e instanceof Error ? e.message : 'Search submit failed') }
-  }, [formula, interval, startTime, endTime, searchSeeds, params, symList, strategy, setErr, searchJobs])
-
-  // Symbol presets from backend workspace
-  const symbolPresets: Array<{ key: string; label: string; brief: string; symbols: string[] }> =
-    (ws?.defaults as any)?.symbol_presets ?? []
-  const activePreset = useMemo(() => {
-    const current = symList().sort().join(',')
-    return symbolPresets.find(p => [...p.symbols].sort().join(',') === current)?.key ?? 'custom'
-  }, [symbols, symbolPresets, symList])
-
-  const handlePresetChange = useCallback((key: string) => {
-    if (key === 'custom') return
-    const preset = symbolPresets.find(p => p.key === key)
-    if (preset) setSymbols(preset.symbols.join(','))
-  }, [symbolPresets, setSymbols])
+  }, [formula, interval, startTime, endTime, searchSeeds, params, symList, strategy, market, universe, excludeST, setErr, searchJobs])
 
   return (
     <div className="space-y-6">
@@ -214,82 +209,17 @@ export const SearchTab: React.FC<SearchTabProps> = ({
           </details>
         </div>
 
-        {/* ── Data scope ── */}
-        <div className="grid gap-4 md:grid-cols-3">
-          <div className="space-y-1.5">
-            <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-              title="K 线周期">Interval<Info className="size-3 opacity-40" /></label>
-            <select value={interval} onChange={e => setInterval(e.target.value)}
-              className="h-10 w-full rounded-xl border border-border bg-input px-3 text-sm text-foreground outline-none">
-              {intervals.map(i => <option key={i} value={i}>{i}</option>)}
-            </select>
-          </div>
-          <div className="space-y-1.5">
-            <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-              title="起始时间">Start<Info className="size-3 opacity-40" /></label>
-            <Input type="datetime-local" value={startTime} onChange={e => setStartTime(e.target.value)} />
-          </div>
-          <div className="space-y-1.5">
-            <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-              title="结束时间">End<Info className="size-3 opacity-40" /></label>
-            <Input type="datetime-local" value={endTime} onChange={e => setEndTime(e.target.value)} />
-          </div>
-        </div>
-
-        {/* ── Symbol preset selector ── */}
-        <div className="space-y-2">
-          <div className="flex items-center gap-3">
-            <label className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
-              title="交易对">Symbols<Info className="size-3 opacity-40" /></label>
-            {symbolPresets.length > 0 && (
-              <div className="flex flex-wrap gap-1.5">
-                {symbolPresets.map(p => (
-                  <button key={p.key} onClick={() => handlePresetChange(p.key)}
-                    title={p.brief}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                      activePreset === p.key
-                        ? 'bg-primary text-primary-foreground'
-                        : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
-                    }`}>
-                    {p.label}
-                  </button>
-                ))}
-                <button onClick={() => {/* keep current custom */}}
-                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                    activePreset === 'custom'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'bg-secondary/60 text-muted-foreground hover:bg-secondary hover:text-foreground'
-                  }`}>
-                  Custom
-                </button>
-              </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            <Input value={symbols} onChange={e => setSymbols(e.target.value)}
-              placeholder="BTCUSDT,ETHUSDT,SOLUSDT"
-              className="flex-1 font-mono text-xs" />
-            <Badge variant="secondary" className="whitespace-nowrap text-[10px]">
-              {symList().length} symbols
-            </Badge>
-          </div>
-          {/* Expandable symbol chips */}
-          {symList().length > 5 && (
-            <details className="group">
-              <summary className="cursor-pointer text-[10px] text-muted-foreground hover:text-foreground transition select-none">
-                <ChevronRight className="inline size-3 transition-transform group-open:rotate-90" />
-                {' '}Show all {symList().length} symbols
-              </summary>
-              <div className="mt-1.5 flex flex-wrap gap-1">
-                {symList().map(s => (
-                  <span key={s} className="rounded bg-secondary/50 px-1.5 py-0.5 text-[10px] font-mono text-muted-foreground">
-                    {s}
-                  </span>
-                ))}
-              </div>
-            </details>
-          )}
-        </div>
+        {/* ── Data scope (shared component) ── */}
+        <DataScopeSection
+          interval={interval} setInterval={setInterval}
+          symbols={symbols} setSymbols={setSymbols}
+          startTime={startTime} setStartTime={setStartTime}
+          endTime={endTime} setEndTime={setEndTime}
+          intervals={intervals} symList={symList}
+          market={market} universe={universe} setUniverse={setUniverse}
+          excludeST={excludeST} setExcludeST={setExcludeST}
+          ws={ws}
+        />
 
         {/* ── Search params (collapsible) ── */}
         <details className="group" open={showAdvanced} onToggle={e => setShowAdvanced((e.target as HTMLDetailsElement).open)}>

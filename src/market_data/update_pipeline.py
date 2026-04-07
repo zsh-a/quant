@@ -11,9 +11,12 @@ from src.market_data.processors.baostock import BaoStockProcessor
 from src.market_data.processors.tdx import TDXProcess
 
 INDEX_LIST = [
-    "000985",
-    "399673",
-    "399101",
+    "000300",   # 沪深300
+    "000905",   # 中证500
+    "000852",   # 中证1000
+    "000985",   # 中证全指
+    "399673",   # 创业板50
+    "399101",   # 中证小盘
 ]
 
 DEFAULT_SHARE_START_DATE = "20250101"

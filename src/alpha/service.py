@@ -294,14 +294,8 @@ class AlphaService:
         )
         target_weights = self.signal_transformer.to_target_weights(alpha, market_ctx)
         wrapped_weights = self.rule_overlay.apply(target_weights, market_ctx)
-        result = self.execution.simulate(
-            wrapped_weights,
-            {
-                "close": store.get_field("close"),
-                "bid_ask_spread": store.get_field("bid_ask_spread"),
-            },
-            CostModel(),
-        )
+        prices, funding = self._sim_args(store)
+        result = self.execution.simulate(wrapped_weights, prices, CostModel(), funding_rate=funding)
         return {
             "program": program.to_dict(),
             "alpha": self._to_serializable_list(alpha),
@@ -315,6 +309,14 @@ class AlphaService:
         if self.vm.backend == "torch" and self.vm.device is not None:
             store = self.vm._prepare_store(store)
         return store
+
+    def _sim_args(self, store: TensorStore) -> tuple[dict[str, Any], Any]:
+        """Build (prices, funding_rate) for ExecutionSimulator based on market schema."""
+        prices: dict[str, Any] = {"close": store.get_field("close")}
+        if "bid_ask_spread" in self.schema.fields:
+            prices["bid_ask_spread"] = store.get_field("bid_ask_spread")
+        funding = store.get_field("funding_rate") if "funding_rate" in self.schema.fields else None
+        return prices, funding
 
     def evaluate_formula_from_dataset(
         self,
@@ -780,12 +782,8 @@ class AlphaService:
         managed_weights = self.portfolio_manager.apply(self._to_numpy(wrapped_weights), close_np, risk_cfg)
 
         # 6. Execute
-        bt_result = self.execution.simulate(
-            managed_weights,
-            {"close": store.get_field("close"), "bid_ask_spread": store.get_field("bid_ask_spread")},
-            CostModel(),
-            funding_rate=store.get_field("funding_rate"),
-        )
+        prices, funding = self._sim_args(store)
+        bt_result = self.execution.simulate(managed_weights, prices, CostModel(), funding_rate=funding)
 
         # 7. Metrics
         fwd = np.zeros_like(close_np)
@@ -1060,13 +1058,17 @@ class AlphaService:
         cost = CostModel()
         fees = turnover * (cost.taker_fee_bps / 10000.0)  # (N, T)
         slippage_base = trade_sizes * (cost.slippage_bps / 10000.0)  # (N, T, S)
-        spread_field = store.get_field("bid_ask_spread")  # (T, S)
-        spread_ratio = torch.abs(spread_field) / (torch.abs(close) + 1e-12)  # (T, S)
-        slippage_spread = trade_sizes * spread_ratio.unsqueeze(0) * cost.spread_weight
+        if "bid_ask_spread" in self.schema.fields:
+            spread_field = store.get_field("bid_ask_spread")  # (T, S)
+            spread_ratio = torch.abs(spread_field) / (torch.abs(close) + 1e-12)
+            slippage_base = slippage_base + trade_sizes * spread_ratio.unsqueeze(0) * cost.spread_weight
         slippage_impact = trade_sizes.pow(2) * (cost.impact_coefficient_bps / 10000.0)
-        total_slippage = torch.nansum(slippage_base + slippage_spread + slippage_impact, dim=2)  # (N, T)
-        funding_rate = store.get_field("funding_rate")  # (T, S)
-        funding = torch.nansum(torch.abs(weights) * funding_rate.unsqueeze(0), dim=2)  # (N, T)
+        total_slippage = torch.nansum(slippage_base + slippage_impact, dim=2)  # (N, T)
+        if "funding_rate" in self.schema.fields:
+            funding_rate = store.get_field("funding_rate")  # (T, S)
+            funding = torch.nansum(torch.abs(weights) * funding_rate.unsqueeze(0), dim=2)
+        else:
+            funding = 0.0
 
         net_returns = position_returns - fees - total_slippage - funding  # (N, T)
         equity_curve = torch.cumprod(1.0 + torch.nan_to_num(net_returns, nan=0.0), dim=1)  # (N, T)
@@ -1705,15 +1707,8 @@ class AlphaService:
             timing_breakdown["rule_overlay_seconds"] += perf_counter() - overlay_start
 
         backtest_start = perf_counter()
-        result = self.execution.simulate(
-            wrapped_weights,
-            {
-                "close": store.get_field("close"),
-                "bid_ask_spread": store.get_field("bid_ask_spread"),
-            },
-            CostModel(),
-            funding_rate=store.get_field("funding_rate"),
-        )
+        prices, funding = self._sim_args(store)
+        result = self.execution.simulate(wrapped_weights, prices, CostModel(), funding_rate=funding)
         if timing_breakdown is not None:
             timing_breakdown["backtest_seconds"] += perf_counter() - backtest_start
 

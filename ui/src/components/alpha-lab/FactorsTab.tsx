@@ -23,6 +23,9 @@ interface FactorsTabProps {
   startTime: string
   endTime: string
   symList: () => string[]
+  market: string
+  universe: string | null
+  excludeST: boolean
   loading: boolean
   onLoadFormula: (f: string) => void
   onRefresh: () => void
@@ -31,6 +34,7 @@ interface FactorsTabProps {
 
 export const FactorsTab: React.FC<FactorsTabProps> = ({
   ws, interval, symbols, startTime, endTime, symList,
+  market, universe, excludeST,
   loading, onLoadFormula, onRefresh, setErr,
 }) => {
   const [subTab, setSubTab] = useState<'zoo' | 'catalog' | 'combine'>('zoo')
@@ -50,13 +54,15 @@ export const FactorsTab: React.FC<FactorsTabProps> = ({
     try {
       setCombining(true); setCombineResult(null); setErr(null)
       const r = await alphaApi.combineZoo({
-        symbols: symList(), start_time: toISO(startTime), end_time: toISO(endTime),
+        market, symbols: symList(), start_time: toISO(startTime), end_time: toISO(endTime),
         interval, method: combineMethod, summary_only: true,
+        ...(universe ? { universe } : {}),
+        ...(excludeST ? { exclude_st: true } : {}),
       })
       setCombineResult(r)
     } catch (e) { setErr(e instanceof Error ? e.message : 'Combine failed') }
     finally { setCombining(false) }
-  }, [symList, startTime, endTime, interval, combineMethod, setErr])
+  }, [symList, startTime, endTime, interval, combineMethod, market, universe, excludeST, setErr])
 
   return (
     <div className="space-y-4">
