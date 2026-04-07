@@ -449,7 +449,6 @@ class NeuralFormulaStrategy(BaseStrategy):
             "因果 Transformer 以 RPN 序列方式采样公式，rank-IC 作为 reward。\n"
             "REINFORCE + 优势归一化梯度更新，探索全新公式空间。"
         ),
-        always_on=False,
     )
 
     def __init__(

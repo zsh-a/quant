@@ -245,7 +245,6 @@ class AlphaPROBEStrategy(BaseStrategy):
         registry_name="alpha_probe",
         label="AlphaPROBE DAG进化",
         brief="DAG 贝叶斯检索 + 祖先路径感知 LLM 生成 (AlphaPROBE)",
-        always_on=False,
         detail=(
             "将因子池建模为有向无环图, 用贝叶斯后验选择最优父代 "
             "(质量 × 深度惩罚 × 检索惩罚 × 多样性), "

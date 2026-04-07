@@ -34,7 +34,6 @@ class StrategyMeta:
     registry_name: str       # key in registry, also returned by ``name`` property
     label: str               # human-readable label (中文 for UI)
     brief: str               # one-line description
-    always_on: bool = False  # base strategy (always included in search)
     detail: str = ""         # optional multi-line description
 
 

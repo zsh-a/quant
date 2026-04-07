@@ -1,34 +1,98 @@
 """Strategy registry — maps string names to factory functions.
 
 Each strategy file registers itself at import time via the ``@register_strategy``
-decorator, passing a ``StrategyMeta`` that carries both the registry key and
-UI metadata (label, brief, detail, always_on).
-
-The ``build_strategies`` function constructs instances from a set of names,
-passing a typed ``StrategyInfra`` bundle instead of raw ``**kwargs``.
-
-Usage::
-
-    @register_strategy(StrategyMeta(
-        registry_name="alpha_probe",
-        label="Alpha Probe",
-        brief="Experimental probe strategy",
-    ))
-    def _build(infra: StrategyInfra):
-        return AlphaProbeStrategy(compiler=infra.compiler, llm=infra.llm_backend)
-
-    # In service.py:
-    infra = StrategyInfra(compiler=..., vm=..., ...)
-    strategies = build_strategies({"mcts", "alpha_probe"}, infra)
+decorator.  ``SearchMode`` defines which strategies compose each selectable mode.
 """
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Any, Callable
 
 from .base import StrategyMeta
 
+
+# ---------------------------------------------------------------------------
+# Search modes — each mode explicitly lists its strategies
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class SearchMode:
+    """A selectable search mode shown in the frontend."""
+    name: str
+    label: str
+    brief: str
+    strategies: tuple[str, ...]
+    params: tuple[str, ...] = ()
+    detail: str = ""
+
+
+_MODES: dict[str, SearchMode] = {}
+
+
+def register_mode(mode: SearchMode) -> None:
+    _MODES[mode.name] = mode
+
+
+def get_mode(name: str) -> SearchMode | None:
+    return _MODES.get(name)
+
+
+def get_all_modes() -> dict[str, SearchMode]:
+    return dict(_MODES)
+
+
+# --- Built-in modes ---
+
+register_mode(SearchMode(
+    name="evolution",
+    label="Evolution (LLM + Enum)",
+    brief="LLM 驱动的进化搜索 + 程序化枚举",
+    detail="Round 0: 枚举种子 → 后续轮次: LLM 进化 + CPCV 评估。",
+    strategies=("enumeration", "llm_evolution"),
+    params=("popSize", "offspring", "gens", "topK", "nSplits", "enumMax", "enumTopK"),
+))
+
+register_mode(SearchMode(
+    name="neural",
+    label="Neural (Transformer + RL)",
+    brief="Transformer 自回归采样 + REINFORCE 策略梯度",
+    detail="因果 Transformer 以 RPN 序列采样公式, rank-IC 作为 reward, 纯 neural 搜索。",
+    strategies=("neural",),
+    params=("gens", "topK", "nSplits", "neuralBatch"),
+))
+
+register_mode(SearchMode(
+    name="mcts",
+    label="MCTS (LLM-Guided Tree Search)",
+    brief="枚举种子 + LLM 进化 + MCTS 精炼",
+    detail="Round 0 枚举种子, LLM 进化扩充 archive, MCTS 从精英出发树搜索精炼。",
+    strategies=("enumeration", "llm_evolution", "mcts"),
+    params=("popSize", "offspring", "gens", "topK", "nSplits", "enumMax", "enumTopK"),
+))
+
+register_mode(SearchMode(
+    name="alpha_forge",
+    label="AlphaForge (Surrogate Model)",
+    brief="代理模型预测 + Gumbel-Softmax 梯度生成",
+    detail="Predictor 学习 IC 分布, Generator 梯度优化生成高质量公式。",
+    strategies=("alpha_forge",),
+    params=("gens", "topK", "nSplits"),
+))
+
+register_mode(SearchMode(
+    name="alpha_probe",
+    label="AlphaPROBE (DAG Evolution)",
+    brief="枚举种子 + LLM 进化 + DAG 贝叶斯检索",
+    detail="DAG 建模因子谱系, 贝叶斯后验选择父代, 祖先路径感知 LLM 生成后代。",
+    strategies=("enumeration", "llm_evolution", "alpha_probe"),
+    params=("popSize", "offspring", "gens", "topK", "nSplits", "enumMax", "enumTopK"),
+))
+
+
+# ---------------------------------------------------------------------------
+# Strategy infrastructure & registry
+# ---------------------------------------------------------------------------
 
 @dataclass
 class StrategyInfra:

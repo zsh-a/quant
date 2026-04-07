@@ -39,7 +39,6 @@ class MCTSRefinementStrategy(BaseStrategy):
             "从 archive 精英出发构建搜索树，UCT 选择 + 维度定向精化 + FSA 子树回避。\n"
             "LLM 生成精化建议，经验证后加入搜索树。动态预算随发现自动增加。"
         ),
-        always_on=False,
     )
 
     def __init__(

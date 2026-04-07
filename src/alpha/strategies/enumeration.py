@@ -29,7 +29,6 @@ class EnumerationStrategy(BaseStrategy):
         registry_name="enumeration",
         label="枚举种子",
         brief="Round 0 批量枚举公式 + fast-IC 筛选 top-K",
-        always_on=True,
     )
 
     def __init__(

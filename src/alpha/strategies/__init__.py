@@ -1,32 +1,30 @@
 """
 Pluggable search strategies for alpha factor discovery.
 
-All strategies inherit from ``BaseStrategy`` and implement the
-``SearchStrategy`` protocol (4 methods):
+All strategies implement the ``SearchStrategy`` protocol (4 methods):
     name, should_activate, generate_candidates, on_evaluation_complete
 
-Base strategies (always active, ``always_on=True``):
-    EnumerationStrategy    — Programmatic bulk formula generation + IC screening
-    LLMEvolutionStrategy   — LLM-driven regularized evolution (main strategy)
-
-Extra strategies (opt-in via strategy="mcts", "neural", etc.):
-    MCTSRefinementStrategy — LLM-guided MCTS refinement of archive elites
-    NeuralFormulaStrategy  — Transformer + REINFORCE on RPN token sequences
-    AlphaForgeStrategy     — Generative-Predictive surrogate model (AlphaForge)
-    AlphaPROBEStrategy     — DAG Bayesian retrieval + evolution (AlphaPROBE)
+Search modes define which strategies run together — see ``SearchMode``
+in ``registry.py``.  Each mode explicitly lists its strategies; there
+are no implicit "always-on" additions.
 
 Strategy registry:
     @register_strategy(StrategyMeta(...)) decorator for adding new strategies.
+    register_mode(SearchMode(...)) for adding new modes.
     build_strategies({"mcts", "neural"}, StrategyInfra(...)) to construct them.
 """
 
 from .base import BaseStrategy, StrategyMeta
 from .registry import (
+    SearchMode,
     register_strategy,
+    register_mode,
     build_strategies,
     build_extra_strategies,
     available_strategies,
     get_all_meta,
+    get_all_modes,
+    get_mode,
     get_strategy_meta,
     StrategyInfra,
 )
@@ -44,12 +42,16 @@ __all__ = [
     "BaseStrategy",
     "StrategyMeta",
     "StrategyInfra",
+    "SearchMode",
     # Registry API
     "register_strategy",
+    "register_mode",
     "build_strategies",
     "build_extra_strategies",
     "available_strategies",
     "get_all_meta",
+    "get_all_modes",
+    "get_mode",
     "get_strategy_meta",
     # Strategy implementations
     "EnumerationStrategy",

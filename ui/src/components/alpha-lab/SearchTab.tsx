@@ -29,24 +29,17 @@ const FALLBACK_MODES: StrategyModeInfo[] = [
   },
   {
     mode: 'neural', label: 'Neural (Transformer + RL)',
-    brief: 'Transformer 自回归生成 + REINFORCE 训练',
-    detail: 'Causal Transformer + RPN 序列生成 + REINFORCE 强化学习。',
-    strategies: ['neural_formula'],
+    brief: 'Transformer 自回归采样 + REINFORCE 策略梯度',
+    detail: '因果 Transformer 以 RPN 序列采样公式, rank-IC 作为 reward, 纯 neural 搜索。',
+    strategies: ['neural'],
     params: ['gens', 'topK', 'nSplits', 'neuralBatch'],
   },
   {
     mode: 'mcts', label: 'MCTS (LLM-Guided Tree Search)',
-    brief: 'LLM 引导的蒙特卡洛树搜索',
-    detail: '论文 Navigating the Alpha Jungle 完整实现。',
-    strategies: ['enumeration', 'mcts_refinement'],
-    params: ['gens', 'topK', 'nSplits', 'enumMax', 'enumTopK'],
-  },
-  {
-    mode: 'full', label: 'Full (All Strategies)',
-    brief: '枚举 + LLM 进化 + MCTS 精炼 + Neural 生成',
-    detail: '组合所有搜索策略，多策略协作。',
-    strategies: ['enumeration', 'llm_evolution', 'mcts_refinement', 'neural_formula'],
-    params: ['popSize', 'offspring', 'gens', 'topK', 'nSplits', 'enumMax', 'enumTopK', 'neuralBatch'],
+    brief: '枚举种子 + LLM 进化 + MCTS 精炼',
+    detail: 'Round 0 枚举种子, LLM 进化扩充 archive, MCTS 从精英出发树搜索精炼。',
+    strategies: ['enumeration', 'llm_evolution', 'mcts'],
+    params: ['popSize', 'offspring', 'gens', 'topK', 'nSplits', 'enumMax', 'enumTopK'],
   },
 ]
 

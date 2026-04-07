@@ -35,7 +35,6 @@ class LLMEvolutionStrategy(BaseStrategy):
         registry_name="llm_evolution",
         label="LLM 进化",
         brief="锦标赛选择父代 → LLM 变异/交叉 → CPCV 评估 → MAP-Elites 归档",
-        always_on=True,
     )
 
     def __init__(

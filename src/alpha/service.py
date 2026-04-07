@@ -147,61 +147,20 @@ class AlphaService:
     # ------------------------------------------------------------------
 
     def get_strategy_modes_info(self) -> list[dict[str, Any]]:
-        """Return strategy modes for frontend StrategyModeInfo selector.
+        """Return strategy modes for frontend StrategyModeInfo selector."""
+        from .strategies.registry import get_all_modes, get_strategy_meta
 
-        Builds composite "modes" from the registry:
-        - Each non-always_on strategy becomes a selectable mode
-        - always_on strategies are included in every mode's strategy list
-        - A "full" mode combines all strategies
-        - Preset modes (evolution, neural, mcts) preserved for compatibility
-        """
-        from .strategies.registry import get_all_meta
-
-        all_meta = get_all_meta()
-        always_on = [name for name, m in all_meta.items() if m.always_on]
-        extras = {name: m for name, m in all_meta.items() if not m.always_on}
-
-        # Default params per strategy type
-        _BASE_PARAMS = ["gens", "topK", "nSplits"]
-        _STRATEGY_PARAMS: dict[str, list[str]] = {
-            "mcts": ["enumMax", "enumTopK"],
-            "neural": ["neuralBatch"],
-        }
-
-        modes: list[dict[str, Any]] = []
-
-        # 1) Base evolution mode (always_on strategies only)
-        modes.append({
-            "mode": "evolution",
-            "label": "Evolution (LLM + Enum)",
-            "brief": "LLM 驱动的进化搜索 + 程序化枚举",
-            "detail": "Round 0: 枚举种子 → 后续轮次: LLM 进化 + CPCV 评估。",
-            "strategies": list(always_on),
-            "params": ["popSize", "offspring", *_BASE_PARAMS, "enumMax", "enumTopK"],
-        })
-
-        # 2) Each extra strategy as its own mode
-        for name, m in extras.items():
-            modes.append({
-                "mode": name,
-                "label": m.label,
-                "brief": m.brief,
-                "detail": m.detail,
-                "strategies": [*always_on, name],
-                "params": [*_BASE_PARAMS, *_STRATEGY_PARAMS.get(name, [])],
-            })
-
-        # 3) Full mode (all strategies combined)
-        modes.append({
-            "mode": "full",
-            "label": "Full (All Strategies)",
-            "brief": "组合所有搜索策略，多策略协作",
-            "detail": "枚举 + LLM 进化 + " + " + ".join(m.label for m in extras.values()),
-            "strategies": [*always_on, *extras.keys()],
-            "params": ["popSize", "offspring", *_BASE_PARAMS, "enumMax", "enumTopK", "neuralBatch"],
-        })
-
-        return modes
+        return [
+            {
+                "mode": mode.name,
+                "label": mode.label,
+                "brief": mode.brief,
+                "detail": mode.detail,
+                "strategies": list(mode.strategies),
+                "params": list(mode.params),
+            }
+            for mode in get_all_modes().values()
+        ]
 
     def _build_strategies(
         self,
@@ -212,27 +171,15 @@ class AlphaService:
         enum_max: int = 500,
         enum_top_k: int = 30,
     ) -> list:
-        """Build strategy list.
+        """Build strategy list from mode name.
 
-        ``strategy`` is a comma-separated string of extra strategies to enable
-        on top of the always-on base strategies.
-        Examples: ``""``, ``"mcts"``, ``"neural"``, ``"mcts,neural"``.
-
-        Legacy mode names are mapped for backwards compatibility:
-          ``"evolution"`` → base only
-          ``"full"``      → ``"mcts,neural"``
+        ``strategy`` is a mode name (e.g. ``"evolution"``, ``"neural"``).
+        Falls back to evolution if unknown.
         """
-        from .strategies.registry import build_strategies, get_all_meta, StrategyInfra
+        from .strategies.registry import build_strategies, get_mode, StrategyInfra
 
-        # Normalize legacy mode names
-        _LEGACY = {"evolution": "", "full": "mcts,neural"}
-        normalized = _LEGACY.get(strategy, strategy)
-        extras = {s.strip() for s in normalized.split(",") if s.strip()}
-
-        # always_on strategies are always included
-        all_meta = get_all_meta()
-        always_on = {name for name, m in all_meta.items() if m.always_on}
-        names = always_on | extras
+        mode = get_mode(strategy or "evolution") or get_mode("evolution")
+        names = set(mode.strategies)
 
         infra = StrategyInfra(
             compiler=self.compiler,

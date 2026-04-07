@@ -95,7 +95,6 @@ class AlphaForgeStrategy(BaseStrategy):
         registry_name="alpha_forge",
         label="AlphaForge 生成预测",
         brief="代理模型 + Gumbel-Softmax 生成器挖掘因子 (AlphaForge)",
-        always_on=False,
         detail=(
             "训练 Predictor 代理模型学习因子 IC 分布, "
             "Generator 通过 Gumbel-Softmax 梯度优化生成高质量公式, "
