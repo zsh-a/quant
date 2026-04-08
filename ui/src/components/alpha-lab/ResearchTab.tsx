@@ -20,8 +20,8 @@ const EVAL_METHOD_LABELS: Record<string, string> = {
   quantile: '分层回测',
 }
 
-const METRIC_KEYS = ['sharpe', 'rank_ic', 'ic_ir', 'total_return', 'max_drawdown', 'avg_turnover', 'signal_coverage', 'pnl_per_turnover'] as const
-const IC_DETAIL_KEYS = ['rank_ic_1d', 'rank_ic_5d', 'rank_ic_10d', 'ic_decay', 'ic_std', 'turnover_proxy'] as const
+const METRIC_KEYS = ['sharpe', 'rank_ic', 'ic_ir', 'calmar', 'total_return', 'max_drawdown', 'win_rate', 'avg_turnover', 'signal_coverage', 'pnl_per_turnover'] as const
+const IC_DETAIL_KEYS = ['rank_ic_1d', 'rank_ic_5d', 'rank_ic_10d', 'ic_decay', 'ic_std', 'turnover_proxy', 'skewness'] as const
 
 interface ResearchTabProps {
   formula: string

@@ -41,10 +41,16 @@ def compute_rank_ic(alpha: np.ndarray, forward_returns: np.ndarray) -> float:
 
 
 def compute_forward_returns(close: np.ndarray, periods: int = 1) -> np.ndarray:
-    """Compute forward returns from close prices. Shape: (time, symbols)."""
+    """Compute forward returns from close prices. Shape: (time, symbols).
+
+    Returns are clipped to [-0.5, 0.5] to cap extreme moves.
+    """
     fwd = np.full_like(close, np.nan, dtype=float)
     if periods < close.shape[0]:
-        fwd[:-periods] = close[periods:] / (close[:-periods] + 1e-12) - 1.0
+        fwd[:-periods] = np.clip(
+            close[periods:] / (close[:-periods] + 1e-12) - 1.0,
+            -0.5, 0.5,
+        )
     return fwd
 
 

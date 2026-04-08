@@ -118,6 +118,7 @@ class AlphaService:
         self.rule_overlay = RuleOverlay()
         self.portfolio_manager = PortfolioManager()
         self.execution = ExecutionSimulator()
+        self.cost_model = CostModel(**(self.market_profile.cost_model_kwargs or {}))
         self.dataset_loader = self._create_loader()
         self.persistence = AlphaPersistence()
         self.combiner = FactorCombiner(compiler=self.compiler, vm=self.vm, schema=self.schema)
@@ -242,7 +243,7 @@ class AlphaService:
         target_weights = self.signal_transformer.to_target_weights(alpha, market_ctx)
         wrapped_weights = self.rule_overlay.apply(target_weights, market_ctx)
         prices, funding = self._sim_args(store)
-        result = self.execution.simulate(wrapped_weights, prices, CostModel(), funding_rate=funding)
+        result = self.execution.simulate(wrapped_weights, prices, self.cost_model, funding_rate=funding)
         return {
             "program": program.to_dict(),
             "alpha": self._to_serializable_list(alpha),
@@ -730,13 +731,11 @@ class AlphaService:
 
         # 6. Execute
         prices, funding = self._sim_args(store)
-        bt_result = self.execution.simulate(managed_weights, prices, CostModel(), funding_rate=funding)
+        bt_result = self.execution.simulate(managed_weights, prices, self.cost_model, funding_rate=funding)
 
         # 7. Metrics
-        fwd = np.zeros_like(close_np)
-        fwd[:-1] = close_np[1:] / (close_np[:-1] + 1e-12) - 1.0
-        fwd = np.clip(fwd, -0.5, 0.5)
-        from .eval.metrics import compute_rank_ic
+        from .eval.metrics import compute_forward_returns, compute_rank_ic
+        fwd = compute_forward_returns(close_np)
         rank_ic = compute_rank_ic(combined_signal[:-1], fwd[:-1])
 
         result: dict[str, Any] = {
@@ -1002,7 +1001,7 @@ class AlphaService:
         turnover = torch.nansum(trade_sizes, dim=2)  # (N, T)
 
         # Costs (inline to handle 3D correctly)
-        cost = CostModel()
+        cost = self.cost_model
         fees = turnover * (cost.taker_fee_bps / 10000.0)  # (N, T)
         slippage_base = trade_sizes * (cost.slippage_bps / 10000.0)  # (N, T, S)
         if "bid_ask_spread" in self.schema.fields:
@@ -1475,6 +1474,8 @@ class AlphaService:
         close: Any,
         summary: dict[str, float] | None = None,
     ) -> dict[str, float]:
+        from .eval.metrics import compute_ic_metrics
+
         resolved_program: BytecodeProgram | None
         resolved_alpha: Any
         resolved_weights: Any
@@ -1497,32 +1498,34 @@ class AlphaService:
         alpha_np = self._to_numpy(resolved_alpha)
         weights_np = self._to_numpy(resolved_weights)
         close_np = self._to_numpy(resolved_close)
-        forward_returns = np.zeros_like(close_np)
-        forward_returns[:-1] = close_np[1:] / (close_np[:-1] + 1e-12) - 1.0
-        forward_returns = np.clip(forward_returns, -0.5, 0.5)
-        rank_ic = self._mean_cross_sectional_correlation(alpha_np[:-1], forward_returns[:-1])
-        rank_ic_abs = abs(rank_ic)
+
+        # Unified IC metrics (rank_ic, ic_ir, ic_std, ic_decay, per-window ICs)
+        ic_metrics = compute_ic_metrics(alpha_np, close_np)
+
+        rank_ic = ic_metrics["rank_ic"]
         avg_turnover = float(resolved_summary.get("avg_turnover", 0.0))
         total_return = float(resolved_summary.get("total_return", 0.0))
         volatility = float(resolved_summary.get("volatility", 0.0))
+        max_dd = float(resolved_summary.get("max_drawdown", 0.0))
         signal_coverage = float(np.mean(np.isfinite(alpha_np))) if alpha_np.size else 0.0
         active_rows = np.sum(np.abs(weights_np), axis=1) > 1e-9 if weights_np.size else np.array([], dtype=bool)
         active_bar_ratio = float(np.mean(active_rows)) if active_rows.size else 0.0
         effective_bars = float(np.sum(active_rows)) if active_rows.size else 0.0
         is_inactive = active_bar_ratio < 0.10 or avg_turnover < 0.005
-        metrics = dict(resolved_summary)
         pnl_per_turnover = total_return / (avg_turnover + 1e-12) if not is_inactive else 0.0
-        tail_adjusted_return = total_return - float(resolved_summary.get("max_drawdown", 0.0))
+        tail_adjusted_return = total_return - max_dd
         tail_ratio = tail_adjusted_return / max(volatility, 1e-6)
         activity_score = self._clip_unit(min(active_bar_ratio / 0.60, 1.0) * min(avg_turnover / 0.05, 1.0))
         turnover_penalty = self._clip_unit((avg_turnover - 0.60) / 0.40)
         coverage_penalty = self._clip_unit((0.50 - signal_coverage) / 0.50)
         pnl_efficiency_score = self._clip_unit(np.log1p(max(pnl_per_turnover, 0.0)) / np.log1p(10.0))
         complexity_metrics = self._formula_complexity_metrics(resolved_program)
+
+        metrics = dict(resolved_summary)
+        metrics.update(ic_metrics)  # rank_ic, ic_ir, ic_std, ic_decay, rank_ic_Nd, turnover_proxy
         metrics.update(
             {
-                "rank_ic": rank_ic,
-                "rank_ic_abs": rank_ic_abs,
+                "rank_ic_abs": abs(rank_ic),
                 "pnl_per_turnover": pnl_per_turnover,
                 "pnl_efficiency_score": pnl_efficiency_score,
                 "activity_score": activity_score,
@@ -1659,7 +1662,7 @@ class AlphaService:
 
         backtest_start = perf_counter()
         prices, funding = self._sim_args(store)
-        result = self.execution.simulate(wrapped_weights, prices, CostModel(), funding_rate=funding)
+        result = self.execution.simulate(wrapped_weights, prices, self.cost_model, funding_rate=funding)
         if timing_breakdown is not None:
             timing_breakdown["backtest_seconds"] += perf_counter() - backtest_start
 
@@ -1693,12 +1696,11 @@ class AlphaService:
             "device": str(self.vm.device) if self.vm.device is not None else "numpy",
         }
 
-        # 分层回测 (quantile analysis)
-        if eval_method in (EvalMethod.QUANTILE, EvalMethod.LONG_ONLY):
-            from .eval.metrics import compute_quantile_returns
-            alpha_np = self._to_numpy(alpha)
-            close_np = self._to_numpy(store.get_field("close"))
-            payload["quantile_analysis"] = compute_quantile_returns(alpha_np, close_np)
+        # 分层回测 (always computed — low cost, high diagnostic value)
+        from .eval.metrics import compute_quantile_returns
+        alpha_np = self._to_numpy(alpha)
+        close_np = self._to_numpy(store.get_field("close"))
+        payload["quantile_analysis"] = compute_quantile_returns(alpha_np, close_np)
 
         return payload
 
@@ -1806,32 +1808,6 @@ class AlphaService:
             "top_results": run.get("top_results", []),
         }
 
-    def _mean_cross_sectional_correlation(self, alpha: Any, returns: Any) -> float:
-        alpha_np = self._to_numpy(alpha)
-        returns_np = self._to_numpy(returns)
-        mask = ~np.isnan(alpha_np) & ~np.isnan(returns_np)
-        valid_counts = np.sum(mask, axis=1)
-        if not np.any(valid_counts >= 3):
-            return 0.0
-
-        safe_alpha = np.where(mask, alpha_np, 0.0)
-        safe_returns = np.where(mask, returns_np, 0.0)
-        denom = np.maximum(valid_counts, 1)
-        mean_alpha = np.sum(safe_alpha, axis=1) / denom
-        mean_returns = np.sum(safe_returns, axis=1) / denom
-        centered_alpha = np.where(mask, alpha_np - mean_alpha[:, None], 0.0)
-        centered_returns = np.where(mask, returns_np - mean_returns[:, None], 0.0)
-
-        cov = np.sum(centered_alpha * centered_returns, axis=1)
-        var_alpha = np.sum(centered_alpha * centered_alpha, axis=1)
-        var_returns = np.sum(centered_returns * centered_returns, axis=1)
-        valid_rows = (valid_counts >= 3) & (var_alpha > 1e-12) & (var_returns > 1e-12)
-        if not np.any(valid_rows):
-            return 0.0
-
-        correlations = cov[valid_rows] / np.sqrt(var_alpha[valid_rows] * var_returns[valid_rows])
-        correlations = np.clip(correlations, -1.0, 1.0)
-        return float(np.mean(correlations)) if correlations.size else 0.0
 
     def _build_alpha_signature(self, alpha: Any, max_points: int = 200) -> list[float]:
         data = np.nan_to_num(self._to_numpy(alpha), nan=0.0, posinf=0.0, neginf=0.0)

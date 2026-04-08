@@ -130,17 +130,29 @@ class BacktestResult:
         std = float(np.nanstd(net_returns)) if net_returns.size else 0.0
         sharpe = mean / (std + 1e-12)
         final_equity = float(equity_curve[-1]) if equity_curve.size else 1.0
-        total_return = final_equity - 1.0  # geometric return from equity curve
+        total_return = final_equity - 1.0
         avg_turnover = float(np.nanmean(turnover)) if turnover.size else 0.0
         peak = np.maximum.accumulate(equity_curve)
         drawdown = np.where(peak > 1e-12, 1.0 - equity_curve / peak, 0.0)
+        max_dd = float(np.clip(np.nanmax(drawdown), 0.0, 1.0)) if drawdown.size else 0.0
+
+        # Extended metrics
+        calmar = total_return / (max_dd + 1e-12)
+        win_rate = float(np.mean(net_returns > 0)) if net_returns.size else 0.0
+        skewness = float(
+            np.mean(((net_returns - mean) / (std + 1e-12)) ** 3)
+        ) if net_returns.size and std > 1e-12 else 0.0
+
         return {
             "sharpe": sharpe,
             "total_return": total_return,
             "avg_turnover": avg_turnover,
             "volatility": std,
-            "max_drawdown": float(np.clip(np.nanmax(drawdown), 0.0, 1.0)) if drawdown.size else 0.0,
+            "max_drawdown": max_dd,
             "final_equity": final_equity,
+            "calmar": calmar,
+            "win_rate": win_rate,
+            "skewness": skewness,
         }
 
 

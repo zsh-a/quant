@@ -39,6 +39,9 @@ class MarketProfile:
     eval_methods: tuple[str, ...] = ("long_short",)
     default_eval_method: str = "long_short"
 
+    # 市场专属交易成本 (None → 使用 CostModel 默认值 = crypto)
+    cost_model_kwargs: dict[str, float] | None = None
+
 
 # ---------------------------------------------------------------------------
 # Profile registry
@@ -268,4 +271,12 @@ register_profile(MarketProfile(
     symbol_presets=_ASTOCK_SYMBOL_PRESETS,
     eval_methods=("long_only", "quantile", "long_short"),
     default_eval_method="quantile",
+    cost_model_kwargs={
+        "taker_fee_bps": 1.0,     # A股佣金 ~万1
+        "maker_fee_bps": 0.5,
+        "slippage_bps": 1.5,      # 日线滑点较小
+        "funding_bps_per_event": 0.0,  # 无资金费率
+        "spread_weight": 0.1,
+        "impact_coefficient_bps": 0.2,
+    },
 ))

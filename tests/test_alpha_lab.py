@@ -470,8 +470,9 @@ def test_rule_overlay_respects_turnover_limit():
     assert np.allclose(limited, expected)
 
 
-def test_mean_cross_sectional_correlation_matches_reference_loop():
-    service = AlphaService()
+def test_compute_rank_ic_matches_reference_loop():
+    from src.alpha.eval.metrics import compute_rank_ic
+
     alpha = np.array(
         [
             [1.0, 2.0, np.nan, 4.0],
@@ -501,7 +502,7 @@ def test_mean_cross_sectional_correlation_matches_reference_loop():
         valid_rows.append(float(np.corrcoef(left, right)[0, 1]))
     expected = float(np.mean(valid_rows)) if valid_rows else 0.0
 
-    observed = service._mean_cross_sectional_correlation(alpha, returns)
+    observed = compute_rank_ic(alpha, returns)
 
     assert np.isclose(observed, expected)
 

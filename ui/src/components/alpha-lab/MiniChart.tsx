@@ -32,9 +32,10 @@ export function MetricGrid({ metrics, keys, labels }: {
     sharpe: 'Sharpe', rank_ic: 'Rank IC', ic_ir: 'IC IR', ic_std: 'IC Std', ic_decay: 'IC Decay',
     pnl_per_turnover: 'PnL/Turnover', total_return: 'Total Return', max_drawdown: 'Max DD',
     avg_turnover: 'Avg Turnover', signal_coverage: 'Coverage', turnover_proxy: 'Turnover Proxy',
-    rank_ic_1d: 'IC 1D', rank_ic_5d: 'IC 5D', rank_ic_10d: 'IC 10D', ...labels,
+    rank_ic_1d: 'IC 1D', rank_ic_5d: 'IC 5D', rank_ic_10d: 'IC 10D',
+    calmar: 'Calmar', win_rate: 'Win Rate', skewness: 'Skewness', ...labels,
   }
-  const PCT = new Set(['total_return', 'max_drawdown', 'volatility', 'signal_coverage', 'turnover_proxy'])
+  const PCT = new Set(['total_return', 'max_drawdown', 'volatility', 'signal_coverage', 'turnover_proxy', 'win_rate'])
   const format = (k: string, v: number) => {
     if (!Number.isFinite(v)) return '--'
     if (PCT.has(k)) return `${(v * 100).toFixed(2)}%`
