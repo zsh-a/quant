@@ -243,6 +243,7 @@ export interface AlphaLabRunDetail {
 export interface AlphaLabSeriesPoint {
     i: number;
     v: number;
+    t?: string;  // ISO timestamp or date string
 }
 
 export interface QuantileStat {
@@ -259,6 +260,7 @@ export interface QuantileAnalysis {
     quantile_stats: QuantileStat[];
     long_short_equity: number[];
     monotonicity: number;
+    timestamps?: string[];
 }
 
 export interface AlphaLabEvaluationSummary {

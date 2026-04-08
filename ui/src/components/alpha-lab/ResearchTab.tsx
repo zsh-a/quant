@@ -1,7 +1,7 @@
 /**
  * Research tab — formula editing, validation, and single-formula analysis.
  */
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useState } from 'react'
 import { Activity, AlertTriangle, CheckCircle2, Loader2, Save } from 'lucide-react'
 import type { AlphaLabEvaluationSummary, AlphaLabValidationReport, AlphaLabWorkspace as WorkspacePayload } from '../../types'
 import { SectionCard } from '../layout/SectionCard'
@@ -93,78 +93,86 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
   }, [formula, analysis, onSaved, setErr])
 
   return (
-    <div className="space-y-6">
-      <SectionCard title="Formula">
-        <textarea value={formula} onChange={e => setFormula(e.target.value)} placeholder="cs_rank(ts_mean(close, 5) - close)"
-          className="min-h-28 w-full rounded-xl border border-border bg-input px-4 py-3 text-sm font-mono text-foreground outline-none transition focus:border-ring/60 focus:ring-2 focus:ring-ring/30" />
-        {samples.length > 0 && (
-          <div className="flex flex-wrap gap-2">{samples.map(s => (
-            <button key={s} type="button" onClick={() => { setFormula(s); setValidation(null); setAnalysis(null) }}
-              className="rounded-full border border-border/80 bg-secondary/60 px-3 py-1 text-xs font-mono text-muted-foreground transition hover:text-foreground">{s}</button>
-          ))}</div>
-        )}
-        <DataScopeSection
-          interval={interval} setInterval={setInterval}
-          symbols={symbols} setSymbols={setSymbols}
-          startTime={startTime} setStartTime={setStartTime}
-          endTime={endTime} setEndTime={setEndTime}
-          intervals={intervals} symList={symList}
-          market={market} universe={universe} setUniverse={setUniverse}
-          excludeST={excludeST} setExcludeST={setExcludeST}
-          ws={ws}
-        />
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" onClick={() => void handleValidate()} disabled={validating || !formula.trim()}>
-            {validating ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}Validate</Button>
-          <Button onClick={() => void handleAnalyze()} disabled={analyzing || !formula.trim()}>
-            {analyzing ? <Loader2 className="animate-spin" /> : <Activity />}Analyze</Button>
-          <Button variant="secondary" onClick={() => void handleSave()} disabled={saving || !formula.trim()}>
-            {saving ? <Loader2 className="animate-spin" /> : <Save />}Save to Zoo</Button>
-        </div>
-        {validation && (
-          <div className={`rounded-xl border px-4 py-3 text-sm ${validation.ok ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
-            <div className="flex items-center gap-2 font-semibold">{validation.ok ? <CheckCircle2 className="size-4" /> : <AlertTriangle className="size-4" />}{validation.ok ? 'Valid' : 'Invalid'}</div>
-            {validation.normalized_formula && <p className="mt-1 break-all font-mono text-xs opacity-80">{validation.normalized_formula}</p>}
-            {validation.errors?.map(e => <p key={e} className="mt-1 text-xs text-rose-300">{e}</p>)}
+    <div className="space-y-4">
+      {/* ── Formula + Data scope: side-by-side on wide screens ── */}
+      <div className="grid gap-4 xl:grid-cols-[1fr_auto]">
+        {/* Left: formula input */}
+        <SectionCard title="Formula" contentClassName="space-y-3">
+          <textarea value={formula} onChange={e => setFormula(e.target.value)} placeholder="cs_rank(ts_mean(close, 5) - close)"
+            className="min-h-20 w-full rounded-lg border border-border bg-input px-3 py-2 text-sm font-mono text-foreground outline-none transition focus:border-ring/60 focus:ring-2 focus:ring-ring/30 resize-y" />
+          {samples.length > 0 && (
+            <div className="flex flex-wrap gap-1.5">{samples.map(s => (
+              <button key={s} type="button" onClick={() => { setFormula(s); setValidation(null); setAnalysis(null) }}
+                className="rounded-full border border-border/60 bg-secondary/40 px-2.5 py-0.5 text-[11px] font-mono text-muted-foreground transition hover:text-foreground">{s}</button>
+            ))}</div>
+          )}
+          <div className="flex flex-wrap items-center gap-2">
+            <Button size="sm" variant="outline" onClick={() => void handleValidate()} disabled={validating || !formula.trim()}>
+              {validating ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}Validate</Button>
+            <Button size="sm" onClick={() => void handleAnalyze()} disabled={analyzing || !formula.trim()}>
+              {analyzing ? <Loader2 className="animate-spin" /> : <Activity />}Analyze</Button>
+            <Button size="sm" variant="secondary" onClick={() => void handleSave()} disabled={saving || !formula.trim()}>
+              {saving ? <Loader2 className="animate-spin" /> : <Save />}Save to Zoo</Button>
           </div>
-        )}
-      </SectionCard>
-
-      {analysis ? (
-        <SectionCard title="Analysis">
-          <div className="space-y-4">
-            {/* Eval method + badges */}
-            <div className="flex flex-wrap gap-2">
-              {analysis.metrics.eval_method && (
-                <Badge variant="info">{EVAL_METHOD_LABELS[analysis.metrics.eval_method as any] ?? analysis.metrics.eval_method}</Badge>
-              )}
-              {analysis.backend && <Badge>{analysis.backend}</Badge>}
-              {analysis.device && <Badge>{analysis.device}</Badge>}
-              {analysis.dataset?.shape && <Badge>{analysis.dataset.shape[0]} x {analysis.dataset.shape[1]}</Badge>}
-              {analysis.expr_hash && <Badge variant="info" className="font-mono text-[10px]">{analysis.expr_hash.slice(0, 12)}</Badge>}
+          {validation && (
+            <div className={`rounded-lg border px-3 py-2 text-xs ${validation.ok ? 'border-emerald-500/20 bg-emerald-500/10 text-emerald-300' : 'border-amber-500/20 bg-amber-500/10 text-amber-300'}`}>
+              <span className="inline-flex items-center gap-1 font-semibold">{validation.ok ? <CheckCircle2 className="size-3" /> : <AlertTriangle className="size-3" />}{validation.ok ? 'Valid' : 'Invalid'}</span>
+              {validation.normalized_formula && <span className="ml-2 break-all font-mono opacity-80">{validation.normalized_formula}</span>}
+              {validation.errors?.map(e => <p key={e} className="mt-1 text-rose-300">{e}</p>)}
             </div>
+          )}
+        </SectionCard>
 
+        {/* Right: data scope (narrower on wide screens) */}
+        <SectionCard title="Data Scope" className="xl:w-80" contentClassName="space-y-3">
+          <DataScopeSection
+            interval={interval} setInterval={setInterval}
+            symbols={symbols} setSymbols={setSymbols}
+            startTime={startTime} setStartTime={setStartTime}
+            endTime={endTime} setEndTime={setEndTime}
+            intervals={intervals} symList={symList}
+            market={market} universe={universe} setUniverse={setUniverse}
+            excludeST={excludeST} setExcludeST={setExcludeST}
+            ws={ws}
+          />
+        </SectionCard>
+      </div>
+
+      {/* ── Analysis results ── */}
+      {analysis ? (
+        <div className="space-y-3">
+          {/* Badges + Metrics */}
+          <SectionCard title="Analysis"
+            action={
+              <div className="flex flex-wrap gap-1.5">
+                {analysis.metrics.eval_method && (
+                  <Badge variant="info" className="text-[10px]">{EVAL_METHOD_LABELS[analysis.metrics.eval_method as any] ?? analysis.metrics.eval_method}</Badge>
+                )}
+                {analysis.dataset?.shape && <Badge variant="secondary" className="text-[10px]">{analysis.dataset.shape[0]}×{analysis.dataset.shape[1]}</Badge>}
+                {analysis.expr_hash && <Badge variant="secondary" className="font-mono text-[9px]">{analysis.expr_hash.slice(0, 10)}</Badge>}
+              </div>
+            }
+            contentClassName="space-y-3"
+          >
             <MetricGrid metrics={analysis.metrics} keys={METRIC_KEYS} />
             {(analysis.metrics.rank_ic_1d != null || analysis.metrics.ic_decay != null) && (
               <MetricGrid metrics={analysis.metrics} keys={IC_DETAIL_KEYS} />
             )}
+          </SectionCard>
 
-            {/* Quantile analysis (分层回测) */}
-            {analysis.quantile_analysis && (
-              <QuantileChart analysis={analysis.quantile_analysis} />
-            )}
-
-            {/* Equity / Drawdown / Turnover charts */}
-            <div className="grid gap-4 lg:grid-cols-2">
-              <MiniChart data={analysis.equity_series ?? []} label="Equity Curve" height={200} />
-              <MiniChart data={analysis.drawdown_series ?? []} label="Drawdown" color="#f43f5e" height={200} pct />
-            </div>
-            <MiniChart data={analysis.turnover_series ?? []} label="Turnover" color="#a78bfa" height={140} />
+          {/* Charts: equity+drawdown side by side, turnover below */}
+          <div className="grid gap-3 lg:grid-cols-2">
+            <MiniChart data={analysis.equity_series ?? []} label="Equity Curve" height={240} />
+            <MiniChart data={analysis.drawdown_series ?? []} label="Drawdown" color="#f43f5e" height={240} pct />
           </div>
-        </SectionCard>
+          <MiniChart data={analysis.turnover_series ?? []} label="Turnover" color="#a78bfa" height={180} />
+
+          {/* Quantile analysis */}
+          {analysis.quantile_analysis && <QuantileChart analysis={analysis.quantile_analysis} />}
+        </div>
       ) : (
         <EmptyState title="No analysis yet" description="Enter a formula and click Analyze to see results."
-          action={<Button onClick={() => void handleAnalyze()} disabled={analyzing || !formula.trim()}><Activity className="size-4" />Analyze</Button>} />
+          action={<Button size="sm" onClick={() => void handleAnalyze()} disabled={analyzing || !formula.trim()}><Activity className="size-3.5" />Analyze</Button>} />
       )}
     </div>
   )

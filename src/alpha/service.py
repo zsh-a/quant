@@ -1678,9 +1678,10 @@ class AlphaService:
             timing_breakdown["signature_seconds"] += perf_counter() - signature_start
         equity_np = self._to_numpy(result.equity_curve)
         turnover_np = self._to_numpy(result.turnover)
-        equity_series = self._downsample_series(equity_np, max_points=500)
-        drawdown_series = self._build_drawdown_series(equity_np, max_points=500)
-        turnover_series = self._downsample_series(turnover_np, max_points=500)
+        ts = dataset.timestamps
+        equity_series = self._downsample_series(equity_np, ts, max_points=500)
+        drawdown_series = self._build_drawdown_series(equity_np, ts, max_points=500)
+        turnover_series = self._downsample_series(turnover_np, ts, max_points=500)
 
         payload: dict[str, Any] = {
             "program": program.to_dict(),
@@ -1700,7 +1701,9 @@ class AlphaService:
         from .eval.metrics import compute_quantile_returns
         alpha_np = self._to_numpy(alpha)
         close_np = self._to_numpy(store.get_field("close"))
-        payload["quantile_analysis"] = compute_quantile_returns(alpha_np, close_np)
+        payload["quantile_analysis"] = compute_quantile_returns(
+            alpha_np, close_np, timestamps=dataset.timestamps,
+        )
 
         return payload
 
@@ -1833,16 +1836,28 @@ class AlphaService:
     def _to_serializable_list(self, value: Any) -> list[Any]:
         return self._to_numpy(value).tolist()
 
-    def _downsample_series(self, arr: np.ndarray, max_points: int = 500) -> list[dict[str, float]]:
+    def _downsample_series(
+        self,
+        arr: np.ndarray,
+        timestamps: list[str] | None = None,
+        max_points: int = 500,
+    ) -> list[dict]:
         """Downsample a 1-D array to max_points via LTTB-like min/max bucketing."""
         flat = np.nan_to_num(arr.flatten() if arr.ndim > 1 else arr, nan=0.0)
         n = flat.size
         if n == 0:
             return []
+
+        def _point(idx: int) -> dict:
+            p: dict = {"i": idx, "v": round(float(flat[idx]), 6)}
+            if timestamps and idx < len(timestamps):
+                p["t"] = timestamps[idx]
+            return p
+
         if n <= max_points:
-            return [{"i": int(i), "v": round(float(flat[i]), 6)} for i in range(n)]
+            return [_point(i) for i in range(n)]
         step = n / max_points
-        result: list[dict[str, float]] = []
+        result: list[dict] = []
         for b in range(max_points):
             lo = int(b * step)
             hi = min(int((b + 1) * step), n)
@@ -1850,15 +1865,20 @@ class AlphaService:
             idx_min = lo + int(np.argmin(bucket))
             idx_max = lo + int(np.argmax(bucket))
             first, second = (idx_min, idx_max) if idx_min <= idx_max else (idx_max, idx_min)
-            result.append({"i": first, "v": round(float(flat[first]), 6)})
+            result.append(_point(first))
             if first != second:
-                result.append({"i": second, "v": round(float(flat[second]), 6)})
+                result.append(_point(second))
         return result
 
-    def _build_drawdown_series(self, equity: np.ndarray, max_points: int = 500) -> list[dict[str, float]]:
+    def _build_drawdown_series(
+        self,
+        equity: np.ndarray,
+        timestamps: list[str] | None = None,
+        max_points: int = 500,
+    ) -> list[dict]:
         flat = np.nan_to_num(equity.flatten() if equity.ndim > 1 else equity, nan=1.0)
         if flat.size == 0:
             return []
         peak = np.maximum.accumulate(flat)
         dd = np.where(peak > 1e-12, 1.0 - flat / peak, 0.0)
-        return self._downsample_series(dd, max_points)
+        return self._downsample_series(dd, timestamps, max_points)

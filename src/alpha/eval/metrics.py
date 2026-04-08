@@ -146,6 +146,7 @@ def compute_quantile_returns(
     close: np.ndarray,
     n_quantiles: int = 5,
     periods: int = 1,
+    timestamps: list[str] | None = None,
 ) -> dict[str, Any]:
     """分层回测：按因子值分 N 组，计算每组的累计收益和统计指标。
 
@@ -154,6 +155,7 @@ def compute_quantile_returns(
         close: (T, S) 收盘价矩阵
         n_quantiles: 分组数量（默认 5 = 五分位）
         periods: 收益计算周期
+        timestamps: 可选时间戳列表 (len = T)
 
     Returns:
         dict with:
@@ -231,10 +233,14 @@ def compute_quantile_returns(
     else:
         monotonicity = 0.0
 
+    # Timestamps for the x-axis (one per return period, excluding last `periods` rows)
+    ts = timestamps[:T - periods] if timestamps else None
+
     return {
         "n_quantiles": n_quantiles,
         "quantile_equity": quantile_equity,
         "quantile_stats": quantile_stats,
         "long_short_equity": ls_equity.tolist(),
         "monotonicity": monotonicity,
+        "timestamps": ts,
     }
