@@ -19,7 +19,19 @@ export const TRACING_POLL_MS = 10_000
 
 export const pad = (n: number) => String(n).padStart(2, '0')
 export const dtLocal = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
+export const dtDate = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`
 export const toISO = (v: string) => { const d = new Date(v); return Number.isNaN(d.getTime()) ? v : d.toISOString() }
+
+export const DEFAULT_LOOKBACK_YEARS = 3
+
+export const RANGE_PRESETS = [
+  { label: '1M', days: 30 },
+  { label: '3M', days: 90 },
+  { label: '1Y', days: 365 },
+  { label: '2Y', days: 730 },
+  { label: '3Y', days: 1095 },
+  { label: '5Y', days: 1825 },
+] as const
 
 export function fmt(key: string, v?: number | null) {
   const n = Number(v)

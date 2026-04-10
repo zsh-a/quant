@@ -188,6 +188,25 @@ _RESAMPLE_LAST = {
     "funding_rate",
 }
 
+# ClickHouse-side aggregation rules per column (mirrors _resample_frame logic)
+_CH_AGG: dict[str, str] = {}
+for _col in _SELECT_COLUMNS:
+    if _col in ("symbol", "open_time"):
+        continue
+    elif _col == "close_time":
+        _CH_AGG[_col] = "max"
+    elif _col in ("open", "mark_open", "premium_open"):
+        _CH_AGG[_col] = "argMin"
+    elif _col in ("high", "mark_high", "premium_high"):
+        _CH_AGG[_col] = "max"
+    elif _col in ("low", "mark_low", "premium_low"):
+        _CH_AGG[_col] = "min"
+    elif _col in ("volume", "quote_volume", "trade_count",
+                   "taker_buy_volume", "taker_buy_quote_volume"):
+        _CH_AGG[_col] = "sum"
+    else:
+        _CH_AGG[_col] = "argMax"  # last by time
+
 _ZERO_FILL_FIELDS = [
     "trade_count", "taker_buy_volume", "taker_buy_quote_volume",
     "mark_open", "mark_high", "mark_low", "mark_close",
@@ -232,28 +251,40 @@ class CryptoMinuteDatasetLoader:
         symbols_clause = ",".join(f"'{s}'" for s in upper_symbols)
         start_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
         end_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
-        cols = ", ".join(_SELECT_COLUMNS)
 
-        result = client.query(
-            f"SELECT {cols} FROM {_FUTURES_TABLE} "
-            f"WHERE symbol IN ({symbols_clause}) "
-            f"AND open_time >= toDateTime64('{start_str}', 3, 'UTC') "
-            f"AND open_time < toDateTime64('{end_str}', 3, 'UTC') "
-            f"ORDER BY open_time, symbol"
-        )
-
-        if not result.result_rows:
-            raise ValueError("No futures data found for the requested symbols/time range")
-
-        df = pd.DataFrame(result.result_rows, columns=result.column_names)
-        df["open_time"] = pd.to_datetime(df["open_time"], utc=True)
+        from time import perf_counter as _pc
+        _t0 = _pc()
 
         requested_interval = interval
-        if self._should_resample(requested_interval):
-            frames = []
-            for sym in df["symbol"].unique():
-                frames.append(self._resample_frame(df[df["symbol"] == sym].copy(), requested_interval))
-            df = pd.concat(frames, ignore_index=True)
+        resample_minutes = self._interval_minutes(requested_interval)
+        if resample_minutes is not None and resample_minutes > _BASE_INTERVAL_MINUTES:
+            query = self._build_ch_resample_query(
+                symbols_clause, start_str, end_str, resample_minutes,
+            )
+        else:
+            cols = ", ".join(_SELECT_COLUMNS)
+            query = (
+                f"SELECT {cols} FROM {_FUTURES_TABLE} "
+                f"WHERE symbol IN ({symbols_clause}) "
+                f"AND open_time >= toDateTime64('{start_str}', 3, 'UTC') "
+                f"AND open_time < toDateTime64('{end_str}', 3, 'UTC') "
+                f"ORDER BY open_time, symbol"
+            )
+
+        df = client.query_df(query)
+        _t_query = _pc()
+
+        if df.empty:
+            raise ValueError("No futures data found for the requested symbols/time range")
+
+        # Rename _ot → open_time when server-side resample was used
+        if "_ot" in df.columns:
+            df.rename(columns={"_ot": "open_time"}, inplace=True)
+
+        # Downcast float64 → float32 early to halve DataFrame memory
+        float_cols = df.select_dtypes(include=["float64"]).columns
+        df[float_cols] = df[float_cols].astype(_DTYPE)
+        df["open_time"] = pd.to_datetime(df["open_time"], utc=True)
 
         sort_idx = np.lexsort([df["symbol"].values, df["open_time"].values])
         df = df.iloc[sort_idx].reset_index(drop=True)
@@ -263,6 +294,12 @@ class CryptoMinuteDatasetLoader:
 
         # --- Build all field arrays directly without pandas pivot ---
         fields = self._build_fields_direct(df, timestamps, resolved_symbols)
+        _t_pivot = _pc()
+
+        logger.info(
+            "alpha.dataset.timing query={:.1f}s pivot={:.1f}s rows={}",
+            _t_query - _t0, _t_pivot - _t_query, len(df),
+        )
 
         # Release the large DataFrame and force GC before downstream work.
         del df
@@ -285,9 +322,11 @@ class CryptoMinuteDatasetLoader:
         )
         session_mask = np.broadcast_to(tradable_by_row[:, None], liquidity_mask.shape).copy()
 
+        mem_mb = sum(a.nbytes for a in fields.values()) / (1024 * 1024)
         logger.info(
-            "alpha.dataset loaded symbols={} timestamps={} interval={} dtype={}",
+            "alpha.dataset loaded symbols={} timestamps={} interval={} dtype={} fields={} mem={:.0f}MB",
             len(resolved_symbols), len(timestamps), requested_interval, _DTYPE.__name__,
+            len(fields), mem_mb,
         )
 
         return AlphaDataset(
@@ -352,6 +391,33 @@ class CryptoMinuteDatasetLoader:
             .to_numpy(dtype=_DTYPE)
         )
 
+    @staticmethod
+    def _build_ch_resample_query(
+        symbols_clause: str, start_str: str, end_str: str, minutes: int,
+    ) -> str:
+        """Build a ClickHouse query that resamples 5m data server-side.
+
+        Uses ``_ot`` as the interval alias to avoid ambiguity with the raw
+        ``open_time`` column used inside ``argMin`` / ``argMax``.
+        """
+        interval_expr = f"toStartOfInterval(open_time, INTERVAL {minutes} MINUTE)"
+        selects = ["symbol", f"{interval_expr} AS _ot"]
+        for col, agg in _CH_AGG.items():
+            if agg == "argMin":
+                selects.append(f"argMin({col}, open_time) AS {col}")
+            elif agg == "argMax":
+                selects.append(f"argMax({col}, open_time) AS {col}")
+            else:
+                selects.append(f"{agg}({col}) AS {col}")
+        return (
+            f"SELECT {', '.join(selects)} FROM {_FUTURES_TABLE} "
+            f"WHERE symbol IN ({symbols_clause}) "
+            f"AND open_time >= toDateTime64('{start_str}', 3, 'UTC') "
+            f"AND open_time < toDateTime64('{end_str}', 3, 'UTC') "
+            f"GROUP BY symbol, {interval_expr} "
+            f"ORDER BY _ot, symbol"
+        )
+
     def _should_resample(self, interval: str) -> bool:
         minutes = self._interval_minutes(interval)
         return minutes is not None and minutes > _BASE_INTERVAL_MINUTES
@@ -379,7 +445,7 @@ class CryptoMinuteDatasetLoader:
 
         symbol = str(frame["symbol"].iloc[0]).upper()
         rule = f"{minutes}min"
-        ordered = frame.sort_values("open_time").set_index("open_time")
+        ordered = frame.set_index("open_time").sort_index()
 
         agg_spec: dict[str, str] = {}
         for col in ordered.columns:
@@ -471,17 +537,17 @@ class AShareDailyDatasetLoader:
         else:
             where_symbols = ""
 
-        result = client.query(
+        query = (
             f"SELECT {cols} FROM {_STOCK_TABLE} FINAL "
             f"WHERE date >= '{start_str}' AND date <= '{end_str}' "
             f"{where_symbols} "
             f"ORDER BY date, code"
         )
+        df = client.query_df(query)
 
-        if not result.result_rows:
+        if df.empty:
             raise ValueError("No A-share data found for the requested symbols/time range")
 
-        df = pd.DataFrame(result.result_rows, columns=result.column_names)
         df["date"] = pd.to_datetime(df["date"])
 
         # --- Forward-adjust prices (前复权) ---

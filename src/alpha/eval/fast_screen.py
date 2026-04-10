@@ -7,6 +7,7 @@ or CPCV.  Processes formulas in GPU-batched chunks for speed.
 from __future__ import annotations
 
 from time import perf_counter
+from typing import TYPE_CHECKING
 
 import numpy as np
 from loguru import logger
@@ -15,7 +16,9 @@ from ..core.compiler import FormulaCompiler
 from ..core.dataset import AlphaDataset
 from ..core.dsl import TensorSchema
 from .metrics import compute_forward_returns
-from ..core.vm import StackVM, TensorStore
+
+if TYPE_CHECKING:
+    from ..core.vm import StackVM, TensorStore
 
 _CHUNK_SIZE = 128  # formulas per GPU batch
 
@@ -60,6 +63,7 @@ def fast_screen_ic(
         screen_fields = dataset.fields
 
     # Prepare store — convert to torch for GPU path
+    from ..core.vm import TensorStore
     store = TensorStore(screen_fields)
     if vm.backend == "torch" and vm.device is not None:
         store = vm._prepare_store(store)

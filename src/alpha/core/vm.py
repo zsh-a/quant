@@ -22,7 +22,9 @@ try:
         cs_rank as _triton_cs_rank,
         decay_linear as _triton_decay_linear,
     )
-except Exception:  # pragma: no cover
+except Exception as _exc:  # pragma: no cover
+    import logging as _logging
+    _logging.getLogger(__name__).warning("Triton import failed: %s", _exc)
     _TRITON_OK = False
 
 

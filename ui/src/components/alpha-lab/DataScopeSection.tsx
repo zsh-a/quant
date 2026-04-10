@@ -7,6 +7,7 @@ import { ChevronRight } from 'lucide-react'
 import type { AlphaLabWorkspace as WorkspacePayload } from '../../types'
 import { Badge } from '../ui/badge'
 import { Input } from '../ui/input'
+import { dtDate, RANGE_PRESETS } from './shared'
 
 interface SymbolPreset {
   key: string
@@ -69,9 +70,28 @@ export const DataScopeSection: React.FC<DataScopeProps> = ({
     }
   }, [symbolPresets, setSymbols, setUniverse, isAShare])
 
+  const activeRangePreset = useMemo(() => {
+    const start = startTime.slice(0, 10)
+    const end = endTime.slice(0, 10)
+    const today = dtDate(new Date())
+    if (end !== today) return null
+    for (const p of RANGE_PRESETS) {
+      const d = new Date(Date.now() - p.days * 86400_000)
+      if (dtDate(d) === start) return p.label
+    }
+    return null
+  }, [startTime, endTime])
+
+  const handleRangePreset = useCallback((days: number) => {
+    const now = new Date()
+    const start = new Date(Date.now() - days * 86400_000)
+    setStartTime(dtDate(start) + 'T00:00')
+    setEndTime(dtDate(now) + 'T23:59')
+  }, [setStartTime, setEndTime])
+
   return (
     <div className="space-y-3">
-      {/* Row 1: Interval + time range (stacked in narrow contexts) */}
+      {/* Row 1: Interval */}
       <div className="space-y-1">
         <Label>Interval</Label>
         <select value={interval} onChange={e => setInterval(e.target.value)}
@@ -79,18 +99,30 @@ export const DataScopeSection: React.FC<DataScopeProps> = ({
           {intervals.map(i => <option key={i} value={i}>{i}</option>)}
         </select>
       </div>
-      <div className="grid grid-cols-2 gap-2">
-        <div className="space-y-1">
-          <Label>Start</Label>
-          <Input className="h-8 text-xs" type={isAShare ? 'date' : 'datetime-local'}
-            value={isAShare ? startTime.slice(0, 10) : startTime}
-            onChange={e => setStartTime(isAShare ? e.target.value + 'T00:00' : e.target.value)} />
+
+      {/* Row 2: Date range — quick presets + inputs */}
+      <div className="space-y-1.5">
+        <Label>Date Range</Label>
+        <div className="flex flex-wrap gap-1">
+          {RANGE_PRESETS.map(p => (
+            <button key={p.label} onClick={() => handleRangePreset(p.days)}
+              className={`rounded-md px-2 py-0.5 text-[10px] font-medium transition ${
+                activeRangePreset === p.label
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-secondary/50 text-muted-foreground hover:text-foreground'
+              }`}>
+              {p.label}
+            </button>
+          ))}
         </div>
-        <div className="space-y-1">
-          <Label>End</Label>
-          <Input className="h-8 text-xs" type={isAShare ? 'date' : 'datetime-local'}
-            value={isAShare ? endTime.slice(0, 10) : endTime}
-            onChange={e => setEndTime(isAShare ? e.target.value + 'T23:59' : e.target.value)} />
+        <div className="flex items-center gap-1.5">
+          <input type="date" className="flex-1 h-8 rounded-lg border border-border bg-input px-2 text-xs text-foreground outline-none focus:border-ring/60 focus:ring-2 focus:ring-ring/30"
+            value={startTime.slice(0, 10)}
+            onChange={e => setStartTime(e.target.value + 'T00:00')} />
+          <span className="text-muted-foreground text-xs shrink-0">→</span>
+          <input type="date" className="flex-1 h-8 rounded-lg border border-border bg-input px-2 text-xs text-foreground outline-none focus:border-ring/60 focus:ring-2 focus:ring-ring/30"
+            value={endTime.slice(0, 10)}
+            onChange={e => setEndTime(e.target.value + 'T23:59')} />
         </div>
       </div>
 

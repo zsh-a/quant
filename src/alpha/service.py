@@ -128,6 +128,13 @@ class AlphaService:
         self._program_cache_lock = threading.Lock()
         self._complexity_cache: dict[str, dict[str, float]] = {}
 
+        logger.info(
+            "AlphaService init market={} vm_backend={} device={} triton={}",
+            market, self.vm.backend,
+            self.vm.device if self.vm.device is not None else "numpy",
+            getattr(self.vm, "use_triton", False),
+        )
+
     # ------------------------------------------------------------------
     # Loader factory
     # ------------------------------------------------------------------
@@ -314,6 +321,7 @@ class AlphaService:
         summary_only: bool = False,
         **loader_kwargs,
     ) -> dict[str, Any]:
+        t0 = perf_counter()
         dataset = self.dataset_loader.load(
             symbols=symbols,
             start_time=start_time,
@@ -323,7 +331,15 @@ class AlphaService:
             blocked_utc_hours=blocked_utc_hours,
             **loader_kwargs,
         )
-        return self.evaluate_formula_from_dataset(formula=formula, dataset=dataset, summary_only=summary_only)
+        t_load = perf_counter()
+        result = self.evaluate_formula_from_dataset(formula=formula, dataset=dataset, summary_only=summary_only)
+        t_eval = perf_counter()
+        logger.info(
+            "alpha.evaluate_db load={:.1f}s eval={:.1f}s total={:.1f}s backend={} device={}",
+            t_load - t0, t_eval - t_load, t_eval - t0,
+            self.vm.backend, self.vm.device or "numpy",
+        )
+        return result
 
     def evaluate_formulas_from_db(
         self,

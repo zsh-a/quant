@@ -13,7 +13,7 @@ import { SearchTab } from './alpha-lab/SearchTab'
 import { FactorsTab } from './alpha-lab/FactorsTab'
 import { HistoryTab } from './alpha-lab/HistoryTab'
 import { MonitorTab } from './alpha-lab/MonitorTab'
-import { dtLocal } from './alpha-lab/shared'
+import { dtLocal, dtDate, DEFAULT_LOOKBACK_YEARS } from './alpha-lab/shared'
 import { alphaApi } from '../utils/alphaApi'
 
 type Tab = 'research' | 'search' | 'factors' | 'history' | 'monitor'
@@ -34,8 +34,8 @@ export const AlphaLabWorkspace: React.FC = () => {
   const [symbols, setSymbols] = useState('BTCUSDT,ETHUSDT,SOLUSDT')
   const [universe, setUniverse] = useState<string | null>(null)
   const [excludeST, setExcludeST] = useState(false)
-  const [startTime, setStartTime] = useState(() => dtLocal(new Date(Date.now() - 7 * 86400_000)))
-  const [endTime, setEndTime] = useState(() => dtLocal(new Date()))
+  const [startTime, setStartTime] = useState(() => dtDate(new Date(Date.now() - DEFAULT_LOOKBACK_YEARS * 365 * 86400_000)) + 'T00:00')
+  const [endTime, setEndTime] = useState(() => dtDate(new Date()) + 'T23:59')
 
   const availableMarkets: string[] = (ws?.defaults as any)?.available_markets ?? ['crypto']
   const marketPresets = useMemo(() => (ws?.defaults as any)?.market_presets ?? {}, [ws])
@@ -50,14 +50,15 @@ export const AlphaLabWorkspace: React.FC = () => {
     const newIntervals = preset.intervals ?? []
     setInterval(newIntervals[0] ?? '1d')
     setFormula(preset.sample_formulas?.[0] ?? 'cs_rank(ts_mean(close, 5) - close)')
+    const lookback = dtDate(new Date(Date.now() - DEFAULT_LOOKBACK_YEARS * 365 * 86400_000)) + 'T00:00'
     if (m === 'a_share') {
       setSymbols(''); setUniverse('000300'); setExcludeST(true)
-      setStartTime(dtLocal(new Date(Date.now() - 365 * 86400_000)))
+      setStartTime(lookback)
     } else {
       const cm = ws?.defaults.crypto_market as Record<string, any>
       setSymbols(Array.isArray(cm?.default_symbols) ? cm.default_symbols.join(',') : 'BTCUSDT,ETHUSDT,SOLUSDT')
       setUniverse(null); setExcludeST(false)
-      setStartTime(dtLocal(new Date(Date.now() - 7 * 86400_000)))
+      setStartTime(lookback)
     }
   }, [marketPresets, ws])
 
