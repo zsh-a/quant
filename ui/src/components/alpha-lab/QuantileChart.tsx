@@ -54,7 +54,7 @@ export const QuantileChart: React.FC<{ analysis: QuantileAnalysis }> = ({ analys
       data: seriesData[n_quantiles],
       smooth: 0.2,
       symbol: 'none',
-      lineStyle: { width: 2, color: LS_COLOR, type: 'dashed' as any },
+      lineStyle: { width: 2, color: LS_COLOR },
     })
 
     return {
@@ -120,7 +120,7 @@ export const QuantileChart: React.FC<{ analysis: QuantileAnalysis }> = ({ analys
       <div className="flex items-center gap-2 px-3 pt-2">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">分层回测</span>
         <Badge variant={monoVariant as any} className="text-[9px]">单调性 {(monotonicity * 100).toFixed(0)}%</Badge>
-        <Badge variant="secondary" className="text-[9px]">{quantile_stats.length} 分位</Badge>
+        <Badge className="text-[9px]">{quantile_stats.length} 分位</Badge>
       </div>
 
       {/* Chart */}

@@ -1,82 +1,76 @@
-# Docker ignore file
+# === Large directories ===
+.venv/
+venv/
+ENV/
+env/
+node_modules/
+jointdata/
+backups/
+AlphaGPT/
+data/
+!data/.gitkeep
+.git/
+
+# === Python artifacts ===
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
-.Python
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
 *.egg
-jointdata
-backups
+build/
+dist/
+wheels/
+sdist/
 
-# Virtual environments
-venv/
-ENV/
-env/
+# === Frontend build outputs ===
+ui/dist/
+ui/build/
+ui/node_modules/
 
-# IDE
+# === Database files ===
+db/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# === Logs & temp ===
+*.log
+logs/
+tmp/
+temp/
+*.tmp
+
+# === IDE & OS ===
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
-
-# Logs
-*.log
-logs/
-
-# Database
-*.db
-*.sqlite
-*.sqlite3
-db/
-
-# Data
-data/
-!data/.gitkeep
-
-# Node
-node_modules/
-npm-debug.log*
-ui/dist/
-ui/build/
-
-# OS
 .DS_Store
 Thumbs.db
 
-# Git
-.git/
-.gitignore
-
-# Documentation
+# === CI/CD & docs ===
+.github/
+.gitlab-ci.yml
 docs/
 *.md
 !README.md
 
-# Tests
+# === Tests ===
+tests/
 test_*.py
 *_test.py
-tests/
+pytest.ini
 
-# CI/CD
-.github/
-.gitlab-ci.yml
-
-# Temporary files
-tmp/
-temp/
-*.tmp
+# === Not needed in image ===
+.claude/
+deploy.sh
+dev_local.sh
+Makefile
+docker-compose.yml
+Dockerfile*
+nginx.conf.bak
+# marked_trade_datas.csv is needed by MultiFactorStrategy

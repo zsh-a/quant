@@ -106,7 +106,7 @@ const LabPanel: React.FC<LabPanelProps> = ({
         </TabsContent>
 
         <TabsContent value="alpha">
-          <AlphaLabWorkspace />
+          <AlphaLabWorkspace onViewSession={onViewSession} />
         </TabsContent>
       </Tabs>
     </div>

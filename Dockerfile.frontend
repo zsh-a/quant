@@ -3,11 +3,17 @@ FROM oven/bun:1-alpine AS builder
 
 WORKDIR /app
 
-# Copy source first (node_modules excluded via .dockerignore), then install
-COPY ui/ ./
+# Aliyun npm mirror
+RUN echo 'registry = "https://registry.npmmirror.com"' > /root/.bunfig.toml
 
-# Install dependencies with Bun (no package-lock.json required)
-RUN bun install
+# Copy dependency files FIRST — cached unless package.json/bun.lock change
+COPY ui/package.json ui/bun.lock* ./
+
+# Install dependencies (cached layer)
+RUN bun install --frozen-lockfile 2>/dev/null || bun install
+
+# Copy source code (changes frequently — separate layer)
+COPY ui/ ./
 
 # Build production bundle
 RUN bun run build
@@ -15,13 +21,12 @@ RUN bun run build
 # Production stage - Nginx
 FROM nginx:alpine
 
-# Copy built files from builder
-COPY --from=builder /app/dist /usr/share/nginx/html
+# Aliyun alpine mirror
+RUN sed -i 's|dl-cdn.alpinelinux.org|mirrors.aliyun.com|g' /etc/apk/repositories
 
-# Copy nginx configuration
+COPY --from=builder /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-# Expose port
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]

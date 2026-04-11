@@ -3,7 +3,7 @@
  *
  * Features: time-based x-axis, crosshair tooltip, dataZoom slider, responsive resize.
  */
-import React, { useMemo } from 'react'
+import { useMemo } from 'react'
 import ReactEChartsCore from 'echarts-for-react/lib/core'
 import * as echarts from 'echarts/core'
 import { LineChart, BarChart } from 'echarts/charts'

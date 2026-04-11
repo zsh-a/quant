@@ -13,14 +13,18 @@ import { SearchTab } from './alpha-lab/SearchTab'
 import { FactorsTab } from './alpha-lab/FactorsTab'
 import { HistoryTab } from './alpha-lab/HistoryTab'
 import { MonitorTab } from './alpha-lab/MonitorTab'
-import { dtLocal, dtDate, DEFAULT_LOOKBACK_YEARS } from './alpha-lab/shared'
+import { dtDate, DEFAULT_LOOKBACK_YEARS } from './alpha-lab/shared'
 import { alphaApi } from '../utils/alphaApi'
 
 type Tab = 'research' | 'search' | 'factors' | 'history' | 'monitor'
 
 const MARKET_LABELS: Record<string, string> = { crypto: 'Crypto', a_share: 'A 股' }
 
-export const AlphaLabWorkspace: React.FC = () => {
+interface AlphaLabWorkspaceProps {
+  onViewSession?: (sessionId: string) => void
+}
+
+export const AlphaLabWorkspace: React.FC<AlphaLabWorkspaceProps> = ({ onViewSession }) => {
   const [ws, setWs] = useState<WorkspacePayload | null>(null)
   const [tab, setTab] = useState<Tab>('research')
   const [err, setErr] = useState<string | null>(null)
@@ -179,6 +183,7 @@ export const AlphaLabWorkspace: React.FC = () => {
             market={market} universe={universe} excludeST={excludeST}
             loading={loading} onLoadFormula={handleLoadFormula}
             onRefresh={() => void loadWorkspace()} setErr={setErr}
+            onViewSession={onViewSession}
           />
         </TabsContent>
 

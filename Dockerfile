@@ -1,37 +1,63 @@
-# Backend Dockerfile - Optimized with UV and pyproject.toml
-FROM python:3.14-slim as base
+# Backend Dockerfile - Multi-stage build with GPU support
+# =======================================================
+# Build arg: DEVICE=cpu|cu124 (default: cu124 for CUDA 12.x)
+ARG DEVICE=cu124
 
-# Set working directory
+# Stage 1: Install dependencies (cached unless pyproject.toml changes)
+FROM python:3.14-slim AS deps
+
+ARG DEVICE
+
 WORKDIR /app
 
-# Install system dependencies and uv
-RUN apt-get update && apt-get install -y \
-    gcc \
-    g++ \
-    git \
+# Aliyun apt mirror + system build dependencies
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ curl \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install uv
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Copy ONLY dependency files — maximizes layer cache hits
+COPY pyproject.toml uv.lock* ./
+
+# Install Python dependencies
+# - cu124: PyTorch with CUDA 12.4 support (~1.2GB, uses host GPU driver)
+# - cpu:   PyTorch CPU-only (~200MB)
+# Uses Aliyun mirrors for faster downloads in China
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv pip install --system \
+    --index-url https://mirrors.aliyun.com/pypi/simple/ \
+    --extra-index-url https://download.pytorch.org/whl/${DEVICE} \
+    --index-strategy unsafe-best-match \
+    .
+
+# Stage 2: Runtime image
+FROM python:3.14-slim AS runtime
+
+WORKDIR /app
+
+# Aliyun apt mirror + minimal runtime deps
+RUN sed -i 's|deb.debian.org|mirrors.aliyun.com|g' /etc/apt/sources.list.d/debian.sources \
+    && apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    && rm -rf /var/lib/apt/lists/* \
-    && curl -LsSf https://astral.sh/uv/install.sh | sh
+    && rm -rf /var/lib/apt/lists/*
 
-# Add uv to PATH (install script puts it in ~/.local/bin on Unix)
-ENV PATH="/root/.local/bin:$PATH"
-
-# Copy dependency file
-COPY pyproject.toml ./
-
-# Install Python dependencies with uv (much faster than pip)
-# Use --no-cache to reduce image size
-RUN uv pip install --system --no-cache .
+# Copy installed packages from deps stage
+COPY --from=deps /usr/local/lib/python3.14/site-packages /usr/local/lib/python3.14/site-packages
+COPY --from=deps /usr/local/bin /usr/local/bin
 
 # Copy application code
-COPY . .
+COPY src/ ./src/
+COPY config/ ./config/
+COPY utils/ ./utils/
+COPY session_db.py ./
+COPY *.csv ./
 
 # Create data directories
-RUN mkdir -p data/checkpoints data/logs
+RUN mkdir -p data/checkpoints data/logs data/alpha_lab data/alpha_zoo
 
-# Expose port
 EXPOSE 8000
 
-# Default command (can be overridden)
-# --ws-ping-timeout 60: avoid closing connections when client is slow to pong (e.g. tab in background)
 CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000", "--ws-ping-timeout", "60"]

@@ -4,6 +4,29 @@ x-logging: &default-logging
     max-size: "10m"
     max-file: "3"
 
+# Shared backend build — api and celery_worker use the same image (built once)
+# Set DEVICE=cpu to build without GPU support (smaller image)
+x-backend: &backend-build
+  build:
+    context: .
+    dockerfile: Dockerfile
+    args:
+      DEVICE: ${DEVICE:-cu124}
+  image: quant-backend:latest
+
+x-backend-env: &backend-env
+  CELERY_BROKER_URL: redis://redis:6379/0
+  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  PYTHONUNBUFFERED: "1"
+  SESSION_DB_PATH: /app/data/sessions.db
+  QUANT_DATABASE__HOST: clickhouse
+  QUANT_DATABASE__PORT: "8123"
+
+x-backend-volumes: &backend-volumes
+  - ./data:/app/data
+  - ./config:/app/config
+  - ./logs:/app/logs
+
 services:
   # Redis - Message broker and cache
   redis:
@@ -23,26 +46,22 @@ services:
       - quant_network
     logging: *default-logging
 
-  # API Server
+  # API Server (GPU enabled)
   api:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *backend-build
     container_name: quant_api
     ports:
       - "8000:8000"
-    volumes:
-      - ./data:/app/data
-      - ./config:/app/config
-      - ./logs:/app/logs
+    volumes: *backend-volumes
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - PYTHONUNBUFFERED=1
-      # Shared sessions DB so API and worker see same equity/trades (Strategy Comparison needs this)
-      - SESSION_DB_PATH=/app/data/sessions.db
-      - QUANT_DATABASE__HOST=clickhouse
-      - QUANT_DATABASE__PORT=8123
+      <<: *backend-env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     depends_on:
       redis:
         condition: service_healthy
@@ -56,24 +75,21 @@ services:
     restart: unless-stopped
     logging: *default-logging
 
-  # Celery Worker - Backtest tasks
+  # Celery Worker (GPU enabled for alpha search tasks)
   celery_worker:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    <<: *backend-build
     container_name: quant_celery_worker
     command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=4 --queues=backtest,default,automation
-    volumes:
-      - ./data:/app/data
-      - ./config:/app/config
-      - ./logs:/app/logs
+    volumes: *backend-volumes
     environment:
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/1
-      - PYTHONUNBUFFERED=1
-      - SESSION_DB_PATH=/app/data/sessions.db
-      - QUANT_DATABASE__HOST=clickhouse
-      - QUANT_DATABASE__PORT=8123
+      <<: *backend-env
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
     depends_on:
       redis:
         condition: service_healthy

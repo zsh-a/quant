@@ -12,16 +12,13 @@ import {
   Brain,
   Database,
   Filter,
-  Loader2,
   RefreshCw,
   Save,
 } from 'lucide-react'
 import { alphaApi } from '../../utils/alphaApi'
 import type {
   CheckpointEntry,
-  FactorCatalogEntry,
   FactorCatalogResponse,
-  StrategyInfo,
   StrategyStateResponse,
 } from '../../types'
 import { SectionCard } from '../layout/SectionCard'
@@ -30,12 +27,12 @@ import { MetricCard } from '../layout/MetricCard'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
-import { fmt, fmtDur, fmtTime } from './shared'
+import { fmt, fmtTime } from './shared'
 
 /* ── Strategy State Section ─────────────────────────────────────────── */
 
 function StrategyStateSection({ data }: { data: StrategyStateResponse | null }) {
-  if (!data) return <EmptyState title="Loading..." />
+  if (!data) return <EmptyState title="Loading..." description="Fetching strategy state" />
 
   return (
     <SectionCard title="Strategy State" description="Registered strategies and their current state">
@@ -288,7 +285,7 @@ function CheckpointsSection() {
                   )}
                   {ckpt.context_state?.total_evaluations != null && (
                     <span className="text-[11px] text-muted-foreground">
-                      {ckpt.context_state.total_evaluations} evals
+                      {String(ckpt.context_state.total_evaluations)} evals
                     </span>
                   )}
                 </div>
@@ -333,7 +330,7 @@ interface StrategyManagerProps {
 
 export const StrategyManager: React.FC<StrategyManagerProps> = ({ onLoadFormula, showOnly }) => {
   const [stateData, setStateData] = useState<StrategyStateResponse | null>(null)
-  const [loading, setLoading] = useState(false)
+  const [, setLoading] = useState(false)
 
   const needsState = !showOnly || showOnly === 'strategies'
 

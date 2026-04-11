@@ -6,7 +6,7 @@
  */
 import React, { useCallback, useState } from 'react'
 import {
-  BarChart3, ChevronDown, ChevronRight, Clock, Database,
+  BarChart3, ChevronDown, ChevronRight, Clock,
   Loader2, RefreshCw, Trophy,
 } from 'lucide-react'
 import type { AlphaLabRunDetail, AlphaLabRunSummary } from '../../types'

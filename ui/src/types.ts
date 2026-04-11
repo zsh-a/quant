@@ -354,6 +354,36 @@ export interface AlphaLabCombineResult {
     drawdown_series?: AlphaLabSeriesPoint[];
 }
 
+/* ── Event Engine Backtest ───────────────────────────────────────────── */
+
+export interface EventBacktestParams {
+    market: string
+    symbols: string[]
+    universe?: string
+    start_time: string
+    end_time: string
+    interval: string
+    method: string
+    max_factors: number
+    min_abs_ic: number
+    max_correlation: number
+    zoo_limit: number
+    position_method: string
+    top_n: number
+    top_pct: number
+    rebalance_interval: number
+    initial_cash: number
+    commission: number
+    slippage: number
+    exclude_st?: boolean
+}
+
+export interface EventBacktestResponse {
+    session_id: string
+    status: string
+    message: string
+}
+
 export interface AlphaLabWorkspaceDefaults {
     alpha_lab: Record<string, unknown>;
     bitget: Record<string, unknown>;

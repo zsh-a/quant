@@ -2,7 +2,7 @@
  * Shared constants, helpers and types for Alpha Lab tab components.
  */
 import { formatPercent, formatPrice } from '../../utils/format'
-import type { AlphaLabSeriesPoint } from '../../types'
+
 import { API_BASE } from '../../utils/api'
 
 export const METRIC_KEYS = ['sharpe', 'rank_ic', 'ic_ir', 'total_return', 'max_drawdown', 'avg_turnover', 'signal_coverage', 'pnl_per_turnover'] as const

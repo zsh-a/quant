@@ -3,6 +3,10 @@
 
 set -euo pipefail
 
+# Enable BuildKit for faster builds with cache mounts
+export DOCKER_BUILDKIT=1
+export COMPOSE_DOCKER_CLI_BUILD=1
+
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 SERVICES=(redis api celery_worker frontend)
 VALID_LOG_SERVICES=(redis api celery_worker frontend)

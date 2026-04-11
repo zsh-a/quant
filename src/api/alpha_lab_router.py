@@ -464,6 +464,150 @@ async def combine_factors_from_zoo(request: CombineZooRequest):
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+# --- Event Engine Backtest ---
+
+
+class EventBacktestRequest(BaseModel):
+    """多因子策略 event engine 回测请求。"""
+    # Alpha 参数
+    market: str = "a_share"
+    symbols: list[str] = Field(default_factory=list)
+    universe: str | None = None
+    start_time: datetime
+    end_time: datetime
+    interval: str = "1d"
+    min_quote_volume: float = 0.0
+    blocked_utc_hours: list[int] = Field(default_factory=list)
+    exclude_st: bool = False
+    # 组合参数
+    method: str = "ic_weighted"
+    max_factors: int = 10
+    min_abs_ic: float = 0.01
+    max_correlation: float = 0.70
+    ic_lookback: int = 60
+    zoo_limit: int = 50
+    # Event engine 参数
+    position_method: str = "long_only"
+    top_n: int = 10
+    top_pct: float = 0.2
+    rebalance_interval: int = 5
+    initial_cash: float = 1_000_000.0
+    commission: float = 0.0003
+    slippage: float = 0.001
+
+
+def _run_event_backtest(
+    session_id: str,
+    request: EventBacktestRequest,
+) -> None:
+    """在后台线程中执行 event engine 回测。"""
+    from session_db import SessionDB
+    from src.services import SessionExecutionConfig, SessionExecutionHooks, execute_session
+
+    session_db = SessionDB()
+
+    try:
+        # 1. 生成预计算权重
+        svc = _get_service(request.market)
+        weights_result = svc.generate_event_backtest_weights(
+            symbols=request.symbols,
+            start_time=request.start_time,
+            end_time=request.end_time,
+            interval=request.interval,
+            min_quote_volume=request.min_quote_volume,
+            blocked_utc_hours=_normalize_blocked_hours(request.blocked_utc_hours),
+            method=request.method,
+            position_method=request.position_method,
+            top_pct=request.top_pct,
+            max_factors=request.max_factors,
+            min_abs_ic=request.min_abs_ic,
+            max_correlation=request.max_correlation,
+            ic_lookback=request.ic_lookback,
+            zoo_limit=request.zoo_limit,
+            **({"universe": request.universe} if request.universe else {}),
+            **({"exclude_st": request.exclude_st} if request.exclude_st else {}),
+        )
+
+        weight_map = weights_result["weight_map"]
+        all_symbols = weights_result["symbols"]
+
+        if not weight_map:
+            session_db.update_session(session_id, status="failed", error="No valid weights generated")
+            return
+
+        # 2. 执行 event engine 回测
+        symbol_str = ",".join(all_symbols)
+        config = SessionExecutionConfig(
+            session_id=session_id,
+            strategy="precomputed_alpha",
+            symbol=symbol_str,
+            start_date=request.start_time.strftime("%Y-%m-%d"),
+            end_date=request.end_time.strftime("%Y-%m-%d"),
+            mode="backtest",
+            params={
+                "weight_map": weight_map,
+                "top_n": request.top_n,
+                "rebalance_interval": request.rebalance_interval,
+                "position_method": request.position_method,
+                "cash_reserve_pct": 0.05,
+            },
+            initial_cash=request.initial_cash,
+            commission=request.commission,
+            slippage=request.slippage,
+        )
+
+        execute_session(config, session_db=session_db)
+
+    except Exception as exc:
+        logger.exception("event-backtest failed session_id={}", session_id)
+        try:
+            session_db.update_session(session_id, status="failed", error=str(exc))
+        except Exception:
+            pass
+
+
+@router.post("/event-backtest")
+async def run_event_backtest(request: EventBacktestRequest, background_tasks: BackgroundTasks):
+    """
+    多因子策略 event engine 回测。
+
+    流程:
+    1. AlphaService 生成预计算目标权重
+    2. 创建 Session 并在后台执行 event engine 回测
+    3. 返回 session_id，通过现有 session API 查询结果
+    """
+    import uuid
+    from session_db import SessionDB
+
+    session_id = str(uuid.uuid4())
+
+    # 在 SessionDB 中创建 session 记录
+    session_db = SessionDB()
+    session_db.create_session(
+        session_id=session_id,
+        strategy_name="precomputed_alpha",
+        symbol=",".join(request.symbols) if request.symbols else request.market,
+        mode="backtest",
+        start_date=request.start_time.strftime("%Y-%m-%d"),
+        end_date=request.end_time.strftime("%Y-%m-%d"),
+        params={
+            "method": request.method,
+            "position_method": request.position_method,
+            "top_n": request.top_n,
+            "rebalance_interval": request.rebalance_interval,
+            "max_factors": request.max_factors,
+        },
+    )
+
+    background_tasks.add_task(_run_event_backtest, session_id, request)
+
+    return {
+        "session_id": session_id,
+        "status": "pending",
+        "message": "Event engine backtest submitted",
+    }
+
+
 # --- SSE: real-time search progress ---
 
 

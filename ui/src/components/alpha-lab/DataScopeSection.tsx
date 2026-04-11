@@ -166,7 +166,7 @@ export const DataScopeSection: React.FC<DataScopeProps> = ({
             <Input value={symbols} onChange={e => setSymbols(e.target.value)}
               placeholder="BTCUSDT,ETHUSDT"
               className="flex-1 font-mono text-[10px] h-7" />
-            <Badge variant="secondary" className="text-[9px] shrink-0">{symList().length}</Badge>
+            <Badge className="text-[9px] shrink-0">{symList().length}</Badge>
           </div>
           {symList().length > 8 && (
             <details className="group">

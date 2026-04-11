@@ -1,11 +1,11 @@
 /**
- * Factors tab — Zoo + Factor Catalog + Combine.
+ * Factors tab — Zoo + Factor Catalog + Combine + Event Engine Backtest.
  *
  * Consolidates all factor browsing/management into one place.
  */
 import React, { useCallback, useMemo, useState } from 'react'
-import { LibraryBig, Loader2, RefreshCw, Workflow } from 'lucide-react'
-import type { AlphaLabCombineResult, AlphaLabWorkspace as WorkspacePayload, AlphaLabZooEntry } from '../../types'
+import { ExternalLink, Loader2, Play, RefreshCw, Workflow } from 'lucide-react'
+import type { AlphaLabCombineResult, AlphaLabWorkspace as WorkspacePayload, EventBacktestResponse } from '../../types'
 import { SectionCard } from '../layout/SectionCard'
 import { EmptyState } from '../layout/EmptyState'
 import { Badge } from '../ui/badge'
@@ -30,18 +30,30 @@ interface FactorsTabProps {
   onLoadFormula: (f: string) => void
   onRefresh: () => void
   setErr: (e: string | null) => void
+  onViewSession?: (sessionId: string) => void
 }
 
 export const FactorsTab: React.FC<FactorsTabProps> = ({
   ws, interval, symbols, startTime, endTime, symList,
   market, universe, excludeST,
   loading, onLoadFormula, onRefresh, setErr,
+  onViewSession,
 }) => {
   const [subTab, setSubTab] = useState<'zoo' | 'catalog' | 'combine'>('zoo')
   const [zooSort, setZooSort] = useState<'fitness' | 'saved_at'>('fitness')
   const [combining, setCombining] = useState(false)
   const [combineResult, setCombineResult] = useState<AlphaLabCombineResult | null>(null)
   const [combineMethod, setCombineMethod] = useState('ic_weighted')
+
+  // Event backtest state
+  const [backtesting, setBacktesting] = useState(false)
+  const [btResult, setBtResult] = useState<EventBacktestResponse | null>(null)
+  const [btTopN, setBtTopN] = useState(10)
+  const [btRebalanceInterval, setBtRebalanceInterval] = useState(5)
+  const [btPositionMethod, setBtPositionMethod] = useState('long_only')
+  const [btInitialCash, setBtInitialCash] = useState(1_000_000)
+  const [btCommission, setBtCommission] = useState(0.0003)
+  const [btSlippage, setBtSlippage] = useState(0.001)
 
   const sortedZoo = useMemo(() => {
     const e = [...(ws?.zoo ?? [])]
@@ -52,7 +64,7 @@ export const FactorsTab: React.FC<FactorsTabProps> = ({
 
   const handleCombine = useCallback(async () => {
     try {
-      setCombining(true); setCombineResult(null); setErr(null)
+      setCombining(true); setCombineResult(null); setBtResult(null); setErr(null)
       const r = await alphaApi.combineZoo({
         market, symbols: symList(), start_time: toISO(startTime), end_time: toISO(endTime),
         interval, method: combineMethod, summary_only: true,
@@ -63,6 +75,36 @@ export const FactorsTab: React.FC<FactorsTabProps> = ({
     } catch (e) { setErr(e instanceof Error ? e.message : 'Combine failed') }
     finally { setCombining(false) }
   }, [symList, startTime, endTime, interval, combineMethod, market, universe, excludeST, setErr])
+
+  const handleEventBacktest = useCallback(async () => {
+    try {
+      setBacktesting(true); setBtResult(null); setErr(null)
+      const r = await alphaApi.runEventBacktest({
+        market,
+        symbols: symList(),
+        start_time: toISO(startTime),
+        end_time: toISO(endTime),
+        interval,
+        method: combineMethod,
+        max_factors: 10,
+        min_abs_ic: 0.01,
+        max_correlation: 0.70,
+        zoo_limit: 50,
+        position_method: btPositionMethod,
+        top_n: btTopN,
+        top_pct: 0.2,
+        rebalance_interval: btRebalanceInterval,
+        initial_cash: btInitialCash,
+        commission: btCommission,
+        slippage: btSlippage,
+        ...(universe ? { universe } : {}),
+        ...(excludeST ? { exclude_st: true } : {}),
+      })
+      setBtResult(r)
+    } catch (e) { setErr(e instanceof Error ? e.message : 'Event backtest failed') }
+    finally { setBacktesting(false) }
+  }, [symList, startTime, endTime, interval, combineMethod, market, universe, excludeST,
+      btPositionMethod, btTopN, btRebalanceInterval, btInitialCash, btCommission, btSlippage, setErr])
 
   return (
     <div className="space-y-4">
@@ -133,6 +175,8 @@ export const FactorsTab: React.FC<FactorsTabProps> = ({
             <Button onClick={() => void handleCombine()} disabled={combining || (ws?.zoo.length ?? 0) === 0}>
               {combining ? <Loader2 className="animate-spin" /> : <Workflow />}{combining ? 'Combining...' : 'Run Combination'}</Button>
           </SectionCard>
+
+          {/* Combination Result */}
           {combineResult && (
             <SectionCard title="Combination Result">
               <div className="space-y-4">
@@ -149,6 +193,71 @@ export const FactorsTab: React.FC<FactorsTabProps> = ({
                   </div>
                 )}
                 <MiniChart data={combineResult.equity_series ?? []} label="Combined Equity" height={200} />
+              </div>
+            </SectionCard>
+          )}
+
+          {/* Event Engine Backtest */}
+          <SectionCard
+            title="Event Engine Backtest"
+            description="Run a realistic bar-by-bar backtest using the combined multi-factor signal with order execution, slippage, and commissions."
+          >
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Position Method</label>
+                <select value={btPositionMethod} onChange={e => setBtPositionMethod(e.target.value)}
+                  className="h-10 w-full rounded-xl border border-border bg-input px-3 text-sm text-foreground outline-none">
+                  <option value="long_only">Long Only</option>
+                  <option value="long_short">Long Short</option>
+                </select>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Top N</label>
+                <Input type="number" value={btTopN} onChange={e => setBtTopN(Number(e.target.value))} min={1} max={100} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Rebalance Interval (bars)</label>
+                <Input type="number" value={btRebalanceInterval} onChange={e => setBtRebalanceInterval(Number(e.target.value))} min={1} max={60} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Initial Cash</label>
+                <Input type="number" value={btInitialCash} onChange={e => setBtInitialCash(Number(e.target.value))} min={10000} step={100000} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Commission</label>
+                <Input type="number" value={btCommission} onChange={e => setBtCommission(Number(e.target.value))} min={0} max={0.01} step={0.0001} />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Slippage</label>
+                <Input type="number" value={btSlippage} onChange={e => setBtSlippage(Number(e.target.value))} min={0} max={0.01} step={0.0001} />
+              </div>
+            </div>
+            <div className="flex items-center gap-3 pt-2">
+              <Button onClick={() => void handleEventBacktest()} disabled={backtesting || (ws?.zoo.length ?? 0) === 0}>
+                {backtesting ? <Loader2 className="animate-spin" /> : <Play className="size-4" />}
+                {backtesting ? 'Running...' : 'Start Event Backtest'}
+              </Button>
+              {backtesting && <span className="text-xs text-muted-foreground">Computing factor weights and running event engine backtest...</span>}
+            </div>
+          </SectionCard>
+
+          {/* Event Backtest Result */}
+          {btResult && (
+            <SectionCard title="Event Backtest Submitted">
+              <div className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <Badge variant="info">Session ID</Badge>
+                  <code className="rounded bg-secondary px-2 py-1 text-xs font-mono">{btResult.session_id}</code>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Event engine backtest is running in the background. The session will appear in the session list.
+                  Navigate to the <strong>Session</strong> tab to view real-time progress, equity curve, trades, and performance metrics.
+                </p>
+                {onViewSession && (
+                  <Button variant="outline" size="sm" onClick={() => onViewSession(btResult.session_id)}>
+                    <ExternalLink className="size-4 mr-1" /> View Session Details
+                  </Button>
+                )}
               </div>
             </SectionCard>
           )}

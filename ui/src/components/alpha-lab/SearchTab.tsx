@@ -282,7 +282,6 @@ export const SearchTab: React.FC<SearchTabProps> = ({
               job={job}
               onLoadFormula={onLoadFormula}
               onDismiss={() => searchJobs.dismiss(job.job_id)}
-              onRefresh={() => searchJobs.refresh(job.job_id)}
             />
           ))}
         </div>
@@ -293,11 +292,10 @@ export const SearchTab: React.FC<SearchTabProps> = ({
 
 /* ── Job card: wraps SearchProgress + dismiss button ────────────────── */
 
-function JobCard({ job, onLoadFormula, onDismiss, onRefresh }: {
+function JobCard({ job, onLoadFormula, onDismiss }: {
   job: AlphaLabSearchJob
   onLoadFormula: (f: string) => void
   onDismiss: () => void
-  onRefresh: () => void
 }) {
   const isActive = job.status === 'pending' || job.status === 'running'
   const isCompleted = job.status === 'completed'

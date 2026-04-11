@@ -4,7 +4,7 @@
  * Consolidates all observability views into one place.
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
-import { Activity, AlertTriangle, Clock, Cpu, RefreshCw, Zap } from 'lucide-react'
+import { Activity, AlertTriangle, Clock, RefreshCw, Zap } from 'lucide-react'
 import { SectionCard } from '../layout/SectionCard'
 import { EmptyState } from '../layout/EmptyState'
 import { MetricCard } from '../layout/MetricCard'
@@ -33,8 +33,8 @@ export const MonitorTab: React.FC<MonitorTabProps> = ({ onLoadFormula }) => {
   const loadTracing = useCallback(async () => {
     try {
       const [s, sp] = await Promise.all([
-        alphaApi.getTracingSummary() as Promise<TracingSummary>,
-        alphaApi.getTracingSpans() as Promise<{ spans: TracingSpan[] }>,
+        alphaApi.getTracingSummary() as unknown as Promise<TracingSummary>,
+        alphaApi.getTracingSpans() as unknown as Promise<{ spans: TracingSpan[] }>,
       ])
       setTracingSummary(s); setTracingSpans(sp.spans ?? [])
     } catch { /* ignore */ }
@@ -126,7 +126,7 @@ export const MonitorTab: React.FC<MonitorTabProps> = ({ onLoadFormula }) => {
         <SectionCard title="Neural Training" description="Transformer + REINFORCE training progress"
           action={<Button variant="outline" size="sm" onClick={loadTrainingHistory}><RefreshCw className="size-3.5" />Refresh</Button>}>
           {!trainingHistory ? (
-            <EmptyState message="No training history yet. Run a search with Neural strategy." />
+            <EmptyState title="No training history" description="Run a search with Neural strategy to see training progress." />
           ) : (
             <div className="space-y-6">
               <div className="rounded-xl border border-border/50 overflow-hidden">

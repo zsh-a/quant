@@ -111,7 +111,7 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
               {validating ? <Loader2 className="animate-spin" /> : <CheckCircle2 />}Validate</Button>
             <Button size="sm" onClick={() => void handleAnalyze()} disabled={analyzing || !formula.trim()}>
               {analyzing ? <Loader2 className="animate-spin" /> : <Activity />}Analyze</Button>
-            <Button size="sm" variant="secondary" onClick={() => void handleSave()} disabled={saving || !formula.trim()}>
+            <Button size="sm" variant="default" onClick={() => void handleSave()} disabled={saving || !formula.trim()}>
               {saving ? <Loader2 className="animate-spin" /> : <Save />}Save to Zoo</Button>
           </div>
           {validation && (
@@ -148,8 +148,8 @@ export const ResearchTab: React.FC<ResearchTabProps> = ({
                 {analysis.metrics.eval_method && (
                   <Badge variant="info" className="text-[10px]">{EVAL_METHOD_LABELS[analysis.metrics.eval_method as any] ?? analysis.metrics.eval_method}</Badge>
                 )}
-                {analysis.dataset?.shape && <Badge variant="secondary" className="text-[10px]">{analysis.dataset.shape[0]}×{analysis.dataset.shape[1]}</Badge>}
-                {analysis.expr_hash && <Badge variant="secondary" className="font-mono text-[9px]">{analysis.expr_hash.slice(0, 10)}</Badge>}
+                {analysis.dataset?.shape && <Badge variant="default" className="text-[10px]">{analysis.dataset.shape[0]}×{analysis.dataset.shape[1]}</Badge>}
+                {analysis.expr_hash && <Badge variant="default" className="font-mono text-[9px]">{analysis.expr_hash.slice(0, 10)}</Badge>}
               </div>
             }
             contentClassName="space-y-3"

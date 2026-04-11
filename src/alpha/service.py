@@ -792,6 +792,124 @@ class AlphaService:
         )
         return result
 
+    def generate_event_backtest_weights(
+        self,
+        symbols: list[str],
+        start_time: datetime,
+        end_time: datetime,
+        interval: str = "1d",
+        min_quote_volume: float = 0.0,
+        blocked_utc_hours: list[int] | None = None,
+        method: str = "ic_weighted",
+        position_method: str = "long_only",
+        top_pct: float = 0.2,
+        max_factors: int = 10,
+        min_abs_ic: float = 0.01,
+        max_correlation: float = 0.70,
+        ic_lookback: int = 60,
+        zoo_limit: int = 50,
+        **loader_kwargs,
+    ) -> dict[str, Any]:
+        """
+        生成适用于 event engine 的预计算权重表。
+
+        流程:
+        1. 加载数据集 (AlphaDataset)
+        2. FactorCombiner.combine_from_zoo() -> 组合信号 (T x N)
+        3. SignalTransformer.to_target_weights() -> 目标权重 (T x N)
+        4. 将权重矩阵转为 {timestamp: {symbol: weight}} dict
+        5. 返回 weight_map + 元数据
+        """
+        from .risk.models import EvalMethod
+
+        overall_start = perf_counter()
+
+        # 1. 加载数据集
+        dataset = self.dataset_loader.load(
+            symbols=symbols,
+            start_time=start_time,
+            end_time=end_time,
+            interval=interval,
+            min_quote_volume=min_quote_volume,
+            blocked_utc_hours=blocked_utc_hours,
+            **loader_kwargs,
+        )
+        load_seconds = perf_counter() - overall_start
+
+        # 2. 加载 zoo 并组合
+        zoo_entries = self.persistence.list_zoo_entries(limit=zoo_limit)
+        if not zoo_entries:
+            raise ValueError("Alpha zoo is empty - run search-db first to populate it")
+
+        combo_result = self.combiner.combine_from_zoo(
+            zoo_entries=zoo_entries,
+            dataset=dataset,
+            method=method,
+            max_factors=max_factors,
+            min_abs_ic=min_abs_ic,
+            max_correlation=max_correlation,
+            ic_lookback=ic_lookback,
+        )
+        combined_signal = combo_result["combined_signal"]
+
+        # 3. 信号 -> 目标权重
+        market_ctx = MarketContext(
+            liquidity_mask=dataset.liquidity_mask,
+            session_mask=dataset.session_mask,
+        )
+        eval_method = EvalMethod.LONG_ONLY if position_method == "long_only" else EvalMethod.LONG_SHORT
+        target_weights = self.signal_transformer.to_target_weights(
+            combined_signal, market_ctx, method=eval_method, top_pct=top_pct,
+        )
+        weights_np = self._to_numpy(target_weights)
+
+        # 4. 向量化参考指标
+        store = self._prepare_store(dataset)
+        prices, funding = self._sim_args(store)
+        bt_result = self.execution.simulate(weights_np, prices, self.cost_model, funding_rate=funding)
+        vectorized_metrics = bt_result.summary()
+
+        # 5. 构建 weight_map: {date_str: {symbol: weight}}
+        timestamps = dataset.timestamps
+        ds_symbols = dataset.symbols
+        weight_map: dict[str, dict[str, float]] = {}
+
+        for t_idx in range(weights_np.shape[0]):
+            ts = timestamps[t_idx]
+            date_str = str(ts)[:10] if not isinstance(ts, str) else ts[:10]
+            row = weights_np[t_idx]
+            # 只保留非零权重，节省内存
+            symbol_weights = {}
+            for s_idx in range(len(ds_symbols)):
+                w = float(row[s_idx])
+                if abs(w) > 1e-8:
+                    symbol_weights[ds_symbols[s_idx]] = w
+            if symbol_weights:
+                weight_map[date_str] = symbol_weights
+
+        overall_seconds = perf_counter() - overall_start
+        logger.info(
+            "alpha.generate_event_weights method={} factors={} weight_dates={} overall={:.3f}s",
+            method, len(combo_result["selected_factors"]), len(weight_map), overall_seconds,
+        )
+
+        return {
+            "weight_map": weight_map,
+            "symbols": ds_symbols,
+            "combination": {
+                "method": method,
+                "selected_factors": combo_result["selected_factors"],
+                "factor_count": len(combo_result["selected_factors"]),
+            },
+            "vectorized_metrics": vectorized_metrics,
+            "dataset": self._dataset_summary(dataset),
+            "timing": {
+                "dataset_load_seconds": load_seconds,
+                **combo_result["timing"],
+                "overall_seconds": overall_seconds,
+            },
+        }
+
     def evaluate_formula_across_splits(
         self,
         formula: str,

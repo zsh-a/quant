@@ -144,7 +144,11 @@ def execute_session(
     _emit(hooks.on_status_change, "running", 0.0, None)
     _emit(hooks.on_session_started, config)
 
-    symbols = [config.symbol]
+    # 支持逗号分隔的多 symbol (用于多因子策略等)
+    if "," in config.symbol:
+        symbols = [s.strip() for s in config.symbol.split(",") if s.strip()]
+    else:
+        symbols = [config.symbol]
     if config.mode == "live":
         stream = RealtimeDataStream(
             symbols,

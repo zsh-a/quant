@@ -14,6 +14,8 @@ import type {
   AlphaLabZooEntry,
   AlphaPipelineRecord,
   CheckpointEntry,
+  EventBacktestParams,
+  EventBacktestResponse,
   FactorCatalogResponse,
   StrategyStateResponse,
 } from '../types'
@@ -112,4 +114,8 @@ export const alphaApi = {
   },
   getFactorCatalogStats: () =>
     request<{ strategies: Record<string, unknown>; total_factors: number; job_id?: string }>('/alpha-lab/factor-catalog/stats'),
+
+  // Event Engine Backtest
+  runEventBacktest: (params: EventBacktestParams) =>
+    post<EventBacktestResponse>('/alpha-lab/event-backtest', params),
 }

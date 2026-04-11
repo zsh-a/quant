@@ -10,7 +10,7 @@
 import React, { useMemo, useState } from 'react'
 import {
   AlertTriangle, BarChart3, CheckCircle2, ChevronDown, ChevronRight,
-  Clock, Loader2, Trophy,
+  Loader2, Trophy,
 } from 'lucide-react'
 import { useSearchSSE } from '../../hooks/useSearchSSE'
 import type { AlphaLabSearchJob, AlphaLabZooEntry } from '../../types'
