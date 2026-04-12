@@ -18,7 +18,7 @@ x-backend-env: &backend-env
   CELERY_BROKER_URL: redis://localhost:6379/0
   CELERY_RESULT_BACKEND: redis://localhost:6379/1
   PYTHONUNBUFFERED: "1"
-  SESSION_DB_PATH: /app/data/sessions.db
+  QUANT_PROJECT_ROOT: /app
   QUANT_DATABASE__HOST: localhost
   QUANT_DATABASE__PORT: "8123"
 

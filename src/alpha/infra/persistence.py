@@ -19,8 +19,9 @@ class PersistedRun:
 
 
 class AlphaPersistence:
-    def __init__(self, root_dir: str = "data/alpha"):
-        self.root_dir = Path(root_dir)
+    def __init__(self, root_dir: str = ""):
+        from src.config.paths import ALPHA_DIR
+        self.root_dir = Path(root_dir) if root_dir else ALPHA_DIR
         self.runs_dir = self.root_dir / "runs"
         self.zoo_dir = self.root_dir / "zoo"
         self.runs_dir.mkdir(parents=True, exist_ok=True)
@@ -219,10 +220,13 @@ class AlphaPersistence:
         alphas.sort(key=lambda x: abs(x.get('metrics', {}).get('rank_ic', 0)), reverse=True)
         return alphas
 
-    def export_to_csv(self, output_path: str = "data/alpha_zoo_summary.csv") -> None:
+    def export_to_csv(self, output_path: str = "") -> None:
         """
         Export factor summary to CSV for easy spreadsheet viewing.
         """
+        if not output_path:
+            from src.config.paths import DATA_DIR
+            output_path = str(DATA_DIR / "alpha_zoo_summary.csv")
         import pandas as pd
         alphas = self.load_all()
         if not alphas:

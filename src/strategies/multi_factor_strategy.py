@@ -137,7 +137,7 @@ class MultiFactorStrategy(Strategy):
             },
             "zoo_dir": {
                 "type": "str",
-                "default": "data/alpha_zoo",
+                "default": "",
                 "description": "Alpha因子库目录",
             },
         }
@@ -146,7 +146,10 @@ class MultiFactorStrategy(Strategy):
 
     def _load_factors(self, zoo_dir: str) -> List[Dict[str, Any]]:
         """Load and filter factors from the alpha zoo."""
-        zoo = AlphaZooPersistence(storage_dir=zoo_dir)
+        if not zoo_dir:
+            from src.config.paths import ALPHA_ZOO_DIR
+            zoo_dir = str(ALPHA_ZOO_DIR.parent)
+        zoo = AlphaZooPersistence(root_dir=zoo_dir)
         all_factors = zoo.load_all()
 
         if not all_factors:

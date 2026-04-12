@@ -54,7 +54,7 @@ class AlphaService:
         strategy: str = "evolution",
         neural_sample_batch: int = 512,
         mcts_refinement_frequency: int = 3,
-        strategy_memory_path: str | None = "data/alpha_lab/strategy_memory.json",
+        strategy_memory_path: str | None = None,
         enum_max: int = 500,
         enum_top_k: int = 30,
     ):
@@ -68,6 +68,9 @@ class AlphaService:
         # --- Enhanced modules ---
         self.knowledge_base = FinancialKnowledgeBase()
         self.feature_kitchen = FeatureKitchen(self.schema)
+        if strategy_memory_path is None:
+            from src.config.paths import STRATEGY_MEMORY_PATH
+            strategy_memory_path = str(STRATEGY_MEMORY_PATH)
         self.strategy_memory = StrategyMemory(
             persistence_path=strategy_memory_path,
             all_theme_ids=self.knowledge_base.get_all_theme_ids(),

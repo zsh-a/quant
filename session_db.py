@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Optional
 
 
 def _default_db_path() -> str:
-    return os.environ.get("SESSION_DB_PATH", "sessions.db")
+    from src.config.paths import SESSIONS_DB
+    return os.environ.get("SESSION_DB_PATH", str(SESSIONS_DB))
 
 
 class SessionDB:

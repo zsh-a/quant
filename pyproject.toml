@@ -20,7 +20,8 @@ dependencies = [
     "pyecharts>=2.0.9",
     "pyyaml>=6.0.3",
     "ta-lib>=0.6.8",
-    "uvicorn>=0.40.0",
+    "hypercorn>=0.17.0",
+    "h2>=4.0.0",
     # Phase 3 - Task Queue & Monitoring
     "celery>=5.3.4",
     "redis>=5.0.1",

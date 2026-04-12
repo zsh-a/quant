@@ -9,7 +9,10 @@ from celery import Celery
 from kombu import Exchange, Queue
 import os
 
+from src.config.paths import ensure_data_dirs
 from src.utils.logging_config import setup_logging
+
+ensure_data_dirs()
 
 # Celery app instance
 app = Celery('quant_tasks')

@@ -29,7 +29,7 @@ load_env() {
   fi
 
   export PYTHONPATH="$ROOT_DIR:${PYTHONPATH:-}"
-  export SESSION_DB_PATH="${SESSION_DB_PATH:-$ROOT_DIR/sessions.db}"
+  export QUANT_PROJECT_ROOT="${QUANT_PROJECT_ROOT:-$ROOT_DIR}"
   export CELERY_BROKER_URL="${CELERY_BROKER_URL:-redis://127.0.0.1:6379/0}"
   export CELERY_RESULT_BACKEND="${CELERY_RESULT_BACKEND:-redis://127.0.0.1:6379/1}"
   export PYTHONUNBUFFERED=1
@@ -146,6 +146,61 @@ start_redis() {
   echo "[INFO] Started Redis via docker compose"
 }
 
+CLICKHOUSE_MODE_FILE="$DEV_DIR/clickhouse.mode"
+
+start_clickhouse() {
+  if [ "$(is_port_open "${QUANT_DATABASE__PORT:-8123}")" = "1" ]; then
+    echo "reuse" > "$CLICKHOUSE_MODE_FILE"
+    echo "[INFO] Reusing existing ClickHouse on 127.0.0.1:${QUANT_DATABASE__PORT:-8123}"
+    return
+  fi
+
+  local compose
+  compose="$(compose_cmd)" || {
+    echo "[ERROR] ClickHouse not running and docker compose unavailable" >&2
+    exit 1
+  }
+  (cd "$ROOT_DIR" && $compose up -d clickhouse)
+  echo "docker" > "$CLICKHOUSE_MODE_FILE"
+
+  # Wait for ClickHouse to be ready
+  echo -n "[INFO] Waiting for ClickHouse"
+  local retries=0
+  while [ "$(is_port_open "${QUANT_DATABASE__PORT:-8123}")" != "1" ]; do
+    retries=$((retries + 1))
+    if [ $retries -ge 30 ]; then
+      echo " [TIMEOUT]"
+      echo "[ERROR] ClickHouse failed to start within 30s" >&2
+      exit 1
+    fi
+    echo -n "."
+    sleep 1
+  done
+  echo " ready"
+}
+
+stop_clickhouse() {
+  if [ ! -f "$CLICKHOUSE_MODE_FILE" ]; then
+    return
+  fi
+
+  local mode
+  mode="$(cat "$CLICKHOUSE_MODE_FILE")"
+  case "$mode" in
+    docker)
+      local compose
+      compose="$(compose_cmd)"
+      (cd "$ROOT_DIR" && $compose stop clickhouse >/dev/null)
+      echo "[INFO] Stopped docker compose ClickHouse"
+      ;;
+    reuse)
+      echo "[INFO] ClickHouse was pre-existing; leaving it running"
+      ;;
+  esac
+
+  rm -f "$CLICKHOUSE_MODE_FILE"
+}
+
 stop_redis() {
   if [ ! -f "$REDIS_MODE_FILE" ]; then
     return
@@ -197,6 +252,14 @@ show_status() {
     echo "[DOWN] redis"
   fi
 
+  if [ -f "$CLICKHOUSE_MODE_FILE" ]; then
+    echo "[INFO] clickhouse mode: $(cat "$CLICKHOUSE_MODE_FILE")"
+  elif [ "$(is_port_open "${QUANT_DATABASE__PORT:-8123}")" = "1" ]; then
+    echo "[INFO] clickhouse mode: external"
+  else
+    echo "[DOWN] clickhouse"
+  fi
+
   echo
   echo "API:    http://127.0.0.1:${API_PORT:-8000}/docs"
   echo "UI:     http://127.0.0.1:${UI_PORT:-5173}"
@@ -241,12 +304,13 @@ up() {
   [ -x "$ROOT_DIR/.venv/bin/celery" ] || { echo "[ERROR] Missing .venv/bin/celery" >&2; exit 1; }
 
   start_redis
+  start_clickhouse
 
   start_background "api" "$ROOT_DIR" \
-    "export PYTHONPATH='$PYTHONPATH' SESSION_DB_PATH='$SESSION_DB_PATH' CELERY_BROKER_URL='$CELERY_BROKER_URL' CELERY_RESULT_BACKEND='$CELERY_RESULT_BACKEND' QUANT_DATABASE__HOST='$QUANT_DATABASE__HOST' QUANT_DATABASE__PORT='$QUANT_DATABASE__PORT' QUANT_DATABASE__USERNAME='$QUANT_DATABASE__USERNAME' QUANT_DATABASE__PASSWORD='$QUANT_DATABASE__PASSWORD' PYTHONUNBUFFERED=1; '$ROOT_DIR/.venv/bin/python' -m uvicorn src.api.server:app --reload --host 0.0.0.0 --port '$API_PORT'"
+    "export PYTHONPATH='$PYTHONPATH' QUANT_PROJECT_ROOT='$QUANT_PROJECT_ROOT' CELERY_BROKER_URL='$CELERY_BROKER_URL' CELERY_RESULT_BACKEND='$CELERY_RESULT_BACKEND' QUANT_DATABASE__HOST='$QUANT_DATABASE__HOST' QUANT_DATABASE__PORT='$QUANT_DATABASE__PORT' QUANT_DATABASE__USERNAME='$QUANT_DATABASE__USERNAME' QUANT_DATABASE__PASSWORD='$QUANT_DATABASE__PASSWORD' PYTHONUNBUFFERED=1; '$ROOT_DIR/.venv/bin/python' -m hypercorn src.api.server:app --reload --bind 0.0.0.0:'$API_PORT'"
 
   start_background "worker" "$ROOT_DIR" \
-    "export PYTHONPATH='$PYTHONPATH' SESSION_DB_PATH='$SESSION_DB_PATH' CELERY_BROKER_URL='$CELERY_BROKER_URL' CELERY_RESULT_BACKEND='$CELERY_RESULT_BACKEND' QUANT_DATABASE__HOST='$QUANT_DATABASE__HOST' QUANT_DATABASE__PORT='$QUANT_DATABASE__PORT' QUANT_DATABASE__USERNAME='$QUANT_DATABASE__USERNAME' QUANT_DATABASE__PASSWORD='$QUANT_DATABASE__PASSWORD' PYTHONUNBUFFERED=1; '$ROOT_DIR/.venv/bin/celery' -A src.tasks.celery_app worker --loglevel=info --concurrency='$CELERY_WORKER_CONCURRENCY' --queues='$CELERY_QUEUES' --max-tasks-per-child=100 --time-limit=3600 --soft-time-limit=3000"
+    "export PYTHONPATH='$PYTHONPATH' QUANT_PROJECT_ROOT='$QUANT_PROJECT_ROOT' CELERY_BROKER_URL='$CELERY_BROKER_URL' CELERY_RESULT_BACKEND='$CELERY_RESULT_BACKEND' QUANT_DATABASE__HOST='$QUANT_DATABASE__HOST' QUANT_DATABASE__PORT='$QUANT_DATABASE__PORT' QUANT_DATABASE__USERNAME='$QUANT_DATABASE__USERNAME' QUANT_DATABASE__PASSWORD='$QUANT_DATABASE__PASSWORD' PYTHONUNBUFFERED=1; '$ROOT_DIR/.venv/bin/celery' -A src.tasks.celery_app worker --loglevel=info --concurrency='$CELERY_WORKER_CONCURRENCY' --queues='$CELERY_QUEUES' --max-tasks-per-child=100 --time-limit=3600 --soft-time-limit=3000"
 
   start_background "ui" "$ROOT_DIR/ui" \
     "npm run dev -- --host 0.0.0.0 --port '$UI_PORT'"
@@ -267,6 +331,7 @@ down() {
   stop_background "worker"
   stop_background "api"
   stop_redis
+  stop_clickhouse
 }
 
 restart() {

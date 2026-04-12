@@ -18,12 +18,11 @@ class StatePersistence:
     """Manages session state persistence and recovery"""
 
     def __init__(self):
+        from src.config.paths import CHECKPOINTS_DIR
         self.enabled = True
-        self.checkpoint_path = Path("data/checkpoints")
+        self.checkpoint_path = CHECKPOINTS_DIR
         self.checkpoint_interval = 60
         self.use_compression = True
-
-        self.checkpoint_path.mkdir(parents=True, exist_ok=True)
 
         # Initialize SQLite database
         self.db_path = self.checkpoint_path / "checkpoints.db"

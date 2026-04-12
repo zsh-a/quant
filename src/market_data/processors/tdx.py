@@ -28,13 +28,12 @@ def convert_to_date(num):
 
 class TDXProcess:
     table_name = "stock_data.finicial_report"
-    state_file = "data/tdx_sync_state.json"
 
     def __init__(self):
+        from src.config.paths import TDX_SYNC_STATE_PATH, TDX_FIN_DATA_DIR
+        self.state_file = str(TDX_SYNC_STATE_PATH)
         self.client = create_clickhouse_client()
-        self.fin_path = "fin_data"
-        os.makedirs(self.fin_path, exist_ok=True)
-        os.makedirs(os.path.dirname(self.state_file), exist_ok=True)
+        self.fin_path = str(TDX_FIN_DATA_DIR)
         self.state = self._load_state()
 
     def _load_state(self):

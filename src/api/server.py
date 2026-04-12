@@ -29,6 +29,9 @@ requests.post = partial(requests.post, timeout=5)
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
+from src.config.paths import ensure_data_dirs
+ensure_data_dirs()
+
 from src.strategies.registry import StrategyRegistry
 from src.utils.cache import get_cache, get_backtest_cache
 from src.config.settings import (

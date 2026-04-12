@@ -7,9 +7,9 @@ from typing import Any
 
 
 class CryptoSyncStateStore:
-    def __init__(self, path: str = "data/crypto_sync_state.json"):
-        self.path = Path(path)
-        self.path.parent.mkdir(parents=True, exist_ok=True)
+    def __init__(self, path: str = ""):
+        from src.config.paths import CRYPTO_SYNC_STATE_PATH
+        self.path = Path(path) if path else CRYPTO_SYNC_STATE_PATH
 
     def load(self) -> dict[str, Any]:
         if not self.path.exists():

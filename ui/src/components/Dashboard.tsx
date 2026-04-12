@@ -11,6 +11,7 @@ import { calculateMetrics } from '../utils/metrics';
 import { formatMoney, formatSignedMoney, formatSigned, formatPercent, colorFromSign, colorFromValue } from '../utils/format';
 import { formatModeLabel } from '../utils/display';
 import { Button } from './ui/button';
+import { useCssVar } from '../hooks/useCssVar';
 
 interface DashboardProps {
     primarySession: SessionSummary | undefined;
@@ -49,6 +50,8 @@ const Dashboard: React.FC<DashboardProps> = ({
     onSelectSession,
     allSessions
 }) => {
+    const chartStroke = useCssVar('--chart-stroke');
+    const chartGrid = useCssVar('--chart-grid');
     const [useLttb, setUseLttb] = useState(true);
     const [selectedDay, setSelectedDay] = useState<EquityPoint | null>(null);
     const [equityPage, setEquityPage] = useState(1);
@@ -267,11 +270,11 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
                             <defs>
                                 <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="var(--chart-stroke)" stopOpacity={0.22} />
-                                    <stop offset="95%" stopColor="var(--chart-stroke)" stopOpacity={0} />
+                                    <stop offset="5%" stopColor={chartStroke} stopOpacity={0.22} />
+                                    <stop offset="95%" stopColor={chartStroke} stopOpacity={0} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
                             <XAxis dataKey="timestamp" hide />
                             <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} width={56} />
                             <Tooltip
@@ -284,7 +287,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 labelFormatter={(label) => label.split(' ')[0]}
                             />
                             <Legend wrapperStyle={{ paddingTop: '12px' }} verticalAlign="bottom" />
-                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="var(--chart-stroke)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={2.5} />
+                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke={chartStroke} fillOpacity={1} fill="url(#colorEquity)" strokeWidth={2.5} />
                             {visibleComparisonData.map((c, idx) => (
                                 <Line
                                     key={c.id}

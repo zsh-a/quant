@@ -69,7 +69,7 @@ class RuntimeConfig(BaseModel):
     failure_backoff_seconds: int = 30
     max_failure_backoff_seconds: int = 900
     require_new_window: bool = True
-    state_path: str = "data/alpha_lab/auto_search_state.json"
+    state_path: str = ""
     max_run_files: int | None = None
     max_zoo_entries: int | None = None
 
@@ -127,7 +127,11 @@ def run_auto_search_loop(
     sleep_fn: Callable[[float], None] = time.sleep,
     now_fn: Callable[[], datetime] | None = None,
 ) -> dict[str, Any]:
-    state_path = Path(config.runtime.state_path)
+    _sp = config.runtime.state_path
+    if not _sp:
+        from src.config.paths import AUTO_SEARCH_STATE_PATH
+        _sp = str(AUTO_SEARCH_STATE_PATH)
+    state_path = Path(_sp)
     state = _load_state(state_path)
     resolved_max = max_cycles if max_cycles is not None else config.runtime.max_cycles
     effective_now = now_fn or (lambda: datetime.now(UTC))

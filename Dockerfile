@@ -62,9 +62,9 @@ COPY config/ ./config/
 COPY utils/ ./utils/
 COPY session_db.py ./
 
-# Create data directories
-RUN mkdir -p data/checkpoints data/logs data/alpha_lab data/alpha_zoo
+# Data directories are created at runtime by ensure_data_dirs()
+ENV QUANT_PROJECT_ROOT=/app
 
 EXPOSE 8000
 
-CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000", "--ws-ping-timeout", "60"]
+CMD ["hypercorn", "src.api.server:app", "--bind", "0.0.0.0:8000", "--keep-alive", "75", "--websocket-ping-interval", "60"]

@@ -137,10 +137,13 @@ class CheckpointManager:
 
     def __init__(
         self,
-        checkpoint_dir: str = "data/alpha_lab/checkpoints",
+        checkpoint_dir: str = "",
         checkpoint_every_n_rounds: int = 5,
         keep_latest: int = 3,
     ) -> None:
+        if not checkpoint_dir:
+            from src.config.paths import ALPHA_LAB_CHECKPOINTS_DIR
+            checkpoint_dir = str(ALPHA_LAB_CHECKPOINTS_DIR)
         self._dir = Path(checkpoint_dir)
         self._every_n = checkpoint_every_n_rounds
         self._keep_latest = keep_latest

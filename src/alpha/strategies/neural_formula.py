@@ -469,7 +469,7 @@ class NeuralFormulaStrategy(BaseStrategy):
         activation_frequency: int = 1,
         min_round: int = 1,
         device: str | None = None,
-        output_dir: str = "data/alpha_lab/neural",
+        output_dir: str = "",
     ) -> None:
         self._registry = registry or OperatorRegistry()
         self._schema = schema or TensorSchema.default_market_schema()
@@ -483,6 +483,9 @@ class NeuralFormulaStrategy(BaseStrategy):
         self._enable_lord = enable_lord
         self._activation_freq = activation_frequency
         self._min_round = min_round
+        if not output_dir:
+            from src.config.paths import ALPHA_LAB_NEURAL_DIR
+            output_dir = str(ALPHA_LAB_NEURAL_DIR)
         self._output_dir = Path(output_dir)
 
         if device is None:

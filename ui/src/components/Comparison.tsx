@@ -10,6 +10,7 @@ import { EmptyState } from './layout/EmptyState';
 import { PageHeader } from './layout/PageHeader';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
+import { useCssVar } from '../hooks/useCssVar';
 
 interface ComparisonProps {
     selectedSessionIds: string[];
@@ -67,6 +68,7 @@ const Comparison: React.FC<ComparisonProps> = ({
     benchmarksData: _benchmarksData,
     availableBenchmarks: _availableBenchmarks
 }) => {
+    const chartGrid = useCssVar('--chart-grid');
     const [useLttb, setUseLttb] = useState(true);
 
     const sessionMetrics = useMemo(() => {
@@ -185,7 +187,7 @@ const Comparison: React.FC<ComparisonProps> = ({
             <div className="chart-container h-[500px]">
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
                         <XAxis dataKey="timestamp" hide />
                         <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
                         <Tooltip

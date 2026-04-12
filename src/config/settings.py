@@ -12,6 +12,8 @@ import yaml
 from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
+from src.config import paths
+
 
 class RealtimeDataStreamConfig(BaseModel):
     """Realtime data stream configuration"""
@@ -76,7 +78,7 @@ class FileConfig(BaseModel):
     """File logging configuration"""
 
     enabled: bool = True
-    path: str = "logs/quant.log"
+    path: str = str(paths.LOG_FILE_PATH)
 
 
 class LoggingConfig(BaseModel):
@@ -135,7 +137,7 @@ class CryptoMarketConfig(BaseModel):
     )
     default_lookback_hours: int = 24
     full_history_start: str = "2020-01-01T00:00:00+00:00"
-    state_file: str = "data/crypto_sync_state.json"
+    state_file: str = str(paths.CRYPTO_SYNC_STATE_PATH)
 
 
 class Settings(BaseSettings):

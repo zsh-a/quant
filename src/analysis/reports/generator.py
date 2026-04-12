@@ -17,9 +17,11 @@ class ReportGenerator:
     Generates professional reports in Markdown format.
     """
     
-    def __init__(self, output_dir: str = "data/reports"):
+    def __init__(self, output_dir: str = ""):
+        if not output_dir:
+            from src.config.paths import REPORTS_DIR
+            output_dir = str(REPORTS_DIR)
         self.output_dir = output_dir
-        os.makedirs(output_dir, exist_ok=True)
     
     def generate(
         self,

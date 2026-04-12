@@ -28,8 +28,10 @@ session_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
 LOG_LEVEL = "INFO"
 LOG_ROTATION = "100 MB"
 LOG_RETENTION = "30 days"
-LOG_PATH = "logs/quant.log"
-JSON_LOG_PATH = "logs/quant.jsonl"
+from src.config.paths import LOG_FILE_PATH as _LOG_FILE_PATH, JSON_LOG_PATH as _JSON_LOG_PATH
+
+LOG_PATH = str(_LOG_FILE_PATH)
+JSON_LOG_PATH = str(_JSON_LOG_PATH)
 
 # Human-readable format for console
 # Compact: timestamp | LEVEL | module - message | context

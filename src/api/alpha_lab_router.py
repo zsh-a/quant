@@ -789,20 +789,20 @@ async def get_tracing_traces():
 @router.get("/neural/history")
 async def get_neural_history():
     """Get neural strategy training history if available."""
-    from pathlib import Path
     import json
-    p = Path("data/alpha_lab/neural/training_history.json")
+    from src.config.paths import ALPHA_LAB_NEURAL_DIR
+    p = ALPHA_LAB_NEURAL_DIR / "training_history.json"
     if not p.exists():
         return {"history": [], "plot_available": False}
     history = json.loads(p.read_text())
-    plot_available = Path("data/alpha_lab/neural/training_curves.png").exists()
+    plot_available = (ALPHA_LAB_NEURAL_DIR / "training_curves.png").exists()
     return {"history": history, "plot_available": plot_available}
 
 
 @router.get("/neural/plot")
 async def get_neural_plot():
-    from pathlib import Path
-    p = Path("data/alpha_lab/neural/training_curves.png")
+    from src.config.paths import ALPHA_LAB_NEURAL_DIR
+    p = ALPHA_LAB_NEURAL_DIR / "training_curves.png"
     if not p.exists():
         raise HTTPException(status_code=404, detail="No training plot available")
     return FileResponse(p, media_type="image/png")
