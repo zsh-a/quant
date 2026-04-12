@@ -10,7 +10,7 @@ import { EmptyState } from './layout/EmptyState';
 import { PageHeader } from './layout/PageHeader';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
-import { useCssVar } from '../hooks/useCssVar';
+import { useChartTheme } from '../hooks/useChartTheme';
 
 interface ComparisonProps {
     selectedSessionIds: string[];
@@ -68,7 +68,7 @@ const Comparison: React.FC<ComparisonProps> = ({
     benchmarksData: _benchmarksData,
     availableBenchmarks: _availableBenchmarks
 }) => {
-    const chartGrid = useCssVar('--chart-grid');
+    const chart = useChartTheme();
     const [useLttb, setUseLttb] = useState(true);
 
     const sessionMetrics = useMemo(() => {
@@ -187,11 +187,11 @@ const Comparison: React.FC<ComparisonProps> = ({
             <div className="chart-container h-[500px]">
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={chartGrid} vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
                         <XAxis dataKey="timestamp" hide />
-                        <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
+                        <YAxis domain={['auto', 'auto']} stroke={chart.textDim} fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
                         <Tooltip
-                            contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--color-border)', borderRadius: '10px' }}
+                            contentStyle={{ backgroundColor: chart.tooltipBg, borderColor: chart.tooltipBorder, borderRadius: '10px' }}
                             itemStyle={{ color: 'var(--color-text)' }}
                             formatter={(value: any, name: string) => {
                                 const sessionId = name.replace('session_', '');
