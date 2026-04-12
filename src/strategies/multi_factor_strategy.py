@@ -251,33 +251,36 @@ class MultiFactorStrategy(Strategy):
 
         self._log("========== 多因子调仓日 ==========")
 
-        # 1. Get universe
-        stocks = self.db_client.get_index_stocks(self.index_code, today_str)
-        if not stocks:
-            stocks = self.db_client.get_index_stocks(f"sh.{self.index_code}", today_str)
-        if not stocks:
-            self._log("Failed to fetch universe stocks", level="ERROR")
-            return
+        try:
+            # 1. Get universe
+            stocks = self.db_client.get_index_stocks(self.index_code, today_str)
+            if not stocks:
+                stocks = self.db_client.get_index_stocks(f"sh.{self.index_code}", today_str)
+            if not stocks:
+                self._log("Failed to fetch universe stocks", level="ERROR")
+                return
 
-        self._log(f"Universe: {len(stocks)} stocks from index {self.index_code}")
+            self._log(f"Universe: {len(stocks)} stocks from index {self.index_code}")
 
-        # 2. Compute composite score
-        scores = self._compute_composite_score(stocks, today_str)
-        if scores.empty:
-            self._log("Composite score is empty, skipping rebalance", level="WARNING")
-            return
+            # 2. Compute composite score
+            scores = self._compute_composite_score(stocks, today_str)
+            if scores.empty:
+                self._log("Composite score is empty, skipping rebalance", level="WARNING")
+                return
 
-        # 3. Select top_n
-        target_stocks = scores.head(self.top_n).index.tolist()
-        self._log(f"Top {self.top_n} stocks selected")
-        for i, s in enumerate(target_stocks[:5]):
-            self._log(f"  {i+1}. {s}  score={scores[s]:.4f}")
-        if len(target_stocks) > 5:
-            self._log(f"  ... and {len(target_stocks) - 5} more")
+            # 3. Select top_n
+            target_stocks = scores.head(self.top_n).index.tolist()
+            self._log(f"Top {self.top_n} stocks selected")
+            for i, s in enumerate(target_stocks[:5]):
+                self._log(f"  {i+1}. {s}  score={scores[s]:.4f}")
+            if len(target_stocks) > 5:
+                self._log(f"  ... and {len(target_stocks) - 5} more")
 
-        # 4. Rebalance
-        self._rebalance(target_stocks, today_str)
-        self._last_rebalance_date = today_str
+            # 4. Rebalance
+            self._rebalance(target_stocks, today_str)
+            self._last_rebalance_date = today_str
+        except Exception as e:
+            self._log(f"调仓失败: {e}", level="ERROR")
 
     # ---- Rebalance execution ----
 

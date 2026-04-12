@@ -230,16 +230,19 @@ class JSGStrategy(Strategy):
 
         self._log("========== 调仓日 ==========")
 
-        # 1. Broad market check
-        I = self.get_market_breadth(today_str)
-        self._log(f"市场宽度(热门行业): {I}", breadth=I)
+        try:
+            # 1. Broad market check
+            I = self.get_market_breadth(today_str)
+            self._log(f"市场宽度(热门行业): {I}", breadth=I)
 
-        # 2. Select stocks
-        cand_stocks = self.stock_decider(I, today_str)
-        self._log(f"候选股票: {cand_stocks}", candidates=len(cand_stocks))
+            # 2. Select stocks
+            cand_stocks = self.stock_decider(I, today_str)
+            self._log(f"候选股票: {cand_stocks}", candidates=len(cand_stocks))
 
-        # 3. Adjust positions
-        self.adjust(cand_stocks, today_str)
+            # 3. Adjust positions
+            self.adjust(cand_stocks, today_str)
+        except Exception as e:
+            self._log(f"调仓失败: {e}", level="ERROR")
 
     def get_market_breadth(self, end_date):
         stocks = self.db_client.get_index_stocks("000985", end_date)

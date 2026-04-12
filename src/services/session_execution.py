@@ -7,6 +7,7 @@ import time
 from loguru import logger
 
 from session_db import SessionDB
+from src.utils.session_logger import get_session_logger
 from src.config.settings import get_broker_config, get_data_stream_config
 from src.core.backtest_broker import BacktestBroker
 from src.core.data_stream import DBDataStream, RealtimeDataStream
@@ -244,8 +245,15 @@ def execute_session(
     )
     _emit(hooks.on_engine_created, engine, broker)
 
+    def _flush_session_logs():
+        """Flush any pending strategy logs to persistence."""
+        collector = get_session_logger(config.session_id, create=False)
+        if collector:
+            collector.flush(force=True)
+
     try:
         engine.run()
+        _flush_session_logs()
         snapshot = _persist_runtime_snapshot(config.session_id, broker, session_db, hooks)
         final_info = snapshot["info"]
 
@@ -277,6 +285,7 @@ def execute_session(
         _emit(hooks.on_completed, result)
         return result
     except Exception as exc:
+        _flush_session_logs()
         error_message = str(exc)
         _update_session_record(session_db, config.session_id, "failed", error=error_message)
         _emit(hooks.on_status_change, "failed", 0.0, error_message)

@@ -147,42 +147,45 @@ class RotationStrategy(Strategy):
             f"========== 轮动调仓日 (Timing: {self.timing}, Live: {is_live}) =========="
         )
 
-        df_ratio = self.get_market_breadth(today_str)
-        if df_ratio.empty:
-            return
+        try:
+            df_ratio = self.get_market_breadth(today_str)
+            if df_ratio.empty:
+                return
 
-        means = self.calculate_group_means(df_ratio)
-        max_group = max(means, key=means.get)
-        max_mean = means[max_group]
+            means = self.calculate_group_means(df_ratio)
+            max_group = max(means, key=means.get)
+            max_mean = means[max_group]
 
-        I_top = df_ratio.nlargest(1, "ratio")["name"].tolist()
-        market_env = self.judge_market_env(today_str)
+            I_top = df_ratio.nlargest(1, "ratio")["name"].tolist()
+            market_env = self.judge_market_env(today_str)
 
-        if (
-            any(item in self.black_industry_name for item in I_top)
-            and market_env == "存量"
-        ):
-            self.adjust([], today_str)
-            return
+            if (
+                any(item in self.black_industry_name for item in I_top)
+                and market_env == "存量"
+            ):
+                self.adjust([], today_str)
+                return
 
-        final_list = []
-        if max_group == "JSG" and max_mean > 90:
-            L2 = self.get_L2(today_str)
-            max_ind_code = df_ratio[df_ratio["name"].isin(self.JSG_group)][
-                "ratio"
-            ].idxmax()
-            L1_stocks = self.db_client.get_swindustry_stocks(max_ind_code, today_str)
-            L1 = self.get_L1(L1_stocks, today_str)
-            final_list = L1[:1] + L2[:9]
-        elif max_group == "XSZ":
-            final_list = self.get_L2(today_str)[:10]
-        elif max_group == "CYB":
-            L2 = self.get_L2(today_str)
-            final_list = L2[:9] + ["159915"]
-        else:
-            final_list = self.get_L2(today_str)[:10]
+            final_list = []
+            if max_group == "JSG" and max_mean > 90:
+                L2 = self.get_L2(today_str)
+                max_ind_code = df_ratio[df_ratio["name"].isin(self.JSG_group)][
+                    "ratio"
+                ].idxmax()
+                L1_stocks = self.db_client.get_swindustry_stocks(max_ind_code, today_str)
+                L1 = self.get_L1(L1_stocks, today_str)
+                final_list = L1[:1] + L2[:9]
+            elif max_group == "XSZ":
+                final_list = self.get_L2(today_str)[:10]
+            elif max_group == "CYB":
+                L2 = self.get_L2(today_str)
+                final_list = L2[:9] + ["159915"]
+            else:
+                final_list = self.get_L2(today_str)[:10]
 
-        self.adjust(final_list, today_str)
+            self.adjust(final_list, today_str)
+        except Exception as e:
+            self._log(f"调仓失败: {e}", level="ERROR")
 
     def get_market_breadth(self, end_date):
         all_stocks = self.db_client.get_index_stocks("000985", end_date)
