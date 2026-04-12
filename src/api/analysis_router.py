@@ -17,7 +17,7 @@ router = APIRouter(prefix="/analysis", tags=["analysis"])
 try:
     from session_db import SessionDB
     session_db = SessionDB()
-except:
+except Exception:
     session_db = None
 
 

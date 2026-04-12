@@ -94,9 +94,7 @@ session_service = SessionService(session_db, persistence)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=api_config.cors_origins
-    if hasattr(api_config, "cors_origins")
-    else ["*"],
+    allow_origins=api_config.cors_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -126,9 +124,6 @@ class SessionRequest(BaseModel):
     end_date: Optional[str] = None
     mode: str = "backtest"  # backtest, simulation, live
     params: Dict[str, Any] = Field(default_factory=dict)
-
-# Mock live server URL - in real scenario this might be config
-LIVE_SERVER_URL = "http://localhost:11122"
 
 # Register strategies once at startup
 StrategyRegistry.register_all()
@@ -332,13 +327,6 @@ async def get_session_status(
     )
 
 
-@app.get("/sessions/{session_id}")
-async def get_session_resource(session_id: str):
-    payload = await anyio.to_thread.run_sync(session_service.get_status_payload, session_id, None)
-    payload["session_id"] = session_id
-    return payload
-
-
 @app.get("/sessions/{session_id}/equity")
 async def get_session_equity(
     session_id: str,
@@ -402,22 +390,12 @@ async def get_session_metrics(session_id: str):
     return {"session_id": session_id, "metrics": metrics.to_dict()}
 
 
-@app.get("/sessions/{session_id}/metrics")
-async def get_session_metrics_resource(session_id: str):
-    return await get_session_metrics(session_id)
-
-
 @app.post("/session/{session_id}/stop")
 async def stop_session(session_id: str):
     result = await anyio.to_thread.run_sync(session_service.stop_session, session_id)
     await emit_session_stopped(session_id)
     await emit_session_progress(session_id, 0.0, "stopped")
     return result
-
-
-@app.post("/sessions/{session_id}/stop")
-async def stop_session_resource(session_id: str):
-    return await stop_session(session_id)
 
 
 @app.get("/market/benchmark")
@@ -433,7 +411,7 @@ async def get_benchmark(symbol: str, start_date: str, end_date: Optional[str] = 
             result.append({"timestamp": str(ts), "value": row["close"]})
         return result
     except Exception as e:
-        print(f"Error fetching benchmark: {e}")
+        logger.error(f"Error fetching benchmark: {e}")
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -465,24 +443,10 @@ async def broadcast_session_event(event_data: dict):
         await ws_manager.broadcast_to_session(session_id, event_data)
 
 
-# Register event listeners
-event_bus.subscribe(EventType.SESSION_STARTED, broadcast_session_event)
-event_bus.subscribe(EventType.SESSION_PROGRESS, broadcast_session_event)
-event_bus.subscribe(EventType.SESSION_COMPLETED, broadcast_session_event)
-event_bus.subscribe(EventType.SESSION_FAILED, broadcast_session_event)
-event_bus.subscribe(EventType.SESSION_STOPPED, broadcast_session_event)
-event_bus.subscribe(EventType.TRADE_EXECUTED, broadcast_session_event)
-event_bus.subscribe(EventType.EQUITY_UPDATE, broadcast_session_event)
-event_bus.subscribe(EventType.ERROR_OCCURRED, broadcast_session_event)
-event_bus.subscribe(EventType.DATA_UPDATE_STARTED, broadcast_session_event)
-event_bus.subscribe(EventType.DATA_UPDATE_PROGRESS, broadcast_session_event)
-event_bus.subscribe(EventType.DATA_UPDATE_COMPLETED, broadcast_session_event)
-event_bus.subscribe(EventType.DATA_UPDATE_FAILED, broadcast_session_event)
-event_bus.subscribe(EventType.SIMULATION_BATCH_STARTED, broadcast_session_event)
-event_bus.subscribe(EventType.SIMULATION_BATCH_PROGRESS, broadcast_session_event)
-event_bus.subscribe(EventType.SIMULATION_BATCH_COMPLETED, broadcast_session_event)
-event_bus.subscribe(EventType.SIMULATION_BATCH_FAILED, broadcast_session_event)
-event_bus.subscribe(EventType.STRATEGY_STEP, broadcast_session_event)
+# Register event listeners — broadcast all event types to WebSocket clients
+for _evt in vars(EventType).values():
+    if isinstance(_evt, str) and not _evt.startswith("_"):
+        event_bus.subscribe(_evt, broadcast_session_event)
 
 logger.info("WebSocket event listeners registered")
 
@@ -502,21 +466,11 @@ async def create_checkpoint(session_id: str):
         raise HTTPException(status_code=500, detail="Failed to create checkpoint")
 
 
-@app.post("/sessions/{session_id}/checkpoint")
-async def create_checkpoint_resource(session_id: str):
-    return await create_checkpoint(session_id)
-
-
 @app.get("/session/{session_id}/checkpoints")
 async def list_checkpoints(session_id: str):
     """List all checkpoints for a session"""
     checkpoints = persistence.list_checkpoints(session_id)
     return {"session_id": session_id, "checkpoints": checkpoints}
-
-
-@app.get("/sessions/{session_id}/checkpoints")
-async def list_checkpoints_resource(session_id: str):
-    return await list_checkpoints(session_id)
 
 
 @app.post("/session/{session_id}/restore")
@@ -543,11 +497,6 @@ async def restore_session(session_id: str):
         "status": session.status,
         "progress": session.progress,
     }
-
-
-@app.post("/sessions/{session_id}/restore")
-async def restore_session_resource(session_id: str):
-    return await restore_session(session_id)
 
 
 @app.get("/persistence/stats")

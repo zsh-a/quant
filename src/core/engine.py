@@ -25,11 +25,8 @@ class TradingEngine:
         """Submit order with optional risk check"""
         # Risk check if risk manager is enabled
         if self.risk_manager and self.risk_manager.enabled:
-            # Get current price from current bars if available, otherwise last bars
             current_price = 0.0
-            
-            # Check if we have current bars from the data stream
-            target_bars = self.current_bars if hasattr(self, 'current_bars') and self.current_bars else self.last_bars
+            target_bars = self.current_bars or self.last_bars
             
             if target_bars and order.symbol in target_bars:
                 current_price = target_bars[order.symbol].close

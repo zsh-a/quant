@@ -158,23 +158,3 @@ def build_strategies(names: set[str], infra: StrategyInfra) -> list:
         factory_fn, _meta = entry
         strategies.append(factory_fn(infra))
     return strategies
-
-
-# Backward compatibility alias
-def build_extra_strategies(names: set[str], **infra: Any) -> list:
-    """Legacy wrapper — prefer ``build_strategies(names, StrategyInfra(...))``.
-
-    Converts ``**kwargs`` to ``StrategyInfra`` for backward compatibility.
-    """
-    typed_infra = StrategyInfra(
-        compiler=infra.get("compiler"),
-        vm=infra.get("vm"),
-        schema=infra.get("schema"),
-        registry=infra.get("registry"),
-        llm_backend=infra.get("llm_backend"),
-        neural_sample_batch=infra.get("neural_sample_batch", 4096),
-        mcts_frequency=infra.get("mcts_frequency", 1),
-        enum_max=infra.get("enum_max", 500),
-        enum_top_k=infra.get("enum_top_k", 30),
-    )
-    return build_strategies(names, typed_infra)

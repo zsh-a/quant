@@ -454,7 +454,7 @@ class ParameterOptimizer:
             try:
                 corr = np.corrcoef(values, scores)[0, 1]
                 importance[name] = abs(corr) if not np.isnan(corr) else 0
-            except:
+            except Exception:
                 importance[name] = 0
         
         # Normalize

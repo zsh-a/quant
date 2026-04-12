@@ -659,10 +659,6 @@ Output exactly {count} items:
                 items.append((m.group(1), ""))
         return items
 
-    def _extract_formula_strings(self, raw: str) -> list[str]:
-        """Pull formula strings from JSON or regex fallback (backward compat)."""
-        return [formula for formula, _ in self._extract_items(raw)]
-
     @staticmethod
     def _finalize(formulas: list[str], target: int, fallback) -> list[str]:
         unique: list[str] = list(dict.fromkeys(formulas))[:target]

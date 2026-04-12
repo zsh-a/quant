@@ -383,14 +383,6 @@ class CryptoMinuteDatasetLoader:
 
         return fields
 
-    def _pivot(self, aligned, column, timestamps, symbols) -> np.ndarray:
-        """Legacy pivot — kept for compatibility but no longer used by load()."""
-        return (
-            aligned.pivot(index="open_time", columns="symbol", values=column)
-            .reindex(index=timestamps, columns=symbols)
-            .to_numpy(dtype=_DTYPE)
-        )
-
     @staticmethod
     def _build_ch_resample_query(
         symbols_clause: str, start_str: str, end_str: str, minutes: int,

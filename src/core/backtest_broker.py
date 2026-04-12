@@ -404,7 +404,8 @@ class BacktestBroker(Broker):
                     if not df.empty:
                         price = float(df.iloc[0]["close"])
                         self.last_prices[k] = price
-                 except: pass
+                 except Exception:
+                    pass
             
             if price == 0 and k in self.last_prices:
                 price = float(self.last_prices[k])

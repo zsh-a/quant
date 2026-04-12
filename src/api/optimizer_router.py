@@ -15,6 +15,7 @@ from src.optimizer.optimizer import (
     OptimizationObjective,
     OptimizationReport
 )
+from src.strategies.registry import StrategyRegistry
 
 
 router = APIRouter(prefix="/optimize", tags=["optimizer"])
@@ -167,7 +168,7 @@ def _run_optimization(task_id: str, req: OptimizeRequest):
         OPTIMIZATION_TASKS[task_id]['status'] = 'running'
         
         # Load strategy class
-        strategy_class = _get_strategy_class(req.strategy)
+        strategy_class = StrategyRegistry.get_strategy_class(req.strategy)
         if not strategy_class:
             raise ValueError(f"Unknown strategy: {req.strategy}")
         
@@ -228,27 +229,6 @@ def _run_optimization(task_id: str, req: OptimizeRequest):
         logger.error(f"Optimization {task_id} failed: {e}")
         OPTIMIZATION_TASKS[task_id]['status'] = 'failed'
         OPTIMIZATION_TASKS[task_id]['error'] = str(e)
-
-
-def _get_strategy_class(strategy_name: str):
-    """Get strategy class by name"""
-    strategy_map = {
-        'jsg': 'src.strategies.jsg_strategy.JSGStrategy',
-        'rotation': 'src.strategies.rotation_strategy.RotationStrategy'
-    }
-    
-    class_path = strategy_map.get(strategy_name.lower())
-    if not class_path:
-        return None
-    
-    try:
-        module_path, class_name = class_path.rsplit('.', 1)
-        import importlib
-        module = importlib.import_module(module_path)
-        return getattr(module, class_name)
-    except Exception as e:
-        logger.error(f"Failed to load strategy: {e}")
-        return None
 
 
 def _run_single_backtest(strategy_class, params: Dict, config: Dict) -> Dict:

@@ -19,15 +19,9 @@ import yaml
 from loguru import logger
 from pydantic import BaseModel, Field
 
+from .cli import _parse_iso
 from .risk.models import RiskConfig
 from .service import AlphaService
-
-
-def _parse_iso(value: str) -> datetime:
-    parsed = datetime.fromisoformat(value)
-    if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=UTC)
-    return parsed.astimezone(UTC)
 
 
 # ---------------------------------------------------------------------------

@@ -13,6 +13,7 @@ from src.portfolio.portfolio_manager import (
     WeightMethod
 )
 from src.portfolio.backtest import PortfolioBacktester, PortfolioBacktestResult
+from src.strategies.registry import StrategyRegistry
 
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
@@ -60,7 +61,7 @@ async def create_portfolio(req: CreatePortfolioRequest):
         strategy_configs = []
         for s in req.strategies:
             # Import strategy class dynamically
-            strategy_class = _get_strategy_class(s.get('strategy', 'jsg'))
+            strategy_class = StrategyRegistry.get_strategy_class(s.get('strategy', 'jsg'))
             if strategy_class is None:
                 raise HTTPException(400, f"Unknown strategy: {s.get('strategy')}")
             
@@ -194,22 +195,3 @@ async def get_backtest_result(portfolio_id: str):
     }
 
 
-def _get_strategy_class(strategy_name: str):
-    """Get strategy class by name"""
-    strategy_map = {
-        'jsg': 'src.strategies.jsg_strategy.JSGStrategy',
-        'rotation': 'src.strategies.rotation_strategy.RotationStrategy'
-    }
-    
-    class_path = strategy_map.get(strategy_name.lower())
-    if not class_path:
-        return None
-    
-    try:
-        module_path, class_name = class_path.rsplit('.', 1)
-        import importlib
-        module = importlib.import_module(module_path)
-        return getattr(module, class_name)
-    except Exception as e:
-        logger.error(f"Failed to load strategy {strategy_name}: {e}")
-        return None
