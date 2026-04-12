@@ -155,10 +155,10 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
 
             <style>{`
         .checkpoint-list {
-          background: #1a1a1a;
+          background: var(--color-card);
           border-radius: 12px;
           padding: 20px;
-          color: #fff;
+          color: var(--color-foreground);
         }
 
         .checkpoint-header {
@@ -175,9 +175,9 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
         }
 
         .refresh-btn {
-          background: #2a2a2a;
-          border: 1px solid #444;
-          color: #fff;
+          background: var(--color-secondary);
+          border: 1px solid var(--color-border);
+          color: var(--color-foreground);
           padding: 6px 12px;
           border-radius: 6px;
           cursor: pointer;
@@ -186,8 +186,8 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
         }
 
         .refresh-btn:hover {
-          background: #333;
-          border-color: #555;
+          background: var(--color-accent);
+          border-color: var(--color-border);
         }
 
         .checkpoints {
@@ -197,20 +197,20 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
         }
 
         .checkpoint-item {
-          background: #2a2a2a;
+          background: var(--color-secondary);
           border-radius: 8px;
           padding: 16px;
           display: flex;
           justify-content: space-between;
           align-items: center;
           gap: 16px;
-          border: 1px solid #333;
+          border: 1px solid var(--color-border);
           transition: all 0.2s;
         }
 
         .checkpoint-item:hover {
-          border-color: #444;
-          background: #2d2d2d;
+          border-color: var(--color-border);
+          background: var(--color-accent);
         }
 
         .checkpoint-info {
@@ -221,7 +221,7 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
           font-size: 14px;
           font-weight: 600;
           margin-bottom: 8px;
-          color: #3498db;
+          color: #4DA8D4;
         }
 
         .checkpoint-details {
@@ -229,7 +229,7 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
           flex-wrap: wrap;
           gap: 12px;
           font-size: 12px;
-          color: #888;
+          color: var(--color-muted-foreground);
         }
 
         .detail-item {
@@ -237,13 +237,13 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
         }
 
         .compression {
-          color: #2ecc71;
+          color: #46A488;
         }
 
         .restore-btn {
-          background: #3498db;
+          background: #4DA8D4;
           border: none;
-          color: #fff;
+          color: var(--color-foreground);
           padding: 8px 16px;
           border-radius: 6px;
           cursor: pointer;
@@ -254,12 +254,12 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
         }
 
         .restore-btn:hover:not(:disabled) {
-          background: #2980b9;
+          background: #3E95BD;
           transform: translateY(-1px);
         }
 
         .restore-btn:disabled {
-          background: #555;
+          background: hsl(224 14% 22%);
           cursor: not-allowed;
           opacity: 0.6;
         }

@@ -2,6 +2,7 @@ import { Suspense, lazy, useEffect, useMemo } from 'react';
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import './App.css';
 
+import { useTheme } from './hooks/useTheme';
 import { useStrategies } from './hooks/useStrategies';
 import { useSessionData } from './hooks/useSessionData';
 import { useBenchmarks } from './hooks/useBenchmarks';
@@ -57,6 +58,7 @@ const TabFallback = () => (
 const App = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { theme, toggle: toggleTheme } = useTheme();
 
   const sessions = useSessions();
   const selectedSessionIds = useSelectedSessions();
@@ -154,6 +156,8 @@ const App = () => {
           activeSessions={activeSessions}
           onSessionSelect={handleOpenSession}
           hasSelectedSession={!!primarySessionId}
+          theme={theme}
+          onToggleTheme={toggleTheme}
         />
       }
       header={

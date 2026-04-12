@@ -27,12 +27,12 @@ interface DashboardProps {
 }
 
 const COLORS: Record<string, string> = {
-    'sh.000300': '#f59e0b',
-    'sh.000905': '#38bdf8',
-    'sz.399006': '#34d399',
+    'sh.000300': '#C07D2F',
+    'sh.000905': '#3D8EB8',
+    'sz.399006': '#368A72',
 };
 
-const SESSION_COMPARE_COLORS = ['#fb7185', '#f59e0b', '#a78bfa', '#e8a230', '#f97316', '#4ade80'];
+const SESSION_COMPARE_COLORS = ['#C4626A', '#C07D2F', '#8B75C6', '#3D8EB8', '#C97C3A', '#368A72'];
 
 const PAGE_SIZE = 10;
 
@@ -267,15 +267,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
                             <defs>
                                 <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="hsl(38 92% 50%)" stopOpacity={0.32} />
-                                    <stop offset="95%" stopColor="hsl(38 92% 50%)" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="var(--chart-stroke)" stopOpacity={0.22} />
+                                    <stop offset="95%" stopColor="var(--chart-stroke)" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="hsla(220, 13%, 18%, 0.4)" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                             <XAxis dataKey="timestamp" hide />
                             <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} width={56} />
                             <Tooltip
-                                contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'hsla(220, 13%, 18%, 0.5)', borderRadius: '10px' }}
+                                contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--color-border)', borderRadius: '10px' }}
                                 itemStyle={{ color: 'var(--color-text)' }}
                                 formatter={(value: any, name: string) => [
                                     `${value.toFixed(2)}%`,
@@ -284,7 +284,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 labelFormatter={(label) => label.split(' ')[0]}
                             />
                             <Legend wrapperStyle={{ paddingTop: '12px' }} verticalAlign="bottom" />
-                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="hsl(38 92% 50%)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={2.5} />
+                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="var(--chart-stroke)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={2.5} />
                             {visibleComparisonData.map((c, idx) => (
                                 <Line
                                     key={c.id}

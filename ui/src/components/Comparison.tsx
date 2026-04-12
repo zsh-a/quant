@@ -20,13 +20,13 @@ interface ComparisonProps {
 }
 
 const COLORS = [
-    '#e8a230',
-    '#fb7185',
-    '#f59e0b',
-    '#34d399',
-    '#a78bfa',
-    '#38bdf8',
-    '#f97316',
+    '#5B5FD9',
+    '#C4626A',
+    '#3D8EB8',
+    '#368A72',
+    '#8B75C6',
+    '#C97C3A',
+    '#5B93B7',
 ];
 
 type DisplayableMetricKey = 'totalReturn' | 'annualizedReturn' | 'maxDrawdown' | 'sharpeRatio' |
@@ -185,11 +185,11 @@ const Comparison: React.FC<ComparisonProps> = ({
             <div className="chart-container h-[500px]">
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="hsla(220, 13%, 18%, 0.4)" vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="var(--chart-grid)" vertical={false} />
                         <XAxis dataKey="timestamp" hide />
                         <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
                         <Tooltip
-                            contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'hsla(220, 13%, 18%, 0.5)', borderRadius: '10px' }}
+                            contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'var(--color-border)', borderRadius: '10px' }}
                             itemStyle={{ color: 'var(--color-text)' }}
                             formatter={(value: any, name: string) => {
                                 const sessionId = name.replace('session_', '');

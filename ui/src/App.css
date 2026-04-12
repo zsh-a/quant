@@ -12,6 +12,7 @@
 }
 
 .recharts-tooltip-cursor {
-  stroke: hsla(38, 92%, 50%, 0.3);
+  stroke: var(--chart-stroke);
+  stroke-opacity: 0.25;
   stroke-width: 1;
 }

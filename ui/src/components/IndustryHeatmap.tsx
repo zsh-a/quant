@@ -57,7 +57,7 @@ export const IndustryHeatmap: React.FC = () => {
         return {
           value: name,
           textStyle: {
-            color: '#fbbf24', // Gold/Amber highlight
+            color: '#CFA844', // Burnished gold highlight
             fontWeight: 'bold',
             fontSize: 12
           }
@@ -75,21 +75,21 @@ export const IndustryHeatmap: React.FC = () => {
       backgroundColor: 'transparent',
       tooltip: {
         position: 'top',
-        backgroundColor: 'rgba(15, 23, 42, 0.9)',
-        borderColor: 'rgba(255, 255, 255, 0.1)',
+        backgroundColor: 'rgba(12, 15, 24, 0.95)',
+        borderColor: 'rgba(255, 255, 255, 0.08)',
         borderWidth: 1,
-        textStyle: { color: '#f8fafc' },
+        textStyle: { color: '#E2E5EB' },
         formatter: (params: any) => {
           const [dateIdx, industryIdx, value] = params.data;
           const industryName = heatmapData.industries[industryIdx];
           const isBlack = BLACK_LISTED_INDUSTRIES.includes(industryName);
           return `
             <div style="font-weight: bold; margin-bottom: 4px;">${heatmapData.dates[dateIdx]}</div>
-            <div style="color: ${isBlack ? '#fbbf24' : '#94a3b8'};">
+            <div style="color: ${isBlack ? '#CFA844' : '#7A828F'};">
               ${isBlack ? '⚠️ ' : ''}${industryName}
             </div>
             <div style="font-size: 16px; margin-top: 4px;">
-              ${isAmount ? 'Liquidity Share' : 'Breadth'}: <span style="color: ${isAmount ? '#3b82f6' : (value > 50 ? '#10b981' : '#ef4444')}">${value}%</span>
+              ${isAmount ? 'Liquidity Share' : 'Breadth'}: <span style="color: ${isAmount ? '#4DA8D4' : (value > 50 ? '#46A488' : '#CF5A55')}">${value}%</span>
             </div>
           `;
         }
@@ -106,8 +106,8 @@ export const IndustryHeatmap: React.FC = () => {
         type: 'category',
         data: heatmapData.dates,
         splitArea: { show: false },
-        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.1)' } },
-        axisLabel: { color: '#94a3b8', fontSize: 10, rotate: 45 },
+        axisLine: { lineStyle: { color: 'rgba(255, 255, 255, 0.07)' } },
+        axisLabel: { color: '#7A828F', fontSize: 10, rotate: 45 },
         axisTick: { show: false }
       },
       yAxis: {
@@ -115,8 +115,8 @@ export const IndustryHeatmap: React.FC = () => {
         data: industriesWithHighlight,
         splitArea: { show: true, areaStyle: { color: ['rgba(255,255,255,0.02)', 'transparent'] } },
         axisLine: { show: false },
-        axisLabel: { 
-          color: '#f8fafc', 
+        axisLabel: {
+          color: '#E2E5EB',
           fontSize: 11,
           formatter: (value: string) => {
             return BLACK_LISTED_INDUSTRIES.includes(value) ? `⚠️ ${value}` : value;
@@ -134,18 +134,18 @@ export const IndustryHeatmap: React.FC = () => {
         itemWidth: 15,
         itemHeight: 300,
         inRange: {
-          color: isAmount ? 
+          color: isAmount ?
             [
-              '#1e293b', // 0% - Neutral (matches background)
-              '#312e81', // 20%
-              '#4338ca', // 40%
-              '#7c3aed', // 60%
-              '#c026d3', // 80%
-              '#fbbf24'  // 100% - Hot (Amber/Gold)
-            ] : 
-            ['#ef4444', '#92400e', '#1e293b', '#065f46', '#10b981'] // Breadth colors (Red-Green)
+              '#1C222F', // 0% - Neutral (matches secondary surface)
+              '#2D2A6B', // 20%
+              '#3E36A8', // 40%
+              '#6B54C0', // 60%
+              '#A040B0', // 80%
+              '#CFA844'  // 100% - Hot (Burnished gold)
+            ] :
+            ['#CF5A55', '#8A4520', '#1C222F', '#1A5E44', '#46A488'] // Breadth: warm red → teal
         },
-        textStyle: { color: '#94a3b8' }
+        textStyle: { color: '#7A828F' }
       },
       series: [{
         name: isAmount ? 'Liquidity' : 'Breadth',

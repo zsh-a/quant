@@ -175,10 +175,10 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
 
             <style>{`
         .risk-panel {
-          background: #1a1a1a;
+          background: var(--color-card);
           border-radius: 12px;
           padding: 20px;
-          color: #fff;
+          color: var(--color-foreground);
         }
 
         .risk-header {
@@ -199,8 +199,8 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
           border-radius: 12px;
           font-size: 12px;
           font-weight: 500;
-          background: #2ecc71;
-          color: #fff;
+          background: var(--color-success);
+          color: var(--color-foreground);
         }
 
         .risk-metrics {
@@ -211,23 +211,23 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
         }
 
         .metric-card {
-          background: #2a2a2a;
+          background: var(--color-secondary);
           border-radius: 8px;
           padding: 16px;
-          border-left: 3px solid #2ecc71;
+          border-left: 3px solid var(--color-success);
         }
 
         .metric-card.warning {
-          border-left-color: #f39c12;
+          border-left-color: var(--color-chart-4);
         }
 
         .metric-card.danger {
-          border-left-color: #e74c3c;
+          border-left-color: var(--color-danger);
         }
 
         .metric-label {
           font-size: 12px;
-          color: #888;
+          color: var(--color-muted-foreground);
           margin-bottom: 8px;
         }
 
@@ -239,37 +239,37 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
 
         .metric-limit {
           font-size: 14px;
-          color: #666;
+          color: var(--color-muted-foreground);
           font-weight: 400;
           margin-left: 4px;
         }
 
         .metric-bar {
           height: 4px;
-          background: #333;
+          background: var(--color-accent);
           border-radius: 2px;
           overflow: hidden;
         }
 
         .metric-fill {
           height: 100%;
-          background: linear-gradient(90deg, #2ecc71, #27ae60);
+          background: var(--color-success);
           transition: width 0.3s ease;
         }
 
         .metric-card.warning .metric-fill {
-          background: linear-gradient(90deg, #f39c12, #e67e22);
+          background: var(--color-chart-4);
         }
 
         .metric-card.danger .metric-fill {
-          background: linear-gradient(90deg, #e74c3c, #c0392b);
+          background: var(--color-danger);
         }
 
         .capital-info {
           display: flex;
           gap: 20px;
           padding: 16px;
-          background: #2a2a2a;
+          background: var(--color-secondary);
           border-radius: 8px;
           margin-bottom: 20px;
         }
@@ -281,7 +281,7 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
         .capital-item .label {
           display: block;
           font-size: 12px;
-          color: #888;
+          color: var(--color-muted-foreground);
           margin-bottom: 4px;
         }
 
@@ -289,7 +289,7 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
           display: block;
           font-size: 18px;
           font-weight: 600;
-          color: #2ecc71;
+          color: var(--color-success);
         }
 
         .risk-alerts {
@@ -310,25 +310,25 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
 
         .alert-item {
           padding: 12px;
-          background: #2a2a2a;
+          background: var(--color-secondary);
           border-radius: 6px;
-          border-left: 3px solid #3498db;
+          border-left: 3px solid var(--color-primary);
           display: flex;
           gap: 12px;
           align-items: center;
         }
 
         .alert-item.warning {
-          border-left-color: #f39c12;
+          border-left-color: var(--color-chart-4);
         }
 
         .alert-item.error {
-          border-left-color: #e74c3c;
+          border-left-color: var(--color-danger);
         }
 
         .alert-time {
           font-size: 11px;
-          color: #666;
+          color: var(--color-muted-foreground);
           min-width: 70px;
         }
 
@@ -340,7 +340,7 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
         .loading, .disabled {
           text-align: center;
           padding: 40px;
-          color: #666;
+          color: var(--color-muted-foreground);
         }
 
         .spinner {

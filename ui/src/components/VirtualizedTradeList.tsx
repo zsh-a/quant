@@ -69,10 +69,10 @@ const TradeRow = memo<{
                     fontSize: '10px',
                     fontWeight: 600,
                     padding: '3px 8px',
-                    borderRadius: '4px',
+                    borderRadius: '6px',
                     textTransform: 'uppercase',
-                    background: isBuy ? 'rgba(46, 204, 113, 0.15)' : 'rgba(231, 76, 60, 0.15)',
-                    color: isBuy ? '#2ecc71' : '#e74c3c',
+                    background: isBuy ? 'color-mix(in srgb, var(--color-success) 15%, transparent)' : 'color-mix(in srgb, var(--color-danger) 15%, transparent)',
+                    color: isBuy ? 'var(--color-success)' : 'var(--color-danger)',
                 }}>
                     {trade.type}
                 </span>

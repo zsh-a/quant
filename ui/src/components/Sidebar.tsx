@@ -7,7 +7,9 @@ import {
     Database,
     FlaskConical,
     LayoutDashboard,
+    Moon,
     Sparkles,
+    Sun,
     Zap,
 } from 'lucide-react';
 import { SessionSummary } from '../types';
@@ -21,6 +23,8 @@ interface SidebarProps {
     activeSessions: SessionSummary[];
     onSessionSelect: (id: string) => void;
     hasSelectedSession: boolean;
+    theme: 'light' | 'dark';
+    onToggleTheme: () => void;
 }
 
 const NAV_ITEMS = [
@@ -34,7 +38,7 @@ const NAV_ITEMS = [
     { key: 'optimizer', label: 'Optimizer', icon: Sparkles },
 ] as const;
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect, hasSelectedSession }) => {
+const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect, hasSelectedSession, theme, onToggleTheme }) => {
     return (
         <nav className="flex h-full flex-col bg-sidebar-background">
             {/* Brand */}
@@ -42,9 +46,17 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
                 <div className="flex size-8 items-center justify-center rounded-lg bg-primary/12 text-primary">
                     <Zap className="size-4" />
                 </div>
-                <div>
+                <div className="flex-1">
                     <div className="text-[15px] font-semibold text-sidebar-foreground tracking-tight">Quent</div>
                 </div>
+                <button
+                    type="button"
+                    onClick={onToggleTheme}
+                    className="flex size-8 cursor-pointer items-center justify-center rounded-lg text-muted-foreground transition-all duration-200 hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
+                >
+                    {theme === 'dark' ? <Sun className="size-4" /> : <Moon className="size-4" />}
+                </button>
             </div>
 
             {/* Nav */}

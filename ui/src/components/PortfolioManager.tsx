@@ -383,9 +383,9 @@ export const PortfolioManager: React.FC = () => {
             <style>{`
                 .portfolio-manager {
                     padding: 20px;
-                    background: #1a1a1a;
+                    background: var(--color-card);
                     border-radius: 12px;
-                    color: #fff;
+                    color: var(--color-foreground);
                 }
                 .portfolio-header {
                     display: flex;
@@ -397,7 +397,7 @@ export const PortfolioManager: React.FC = () => {
                     margin: 0;
                 }
                 .btn-primary {
-                    background: linear-gradient(135deg, #667eea, #764ba2);
+                    background: var(--color-primary);
                     border: none;
                     padding: 10px 20px;
                     border-radius: 8px;
@@ -413,16 +413,16 @@ export const PortfolioManager: React.FC = () => {
                     cursor: not-allowed;
                 }
                 .btn-secondary {
-                    background: #333;
-                    border: 1px solid #555;
+                    background: var(--color-accent);
+                    border: 1px solid var(--color-border);
                     padding: 10px 20px;
                     border-radius: 8px;
                     color: white;
                     cursor: pointer;
                 }
                 .btn-small {
-                    background: #333;
-                    border: 1px solid #555;
+                    background: var(--color-accent);
+                    border: 1px solid var(--color-border);
                     padding: 5px 10px;
                     border-radius: 4px;
                     color: white;
@@ -430,7 +430,7 @@ export const PortfolioManager: React.FC = () => {
                     font-size: 12px;
                 }
                 .btn-danger {
-                    background: #dc3545;
+                    background: var(--color-destructive);
                     border: none;
                     padding: 5px 10px;
                     border-radius: 4px;
@@ -444,27 +444,27 @@ export const PortfolioManager: React.FC = () => {
                     margin-bottom: 24px;
                 }
                 .portfolio-card {
-                    background: #252525;
-                    border: 1px solid #333;
+                    background: var(--color-secondary);
+                    border: 1px solid var(--color-border);
                     border-radius: 10px;
                     padding: 16px;
                     cursor: pointer;
                     transition: all 0.2s;
                 }
                 .portfolio-card:hover {
-                    border-color: #667eea;
+                    border-color: var(--color-primary);
                 }
                 .portfolio-card.selected {
-                    border-color: #667eea;
-                    background: #2a2a3a;
+                    border-color: var(--color-primary);
+                    background: var(--color-accent);
                 }
                 .portfolio-card h3 {
                     margin: 0 0 8px 0;
                     font-size: 14px;
-                    color: #aaa;
+                    color: var(--color-secondary-foreground);
                 }
                 .portfolio-info {
-                    color: #888;
+                    color: var(--color-muted-foreground);
                     font-size: 12px;
                     margin-bottom: 12px;
                 }
@@ -480,20 +480,20 @@ export const PortfolioManager: React.FC = () => {
                 }
                 .weight-name {
                     font-size: 11px;
-                    color: #888;
+                    color: var(--color-muted-foreground);
                     width: 60px;
                     overflow: hidden;
                     text-overflow: ellipsis;
                 }
                 .weight-fill {
                     height: 6px;
-                    background: linear-gradient(90deg, #667eea, #764ba2);
+                    background: var(--color-primary);
                     border-radius: 3px;
                     flex: 1;
                 }
                 .weight-value {
                     font-size: 11px;
-                    color: #667eea;
+                    color: var(--color-primary);
                     width: 30px;
                     text-align: right;
                 }
@@ -501,10 +501,10 @@ export const PortfolioManager: React.FC = () => {
                     grid-column: 1 / -1;
                     text-align: center;
                     padding: 40px;
-                    color: #666;
+                    color: var(--color-muted-foreground);
                 }
                 .backtest-panel {
-                    background: #252525;
+                    background: var(--color-secondary);
                     border-radius: 10px;
                     padding: 20px;
                 }
@@ -524,25 +524,25 @@ export const PortfolioManager: React.FC = () => {
                 }
                 .form-group label {
                     font-size: 12px;
-                    color: #888;
+                    color: var(--color-muted-foreground);
                 }
                 .form-group input,
                 .form-group select {
-                    background: #333;
-                    border: 1px solid #444;
+                    background: var(--color-accent);
+                    border: 1px solid var(--color-border);
                     border-radius: 6px;
                     padding: 8px 12px;
-                    color: #fff;
+                    color: var(--color-foreground);
                     font-size: 14px;
                 }
                 .backtest-results {
                     margin-top: 20px;
                     padding-top: 20px;
-                    border-top: 1px solid #333;
+                    border-top: 1px solid var(--color-border);
                 }
                 .backtest-results h4 {
                     margin: 0 0 12px 0;
-                    color: #aaa;
+                    color: var(--color-secondary-foreground);
                 }
                 .result-grid {
                     display: grid;
@@ -551,7 +551,7 @@ export const PortfolioManager: React.FC = () => {
                     margin-bottom: 20px;
                 }
                 .result-item {
-                    background: #1a1a1a;
+                    background: var(--color-card);
                     padding: 12px;
                     border-radius: 8px;
                     text-align: center;
@@ -559,7 +559,7 @@ export const PortfolioManager: React.FC = () => {
                 .result-item .label {
                     display: block;
                     font-size: 11px;
-                    color: #888;
+                    color: var(--color-muted-foreground);
                     margin-bottom: 4px;
                 }
                 .result-item .value {
@@ -567,10 +567,10 @@ export const PortfolioManager: React.FC = () => {
                     font-weight: 600;
                 }
                 .result-item .value.positive {
-                    color: #00d26a;
+                    color: #46A488;
                 }
                 .result-item .value.negative {
-                    color: #ff6b6b;
+                    color: #CF5A55;
                 }
                 .strategy-table {
                     width: 100%;
@@ -581,10 +581,10 @@ export const PortfolioManager: React.FC = () => {
                 .strategy-table td {
                     padding: 10px;
                     text-align: left;
-                    border-bottom: 1px solid #333;
+                    border-bottom: 1px solid var(--color-border);
                 }
                 .strategy-table th {
-                    color: #888;
+                    color: var(--color-muted-foreground);
                     font-weight: 500;
                 }
                 .modal-overlay {
@@ -600,7 +600,7 @@ export const PortfolioManager: React.FC = () => {
                     z-index: 1000;
                 }
                 .modal {
-                    background: #1a1a1a;
+                    background: var(--color-card);
                     border-radius: 12px;
                     padding: 24px;
                     width: 500px;
@@ -628,11 +628,11 @@ export const PortfolioManager: React.FC = () => {
                 .strategy-row input,
                 .strategy-row select {
                     flex: 1;
-                    background: #333;
-                    border: 1px solid #444;
+                    background: var(--color-accent);
+                    border: 1px solid var(--color-border);
                     border-radius: 6px;
                     padding: 8px;
-                    color: #fff;
+                    color: var(--color-foreground);
                 }
                 .modal-actions {
                     display: flex;

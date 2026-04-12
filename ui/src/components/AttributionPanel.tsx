@@ -143,9 +143,9 @@ export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
                             key={month}
                             className="rounded-2xl border px-4 py-3"
                             style={{
-                                borderColor: ret >= 0 ? 'rgba(52,211,153,0.18)' : 'rgba(251,113,133,0.18)',
-                                background: ret >= 0 ? 'rgba(52,211,153,0.08)' : 'rgba(251,113,133,0.08)',
-                                color: ret >= 0 ? '#86efac' : '#fda4af',
+                                borderColor: ret >= 0 ? 'color-mix(in srgb, var(--color-success) 18%, transparent)' : 'color-mix(in srgb, var(--color-danger) 18%, transparent)',
+                                background: ret >= 0 ? 'color-mix(in srgb, var(--color-success) 8%, transparent)' : 'color-mix(in srgb, var(--color-danger) 8%, transparent)',
+                                color: ret >= 0 ? 'var(--color-success)' : 'var(--color-danger)',
                             }}
                         >
                             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] opacity-80">{month}</div>
@@ -172,7 +172,7 @@ const ContributionBar: React.FC<{ label: string; value: number; entries: number[
                     className="h-full rounded-full"
                     style={{
                         width,
-                        background: positive ? 'linear-gradient(90deg, #34d399, #22c55e)' : 'linear-gradient(90deg, #fb7185, #ef4444)',
+                        background: positive ? 'var(--color-success)' : 'var(--color-danger)',
                     }}
                 />
             </div>
