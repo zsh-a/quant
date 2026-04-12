@@ -15,35 +15,35 @@ export function AppShell({ sidebar, header, children }: AppShellProps) {
     <div className="min-h-screen bg-background text-foreground">
       <div className="mx-auto flex min-h-screen max-w-[1920px]">
         {/* Sidebar — fixed left rail */}
-        <aside className="sticky top-0 hidden h-screen w-60 shrink-0 border-r border-border lg:block">
+        <aside className="sticky top-0 hidden h-screen w-64 shrink-0 border-r border-border/50 lg:block">
           {sidebar}
         </aside>
 
         {/* Main area */}
         <div className="flex min-h-screen min-w-0 flex-1 flex-col">
           {/* Mobile header */}
-          <div className="flex items-center gap-3 border-b border-border px-4 py-3 lg:hidden">
+          <div className="flex items-center gap-3 border-b border-border/50 px-5 py-3.5 lg:hidden">
             <Sheet>
               <SheetTrigger asChild>
                 <Button variant="ghost" size="icon">
                   <Menu className="size-4" />
                 </Button>
               </SheetTrigger>
-              <SheetContent side="left" className="w-60 p-0">
-                <SheetHeader className="border-b border-border px-4 py-3">
+              <SheetContent side="left" className="w-64 p-0">
+                <SheetHeader className="border-b border-border/50 px-5 py-3.5">
                   <SheetTitle className="text-sm">Quent</SheetTitle>
                 </SheetHeader>
-                <div className="h-[calc(100%-44px)]">{sidebar}</div>
+                <div className="h-[calc(100%-48px)]">{sidebar}</div>
               </SheetContent>
             </Sheet>
             <div className="min-w-0 flex-1">{header}</div>
           </div>
 
           {/* Desktop header */}
-          <div className="hidden border-b border-border lg:block">{header}</div>
+          <div className="hidden border-b border-border/50 lg:block">{header}</div>
 
           {/* Content */}
-          <main className="min-w-0 flex-1 p-5">{children}</main>
+          <main className="min-w-0 flex-1 p-6">{children}</main>
         </div>
       </div>
     </div>

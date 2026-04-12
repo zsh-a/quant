@@ -20,17 +20,16 @@ interface ComparisonProps {
 }
 
 const COLORS = [
-    '#e8a230', // Cyan
-    '#fb7185', // Rose
-    '#f59e0b', // Amber
-    '#34d399', // Emerald
-    '#a78bfa', // Violet
-    '#38bdf8', // Sky
-    '#f97316', // Orange
+    '#e8a230',
+    '#fb7185',
+    '#f59e0b',
+    '#34d399',
+    '#a78bfa',
+    '#38bdf8',
+    '#f97316',
 ];
 
-// Subset of metrics to display in comparison table
-type DisplayableMetricKey = 'totalReturn' | 'annualizedReturn' | 'maxDrawdown' | 'sharpeRatio' | 
+type DisplayableMetricKey = 'totalReturn' | 'annualizedReturn' | 'maxDrawdown' | 'sharpeRatio' |
     'sortinoRatio' | 'volatility' | 'winRate' | 'profitFactor' | 'totalTrades' | 'avgWin' | 'avgLoss';
 
 const METRIC_LABELS: Record<DisplayableMetricKey, string> = {
@@ -70,12 +69,11 @@ const Comparison: React.FC<ComparisonProps> = ({
 }) => {
     const [useLttb, setUseLttb] = useState(true);
 
-    // Prepare data for each selected session
     const sessionMetrics = useMemo(() => {
         return selectedSessionIds.map(id => {
             const session = allSessions.find(s => s.id === id);
             const data = sessionDataCache[id];
-            
+
             if (!session || !data) return null;
 
             const metrics = calculateMetrics(data.equity, data.trades);
@@ -89,7 +87,6 @@ const Comparison: React.FC<ComparisonProps> = ({
         }).filter(item => item !== null) as { id: string, name: string, mode: string, metrics: PerformanceMetrics, equity: EquityPoint[] }[];
     }, [selectedSessionIds, sessionDataCache, allSessions]);
 
-    // Prepare Chart Data
     const chartData = useMemo(() => {
         if (sessionMetrics.length === 0) return [];
 
@@ -118,10 +115,6 @@ const Comparison: React.FC<ComparisonProps> = ({
             });
         });
 
-        // Add Benchmark Data if available (optional, maybe just show sessions for clarity or add benchmark selector later)
-        // For now, let's skip benchmarks in this specific view to focus on session comparison, 
-        // OR we can add them if they are in global state. The prompt asks for "Result Comparison", implying sessions.
-        
         return Array.from(dataMap.values()).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
     }, [sessionMetrics, useLttb]);
 
@@ -132,7 +125,7 @@ const Comparison: React.FC<ComparisonProps> = ({
     }
 
     return (
-        <div className="dashboard-view space-y-6">
+        <div className="dashboard-view space-y-7">
             <PageHeader
                 eyebrow="Cross-run Analytics"
                 title="Strategy Comparison"
@@ -153,8 +146,8 @@ const Comparison: React.FC<ComparisonProps> = ({
                             {sessionMetrics.map((s, idx) => (
                                 <th key={s.id} style={{ minWidth: '150px' }}>
                                     <div style={{ color: COLORS[idx % COLORS.length], fontWeight: 700 }}>{s.name}</div>
-                                    <div className="tagline" style={{ fontSize: '0.7rem' }}>{s.mode}</div>
-                                    <div className="tagline" style={{ fontSize: '0.6rem', fontFamily: 'monospace' }}>{s.id.slice(0, 8)}</div>
+                                    <div className="mt-0.5 text-xs font-normal normal-case tracking-normal text-muted-foreground">{s.mode}</div>
+                                    <div className="mt-0.5 font-mono text-[10px] font-normal normal-case tracking-normal text-muted-foreground/60">{s.id.slice(0, 8)}</div>
                                 </th>
                             ))}
                         </tr>
@@ -169,7 +162,7 @@ const Comparison: React.FC<ComparisonProps> = ({
                                     let color = 'inherit';
                                     if (key === 'totalReturn' || key === 'annualizedReturn' || key === 'sharpeRatio' || key === 'profitFactor') {
                                         color = numVal > 0 ? 'var(--color-success)' : (numVal < 0 ? 'var(--color-danger)' : 'inherit');
-                                        if (key === 'sharpeRatio' && numVal < 1) color = 'var(--color-text-dim)'; // Neutral if low sharpe
+                                        if (key === 'sharpeRatio' && numVal < 1) color = 'var(--color-text-dim)';
                                     }
                                     if (key === 'maxDrawdown') {
                                         color = numVal > 0.2 ? 'var(--color-danger)' : 'inherit';
@@ -192,11 +185,11 @@ const Comparison: React.FC<ComparisonProps> = ({
             <div className="chart-container h-[500px]">
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsla(220, 13%, 18%, 0.4)" vertical={false} />
                         <XAxis dataKey="timestamp" hide />
                         <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
                         <Tooltip
-                            contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                            contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'hsla(220, 13%, 18%, 0.5)', borderRadius: '10px' }}
                             itemStyle={{ color: 'var(--color-text)' }}
                             formatter={(value: any, name: string) => {
                                 const sessionId = name.replace('session_', '');
@@ -205,15 +198,15 @@ const Comparison: React.FC<ComparisonProps> = ({
                             }}
                             labelFormatter={(label) => label.split(' ')[0]}
                         />
-                        <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                        <Legend wrapperStyle={{ paddingTop: '12px' }} />
                         {sessionMetrics.map((s, idx) => (
                             <Line
                                 key={s.id}
                                 type="monotone"
                                 dataKey={`session_${s.id}`}
-                                name={s.name} // Legend uses this
+                                name={s.name}
                                 stroke={COLORS[idx % COLORS.length]}
-                                strokeWidth={2.4}
+                                strokeWidth={2.2}
                                 dot={false}
                             />
                         ))}

@@ -148,24 +148,24 @@ const Dashboard: React.FC<DashboardProps> = ({
     }
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-7">
             {/* Header */}
             <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                     <div className="flex items-center gap-4">
-                        <h2 className="text-xl font-semibold text-foreground">
+                        <h2 className="text-xl font-semibold tracking-tight text-foreground">
                             {primarySession.strategy || 'Unknown'}
-                            <span className="ml-2 text-base font-normal text-muted-foreground">({formatModeLabel(primarySession.mode)})</span>
+                            <span className="ml-2.5 text-base font-normal text-muted-foreground">({formatModeLabel(primarySession.mode)})</span>
                         </h2>
                         <select className="glass-input w-auto" value={primarySession.id} onChange={e => onSelectSession(e.target.value)}>
                             {allSessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {formatModeLabel(s.mode)} ({s.id.slice(0, 6)}...)</option>)}
                         </select>
                     </div>
                     {primarySession.params && Object.keys(primarySession.params).length > 0 && (
-                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-muted-foreground">
                             <span className="text-xs font-medium uppercase tracking-wider">Params:</span>
                             {Object.entries(primarySession.params).map(([k, v]) => (
-                                <span key={k} className="rounded bg-white/[0.08] px-2 py-0.5">
+                                <span key={k} className="rounded-md bg-white/[0.06] px-2.5 py-1 text-xs">
                                     {k}: <strong className="text-foreground">{String(v)}</strong>
                                 </span>
                             ))}
@@ -212,10 +212,10 @@ const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             {/* Return Chart */}
-            <div className="glass card chart-container mt-0 flex min-h-[520px] flex-col gap-4 p-6">
+            <div className="glass card chart-container mt-0 flex min-h-[520px] flex-col gap-5 p-7">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h3 className="mb-1 text-base font-semibold">Return Curve (%)</h3>
+                        <h3 className="mb-1.5 text-base font-semibold tracking-tight">Return Curve (%)</h3>
                         <div className="text-sm text-muted-foreground">Primary session shown by default. Overlay benchmarks or comparison sessions as needed.</div>
                     </div>
                     <div className="flex flex-col items-end gap-3">
@@ -267,15 +267,15 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
                             <defs>
                                 <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#e8a230" stopOpacity={0.38} />
-                                    <stop offset="95%" stopColor="#e8a230" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="hsl(38 92% 50%)" stopOpacity={0.32} />
+                                    <stop offset="95%" stopColor="hsl(38 92% 50%)" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
+                            <CartesianGrid strokeDasharray="3 3" stroke="hsla(220, 13%, 18%, 0.4)" vertical={false} />
                             <XAxis dataKey="timestamp" hide />
                             <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} width={56} />
                             <Tooltip
-                                contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
+                                contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'hsla(220, 13%, 18%, 0.5)', borderRadius: '10px' }}
                                 itemStyle={{ color: 'var(--color-text)' }}
                                 formatter={(value: any, name: string) => [
                                     `${value.toFixed(2)}%`,
@@ -284,7 +284,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 labelFormatter={(label) => label.split(' ')[0]}
                             />
                             <Legend wrapperStyle={{ paddingTop: '12px' }} verticalAlign="bottom" />
-                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="#e8a230" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
+                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="hsl(38 92% 50%)" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={2.5} />
                             {visibleComparisonData.map((c, idx) => (
                                 <Line
                                     key={c.id}
@@ -292,7 +292,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     dataKey={`session_${c.id}`}
                                     name={`${c.name} (${c.id.slice(0, 4)})`}
                                     stroke={SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length]}
-                                    strokeWidth={2.25}
+                                    strokeWidth={2}
                                     dot={false}
                                     strokeDasharray="6 5"
                                 />
@@ -304,7 +304,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     dataKey={code}
                                     name={availableBenchmarks.find(b => b.code === code)?.name}
                                     stroke={COLORS[code] || 'var(--color-secondary)'}
-                                    strokeWidth={2.25}
+                                    strokeWidth={2}
                                     dot={false}
                                 />
                             ))}
@@ -317,8 +317,8 @@ const Dashboard: React.FC<DashboardProps> = ({
             <div className="grid gap-6 lg:grid-cols-2">
                 {/* Holdings */}
                 <div className="glass card">
-                    <div className="mb-4 flex items-center justify-between">
-                        <h3 className="text-base font-semibold">
+                    <div className="mb-5 flex items-center justify-between">
+                        <h3 className="text-base font-semibold tracking-tight">
                             {selectedDay ? `Holdings · ${selectedDay.timestamp.split(' ')[0]}` : 'Current Holdings'}
                         </h3>
                         <div className="flex items-center gap-2">
@@ -362,7 +362,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                             <td className="text-right tabular-nums">{qty}</td>
                                             <td className="text-right tabular-nums">{avgCost > 0 ? formatMoney(avgCost) : '-'}</td>
                                             <td className="text-right tabular-nums">{formatMoney(price)}</td>
-                                            <td className="text-right tabular-nums font-bold">{formatMoney(value)}</td>
+                                            <td className="text-right tabular-nums font-semibold">{formatMoney(value)}</td>
                                             <td className="text-right tabular-nums">
                                                 <div style={{ color: colorFromValue(pnl) }}>{formatSignedMoney(pnl)}</div>
                                                 <div className="text-xs" style={{ color: colorFromValue(pnlPct) }}>{formatSigned(pnlPct, { asPercent: true })}</div>
@@ -371,7 +371,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                     );
                                 })}
                                 {positionKeys.length === 0 && (
-                                    <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No holdings</td></tr>
+                                    <tr><td colSpan={6} className="p-5 text-center text-sm text-muted-foreground">No holdings</td></tr>
                                 )}
                             </tbody>
                         </table>
@@ -380,8 +380,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
                 {/* Trades */}
                 <div className="glass card flex flex-col">
-                    <div className="mb-2 flex items-center justify-between">
-                        <h3 className="text-base font-semibold">
+                    <div className="mb-3 flex items-center justify-between">
+                        <h3 className="text-base font-semibold tracking-tight">
                             {selectedDay ? `Trades · ${selectedDay.timestamp.split(' ')[0]}` : 'All Trades'}
                         </h3>
                         <span className="text-xs tabular-nums text-muted-foreground">{filteredTrades.length} trades</span>
@@ -392,8 +392,8 @@ const Dashboard: React.FC<DashboardProps> = ({
 
             {/* Daily History */}
             <div className="glass card">
-                <div className="mb-4 flex items-center justify-between">
-                    <h3 className="text-base font-semibold">Daily History</h3>
+                <div className="mb-5 flex items-center justify-between">
+                    <h3 className="text-base font-semibold tracking-tight">Daily History</h3>
                     <div className="flex items-center gap-2">
                         <Button variant="ghost" size="sm" onClick={() => setEquityPage(p => Math.max(1, p - 1))} disabled={equityPage === 1}>Prev</Button>
                         <span className="text-xs tabular-nums text-muted-foreground">{equityPage}/{totalEquityPages}</span>
@@ -414,7 +414,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         {[...equityHistory].reverse().slice((equityPage - 1) * PAGE_SIZE, equityPage * PAGE_SIZE).map((day, idx) => (
                             <tr
                                 key={idx}
-                                className={`cursor-pointer ${selectedDay?.timestamp === day.timestamp ? 'bg-primary/10' : ''}`}
+                                className={`cursor-pointer ${selectedDay?.timestamp === day.timestamp ? 'bg-primary/8' : ''}`}
                                 onClick={() => { setSelectedDay(day); setHoldingsPage(1); }}
                             >
                                 <td className="tabular-nums">{day.timestamp.split(' ')[0]}</td>
@@ -432,7 +432,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                             </tr>
                         ))}
                         {equityHistory.length === 0 && (
-                            <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No history data</td></tr>
+                            <tr><td colSpan={5} className="p-5 text-center text-sm text-muted-foreground">No history data</td></tr>
                         )}
                     </tbody>
                 </table>

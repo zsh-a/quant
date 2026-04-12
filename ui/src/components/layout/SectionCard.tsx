@@ -23,13 +23,13 @@ export function SectionCard({
   return (
     <Card className={className}>
       <CardHeader className="flex flex-row items-start justify-between gap-4 space-y-0">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <CardTitle>{title}</CardTitle>
           {description && <CardDescription>{description}</CardDescription>}
         </div>
         {action}
       </CardHeader>
-      <CardContent className={cn("space-y-3", contentClassName)}>{children}</CardContent>
+      <CardContent className={cn("space-y-4", contentClassName)}>{children}</CardContent>
     </Card>
   )
 }

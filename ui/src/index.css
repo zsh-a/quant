@@ -4,61 +4,63 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  /* ── Obsidian + Amber palette ── */
-  --color-background: hsl(225 15% 6%);
-  --color-foreground: hsl(40 10% 92%);
-  --color-card: hsl(225 14% 9%);
-  --color-card-foreground: hsl(40 10% 92%);
-  --color-popover: hsl(225 15% 8%);
-  --color-popover-foreground: hsl(40 10% 92%);
+  /* ── Refined Dark Fintech palette ── */
+  --color-background: hsl(220 20% 4%);
+  --color-foreground: hsl(210 40% 98%);
+  --color-card: hsl(220 18% 7%);
+  --color-card-foreground: hsl(210 40% 98%);
+  --color-popover: hsl(220 20% 6%);
+  --color-popover-foreground: hsl(210 40% 98%);
 
-  /* Warm amber primary */
-  --color-primary: hsl(38 92% 55%);
-  --color-primary-foreground: hsl(225 20% 8%);
+  /* Warm gold primary */
+  --color-primary: hsl(38 92% 50%);
+  --color-primary-foreground: hsl(220 25% 6%);
 
-  --color-secondary: hsl(225 12% 13%);
-  --color-secondary-foreground: hsl(40 10% 85%);
+  --color-secondary: hsl(220 16% 10%);
+  --color-secondary-foreground: hsl(215 20% 80%);
 
-  --color-muted: hsl(225 10% 12%);
-  --color-muted-foreground: hsl(220 10% 50%);
+  --color-muted: hsl(220 14% 9%);
+  --color-muted-foreground: hsl(215 16% 47%);
 
-  --color-accent: hsl(225 12% 15%);
-  --color-accent-foreground: hsl(40 10% 90%);
+  --color-accent: hsl(220 16% 12%);
+  --color-accent-foreground: hsl(210 30% 90%);
 
-  --color-destructive: hsl(0 65% 52%);
+  --color-destructive: hsl(0 72% 51%);
   --color-destructive-foreground: hsl(0 0% 98%);
 
-  --color-border: hsl(225 10% 16%);
-  --color-input: hsl(225 12% 11%);
-  --color-ring: hsl(38 92% 55%);
+  --color-border: hsl(220 13% 13%);
+  --color-input: hsl(220 16% 8%);
+  --color-ring: hsl(38 92% 50%);
 
   /* Semantic */
-  --color-success: hsl(152 60% 52%);
-  --color-danger: hsl(0 72% 62%);
-  --color-text: hsl(40 10% 92%);
-  --color-text-dim: hsl(220 10% 48%);
+  --color-success: hsl(142 71% 45%);
+  --color-danger: hsl(0 84% 60%);
+  --color-text: hsl(210 40% 98%);
+  --color-text-dim: hsl(215 16% 47%);
 
-  --color-chart-1: hsl(38 92% 55%);
-  --color-chart-2: hsl(195 70% 55%);
-  --color-chart-3: hsl(152 60% 52%);
-  --color-chart-4: hsl(280 55% 60%);
-  --color-chart-5: hsl(0 72% 62%);
+  /* Charts — harmonious sequence */
+  --color-chart-1: hsl(38 92% 50%);
+  --color-chart-2: hsl(199 89% 48%);
+  --color-chart-3: hsl(142 71% 45%);
+  --color-chart-4: hsl(263 70% 50%);
+  --color-chart-5: hsl(0 84% 60%);
 
-  --radius: 0.5rem;
+  --radius: 0.625rem;
 
-  --color-sidebar-background: hsl(225 15% 7%);
-  --color-sidebar-foreground: hsl(40 10% 92%);
-  --color-sidebar-primary: hsl(38 92% 55%);
-  --color-sidebar-primary-foreground: hsl(225 20% 8%);
-  --color-sidebar-accent: hsl(225 12% 13%);
-  --color-sidebar-accent-foreground: hsl(40 10% 85%);
-  --color-sidebar-border: hsl(225 10% 14%);
-  --color-sidebar-ring: hsl(38 92% 55%);
+  /* Sidebar */
+  --color-sidebar-background: hsl(220 20% 5%);
+  --color-sidebar-foreground: hsl(210 40% 98%);
+  --color-sidebar-primary: hsl(38 92% 50%);
+  --color-sidebar-primary-foreground: hsl(220 25% 6%);
+  --color-sidebar-accent: hsl(220 16% 10%);
+  --color-sidebar-accent-foreground: hsl(215 20% 80%);
+  --color-sidebar-border: hsl(220 13% 11%);
+  --color-sidebar-ring: hsl(38 92% 50%);
 }
 
 :root {
-  --card-bg: hsla(225, 14%, 9%, 0.92);
-  --glass-bg: hsla(225, 15%, 7%, 0.85);
+  --card-bg: hsla(220, 18%, 7%, 0.95);
+  --glass-bg: hsla(220, 20%, 5%, 0.88);
 }
 
 /* ── Base layer ── */
@@ -75,14 +77,17 @@
   body {
     @apply min-h-screen bg-background text-foreground antialiased;
     margin: 0;
-    font-family: "DM Sans", "Helvetica Neue", "Arial", sans-serif;
+    font-family: "Inter", "Helvetica Neue", "Arial", sans-serif;
     background-image:
-      radial-gradient(ellipse 80% 50% at 50% -20%, hsla(38, 80%, 50%, 0.04), transparent),
-      linear-gradient(180deg, hsl(225 15% 6%), hsl(225 18% 4%));
+      radial-gradient(ellipse 60% 40% at 50% -10%, hsla(38, 80%, 50%, 0.03), transparent),
+      radial-gradient(ellipse 80% 50% at 80% 50%, hsla(220, 60%, 30%, 0.04), transparent);
     background-attachment: fixed;
-    letter-spacing: -0.01em;
-    line-height: 1.5;
+    letter-spacing: -0.011em;
+    line-height: 1.6;
     overflow-x: hidden;
+    font-feature-settings: "cv11", "ss01";
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 
   button, input, select, textarea {
@@ -104,21 +109,22 @@
   }
 
   /* Scrollbar */
-  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar { width: 5px; height: 5px; }
   ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: hsl(225 10% 20%); border-radius: 3px; }
-  ::-webkit-scrollbar-thumb:hover { background: hsl(225 10% 28%); }
+  ::-webkit-scrollbar-thumb { background: hsl(220 13% 18%); border-radius: 9999px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(220 13% 25%); }
 }
 
 /* ── Component layer ── */
 @layer components {
   /* Panel — the fundamental surface */
   .glass {
-    @apply rounded-lg border border-border bg-card;
+    @apply rounded-xl border border-border/70 bg-card;
+    box-shadow: 0 1px 2px 0 hsla(0, 0%, 0%, 0.2);
   }
 
   .card {
-    @apply p-5;
+    @apply p-6;
   }
 
   .main-content {
@@ -126,81 +132,81 @@
   }
 
   .tagline {
-    @apply text-[13px] leading-relaxed text-muted-foreground;
+    @apply text-sm leading-relaxed text-muted-foreground;
   }
 
   .grid {
-    @apply grid gap-3 md:grid-cols-2 xl:grid-cols-4;
+    @apply grid gap-4 md:grid-cols-2 xl:grid-cols-4;
   }
 
   /* Input */
   .glass-input {
-    @apply h-9 w-full rounded-md border border-border bg-input px-3 py-1.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/25;
-    font-family: "DM Sans", sans-serif;
+    @apply h-9 w-full rounded-lg border border-border/70 bg-input px-3 py-1.5 text-sm text-foreground outline-none transition-all duration-200 placeholder:text-muted-foreground focus:border-primary/40 focus:ring-2 focus:ring-primary/15;
+    font-family: "Inter", sans-serif;
   }
 
-  /* Data table — dense terminal-style */
+  /* Data table — clean, spacious */
   .data-table {
     @apply w-full border-collapse text-left text-[13px];
   }
 
   .data-table thead tr {
-    @apply border-b border-border;
+    @apply border-b border-border/60;
   }
 
   .data-table th {
-    @apply px-3 py-2.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground;
+    @apply px-4 py-3 text-xs font-medium uppercase tracking-wider text-muted-foreground;
   }
 
   .data-table td {
-    @apply border-b border-border/50 px-3 py-2.5 text-[13px] text-foreground/90;
+    @apply border-b border-border/30 px-4 py-3 text-[13px] text-foreground/85;
     font-variant-numeric: tabular-nums;
   }
 
   .data-table tbody tr {
-    @apply transition-colors;
+    @apply transition-colors duration-150;
   }
 
   .data-table tbody tr:hover {
-    @apply bg-accent/50;
+    @apply bg-accent/40;
   }
 
   /* Buttons — CSS utility classes */
   .btn-primary {
-    @apply inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-all duration-200 hover:bg-primary/85 hover:shadow-[0_0_16px_-4px] hover:shadow-primary/25 disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-secondary {
-    @apply inline-flex h-9 items-center justify-center rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent;
+    @apply inline-flex h-9 items-center justify-center rounded-lg border border-border/70 bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-all duration-200 hover:bg-accent hover:border-border;
   }
 
   .btn-ghost {
-    @apply inline-flex h-8 items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground;
+    @apply inline-flex h-8 items-center justify-center rounded-lg px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all duration-200 hover:bg-accent hover:text-foreground;
   }
 
   .btn-danger {
-    @apply inline-flex h-9 items-center justify-center rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/85;
+    @apply inline-flex h-9 items-center justify-center rounded-lg bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-all duration-200 hover:bg-destructive/85;
   }
 
   .btn-small {
-    @apply h-7 rounded px-2.5 py-1 text-xs;
+    @apply h-7 rounded-md px-2.5 py-1 text-xs;
   }
 
-  /* Status badges */
+  /* Status badges — pill style */
   .status-badge {
-    @apply inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em];
+    @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider;
   }
 
   .status-live {
-    @apply border-emerald-500/25 bg-emerald-500/10 text-emerald-400;
+    @apply border-emerald-500/20 bg-emerald-500/10 text-emerald-400;
   }
 
   .status-backtest {
-    @apply border-sky-500/25 bg-sky-500/10 text-sky-400;
+    @apply border-sky-500/20 bg-sky-500/10 text-sky-400;
   }
 
   .status-danger {
-    @apply border-rose-500/25 bg-rose-500/10 text-rose-400;
+    @apply border-rose-500/20 bg-rose-500/10 text-rose-400;
   }
 
   /* Legacy class-based panels */
@@ -210,14 +216,15 @@
   .risk-panel,
   .checkpoint-list,
   .checkpoints {
-    @apply rounded-lg border border-border bg-card p-5;
+    @apply rounded-xl border border-border/70 bg-card p-6;
+    box-shadow: 0 1px 2px 0 hsla(0, 0%, 0%, 0.2);
   }
 
   .portfolio-header,
   .strategies-header,
   .risk-header,
   .checkpoint-header {
-    @apply mb-5 flex flex-wrap items-start justify-between gap-4;
+    @apply mb-6 flex flex-wrap items-start justify-between gap-4;
   }
 
   .portfolio-grid,
@@ -225,7 +232,7 @@
   .form-grid,
   .risk-metrics,
   .capital-info {
-    @apply grid gap-3;
+    @apply grid gap-4;
   }
 
   .portfolio-grid,
@@ -243,16 +250,16 @@
   .strategy-row,
   .checkpoint-item,
   .alert-item {
-    @apply rounded-md border border-border bg-secondary/60 p-3;
+    @apply rounded-lg border border-border/50 bg-secondary/50 p-4 transition-all duration-200;
   }
 
   .portfolio-card.selected {
-    @apply border-primary/40 bg-primary/8;
+    @apply border-primary/30 bg-primary/8;
   }
 
   .weight-bars,
   .alerts-list {
-    @apply space-y-2;
+    @apply space-y-2.5;
   }
 
   .weight-bar,
@@ -268,7 +275,7 @@
   .form-group,
   .detail-item,
   .checkpoint-details {
-    @apply flex flex-col gap-1.5;
+    @apply flex flex-col gap-2;
   }
 
   .label,
@@ -276,7 +283,7 @@
   .metric-limit,
   .checkpoint-time,
   .alert-time {
-    @apply text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground;
+    @apply text-xs font-medium uppercase tracking-wider text-muted-foreground;
   }
 
   .empty-state,
@@ -284,7 +291,7 @@
   .checkpoint-list.loading,
   .risk-panel.loading,
   .risk-panel.disabled {
-    @apply flex min-h-40 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground;
+    @apply flex min-h-44 items-center justify-center rounded-xl border border-dashed border-border/50 bg-muted/20 p-8 text-center text-sm text-muted-foreground;
   }
 
   .modal-overlay {
@@ -292,38 +299,48 @@
   }
 
   .modal {
-    @apply fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-6 shadow-2xl;
+    @apply fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 rounded-xl border border-border/70 bg-card p-8 shadow-2xl;
   }
 
   .modal-actions {
-    @apply mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end;
+    @apply mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end;
   }
 
   .spinner {
-    @apply inline-block size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary;
+    @apply inline-block size-4 animate-spin rounded-full border-2 border-muted-foreground/20 border-t-primary;
   }
 }
 
 /* ── Recharts overrides ── */
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
-  stroke: hsla(225, 10%, 20%, 0.5);
+  stroke: hsla(220, 13%, 18%, 0.4);
 }
 
 .recharts-tooltip-wrapper .recharts-default-tooltip {
-  border: 1px solid hsl(225 10% 18%) !important;
-  border-radius: 6px !important;
-  background: hsla(225, 15%, 8%, 0.95) !important;
-  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.6);
+  border: 1px solid hsl(220 13% 15%) !important;
+  border-radius: 10px !important;
+  background: hsla(220, 20%, 6%, 0.96) !important;
+  box-shadow: 0 16px 48px -12px rgba(0, 0, 0, 0.6) !important;
   font-size: 12px !important;
+  backdrop-filter: blur(12px);
 }
 
 /* ── Animate-in utilities ── */
 @keyframes fade-up {
-  from { opacity: 0; transform: translateY(6px); }
+  from { opacity: 0; transform: translateY(8px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .animate-fade-up {
-  animation: fade-up 0.35s ease-out both;
+  animation: fade-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-fade-in {
+  animation: fade-in 0.3s ease-out both;
 }

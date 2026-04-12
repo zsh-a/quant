@@ -4,7 +4,7 @@
 
 .dashboard-view {
   display: grid;
-  gap: 1.25rem;
+  gap: 1.5rem;
 }
 
 .chart-container {
@@ -12,6 +12,6 @@
 }
 
 .recharts-tooltip-cursor {
-  stroke: hsla(38, 92%, 55%, 0.4);
+  stroke: hsla(38, 92%, 50%, 0.3);
   stroke-width: 1;
 }
