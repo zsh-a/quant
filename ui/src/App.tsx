@@ -157,19 +157,16 @@ const App = () => {
         />
       }
       header={
-        <div className="glass flex flex-col gap-4 px-5 py-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="flex items-center justify-between gap-4 px-5 py-3">
           <PageHeader title={meta.title} description={meta.description} />
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Connection</div>
-              <div className="mt-1 flex items-center gap-2 text-sm font-medium text-foreground">
-                <StatusBadge value={isConnected || usePolling ? 'running' : 'failed'} />
-                <span>{isConnected ? 'WebSocket' : usePolling ? 'Polling' : 'Disconnected'}</span>
-              </div>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
+              <StatusBadge value={isConnected || usePolling ? 'running' : 'failed'} />
+              <span>{isConnected ? 'WS' : usePolling ? 'Poll' : 'Off'}</span>
             </div>
-            <div className="rounded-2xl border border-border/70 bg-secondary/45 px-4 py-3">
-              <div className="text-xs font-semibold uppercase tracking-[0.22em] text-muted-foreground">Selected</div>
-              <div className="mt-1 text-lg font-semibold text-foreground">{selectedSessionIds.length}</div>
+            <div className="h-4 w-px bg-border" />
+            <div className="text-[12px] text-muted-foreground">
+              <span className="tabular-nums font-medium text-foreground">{selectedSessionIds.length}</span> selected
             </div>
           </div>
         </div>

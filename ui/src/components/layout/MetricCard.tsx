@@ -14,18 +14,22 @@ export function MetricCard({ label, value, hint, trend, className }: MetricCardP
   return (
     <div
       className={cn(
-        "group relative overflow-hidden rounded-3xl border border-border/70 bg-card/80 p-5 shadow-[0_20px_60px_-40px_rgba(15,23,42,0.85)] transition-transform duration-200 hover:-translate-y-1",
+        "group relative rounded-lg border border-border bg-card p-4 transition-colors hover:border-border/80 hover:bg-accent/30",
         className,
       )}
     >
-      <div className="absolute inset-x-5 top-0 h-px bg-gradient-to-r from-transparent via-primary/50 to-transparent" />
-      <div className="space-y-3.5">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-muted-foreground">
+      {/* Accent top line */}
+      <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-primary/30 to-transparent opacity-0 transition-opacity group-hover:opacity-100" />
+
+      <div className="space-y-2">
+        <p className="text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground">
           {label}
         </p>
-        <div className="text-[1.9rem] font-semibold tracking-[-0.03em] text-foreground">{value}</div>
-        {trend ? <div className="text-sm font-semibold tracking-[-0.012em] text-foreground/92">{trend}</div> : null}
-        {hint ? <div className="text-[13px] leading-6 text-muted-foreground">{hint}</div> : null}
+        <div className="text-2xl font-semibold tracking-tight text-foreground" style={{ fontVariantNumeric: 'tabular-nums' }}>
+          {value}
+        </div>
+        {trend && <div className="text-sm font-medium text-foreground/80">{trend}</div>}
+        {hint && <div className="text-[12px] text-muted-foreground">{hint}</div>}
       </div>
     </div>
   )

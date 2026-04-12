@@ -20,7 +20,7 @@ interface ComparisonProps {
 }
 
 const COLORS = [
-    '#22d3ee', // Cyan
+    '#e8a230', // Cyan
     '#fb7185', // Rose
     '#f59e0b', // Amber
     '#34d399', // Emerald

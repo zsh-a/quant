@@ -1,37 +1,67 @@
 @import "tailwindcss";
+@import "tw-animate-css";
+
+@custom-variant dark (&:is(.dark *));
 
 @theme {
-  --color-background: hsl(220 31% 9%);
-  --color-foreground: hsl(210 40% 96%);
-  --color-card: hsl(222 28% 12%);
-  --color-card-foreground: hsl(210 40% 96%);
-  --color-popover: hsl(222 28% 11%);
-  --color-popover-foreground: hsl(210 40% 96%);
-  --color-primary: hsl(196 79% 53%);
-  --color-primary-foreground: hsl(222 47% 11%);
-  --color-secondary: hsl(218 24% 18%);
-  --color-secondary-foreground: hsl(210 40% 96%);
-  --color-muted: hsl(218 20% 16%);
-  --color-muted-foreground: hsl(215 20% 70%);
-  --color-accent: hsl(217 24% 20%);
-  --color-accent-foreground: hsl(210 40% 96%);
-  --color-destructive: hsl(0 75% 58%);
-  --color-destructive-foreground: hsl(210 40% 98%);
-  --color-border: hsl(217 20% 23%);
-  --color-input: hsl(217 23% 14%);
-  --color-ring: hsl(196 79% 53%);
-  --color-success: #34d399;
-  --color-danger: #fb7185;
-  --color-text: #f8fafc;
-  --color-text-dim: #9ca7bb;
-  --radius: 1rem;
+  /* ── Obsidian + Amber palette ── */
+  --color-background: hsl(225 15% 6%);
+  --color-foreground: hsl(40 10% 92%);
+  --color-card: hsl(225 14% 9%);
+  --color-card-foreground: hsl(40 10% 92%);
+  --color-popover: hsl(225 15% 8%);
+  --color-popover-foreground: hsl(40 10% 92%);
+
+  /* Warm amber primary */
+  --color-primary: hsl(38 92% 55%);
+  --color-primary-foreground: hsl(225 20% 8%);
+
+  --color-secondary: hsl(225 12% 13%);
+  --color-secondary-foreground: hsl(40 10% 85%);
+
+  --color-muted: hsl(225 10% 12%);
+  --color-muted-foreground: hsl(220 10% 50%);
+
+  --color-accent: hsl(225 12% 15%);
+  --color-accent-foreground: hsl(40 10% 90%);
+
+  --color-destructive: hsl(0 65% 52%);
+  --color-destructive-foreground: hsl(0 0% 98%);
+
+  --color-border: hsl(225 10% 16%);
+  --color-input: hsl(225 12% 11%);
+  --color-ring: hsl(38 92% 55%);
+
+  /* Semantic */
+  --color-success: hsl(152 60% 52%);
+  --color-danger: hsl(0 72% 62%);
+  --color-text: hsl(40 10% 92%);
+  --color-text-dim: hsl(220 10% 48%);
+
+  --color-chart-1: hsl(38 92% 55%);
+  --color-chart-2: hsl(195 70% 55%);
+  --color-chart-3: hsl(152 60% 52%);
+  --color-chart-4: hsl(280 55% 60%);
+  --color-chart-5: hsl(0 72% 62%);
+
+  --radius: 0.5rem;
+
+  --color-sidebar-background: hsl(225 15% 7%);
+  --color-sidebar-foreground: hsl(40 10% 92%);
+  --color-sidebar-primary: hsl(38 92% 55%);
+  --color-sidebar-primary-foreground: hsl(225 20% 8%);
+  --color-sidebar-accent: hsl(225 12% 13%);
+  --color-sidebar-accent-foreground: hsl(40 10% 85%);
+  --color-sidebar-border: hsl(225 10% 14%);
+  --color-sidebar-ring: hsl(38 92% 55%);
 }
 
 :root {
-  --card-bg: rgba(20, 28, 45, 0.78);
-  --glass-bg: rgba(16, 23, 37, 0.7);
+  --card-bg: hsla(225, 14%, 9%, 0.92);
+  --glass-bg: hsla(225, 15%, 7%, 0.85);
 }
 
+/* ── Base layer ── */
 @layer base {
   * {
     @apply border-border;
@@ -45,57 +75,50 @@
   body {
     @apply min-h-screen bg-background text-foreground antialiased;
     margin: 0;
-    font-family: "Manrope", "IBM Plex Sans", "SF Pro Display", "Segoe UI", sans-serif;
+    font-family: "DM Sans", "Helvetica Neue", "Arial", sans-serif;
     background-image:
-      radial-gradient(circle at top left, rgba(34, 211, 238, 0.14), transparent 30%),
-      radial-gradient(circle at top, rgba(56, 189, 248, 0.1), transparent 25%),
-      linear-gradient(180deg, rgba(15, 23, 42, 0.96), rgba(9, 14, 24, 1));
-    overflow-x: hidden;
-    letter-spacing: -0.011em;
+      radial-gradient(ellipse 80% 50% at 50% -20%, hsla(38, 80%, 50%, 0.04), transparent),
+      linear-gradient(180deg, hsl(225 15% 6%), hsl(225 18% 4%));
+    background-attachment: fixed;
+    letter-spacing: -0.01em;
     line-height: 1.5;
+    overflow-x: hidden;
   }
 
-  button,
-  input,
-  select,
-  textarea {
+  button, input, select, textarea {
     font: inherit;
   }
 
-  code,
-  pre,
-  kbd,
-  samp {
-    font-family: "IBM Plex Mono", "SFMono-Regular", "JetBrains Mono", monospace;
+  code, pre, kbd, samp {
+    font-family: "JetBrains Mono", "SF Mono", "Fira Code", monospace;
+    font-feature-settings: "liga" 1, "calt" 1;
   }
 
-  a {
-    color: inherit;
-    text-decoration: none;
+  a { color: inherit; text-decoration: none; }
+  h1, h2, h3, h4, h5, h6, p { margin: 0; }
+  #root { min-height: 100vh; }
+
+  /* Tabular figures for all data */
+  td, .tabular-nums {
+    font-variant-numeric: tabular-nums;
   }
 
-  h1,
-  h2,
-  h3,
-  h4,
-  h5,
-  h6,
-  p {
-    margin: 0;
-  }
-
-  #root {
-    min-height: 100vh;
-  }
+  /* Scrollbar */
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: hsl(225 10% 20%); border-radius: 3px; }
+  ::-webkit-scrollbar-thumb:hover { background: hsl(225 10% 28%); }
 }
 
+/* ── Component layer ── */
 @layer components {
+  /* Panel — the fundamental surface */
   .glass {
-    @apply rounded-3xl border border-border/70 bg-card/80 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.9)] backdrop-blur-xl;
+    @apply rounded-lg border border-border bg-card;
   }
 
   .card {
-    @apply p-6;
+    @apply p-5;
   }
 
   .main-content {
@@ -103,90 +126,98 @@
   }
 
   .tagline {
-    @apply text-sm text-muted-foreground;
-    letter-spacing: -0.01em;
-    line-height: 1.55;
+    @apply text-[13px] leading-relaxed text-muted-foreground;
   }
 
   .grid {
-    @apply grid gap-4 md:grid-cols-2 xl:grid-cols-4;
+    @apply grid gap-3 md:grid-cols-2 xl:grid-cols-4;
   }
 
+  /* Input */
   .glass-input {
-    @apply h-11 w-full rounded-xl border border-border bg-input px-3 py-2 text-sm text-foreground outline-none transition-all placeholder:text-muted-foreground focus:border-primary/60 focus:ring-2 focus:ring-primary/20;
+    @apply h-9 w-full rounded-md border border-border bg-input px-3 py-1.5 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus:border-primary/50 focus:ring-1 focus:ring-primary/25;
+    font-family: "DM Sans", sans-serif;
   }
 
+  /* Data table — dense terminal-style */
   .data-table {
-    @apply w-full border-collapse text-left text-sm;
+    @apply w-full border-collapse text-left text-[13px];
   }
 
   .data-table thead tr {
-    @apply border-b border-border/80;
+    @apply border-b border-border;
   }
 
   .data-table th {
-    @apply px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.2em] text-muted-foreground;
+    @apply px-3 py-2.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground;
   }
 
   .data-table td {
-    @apply border-b border-border/50 px-3 py-3 align-top text-sm text-foreground;
-    letter-spacing: -0.01em;
+    @apply border-b border-border/50 px-3 py-2.5 text-[13px] text-foreground/90;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .data-table tbody tr {
+    @apply transition-colors;
   }
 
   .data-table tbody tr:hover {
-    @apply bg-accent/35;
+    @apply bg-accent/50;
   }
 
+  /* Buttons — CSS utility classes */
   .btn-primary {
-    @apply inline-flex h-10 items-center justify-center rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-[0_18px_36px_-18px_rgba(34,211,238,0.7)] transition hover:brightness-110 disabled:pointer-events-none disabled:opacity-50;
+    @apply inline-flex h-9 items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/85 disabled:pointer-events-none disabled:opacity-50;
   }
 
   .btn-secondary {
-    @apply inline-flex h-10 items-center justify-center rounded-xl border border-primary/25 bg-card px-4 py-2 text-sm font-medium text-foreground transition hover:border-primary/45 hover:bg-accent;
+    @apply inline-flex h-9 items-center justify-center rounded-md border border-border bg-secondary px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent;
   }
 
   .btn-ghost {
-    @apply inline-flex h-9 items-center justify-center rounded-lg px-3 py-2 text-sm font-medium text-foreground/80 transition hover:bg-accent hover:text-foreground;
+    @apply inline-flex h-8 items-center justify-center rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground;
   }
 
   .btn-danger {
-    @apply inline-flex h-10 items-center justify-center rounded-xl bg-destructive/90 px-4 py-2 text-sm font-medium text-destructive-foreground transition hover:bg-destructive;
+    @apply inline-flex h-9 items-center justify-center rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground transition-colors hover:bg-destructive/85;
   }
 
   .btn-small {
-    @apply h-8 rounded-lg px-3 py-1 text-xs;
+    @apply h-7 rounded px-2.5 py-1 text-xs;
   }
 
+  /* Status badges */
   .status-badge {
-    @apply inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.24em];
+    @apply inline-flex items-center rounded-sm border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em];
   }
 
   .status-live {
-    @apply border-emerald-400/20 bg-emerald-400/10 text-emerald-200;
+    @apply border-emerald-500/25 bg-emerald-500/10 text-emerald-400;
   }
 
   .status-backtest {
-    @apply border-sky-400/20 bg-sky-400/10 text-sky-200;
+    @apply border-sky-500/25 bg-sky-500/10 text-sky-400;
   }
 
   .status-danger {
-    @apply border-rose-400/20 bg-rose-400/10 text-rose-200;
+    @apply border-rose-500/25 bg-rose-500/10 text-rose-400;
   }
 
+  /* Legacy class-based panels */
   .portfolio-manager,
   .backtest-panel,
   .backtest-results,
   .risk-panel,
   .checkpoint-list,
   .checkpoints {
-    @apply rounded-3xl border border-border/70 bg-card/80 p-6 shadow-[0_24px_80px_-40px_rgba(15,23,42,0.9)] backdrop-blur-xl;
+    @apply rounded-lg border border-border bg-card p-5;
   }
 
   .portfolio-header,
   .strategies-header,
   .risk-header,
   .checkpoint-header {
-    @apply mb-6 flex flex-wrap items-start justify-between gap-4;
+    @apply mb-5 flex flex-wrap items-start justify-between gap-4;
   }
 
   .portfolio-grid,
@@ -194,7 +225,7 @@
   .form-grid,
   .risk-metrics,
   .capital-info {
-    @apply grid gap-4;
+    @apply grid gap-3;
   }
 
   .portfolio-grid,
@@ -212,32 +243,32 @@
   .strategy-row,
   .checkpoint-item,
   .alert-item {
-    @apply rounded-2xl border border-border/70 bg-secondary/50 p-4;
+    @apply rounded-md border border-border bg-secondary/60 p-3;
   }
 
   .portfolio-card.selected {
-    @apply border-primary/40 bg-primary/10;
+    @apply border-primary/40 bg-primary/8;
   }
 
   .weight-bars,
   .alerts-list {
-    @apply space-y-3;
+    @apply space-y-2;
   }
 
   .weight-bar,
   .metric-bar {
-    @apply space-y-2;
+    @apply space-y-1.5;
   }
 
   .weight-fill,
   .metric-fill {
-    @apply h-2 rounded-full bg-primary;
+    @apply h-1 rounded-full bg-primary;
   }
 
   .form-group,
   .detail-item,
   .checkpoint-details {
-    @apply flex flex-col gap-2;
+    @apply flex flex-col gap-1.5;
   }
 
   .label,
@@ -245,7 +276,7 @@
   .metric-limit,
   .checkpoint-time,
   .alert-time {
-    @apply text-[11px] font-semibold uppercase tracking-[0.16em] text-muted-foreground;
+    @apply text-[11px] font-medium uppercase tracking-[0.06em] text-muted-foreground;
   }
 
   .empty-state,
@@ -253,34 +284,46 @@
   .checkpoint-list.loading,
   .risk-panel.loading,
   .risk-panel.disabled {
-    @apply flex min-h-48 items-center justify-center rounded-2xl border border-dashed border-border bg-card/40 p-6 text-center text-muted-foreground;
+    @apply flex min-h-40 items-center justify-center rounded-md border border-dashed border-border bg-muted/30 p-6 text-center text-sm text-muted-foreground;
   }
 
   .modal-overlay {
-    @apply fixed inset-0 z-40 bg-slate-950/80 backdrop-blur-sm;
+    @apply fixed inset-0 z-40 bg-black/70 backdrop-blur-sm;
   }
 
   .modal {
-    @apply fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 rounded-3xl border border-border bg-card p-6 shadow-2xl;
+    @apply fixed left-1/2 top-1/2 z-50 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-card p-6 shadow-2xl;
   }
 
   .modal-actions {
-    @apply mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end;
+    @apply mt-5 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end;
   }
 
   .spinner {
-    @apply inline-block size-5 animate-spin rounded-full border-2 border-border border-t-primary;
+    @apply inline-block size-4 animate-spin rounded-full border-2 border-muted-foreground/30 border-t-primary;
   }
 }
 
+/* ── Recharts overrides ── */
 .recharts-cartesian-grid-horizontal line,
 .recharts-cartesian-grid-vertical line {
-  stroke: rgba(148, 163, 184, 0.12);
+  stroke: hsla(225, 10%, 20%, 0.5);
 }
 
 .recharts-tooltip-wrapper .recharts-default-tooltip {
-  border: 1px solid rgba(71, 85, 105, 0.6) !important;
-  border-radius: 16px !important;
-  background: rgba(15, 23, 42, 0.92) !important;
-  box-shadow: 0 20px 50px -30px rgba(15, 23, 42, 0.95);
+  border: 1px solid hsl(225 10% 18%) !important;
+  border-radius: 6px !important;
+  background: hsla(225, 15%, 8%, 0.95) !important;
+  box-shadow: 0 12px 40px -12px rgba(0, 0, 0, 0.6);
+  font-size: 12px !important;
+}
+
+/* ── Animate-in utilities ── */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-up {
+  animation: fade-up 0.35s ease-out both;
 }

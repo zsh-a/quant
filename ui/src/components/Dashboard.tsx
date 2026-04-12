@@ -32,7 +32,7 @@ const COLORS: Record<string, string> = {
     'sz.399006': '#34d399',
 };
 
-const SESSION_COMPARE_COLORS = ['#fb7185', '#f59e0b', '#a78bfa', '#22d3ee', '#f97316', '#4ade80'];
+const SESSION_COMPARE_COLORS = ['#fb7185', '#f59e0b', '#a78bfa', '#e8a230', '#f97316', '#4ade80'];
 
 const PAGE_SIZE = 10;
 
@@ -267,8 +267,8 @@ const Dashboard: React.FC<DashboardProps> = ({
                         <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
                             <defs>
                                 <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.38} />
-                                    <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
+                                    <stop offset="5%" stopColor="#e8a230" stopOpacity={0.38} />
+                                    <stop offset="95%" stopColor="#e8a230" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
@@ -284,7 +284,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                                 labelFormatter={(label) => label.split(' ')[0]}
                             />
                             <Legend wrapperStyle={{ paddingTop: '12px' }} verticalAlign="bottom" />
-                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="#22d3ee" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
+                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="#e8a230" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
                             {visibleComparisonData.map((c, idx) => (
                                 <Line
                                     key={c.id}

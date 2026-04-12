@@ -5,26 +5,26 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "../../lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl text-sm font-semibold tracking-[-0.01em] transition-all duration-200 outline-none ring-offset-background disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 shrink-0 focus-visible:ring-2 focus-visible:ring-ring/70 focus-visible:ring-offset-2",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors outline-none disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 shrink-0 focus-visible:ring-1 focus-visible:ring-ring",
   {
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[0_18px_36px_-18px_var(--color-primary)] hover:bg-[color-mix(in_oklab,var(--color-primary)_88%,white)]",
+          "bg-primary text-primary-foreground hover:bg-primary/85",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklab,var(--color-secondary)_82%,white)]",
+          "bg-secondary text-secondary-foreground border border-border hover:bg-accent",
         outline:
-          "border border-primary/25 bg-card text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:border-primary/45 hover:bg-accent hover:text-accent-foreground",
+          "border border-border bg-transparent text-foreground hover:bg-accent hover:text-accent-foreground",
         ghost:
-          "text-foreground/82 hover:bg-accent hover:text-accent-foreground",
+          "text-muted-foreground hover:bg-accent hover:text-foreground",
         danger:
-          "bg-destructive text-destructive-foreground shadow-[0_18px_36px_-20px_rgba(244,63,94,0.9)] hover:bg-[color-mix(in_oklab,var(--color-destructive)_90%,white)]",
+          "bg-destructive text-destructive-foreground hover:bg-destructive/85",
       },
       size: {
-        default: "h-10 px-4 py-2",
-        sm: "h-8 rounded-lg px-3 text-xs",
-        lg: "h-11 px-5 text-sm",
-        icon: "size-10",
+        default: "h-9 px-4 py-2",
+        sm: "h-7 rounded px-2.5 text-xs",
+        lg: "h-10 px-5 text-sm",
+        icon: "size-9",
       },
     },
     defaultVariants: {

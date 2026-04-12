@@ -10,11 +10,11 @@ interface EmptyStateProps {
 
 export function EmptyState({ title, description, action }: EmptyStateProps) {
   return (
-    <Card className="border-dashed bg-card/50">
-      <CardContent className="flex min-h-64 flex-col items-center justify-center gap-4 p-10 text-center">
-        <div className="space-y-2">
-          <h2 className="text-xl font-semibold text-foreground">{title}</h2>
-          <p className="max-w-md text-sm text-muted-foreground">{description}</p>
+    <Card className="border-dashed">
+      <CardContent className="flex min-h-52 flex-col items-center justify-center gap-3 p-8 text-center">
+        <div className="space-y-1.5">
+          <h2 className="text-sm font-semibold text-foreground">{title}</h2>
+          <p className="max-w-sm text-[13px] text-muted-foreground">{description}</p>
         </div>
         {action}
       </CardContent>
