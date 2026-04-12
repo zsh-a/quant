@@ -70,8 +70,14 @@ from src.api.logs_router import router as logs_router
 from src.api.market_router import router as market_router
 from src.api.automation_router import router as automation_router
 from src.api.market_admin_router import router as market_admin_router
-from src.api.alpha_lab_router import router as alpha_lab_router
 from src.api.crypto_market_router import router as crypto_market_router
+
+# Alpha Lab — optional, requires torch
+try:
+    from src.api.alpha_lab_router import router as alpha_lab_router
+    _ALPHA_AVAILABLE = True
+except Exception:
+    _ALPHA_AVAILABLE = False
 from src.tasks.backtest import run_backtest_task
 
 setup_logging()
@@ -106,7 +112,8 @@ app.include_router(logs_router)
 app.include_router(market_router)
 app.include_router(automation_router)
 app.include_router(market_admin_router)
-app.include_router(alpha_lab_router)
+if _ALPHA_AVAILABLE:
+    app.include_router(alpha_lab_router)
 app.include_router(crypto_market_router)
 
 logger.info(f"API Server starting with config: port={api_config.port}")

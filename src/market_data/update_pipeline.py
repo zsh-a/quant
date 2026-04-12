@@ -118,8 +118,8 @@ def update_etf_kline(
     progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
 ) -> Dict:
     proc = AKDataProcessor()
-    all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
-    all_etfs = all_etfs["基金代码"].astype(str).to_list()
+    from src.market_data.static_data import get_etf_codes
+    all_etfs = get_etf_codes()
     total = len(all_etfs)
     updated = 0
     errors: List[str] = []

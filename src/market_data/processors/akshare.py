@@ -44,7 +44,8 @@ class AKDataProcessor:
                 self.client.command(sql)
 
     def insert_sw_index(self):
-        df = pd.read_csv("sw_industry.csv", index_col="代码")
+        from src.market_data.static_data import load_sw_industry
+        df = load_sw_industry(index_col="代码")
 
         for index, _ in df.iterrows():
             index = index.split(".")[0]
@@ -64,7 +65,8 @@ class AKDataProcessor:
                 self.client.command(sql)
 
     def insert_sw_industry(self):
-        df = pd.read_csv("sw_industry.csv", index_col="index")
+        from src.market_data.static_data import load_sw_industry
+        df = load_sw_industry(index_col="index")
         for index, row in df.iterrows():
             index = index.split(".")[0]
             index_component_df = get_sw_comoment(index)
@@ -177,8 +179,9 @@ class AKDataProcessor:
         self.client.command("OPTIMIZE TABLE stock_data.stock_daily FINAL")
 
     def create_etf_meta(self):
-        all_etfs = pd.read_csv("all_etf.csv", names=["code", "type", "name"], dtype=str)
-        all_etfs = all_etfs.set_index("code")
+        from src.market_data.static_data import load_etf_list
+
+        all_etfs = load_etf_list().set_index("code")
 
         code_str = ",".join([f"'{code}'" for code in all_etfs.index])
 
@@ -201,8 +204,7 @@ class AKDataProcessor:
 
         kline_data = self.client.query(sql)
 
-        all_etfs = pd.read_csv("all_etf.csv", names=["code", "type", "name"], dtype=str)
-        all_etfs = all_etfs.set_index("code")
+        all_etfs = load_etf_list().set_index("code")
 
         df = kline_data.result_rows
         for code, last_update_date, adjfactor in df:

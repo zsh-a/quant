@@ -43,14 +43,16 @@ class BacktestBroker(Broker):
             logger.info(f"BacktestBroker initialized with risk manager")
 
     def _load_stock_names(self):
-        import os
-        import pandas as pd
-        if os.path.exists("all_stock.csv"):
-            try:
-                df = pd.read_csv("all_stock.csv")
-                self.stock_names = dict(zip(df['code'], df['code_name']))
-            except Exception as e:
-                logger.error(f"Failed to load stock names: {e}")
+        if self.db_client is None:
+            return
+        try:
+            data = self.db_client.client.query(
+                "SELECT code, name FROM stock_data.stock_daily_meta WHERE name != ''"
+            )
+            for code, name in data.result_rows:
+                self.stock_names[code] = name
+        except Exception as e:
+            logger.warning(f"Failed to load stock names from DB: {e}")
 
     def submit_order(self, order: Order) -> str:
         # 统一风险检查入口

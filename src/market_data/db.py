@@ -33,27 +33,25 @@ class DB:
         return df
 
     def update_meta(self):
-        df = pd.read_csv("all_stock.csv", index_col="code")
-
-        for code, data in df.iterrows():
-            name = data["code_name"]
-            if pd.isna(name):
+        """Update stock names in meta table from all_stock table in DB."""
+        data = self.client.query(
+            "SELECT code, code_name FROM stock_data.all_stock "
+            "WHERE code_name != '' "
+            "ORDER BY day DESC "
+            "LIMIT 1 BY code"
+        )
+        for code, name in data.result_rows:
+            if not name:
                 continue
-
-            update_query = f"""
-            INSERT INTO stock_data.stock_daily_meta (code, last_update_date, last_adjfactor, error_update_count, name)
-            SELECT
-                code,
-                last_update_date,
-                last_adjfactor,
-                error_update_count,
-                '{name}'
+            self.client.command(f"""
+            INSERT INTO stock_data.stock_daily_meta
+                (code, last_update_date, last_adjfactor, error_update_count, name)
+            SELECT code, last_update_date, last_adjfactor, error_update_count, '{name}'
             FROM stock_data.stock_daily_meta
             WHERE code = '{code}'
             ORDER BY last_update_date DESC
-            LIMIT 1;
-            """
-            self.client.command(update_query)
+            LIMIT 1
+            """)
 
     def get_meta(self, code):
         query = f"""
@@ -278,9 +276,8 @@ class DB:
         return df
 
     def get_all_etf_code(self):
-        all_etfs = pd.read_csv("all_etf.csv", names=["基金代码", "类别", "名称"])
-        all_etfs = all_etfs["基金代码"].astype(str).to_list()
-        return all_etfs
+        from src.market_data.static_data import get_etf_codes
+        return get_etf_codes()
 
     def get_all_stock_code(self):
         sql = """
@@ -296,6 +293,11 @@ class DB:
             or stock.startswith("sh.60")
             or stock.startswith("sz.30")
         ]
+
+    def get_trading_calendar(self):
+        """获取交易日历 (返回 TradingCalendar 实例)。"""
+        from src.core.trading_calendar import TradingCalendar
+        return TradingCalendar(self)
 
     def get_swindustry_stocks(self, industry_code, date=None):
         sql = f"""

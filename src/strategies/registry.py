@@ -69,11 +69,21 @@ class StrategyRegistry:
         """Import all strategy modules to trigger registration"""
         from src.strategies import jsg_strategy
         from src.strategies import rotation_strategy
-        from src.strategies import multi_factor_strategy
-        from src.strategies import precomputed_alpha_strategy
 
         # Import forces decorator execution
-        _ = jsg_strategy, rotation_strategy, multi_factor_strategy, precomputed_alpha_strategy
+        _ = jsg_strategy, rotation_strategy
+
+        # Alpha-dependent strategies — optional (require torch)
+        try:
+            from src.strategies import multi_factor_strategy
+            _ = multi_factor_strategy
+        except Exception:
+            pass
+        try:
+            from src.strategies import precomputed_alpha_strategy
+            _ = precomputed_alpha_strategy
+        except Exception:
+            pass
 
 
 # Auto-register all strategies on module import

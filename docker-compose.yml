@@ -5,7 +5,7 @@ x-logging: &default-logging
     max-file: "3"
 
 # Shared backend build — api and celery_worker use the same image (built once)
-# Set DEVICE=cpu to build without GPU support (smaller image)
+# DEVICE: cu124 (GPU default) | cpu (PyTorch CPU) | none (no PyTorch, lightweight)
 x-backend: &backend-build
   build:
     context: .
@@ -15,11 +15,11 @@ x-backend: &backend-build
   image: quant-backend:latest
 
 x-backend-env: &backend-env
-  CELERY_BROKER_URL: redis://redis:6379/0
-  CELERY_RESULT_BACKEND: redis://redis:6379/1
+  CELERY_BROKER_URL: redis://localhost:6379/0
+  CELERY_RESULT_BACKEND: redis://localhost:6379/1
   PYTHONUNBUFFERED: "1"
   SESSION_DB_PATH: /app/data/sessions.db
-  QUANT_DATABASE__HOST: clickhouse
+  QUANT_DATABASE__HOST: localhost
   QUANT_DATABASE__PORT: "8123"
 
 x-backend-volumes: &backend-volumes
@@ -28,12 +28,28 @@ x-backend-volumes: &backend-volumes
   - ./logs:/app/logs
 
 services:
-  # Redis - Message broker and cache
+  clickhouse:
+    image: clickhouse/clickhouse-server:latest
+    container_name: clickhouse
+    network_mode: host
+    volumes:
+      - ./db/data:/var/lib/clickhouse
+      - clickhouse_logs:/var/log/clickhouse-server
+    environment:
+      CLICKHOUSE_DB: default
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    restart: unless-stopped
+    logging: *default-logging
+
   redis:
     image: redis:7-alpine
     container_name: quant_redis
-    ports:
-      - "6379:6379"
+    network_mode: host
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
@@ -42,80 +58,55 @@ services:
       interval: 10s
       timeout: 3s
       retries: 3
-    networks:
-      - quant_network
     logging: *default-logging
 
-  # API Server (GPU enabled)
   api:
     <<: *backend-build
     container_name: quant_api
-    ports:
-      - "8000:8000"
+    network_mode: host
     volumes: *backend-volumes
     environment:
       <<: *backend-env
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     depends_on:
       redis:
+        condition: service_healthy
+      clickhouse:
         condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/monitoring/health"]
       interval: 30s
       timeout: 10s
       retries: 3
-    networks:
-      - quant_network
     restart: unless-stopped
     logging: *default-logging
 
-  # Celery Worker (GPU enabled for alpha search tasks)
   celery_worker:
     <<: *backend-build
     container_name: quant_celery_worker
+    network_mode: host
     command: celery -A src.tasks.celery_app worker --loglevel=info --concurrency=4 --queues=backtest,default,automation
     volumes: *backend-volumes
     environment:
       <<: *backend-env
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
     depends_on:
       redis:
         condition: service_healthy
-    networks:
-      - quant_network
+      clickhouse:
+        condition: service_healthy
     restart: unless-stopped
     logging: *default-logging
 
-  # Frontend - React app with Nginx
   frontend:
     build:
       context: .
       dockerfile: Dockerfile.frontend
     container_name: quant_frontend
-    ports:
-      - "80:80"
+    network_mode: host
     depends_on:
       - api
-    networks:
-      - quant_network
     restart: unless-stopped
     logging: *default-logging
 
-networks:
-  quant_network:
-    driver: bridge
-
 volumes:
   redis_data:
+  clickhouse_logs:

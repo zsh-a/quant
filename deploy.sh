@@ -8,8 +8,8 @@ export DOCKER_BUILDKIT=1
 export COMPOSE_DOCKER_CLI_BUILD=1
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SERVICES=(redis api celery_worker frontend)
-VALID_LOG_SERVICES=(redis api celery_worker frontend)
+SERVICES=(clickhouse redis api celery_worker frontend)
+VALID_LOG_SERVICES=(clickhouse redis api celery_worker frontend)
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -29,10 +29,20 @@ print_error() {
 }
 
 compose_cmd() {
+    local compose_files=(-f docker-compose.yml)
+
+    # Auto-detect GPU: add GPU overlay when DEVICE is not "none" or "cpu"
+    local device="${DEVICE:-cu124}"
+    if [ "$device" != "none" ] && [ "$device" != "cpu" ]; then
+        if [ -f "$ROOT_DIR/docker-compose.gpu.yml" ]; then
+            compose_files+=(-f docker-compose.gpu.yml)
+        fi
+    fi
+
     if command -v docker-compose >/dev/null 2>&1; then
-        docker-compose "$@"
+        docker-compose "${compose_files[@]}" "$@"
     else
-        docker compose "$@"
+        docker compose "${compose_files[@]}" "$@"
     fi
 }
 

@@ -7,24 +7,30 @@ Triton is unavailable.
 
 from __future__ import annotations
 
-import torch
-
 try:
-    import triton
-
-    from .triton_kernels import (
-        _batch_rank_ic_kernel,
-        _cs_rank_kernel,
-        _decay_linear_kernel,
-        _factor_corr_matrix_kernel,
-        _parallel_ema_scan_kernel,
-        _rolling_corr_cov_kernel,
-        _rolling_mean_std_kernel,
-        _rolling_reduce_kernel,
-    )
-
-    TRITON_AVAILABLE = True
+    import torch
 except ImportError:
+    torch = None  # type: ignore[assignment]
+
+if torch is not None:
+    try:
+        import triton
+
+        from .triton_kernels import (
+            _batch_rank_ic_kernel,
+            _cs_rank_kernel,
+            _decay_linear_kernel,
+            _factor_corr_matrix_kernel,
+            _parallel_ema_scan_kernel,
+            _rolling_corr_cov_kernel,
+            _rolling_mean_std_kernel,
+            _rolling_reduce_kernel,
+        )
+
+        TRITON_AVAILABLE = True
+    except ImportError:
+        TRITON_AVAILABLE = False
+else:
     TRITON_AVAILABLE = False
 
 

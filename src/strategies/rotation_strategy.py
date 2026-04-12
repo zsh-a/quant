@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import talib as ta
 from src.core.base import Strategy, Bar
+from src.core.trading_calendar import TradingCalendar
 from src.strategies.registry import StrategyRegistry
 
 PRICE_CHANGE_LIMIT = 0.098
@@ -57,11 +58,11 @@ SW1 = {
     description="高级轮动策略 - 基于行业动量的轮动策略",
 )
 class RotationStrategy(Strategy):
-    _trad_days_cache = None
 
     def __init__(self, db_client, session_id: str = None, **kwargs):
         super().__init__(session_id=session_id)
         self.db_client = db_client
+        self.calendar = TradingCalendar(db_client)
 
         params = self.get_parameters()
         self.stock_sum = int(kwargs.get("stock_sum", params["stock_sum"]["default"]))
@@ -79,12 +80,6 @@ class RotationStrategy(Strategy):
         self.CYB_group = {"创业板50"}
         self.black_industry_name = {"银行I", "煤炭I", "采掘I", "钢铁I"}
 
-        if RotationStrategy._trad_days_cache is None:
-            RotationStrategy._trad_days_cache = pd.read_csv(
-                "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
-            )
-        self.trad_days = RotationStrategy._trad_days_cache
-
         self._log(
             f"RotationStrategy initialized: stock_sum={self.stock_sum}, timing={self.timing}"
         )
@@ -93,19 +88,12 @@ class RotationStrategy(Strategy):
         self.trigger_dates_live = set()
 
         if self.rebalance_dates:
-            trading_days_df = self.trad_days[
-                self.trad_days["is_trading_day"] == 1
-            ].index
-
             for d_str in self.rebalance_dates:
                 try:
-                    target_date = pd.Timestamp(d_str)
-                    curr_days = trading_days_df[trading_days_df <= target_date]
-                    if not curr_days.empty:
-                        d_fmt = curr_days[-1].strftime("%Y-%m-%d")
-                        self.trigger_dates_backtest.add(d_fmt)
-                        self.trigger_dates_live.add(d_fmt)
-
+                    nearest = self.calendar.nearest_trading_day(d_str, direction="backward")
+                    if nearest:
+                        self.trigger_dates_backtest.add(nearest)
+                        self.trigger_dates_live.add(nearest)
                 except Exception as e:
                     self._log(f"Error parsing date {d_str}: {e}")
 
@@ -149,9 +137,8 @@ class RotationStrategy(Strategy):
             if today_str in trigger_dates:
                 should_run = True
         else:
-            if today_str in self.trad_days.index.strftime("%Y-%m-%d"):
-                if self.trad_days.loc[today_str, "is_last_trading_day"] != 0:
-                    should_run = True
+            if self.calendar.is_rebalance_day(today_str, freq="weekly"):
+                should_run = True
 
         if not should_run:
             return

@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 import talib as ta
 from src.core.base import Strategy, Bar
+from src.core.trading_calendar import TradingCalendar
 import utils.utils as util
 from src.strategies.registry import StrategyRegistry
 
@@ -15,13 +16,12 @@ NUM_STOCKS = 6
     description="JSG量化策略 - 基于行业轮动策略",
 )
 class JSGStrategy(Strategy):
-    _trad_days_cache = None
 
     def __init__(self, db_client, session_id: str = None, **kwargs):
-        super().__init__(session_id=session_id)  # Pass session_id to base class
+        super().__init__(session_id=session_id)
         self.db_client = db_client
+        self.calendar = TradingCalendar(db_client)
 
-        # Load parameters with defaults and handle type conversion
         params = self.get_parameters()
         self.max_stocks = int(kwargs.get("max_stocks", params["max_stocks"]["default"]))
         self.pool_size = int(kwargs.get("pool_size", params["pool_size"]["default"]))
@@ -31,13 +31,6 @@ class JSGStrategy(Strategy):
         self.max_drawdown_pct = float(kwargs.get("max_drawdown_pct", params["max_drawdown_pct"]["default"]))
 
         self.black_industry_name = {"银行", "煤炭", "有色金属", "钢铁"}
-
-        # Initialize internal state from original Agent (Lazy load)
-        if JSGStrategy._trad_days_cache is None:
-            JSGStrategy._trad_days_cache = pd.read_csv(
-                "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
-            )
-        self.trad_days = JSGStrategy._trad_days_cache
         self.pass_month = []
         
         # Track stocks that hit limit-up yesterday
@@ -220,12 +213,8 @@ class JSGStrategy(Strategy):
         # 2. Daily risk control checks (stop-loss, trailing stop, drawdown)
         drawdown_triggered = self._check_risk_controls(bars)
 
-        # 3. Rebalance Check
-        if today_str not in self.trad_days.index.strftime("%Y-%m-%d"):
-            return
-
-        # Original logic check
-        if self.trad_days.loc[today_str, "is_last_trading_day"] == 0:
+        # 3. Rebalance Check (每周最后一个交易日)
+        if not self.calendar.is_rebalance_day(today_str, freq="weekly"):
             return
 
         # 调仓日重置回撤熔断标志，允许重新建仓

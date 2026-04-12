@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional, Any
 from src.core.base import Strategy, Bar
+from src.core.trading_calendar import TradingCalendar
 from src.strategies.registry import StrategyRegistry
 from src.alpha.infra.persistence import AlphaPersistence as AlphaZooPersistence
 from src.alpha.core.operators import OperatorRegistry as _OperatorRegistry
@@ -75,11 +76,10 @@ class MultiFactorStrategy(Strategy):
       5. Select top_n stocks and equal-weight rebalance.
     """
 
-    _trad_days_cache = None
-
     def __init__(self, db_client, session_id: str = None, **kwargs):
         super().__init__(session_id=session_id)
         self.db_client = db_client
+        self.calendar = TradingCalendar(db_client)
 
         params = self.get_parameters()
         self.top_n = int(kwargs.get("top_n", params["top_n"]["default"]))
@@ -88,15 +88,7 @@ class MultiFactorStrategy(Strategy):
         self.index_code = str(kwargs.get("index_code", params["index_code"]["default"]))
         zoo_dir = str(kwargs.get("zoo_dir", params["zoo_dir"]["default"]))
 
-        # Load factors from alpha zoo
         self.factors = self._load_factors(zoo_dir)
-
-        # Trading calendar (reuse the shared CSV used by other strategies)
-        if MultiFactorStrategy._trad_days_cache is None:
-            MultiFactorStrategy._trad_days_cache = pd.read_csv(
-                "marked_trade_datas.csv", index_col="calendar_date", parse_dates=True
-            )
-        self.trad_days = MultiFactorStrategy._trad_days_cache
 
         # State
         self._last_rebalance_date: Optional[str] = None
@@ -182,28 +174,11 @@ class MultiFactorStrategy(Strategy):
 
     def _should_rebalance(self, today_str: str) -> bool:
         """Check if today is a rebalance date."""
-        if today_str not in self.trad_days.index.strftime("%Y-%m-%d"):
-            return False
-
-        if self.rebalance_freq == "monthly":
-            return self.trad_days.loc[today_str, "is_last_trading_day"] != 0
-        elif self.rebalance_freq == "biweekly":
-            # Every other Friday
-            if self.trad_days.loc[today_str, "is_last_trading_day"] != 0:
-                return True
-            today = pd.Timestamp(today_str)
-            if today.weekday() == 4:  # Friday
-                if self._last_rebalance_date is None:
-                    return True
-                days_since = (today - pd.Timestamp(self._last_rebalance_date)).days
-                return days_since >= 10
-            return False
-        else:  # weekly
-            today = pd.Timestamp(today_str)
-            if today.weekday() == 4:  # Friday
-                return True
-            # Also rebalance on last trading day of month
-            return self.trad_days.loc[today_str, "is_last_trading_day"] != 0
+        return self.calendar.is_rebalance_day(
+            today_str,
+            freq=self.rebalance_freq,
+            last_rebalance=self._last_rebalance_date,
+        )
 
     def _compute_composite_score(self, stocks: List[str], date_str: str) -> pd.Series:
         """
