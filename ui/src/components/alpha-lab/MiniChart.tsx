@@ -52,22 +52,22 @@ export function MiniChart({ data, label, color = '#6366f1', height = 260, pct }:
       grid: { left: 52, right: 16, top: 28, bottom: hasTime ? 56 : 48 },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'hsl(var(--card))',
-        borderColor: 'hsl(var(--border))',
-        textStyle: { color: 'hsl(var(--foreground))', fontSize: 11 },
+        backgroundColor: 'var(--color-card)',
+        borderColor: 'var(--color-border)',
+        textStyle: { color: 'var(--color-foreground)', fontSize: 11 },
         formatter: (params: any) => {
           const p = params[0]
           const v = pct ? `${(p.value * 100).toFixed(2)}%` : p.value.toFixed(4)
           const time = fmtTooltipLabel(hasTime ? data[p.dataIndex]?.t : undefined, p.dataIndex)
           return `<b>${label}</b><br/>${time}: ${v}`
         },
-        axisPointer: { type: 'cross', lineStyle: { type: 'dashed', color: 'hsl(var(--muted-foreground))' } },
+        axisPointer: { type: 'cross', lineStyle: { type: 'dashed', color: 'var(--color-muted-foreground)' } },
       },
       xAxis: {
         type: 'category' as const,
         data: xData,
         axisLabel: hasTime ? {
-          color: 'hsl(var(--muted-foreground))',
+          color: 'var(--color-muted-foreground)',
           fontSize: 9,
           formatter: (v: string) => fmtAxisLabel(v),
           rotate: 0,
@@ -77,9 +77,9 @@ export function MiniChart({ data, label, color = '#6366f1', height = 260, pct }:
       },
       yAxis: {
         type: 'value' as const,
-        splitLine: { lineStyle: { color: 'hsl(var(--border))', opacity: 0.3 } },
+        splitLine: { lineStyle: { color: 'var(--color-border)', opacity: 0.3 } },
         axisLabel: {
-          color: 'hsl(var(--muted-foreground))', fontSize: 10,
+          color: 'var(--color-muted-foreground)', fontSize: 10,
           formatter: pct ? (v: number) => `${(v * 100).toFixed(0)}%` : (v: number) => v.toFixed(2),
         },
       },
@@ -88,10 +88,10 @@ export function MiniChart({ data, label, color = '#6366f1', height = 260, pct }:
         height: 18,
         bottom: 4,
         borderColor: 'transparent',
-        backgroundColor: 'hsl(var(--border))',
+        backgroundColor: 'var(--color-border)',
         fillerColor: color + '30',
         handleStyle: { color },
-        textStyle: { color: 'hsl(var(--muted-foreground))', fontSize: 9 },
+        textStyle: { color: 'var(--color-muted-foreground)', fontSize: 9 },
         labelFormatter: hasTime ? (_: number, val: string) => fmtAxisLabel(val) : undefined,
       }],
       series: [{

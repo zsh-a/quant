@@ -221,7 +221,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             type="text"
             value={value}
             onChange={(e) => onChange(e.target.value)}
-            placeholder="搜索日志..."
+            placeholder="Search logs..."
             autoFocus
             style={{
                 flex: 1,
@@ -242,7 +242,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
                 if (e.key === 'Escape') onClose();
             }}
         />
-        <button onClick={onToggleRegex} title="正则表达式" style={{
+        <button onClick={onToggleRegex} title="Regular expression" style={{
             padding: '2px 6px',
             borderRadius: 4,
             border: `1px solid ${useRegex ? '#58a6ff' : '#30363d'}`,
@@ -253,7 +253,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             fontFamily: 'monospace',
             fontWeight: 600,
         }}>.*</button>
-        <button onClick={onToggleCase} title="区分大小写" style={{
+        <button onClick={onToggleCase} title="Case sensitive" style={{
             padding: '2px 6px',
             borderRadius: 4,
             border: `1px solid ${caseSensitive ? '#58a6ff' : '#30363d'}`,
@@ -264,7 +264,7 @@ const SearchBar: React.FC<SearchBarProps> = ({
             fontWeight: 600,
         }}>Aa</button>
         <span style={{ color: '#8b949e', fontSize: 12, minWidth: 60, textAlign: 'center' }}>
-            {matchCount > 0 ? `${activeMatch + 1}/${matchCount}` : value ? '无匹配' : ''}
+            {matchCount > 0 ? `${activeMatch + 1}/${matchCount}` : value ? 'No matches' : ''}
         </span>
         <button onClick={onPrev} disabled={matchCount === 0} style={navBtnStyle}>↑</button>
         <button onClick={onNext} disabled={matchCount === 0} style={navBtnStyle}>↓</button>
@@ -316,12 +316,12 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
             if (levelFilter) params.append('level', levelFilter);
             if (sourceFilter) params.append('source', sourceFilter);
             const resp = await fetch(`${API_BASE}/logs/${sessionId}?${params}`);
-            if (!resp.ok) { setError(`获取失败: ${resp.statusText}`); return; }
+            if (!resp.ok) { setError(`Fetch failed: ${resp.statusText}`); return; }
             const data = await resp.json();
             setEntries(data.logs || []);
             setError(null);
         } catch (err) {
-            setError(`异常: ${err}`);
+            setError(`Error: ${err}`);
         } finally {
             setLoading(false);
         }
@@ -439,13 +439,13 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
 
     return (
         <SectionCard
-            title="策略日志"
-            description="按级别、来源和关键词筛选会话日志。"
+            title="Strategy Logs"
+            description="Filter session logs by level, source, and keywords."
             action={
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    {loading && <span style={{ color: '#58a6ff', fontSize: 12 }}>加载中...</span>}
-                    <span style={{ color: 'var(--text-dim)', fontSize: '0.85rem' }}>
-                        {entries.length > 0 ? `${entries.length} 条` : ''} · 会话：{sessionId?.slice(0, 8) || '未选择'}
+                    {loading && <span style={{ color: '#58a6ff', fontSize: 12 }}>Loading...</span>}
+                    <span style={{ color: 'var(--color-text-dim)', fontSize: '0.85rem' }}>
+                        {entries.length > 0 ? `${entries.length} entries` : ''} · Session: {sessionId?.slice(0, 8) || 'Not selected'}
                     </span>
                 </div>
             }
@@ -456,7 +456,7 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                 <div style={{ display: 'flex', gap: 4 }}>
                     {['', 'INFO', 'WARNING', 'ERROR', 'DEBUG'].map((lv) => {
                         const active = levelFilter === lv;
-                        const label = lv || '全部';
+                        const label = lv || 'All';
                         const count = lv ? (levelCounts[lv] || 0) : entries.length;
                         const color = lv ? LEVEL_COLORS[lv] : '#c9d1d9';
                         return (
@@ -468,7 +468,7 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                                     borderRadius: 6,
                                     border: `1px solid ${active ? `${color}60` : 'var(--border)'}`,
                                     background: active ? `${color}18` : 'transparent',
-                                    color: active ? color : 'var(--text-dim)',
+                                    color: active ? color : 'var(--color-text-dim)',
                                     fontSize: 12,
                                     fontWeight: active ? 600 : 400,
                                     cursor: 'pointer',
@@ -492,13 +492,13 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                         borderRadius: 6,
                         border: '1px solid var(--border)',
                         background: 'var(--input-bg)',
-                        color: 'var(--text)',
+                        color: 'var(--color-text)',
                         fontSize: 12,
                         cursor: 'pointer',
                     }}
                 >
-                    <option value="">全部来源</option>
-                    <option value="strategy">策略</option>
+                    <option value="">All Sources</option>
+                    <option value="strategy">Strategy</option>
                     <option value="broker">Broker</option>
                     <option value="engine">Engine</option>
                 </select>
@@ -506,17 +506,17 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                 <div style={{ flex: 1 }} />
 
                 {/* Right-side controls */}
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--color-text-dim)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={autoFollow} onChange={(e) => setAutoFollow(e.target.checked)} style={{ width: 'auto' }} />
-                    跟踪
+                    Follow
                 </label>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--text-dim)', cursor: 'pointer' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 4, fontSize: 12, color: 'var(--color-text-dim)', cursor: 'pointer' }}>
                     <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} style={{ width: 'auto' }} />
-                    轮询
+                    Poll
                 </label>
-                <Button onClick={() => setShowSearch((v) => !v)} variant="ghost" size="sm" title="Ctrl+F">搜索</Button>
-                <Button onClick={fetchLogs} variant="outline" size="sm">刷新</Button>
-                <Button onClick={handleClear} variant="danger" size="sm">清空</Button>
+                <Button onClick={() => setShowSearch((v) => !v)} variant="ghost" size="sm" title="Ctrl+F">Search</Button>
+                <Button onClick={fetchLogs} variant="outline" size="sm">Refresh</Button>
+                <Button onClick={handleClear} variant="danger" size="sm">Clear</Button>
             </div>
 
             {/* ---- Search bar ---- */}
@@ -553,7 +553,7 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
                     <div style={{ padding: 24, color: '#f85149' }}>{error}</div>
                 ) : entries.length === 0 ? (
                     <div style={{ padding: 24, color: '#8b949e', fontSize: 13 }}>
-                        {sessionId ? '当前会话还没有日志。' : '尚未选择会话。'}
+                        {sessionId ? 'No logs for this session yet.' : 'No session selected.'}
                     </div>
                 ) : (
                     <AutoSizer>

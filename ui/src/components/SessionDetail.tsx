@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import React from 'react';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import type { BenchmarkData, EquityPoint, Position, SessionSummary, Trade } from '../types';
 import Dashboard from './Dashboard';
 import { RiskPanel } from './RiskPanel';
@@ -10,7 +11,6 @@ import { EmptyState } from './layout/EmptyState';
 import { SectionCard } from './layout/SectionCard';
 import { StatusBadge } from './layout/StatusBadge';
 import { Progress } from './ui/progress';
-import { formatSourceLabel } from '../utils/display';
 
 interface SessionDetailProps {
   primarySession?: SessionSummary;
@@ -27,6 +27,13 @@ interface SessionDetailProps {
   onRestoreCheckpoint: () => void;
 }
 
+function getSubtab(pathname: string): 'overview' | 'risk' | 'analysis' | 'logs' {
+  if (pathname.endsWith('/risk')) return 'risk';
+  if (pathname.endsWith('/analysis')) return 'analysis';
+  if (pathname.endsWith('/logs')) return 'logs';
+  return 'overview';
+}
+
 const SessionDetail: React.FC<SessionDetailProps> = ({
   primarySession,
   allSessions,
@@ -41,30 +48,31 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
   onSelectSession,
   onRestoreCheckpoint,
 }) => {
-  const [subtab, setSubtab] = useState<'overview' | 'risk' | 'analysis' | 'logs'>(() => {
-    const stored = window.localStorage.getItem('quent.session.subtab');
-    if (stored === 'risk' || stored === 'analysis' || stored === 'logs') return stored;
-    return 'overview';
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem('quent.session.subtab', subtab);
-  }, [subtab]);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const subtab = getSubtab(location.pathname);
 
   if (!primarySession) {
     return (
-      <EmptyState title="未选择会话" description="可从总览或实验室中选择一个会话进入详情视图。" />
+      <EmptyState title="No Session Selected" description="Select a session from the overview or lab to view details." />
     );
   }
+
+  const handleTabChange = (value: string) => {
+    const base = `/session/${id}`;
+    const path = value === 'overview' ? base : `${base}/${value}`;
+    navigate(path, { replace: true });
+  };
 
   return (
     <div className="space-y-6">
       <SectionCard
-        title="会话详情"
-        description={`${primarySession.strategy} · ${primarySession.symbol} · ${formatSourceLabel(primarySession.source)}`}
+        title="Session Details"
+        description={`${primarySession.strategy} · ${primarySession.symbol}`}
         action={
           <div className="min-w-[280px] space-y-2">
-            <div className="tagline">切换会话</div>
+            <div className="text-xs font-medium text-muted-foreground">Switch Session</div>
             <select className="glass-input" value={primarySession.id} onChange={(e) => onSelectSession(e.target.value)}>
               {allSessions.map((session) => (
                 <option key={session.id} value={session.id}>
@@ -82,32 +90,29 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
               <StatusBadge value={primarySession.status} />
               <StatusBadge value={primarySession.source || 'manual'} />
             </div>
-            <div className="text-sm text-muted-foreground">
-              状态：{primarySession.status} · 进度：{(primarySession.progress || 0).toFixed(0)}%
-            </div>
             <div className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
-              <div>标的：{primarySession.symbol}</div>
-              <div>来源：{formatSourceLabel(primarySession.source)}</div>
-              <div>Run：{primarySession.run_id ? `${primarySession.run_id.slice(0, 8)}...` : '未关联'}</div>
-              <div>最近处理：{primarySession.last_processed_at || '暂无'}</div>
+              <div>Symbol: {primarySession.symbol}</div>
+              <div>Source: {primarySession.source || 'manual'}</div>
+              <div>Run: {primarySession.run_id ? `${primarySession.run_id.slice(0, 8)}...` : 'N/A'}</div>
+              <div>Last processed: {primarySession.last_processed_at || 'N/A'}</div>
             </div>
           </div>
           <div className="min-w-[260px] space-y-2">
             <div className="flex items-center justify-between text-xs uppercase tracking-[0.22em] text-muted-foreground">
-              <span>执行进度</span>
-              <span>{(primarySession.progress || 0).toFixed(0)}%</span>
+              <span>Progress</span>
+              <span className="tabular-nums">{(primarySession.progress || 0).toFixed(0)}%</span>
             </div>
             <Progress value={primarySession.progress || 0} />
           </div>
         </div>
       </SectionCard>
 
-      <Tabs value={subtab} onValueChange={(value) => setSubtab(value as 'overview' | 'risk' | 'analysis' | 'logs')}>
+      <Tabs value={subtab} onValueChange={handleTabChange}>
         <TabsList>
-          <TabsTrigger value="overview">总览</TabsTrigger>
-          <TabsTrigger value="risk">风险</TabsTrigger>
-          <TabsTrigger value="analysis">分析</TabsTrigger>
-          <TabsTrigger value="logs">日志</TabsTrigger>
+          <TabsTrigger value="overview">Overview</TabsTrigger>
+          <TabsTrigger value="risk">Risk</TabsTrigger>
+          <TabsTrigger value="analysis">Analysis</TabsTrigger>
+          <TabsTrigger value="logs">Logs</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview">

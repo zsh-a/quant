@@ -78,22 +78,22 @@ export const OptimizerPanel: React.FC = () => {
         <div className="space-y-6">
             <PageHeader
                 eyebrow="Model Search"
-                title="参数优化器"
-                description="搜索参数区间、跟踪优化任务，并查看当前最优配置。"
+                title="Parameter Optimizer"
+                description="Search parameter ranges, track optimization tasks, and view the current best configuration."
             />
-            <SectionCard title="优化配置" description="选择策略、目标函数、搜索预算和回测区间。">
+            <SectionCard title="Optimization Config" description="Select strategy, objective function, search budget, and backtest range.">
                 <div className="grid gap-3 xl:grid-cols-4">
                     <select value={strategy} onChange={e => setStrategy(e.target.value)} className="glass-input">
-                        <option value="jsg">JSG策略</option>
-                        <option value="rotation">轮动策略</option>
+                        <option value="jsg">JSG Strategy</option>
+                        <option value="rotation">Rotation Strategy</option>
                     </select>
                     <select value={method} onChange={e => setMethod(e.target.value)} className="glass-input">
-                        <option value="grid">网格搜索</option>
-                        <option value="bayesian">贝叶斯优化</option>
+                        <option value="grid">Grid Search</option>
+                        <option value="bayesian">Bayesian Optimization</option>
                     </select>
                     <select value={objective} onChange={e => setObjective(e.target.value)} className="glass-input">
-                        <option value="max_sharpe">最大夏普</option>
-                        <option value="max_return">最大收益</option>
+                        <option value="max_sharpe">Max Sharpe</option>
+                        <option value="max_return">Max Return</option>
                     </select>
                     <Input type="number" value={iterations} onChange={e => setIterations(+e.target.value)} />
                 </div>
@@ -103,7 +103,7 @@ export const OptimizerPanel: React.FC = () => {
                     <Input value={symbols} onChange={e => setSymbols(e.target.value)} />
                 </div>
                 <Button onClick={submit} disabled={loading} className="w-full sm:w-auto">
-                    {loading ? '提交中...' : '开始优化'}
+                    {loading ? 'Submitting...' : 'Start Optimization'}
                 </Button>
             </SectionCard>
 
@@ -114,7 +114,7 @@ export const OptimizerPanel: React.FC = () => {
                             <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div className="space-y-1">
                                     <div className="font-mono text-sm text-foreground">{t.task_id}</div>
-                                    <div className="text-xs text-muted-foreground">进度 {t.progress ?? 0}%</div>
+                                    <div className="text-xs text-muted-foreground">Progress {t.progress ?? 0}%</div>
                                 </div>
                                 <StatusBadge value={t.status} />
                             </div>
@@ -123,13 +123,13 @@ export const OptimizerPanel: React.FC = () => {
                             </div>
                             {t.result && (
                                 <div className="mt-3 space-y-1 text-sm text-muted-foreground">
-                                    <div>最优参数: {JSON.stringify(t.result.best_params)}</div>
-                                    <div>最优分数: {t.result.best_score.toFixed(4)}</div>
+                                    <div>Best params: {JSON.stringify(t.result.best_params)}</div>
+                                    <div>Best score: {t.result.best_score.toFixed(4)}</div>
                                 </div>
                             )}
                         </div>
                     ))}
-                    {tasks.length === 0 ? <div className="empty-state">暂无优化任务</div> : null}
+                    {tasks.length === 0 ? <div className="empty-state">No optimization tasks</div> : null}
                 </div>
             </SectionCard>
         </div>

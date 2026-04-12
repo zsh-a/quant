@@ -28,14 +28,14 @@ interface BacktestResult {
 }
 
 const AVAILABLE_STRATEGIES = [
-    { id: 'jsg', name: 'JSG策略', description: '金叉死叉策略' },
-    { id: 'rotation', name: '轮动策略', description: '行业轮动策略' },
+    { id: 'jsg', name: 'JSG Strategy', description: 'Golden/Death Cross strategy' },
+    { id: 'rotation', name: 'Rotation Strategy', description: 'Sector rotation strategy' },
 ];
 
 const WEIGHT_METHODS = [
-    { id: 'equal', name: '等权重', description: '每个策略相同权重' },
-    { id: 'vol_inverse', name: '波动率倒数', description: '低波动策略权重更高' },
-    { id: 'sharpe', name: '夏普比率', description: '按夏普比率分配权重' },
+    { id: 'equal', name: 'Equal Weight', description: 'Same weight for each strategy' },
+    { id: 'vol_inverse', name: 'Inverse Volatility', description: 'Higher weight for lower volatility strategies' },
+    { id: 'sharpe', name: 'Sharpe Ratio', description: 'Weight by Sharpe ratio' },
 ];
 
 export const PortfolioManager: React.FC = () => {
@@ -154,19 +154,19 @@ export const PortfolioManager: React.FC = () => {
         <div className="portfolio-manager">
             <PageHeader
                 eyebrow="Portfolio Lab"
-                title="组合管理"
-                description="创建多策略组合、调整配置，并直接发起组合回测。"
+                title="Portfolio Management"
+                description="Create multi-strategy portfolios, adjust configurations, and run portfolio backtests."
                 actions={
                     <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
-                        创建组合
+                        Create Portfolio
                     </button>
                 }
             />
 
             <div className="portfolio-header" style={{ marginTop: '1.25rem' }}>
-                <h2>组合列表</h2>
+                <h2>Portfolio List</h2>
                 <button className="btn-primary" onClick={() => setShowCreateModal(true)}>
-                    + 创建组合
+                    + Create Portfolio
                 </button>
             </div>
 
@@ -180,7 +180,7 @@ export const PortfolioManager: React.FC = () => {
                     >
                         <h3>{p.name || p.portfolio_id}</h3>
                         <div className="portfolio-info">
-                            <span>策略数：{p.n_strategies}</span>
+                            <span>Strategies: {p.n_strategies}</span>
                         </div>
                         <div className="weight-bars">
                             {Object.entries(p.weights).map(([name, weight]) => (
@@ -196,7 +196,7 @@ export const PortfolioManager: React.FC = () => {
 
                 {portfolios.length === 0 && (
                     <div className="empty-state">
-                        <p>暂无组合，点击“创建组合”开始。</p>
+                        <p>No portfolios yet. Click "Create Portfolio" to get started.</p>
                     </div>
                 )}
             </div>
@@ -204,10 +204,10 @@ export const PortfolioManager: React.FC = () => {
             {/* Backtest Panel */}
             {selectedPortfolio && (
                 <div className="backtest-panel">
-                    <h3>回测配置</h3>
+                    <h3>Backtest Configuration</h3>
                     <div className="form-grid">
                         <div className="form-group">
-                            <label>开始日期</label>
+                            <label>Start Date</label>
                             <input
                                 type="date"
                                 value={startDate}
@@ -215,7 +215,7 @@ export const PortfolioManager: React.FC = () => {
                             />
                         </div>
                         <div className="form-group">
-                            <label>结束日期</label>
+                            <label>End Date</label>
                             <input
                                 type="date"
                                 value={endDate}
@@ -223,7 +223,7 @@ export const PortfolioManager: React.FC = () => {
                             />
                         </div>
                         <div className="form-group">
-                            <label>标的代码</label>
+                            <label>Symbols</label>
                             <input
                                 type="text"
                                 value={symbols}
@@ -232,7 +232,7 @@ export const PortfolioManager: React.FC = () => {
                             />
                         </div>
                         <div className="form-group">
-                            <label>初始资金</label>
+                            <label>Initial Capital</label>
                             <input
                                 type="number"
                                 value={initialCapital}
@@ -245,44 +245,44 @@ export const PortfolioManager: React.FC = () => {
                         onClick={runBacktest}
                         disabled={loading}
                     >
-                        {loading ? '运行中...' : '运行回测'}
+                        {loading ? 'Running...' : 'Run Backtest'}
                     </button>
 
                     {/* Backtest Results */}
                     {backtestResult && (
                         <div className="backtest-results">
-                            <h4>回测结果</h4>
+                            <h4>Backtest Results</h4>
                             <div className="result-grid">
                                 <div className="result-item">
-                                    <span className="label">总收益</span>
+                                    <span className="label">Total Return</span>
                                     <span className={`value ${backtestResult.total_return >= 0 ? 'positive' : 'negative'}`}>
                                         {(backtestResult.total_return * 100).toFixed(2)}%
                                     </span>
                                 </div>
                                 <div className="result-item">
-                                    <span className="label">夏普比率</span>
+                                    <span className="label">Sharpe Ratio</span>
                                     <span className="value">{backtestResult.sharpe_ratio.toFixed(2)}</span>
                                 </div>
                                 <div className="result-item">
-                                    <span className="label">最大回撤</span>
+                                    <span className="label">Max Drawdown</span>
                                     <span className="value negative">
                                         {(backtestResult.max_drawdown * 100).toFixed(2)}%
                                     </span>
                                 </div>
                                 <div className="result-item">
-                                    <span className="label">最终权益</span>
+                                    <span className="label">Final Equity</span>
                                     <span className="value">{formatMoney(backtestResult.final_equity, { symbol: '¥' })}</span>
                                 </div>
                             </div>
 
-                            <h4>策略表现</h4>
+                            <h4>Strategy Performance</h4>
                             <table className="strategy-table">
                                 <thead>
                                     <tr>
-                                        <th>策略</th>
-                                        <th>权重</th>
-                                        <th>最终权益</th>
-                                        <th>交易次数</th>
+                                        <th>Strategy</th>
+                                        <th>Weight</th>
+                                        <th>Final Equity</th>
+                                        <th>Trades</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -305,10 +305,10 @@ export const PortfolioManager: React.FC = () => {
             {showCreateModal && (
                 <div className="modal-overlay" onClick={() => setShowCreateModal(false)}>
                     <div className="modal" onClick={(e) => e.stopPropagation()}>
-                        <h3>创建组合</h3>
+                        <h3>Create Portfolio</h3>
 
                         <div className="form-group">
-                            <label>组合名称</label>
+                            <label>Portfolio Name</label>
                             <input
                                 type="text"
                                 value={newPortfolioName}
@@ -318,7 +318,7 @@ export const PortfolioManager: React.FC = () => {
                         </div>
 
                         <div className="form-group">
-                            <label>权重方法</label>
+                            <label>Weight Method</label>
                             <select
                                 value={weightMethod}
                                 onChange={(e) => setWeightMethod(e.target.value)}
@@ -333,9 +333,9 @@ export const PortfolioManager: React.FC = () => {
 
                         <div className="strategies-section">
                             <div className="strategies-header">
-                                <label>策略配置</label>
+                                <label>Strategy Configuration</label>
                                 <button className="btn-small" onClick={addStrategy}>
-                                    + 添加策略
+                                    + Add Strategy
                                 </button>
                             </div>
 
@@ -345,7 +345,7 @@ export const PortfolioManager: React.FC = () => {
                                         type="text"
                                         value={s.name}
                                         onChange={(e) => updateStrategy(i, 'name', e.target.value)}
-                                        placeholder="策略名称"
+                                        placeholder="Strategy name"
                                     />
                                     <select
                                         value={s.strategy}
@@ -366,14 +366,14 @@ export const PortfolioManager: React.FC = () => {
 
                         <div className="modal-actions">
                             <button className="btn-secondary" onClick={() => setShowCreateModal(false)}>
-                                取消
+                                Cancel
                             </button>
                             <button
                                 className="btn-primary"
                                 onClick={createPortfolio}
                                 disabled={loading || !newPortfolioName || selectedStrategies.length === 0}
                             >
-                                {loading ? '创建中...' : '创建'}
+                                {loading ? 'Creating...' : 'Create'}
                             </button>
                         </div>
                     </div>

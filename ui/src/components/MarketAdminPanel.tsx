@@ -17,15 +17,15 @@ import { SectionCard } from './layout/SectionCard';
 import { StatusBadge } from './layout/StatusBadge';
 
 function formatDateTime(value?: string | null) {
-  if (!value) return '未记录';
+  if (!value) return 'Not recorded';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return date.toLocaleString('zh-CN', { hour12: false });
+  return date.toLocaleString('en-US', { hour12: false });
 }
 
 function formatCount(value?: number | null) {
   if (value === null || value === undefined) return 'N/A';
-  return value.toLocaleString('zh-CN');
+  return value.toLocaleString('en-US');
 }
 
 function formatProgress(value?: number | null) {
@@ -37,20 +37,20 @@ function durationLabel(run?: DataUpdateRun | null) {
   const startedAt = run?.started_at ? new Date(run.started_at).getTime() : null;
   const completedAt = run?.completed_at ? new Date(run.completed_at).getTime() : null;
   if (!startedAt || !completedAt || Number.isNaN(startedAt) || Number.isNaN(completedAt)) {
-    return '未完成';
+    return 'Not completed';
   }
   const seconds = Math.max(Math.round((completedAt - startedAt) / 1000), 0);
   return `${seconds}s`;
 }
 
 function summarizeTable(summary?: MarketTableSummary) {
-  if (!summary) return '暂无数据';
-  if (summary.status === 'error') return summary.error || '查询失败';
+  if (!summary) return 'No data';
+  if (summary.status === 'error') return summary.error || 'Query failed';
   const distinctPart =
     summary.distinct_count !== null && summary.distinct_count !== undefined
-      ? `${formatCount(summary.distinct_count)} ${summary.distinct_label || '项'}`
-      : '无去重统计';
-  return `${formatCount(summary.row_count)} 行 · ${distinctPart}`;
+      ? `${formatCount(summary.distinct_count)} ${summary.distinct_label || 'items'}`
+      : 'No distinct stats';
+  return `${formatCount(summary.row_count)} rows · ${distinctPart}`;
 }
 
 export default function MarketAdminPanel() {
@@ -80,7 +80,7 @@ export default function MarketAdminPanel() {
       ]);
 
       if (!overviewResp.ok || !capabilitiesResp.ok || !historyResp.ok) {
-        throw new Error('加载行情数据库看板失败');
+        throw new Error('Failed to load market database dashboard');
       }
 
       const [overviewData, capabilitiesData, historyData] = await Promise.all([
@@ -107,7 +107,7 @@ export default function MarketAdminPanel() {
       setShareStartDate((current) => current || capabilitiesData.share_start_date_default || '');
     } catch (err) {
       if (!background) {
-        setError(err instanceof Error ? err.message : '加载失败');
+        setError(err instanceof Error ? err.message : 'Loading failed');
       }
     } finally {
       setter(false);
@@ -166,11 +166,11 @@ export default function MarketAdminPanel() {
         throw new Error(await resp.text());
       }
       const data = await resp.json();
-      setMessage(`更新任务已提交：${data.update_run_id}`);
+      setMessage(`Update task submitted: ${data.update_run_id}`);
       setSelectedRunId(data.update_run_id);
       await fetchAll(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : '提交失败');
+      setError(err instanceof Error ? err.message : 'Submission failed');
     } finally {
       setSubmitting(false);
     }
@@ -184,40 +184,40 @@ export default function MarketAdminPanel() {
     <div className="space-y-6">
       <PageHeader
         eyebrow="Market Database Control"
-        title="行情数据库"
-        description="集中查看 ClickHouse 行情库的覆盖情况、最近更新批次，并手动触发基础数据更新。"
+        title="Market Database"
+        description="View ClickHouse market database coverage, recent update batches, and manually trigger data updates."
         actions={
           <Button variant="outline" onClick={() => fetchAll(true)} disabled={refreshing || loading}>
             <RefreshCw className={refreshing ? 'animate-spin' : ''} />
-            刷新面板
+            Refresh Panel
           </Button>
         }
       />
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
         <MetricCard
-          label="最新行情日期"
-          value={overview?.latest_market_date || '未发现'}
-          hint={latestTable ? summarizeTable(latestTable) : '等待加载'}
+          label="Latest Market Date"
+          value={overview?.latest_market_date || 'Not found'}
+          hint={latestTable ? summarizeTable(latestTable) : 'Loading'}
         />
         <MetricCard
-          label="数据滞后"
+          label="Data Lag"
           value={
             overview?.data_lag_days === null || overview?.data_lag_days === undefined
               ? 'N/A'
-              : `${overview.data_lag_days} 天`
+              : `${overview.data_lag_days} days`
           }
-          hint={`参考标的 ${overview?.reference_symbol || 'N/A'}`}
+          hint={`Reference symbol: ${overview?.reference_symbol || 'N/A'}`}
         />
         <MetricCard
-          label="股票覆盖"
+          label="Stock Coverage"
           value={formatCount(overview?.stock_coverage?.tracked_stock_codes)}
-          hint={`ETF 目录 ${formatCount(overview?.stock_coverage?.tracked_etf_codes)} 个`}
+          hint={`ETF catalog: ${formatCount(overview?.stock_coverage?.tracked_etf_codes)}`}
         />
         <MetricCard
-          label="最近更新"
-          value={lastRun ? <StatusBadge value={lastRun.status} /> : '无记录'}
-          hint={lastRun ? `${formatDateTime(lastRun.completed_at || lastRun.started_at || lastRun.created_at)} · ${durationLabel(lastRun)}` : '尚未执行过数据更新'}
+          label="Latest Update"
+          value={lastRun ? <StatusBadge value={lastRun.status} /> : 'No records'}
+          hint={lastRun ? `${formatDateTime(lastRun.completed_at || lastRun.started_at || lastRun.created_at)} · ${durationLabel(lastRun)}` : 'No data updates have been run yet'}
         />
       </div>
 
@@ -238,8 +238,8 @@ export default function MarketAdminPanel() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(380px,0.9fr)]">
         <SectionCard
-          title="数据库概览"
-          description="汇总核心表的覆盖范围与最新日期。单表查询异常不会阻断整个看板。"
+          title="Database Overview"
+          description="Summary of core table coverage and latest dates. Single-table query errors will not block the entire dashboard."
         >
           <div className="grid gap-4 md:grid-cols-2">
             {Object.entries(overview?.tables || {}).map(([key, summary]) => (
@@ -247,18 +247,18 @@ export default function MarketAdminPanel() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-foreground">{summary.table}</div>
-                    <div className="mt-1 text-xs text-muted-foreground">{summary.status === 'error' ? '状态异常' : '聚合正常'}</div>
+                    <div className="mt-1 text-xs text-muted-foreground">{summary.status === 'error' ? 'Status error' : 'Aggregation OK'}</div>
                   </div>
                   <StatusBadge value={summary.status === 'error' ? 'failed' : 'success'} />
                 </div>
                 <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                  <div>行数：{formatCount(summary.row_count)}</div>
+                  <div>Rows: {formatCount(summary.row_count)}</div>
                   <div>
-                    {summary.distinct_label || '去重项'}：
+                    {summary.distinct_label || 'Distinct'}:
                     {summary.distinct_count === null || summary.distinct_count === undefined ? ' N/A' : ` ${formatCount(summary.distinct_count)}`}
                   </div>
-                  <div>最早日期：{summary.earliest_date || 'N/A'}</div>
-                  <div>最新日期：{summary.latest_date || 'N/A'}</div>
+                  <div>Earliest date: {summary.earliest_date || 'N/A'}</div>
+                  <div>Latest date: {summary.latest_date || 'N/A'}</div>
                   {summary.error ? (
                     <div className="rounded-2xl border border-destructive/25 bg-destructive/7 px-3 py-2 text-destructive">
                       {summary.error}
@@ -271,13 +271,13 @@ export default function MarketAdminPanel() {
         </SectionCard>
 
         <SectionCard
-          title="手动更新控制台"
-          description="选择要执行的更新步骤，提交后自动触发后端已有的模拟任务联动逻辑。"
+          title="Manual Update Console"
+          description="Select update steps to execute. Submission automatically triggers linked simulation jobs on the backend."
           action={
             overview?.running_update ? (
               <div className="flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
                 <Play className="size-3.5" />
-                运行中
+                Running
               </div>
             ) : null
           }
@@ -317,29 +317,29 @@ export default function MarketAdminPanel() {
               placeholder="20250101"
             />
             <div className="text-sm text-muted-foreground">
-              当前默认值为 {capabilities?.share_start_date_default || 'N/A'}。当勾选“股本信息”步骤时会使用此起始日期。
+              Current default is {capabilities?.share_start_date_default || 'N/A'}. This start date is used when the "Share Info" step is selected.
             </div>
           </div>
 
           <div className="grid gap-3 rounded-3xl border border-border/70 bg-card/60 p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold text-foreground">当前运行批次</div>
+                <div className="text-sm font-semibold text-foreground">Current Running Batch</div>
                 <div className="text-sm text-muted-foreground">
-                  {overview?.running_update ? formatDateTime(overview.running_update.started_at) : '当前没有运行中的数据更新'}
+                  {overview?.running_update ? formatDateTime(overview.running_update.started_at) : 'No data update currently running'}
                 </div>
               </div>
               <StatusBadge value={overview?.running_update?.status || 'completed'} />
             </div>
             {overview?.running_update ? (
               <div className="space-y-2 text-sm text-muted-foreground">
-                <div>批次 ID：{overview.running_update.update_run_id}</div>
-                <div>触发来源：{formatSourceLabel(overview.running_update.trigger_source)}</div>
-                <div>最后心跳：{formatDateTime(overview.running_update.last_heartbeat_at || overview.running_update.started_at)}</div>
+                <div>Batch ID: {overview.running_update.update_run_id}</div>
+                <div>Trigger source: {formatSourceLabel(overview.running_update.trigger_source)}</div>
+                <div>Last heartbeat: {formatDateTime(overview.running_update.last_heartbeat_at || overview.running_update.started_at)}</div>
                 {typeof runningProgress === 'number' ? (
                   <div className="space-y-2 rounded-2xl border border-border/70 bg-background/70 p-3">
                     <div className="flex items-center justify-between text-xs text-muted-foreground">
-                      <span>总体进度</span>
+                      <span>Overall progress</span>
                       <span>{formatProgress(runningProgress)}</span>
                     </div>
                     <Progress value={runningProgress} />
@@ -347,14 +347,14 @@ export default function MarketAdminPanel() {
                 ) : null}
                 {runningCurrentStep ? (
                   <div className="space-y-2 rounded-2xl border border-border/70 bg-background/70 p-3">
-                    <div className="text-xs font-semibold text-foreground">当前步骤</div>
+                    <div className="text-xs font-semibold text-foreground">Current step</div>
                     <div className="text-sm text-muted-foreground">
                       {String(runningCurrentStep.label || runningCurrentStep.key || 'unknown')}
                     </div>
                     {typeof runningCurrentStep.progress === 'number' ? (
                       <>
                         <div className="flex items-center justify-between text-xs text-muted-foreground">
-                          <span>步骤进度</span>
+                          <span>Step progress</span>
                           <span>{formatProgress(runningCurrentStep.progress)}</span>
                         </div>
                         <Progress value={runningCurrentStep.progress} />
@@ -363,7 +363,7 @@ export default function MarketAdminPanel() {
                     {typeof runningCurrentStep.current === 'number' &&
                     typeof runningCurrentStep.total === 'number' ? (
                       <div className="text-xs text-muted-foreground">
-                        批次 {runningCurrentStep.current}/{runningCurrentStep.total}
+                        Batch {runningCurrentStep.current}/{runningCurrentStep.total}
                       </div>
                     ) : null}
                   </div>
@@ -374,15 +374,15 @@ export default function MarketAdminPanel() {
 
           <Button onClick={handleRunUpdate} disabled={submitting || selectedSteps.length === 0}>
             <Database className={submitting ? 'animate-pulse' : ''} />
-            {submitting ? '提交中...' : '开始更新'}
+            {submitting ? 'Submitting...' : 'Start Update'}
           </Button>
         </SectionCard>
       </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
         <SectionCard
-          title="最近更新批次"
-          description="查看最近执行历史，选择右侧查看步骤结果与自动触发的模拟任务。"
+          title="Recent Update Batches"
+          description="View recent execution history. Select a batch on the right to see step results and auto-triggered simulation jobs."
         >
           <div className="space-y-3">
             {history.map((item) => {
@@ -415,46 +415,46 @@ export default function MarketAdminPanel() {
                     <StatusBadge value={item.status} />
                   </div>
                   <div className="mt-4 grid gap-1 text-sm text-muted-foreground">
-                    <div>有新数据：{item.has_new_data ? '是' : '否'}</div>
-                    <div>步骤数：{Array.isArray(item.details?.steps) ? item.details.steps.length : 0}</div>
-                    <div>失败步骤：{failedSteps}</div>
-                    <div>触发模拟：{triggeredCount}</div>
+                    <div>New data: {item.has_new_data ? 'Yes' : 'No'}</div>
+                    <div>Steps: {Array.isArray(item.details?.steps) ? item.details.steps.length : 0}</div>
+                    <div>Failed steps: {failedSteps}</div>
+                    <div>Triggered simulations: {triggeredCount}</div>
                   </div>
                 </button>
               );
             })}
             {history.length === 0 ? (
               <div className="rounded-3xl border border-dashed border-border/70 bg-card/40 p-5 text-sm text-muted-foreground">
-                暂无数据更新批次。
+                No data update batches yet.
               </div>
             ) : null}
           </div>
         </SectionCard>
 
         <SectionCard
-          title="批次明细"
-          description="逐步查看执行结果、耗时、错误和由更新触发的模拟任务。"
+          title="Batch Details"
+          description="Step-by-step execution results, duration, errors, and simulation jobs triggered by the update."
         >
           {selectedRun ? (
             <div className="space-y-5">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="rounded-3xl border border-border/70 bg-secondary/25 p-4">
                   <div className="flex items-center justify-between gap-3">
-                    <div className="text-sm font-semibold text-foreground">批次状态</div>
+                    <div className="text-sm font-semibold text-foreground">Batch Status</div>
                     <StatusBadge value={selectedRun.status} />
                   </div>
                   <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                    <div>批次 ID：{selectedRun.update_run_id}</div>
-                    <div>触发来源：{formatSourceLabel(selectedRun.trigger_source)}</div>
-                    <div>开始时间：{formatDateTime(selectedRun.started_at)}</div>
-                    <div>最后心跳：{formatDateTime(selectedRun.last_heartbeat_at || selectedRun.started_at)}</div>
-                    <div>完成时间：{formatDateTime(selectedRun.completed_at)}</div>
-                    <div>发现新数据：{selectedRun.has_new_data ? '是' : '否'}</div>
+                    <div>Batch ID: {selectedRun.update_run_id}</div>
+                    <div>Trigger source: {formatSourceLabel(selectedRun.trigger_source)}</div>
+                    <div>Start time: {formatDateTime(selectedRun.started_at)}</div>
+                    <div>Last heartbeat: {formatDateTime(selectedRun.last_heartbeat_at || selectedRun.started_at)}</div>
+                    <div>Completion time: {formatDateTime(selectedRun.completed_at)}</div>
+                    <div>New data found: {selectedRun.has_new_data ? 'Yes' : 'No'}</div>
                   </div>
                   {typeof selectedProgress === 'number' ? (
                     <div className="mt-4 space-y-2">
                       <div className="flex items-center justify-between text-xs text-muted-foreground">
-                        <span>总体进度</span>
+                        <span>Overall progress</span>
                         <span>{formatProgress(selectedProgress)}</span>
                       </div>
                       <Progress value={selectedProgress} />
@@ -462,12 +462,12 @@ export default function MarketAdminPanel() {
                   ) : null}
                   {selectedCurrentStep ? (
                     <div className="mt-3 space-y-2 rounded-2xl border border-border/70 bg-background/70 p-3 text-xs text-muted-foreground">
-                      <div className="font-semibold text-foreground">当前步骤</div>
+                      <div className="font-semibold text-foreground">Current step</div>
                       <div>{String(selectedCurrentStep.label || selectedCurrentStep.key || 'unknown')}</div>
                       {typeof selectedCurrentStep.progress === 'number' ? (
                         <>
                           <div className="flex items-center justify-between">
-                            <span>步骤进度</span>
+                            <span>Step progress</span>
                             <span>{formatProgress(selectedCurrentStep.progress)}</span>
                           </div>
                           <Progress value={selectedCurrentStep.progress} />
@@ -476,7 +476,7 @@ export default function MarketAdminPanel() {
                       {typeof selectedCurrentStep.current === 'number' &&
                       typeof selectedCurrentStep.total === 'number' ? (
                         <div>
-                          批次 {selectedCurrentStep.current}/{selectedCurrentStep.total}
+                          Batch {selectedCurrentStep.current}/{selectedCurrentStep.total}
                         </div>
                       ) : null}
                     </div>
@@ -484,12 +484,12 @@ export default function MarketAdminPanel() {
                 </div>
 
                 <div className="rounded-3xl border border-border/70 bg-secondary/25 p-4">
-                  <div className="text-sm font-semibold text-foreground">更新前后对比</div>
+                  <div className="text-sm font-semibold text-foreground">Before / After Comparison</div>
                   <div className="mt-3 space-y-2 text-sm text-muted-foreground">
-                    <div>更新前：{selectedRun.details?.before_latest_date || 'N/A'}</div>
-                    <div>更新后：{selectedRun.details?.after_latest_date || 'N/A'}</div>
-                    <div>参考标的：{selectedRun.details?.reference_symbol || overview?.reference_symbol || 'N/A'}</div>
-                    <div>自动触发任务：{Array.isArray(selectedRun.details?.triggered_jobs) ? selectedRun.details.triggered_jobs.length : 0}</div>
+                    <div>Before update: {selectedRun.details?.before_latest_date || 'N/A'}</div>
+                    <div>After update: {selectedRun.details?.after_latest_date || 'N/A'}</div>
+                    <div>Reference symbol: {selectedRun.details?.reference_symbol || overview?.reference_symbol || 'N/A'}</div>
+                    <div>Auto-triggered jobs: {Array.isArray(selectedRun.details?.triggered_jobs) ? selectedRun.details.triggered_jobs.length : 0}</div>
                   </div>
                 </div>
               </div>
@@ -497,7 +497,7 @@ export default function MarketAdminPanel() {
               <div className="space-y-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                   <TableProperties className="size-4" />
-                  步骤结果
+                  Step Results
                 </div>
                 {Array.isArray(selectedRun.details?.steps) && selectedRun.details.steps.length > 0 ? (
                   selectedRun.details.steps.map((step: Record<string, unknown>, index: number) => (
@@ -510,7 +510,7 @@ export default function MarketAdminPanel() {
                           <div className="mt-1 text-xs text-muted-foreground">
                             {formatStatusLabel(String(step.status || 'unknown'))}
                             {' · '}
-                            {typeof step.duration_seconds === 'number' ? `${step.duration_seconds}s` : '无耗时'}
+                            {typeof step.duration_seconds === 'number' ? `${step.duration_seconds}s` : 'No duration'}
                           </div>
                         </div>
                         <StatusBadge value={String(step.status || 'unknown')} />
@@ -518,13 +518,13 @@ export default function MarketAdminPanel() {
                       {typeof step.progress === 'number' ? (
                         <div className="mt-3 space-y-2">
                           <div className="flex items-center justify-between text-xs text-muted-foreground">
-                            <span>进度</span>
+                            <span>Progress</span>
                             <span>{formatProgress(Number(step.progress))}</span>
                           </div>
                           <Progress value={Number(step.progress)} />
                           {typeof step.current === 'number' && typeof step.total === 'number' ? (
                             <div className="text-xs text-muted-foreground">
-                              批次 {String(step.current)}/{String(step.total)}
+                              Batch {String(step.current)}/{String(step.total)}
                             </div>
                           ) : null}
                         </div>
@@ -543,7 +543,7 @@ export default function MarketAdminPanel() {
                   ))
                 ) : (
                   <div className="rounded-3xl border border-dashed border-border/70 bg-card/40 p-5 text-sm text-muted-foreground">
-                    当前批次还没有步骤明细。
+                    No step details for this batch yet.
                   </div>
                 )}
               </div>
@@ -552,13 +552,13 @@ export default function MarketAdminPanel() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-sm font-semibold text-foreground">
                     <Play className="size-4" />
-                    自动触发的模拟任务
+                    Auto-triggered Simulation Jobs
                   </div>
                   <div className="grid gap-3 md:grid-cols-2">
                     {selectedRun.details.triggered_jobs.map((job: Record<string, unknown>) => (
                       <div key={String(job.task_id || job.job_id)} className="rounded-3xl border border-border/70 bg-secondary/25 p-4">
                         <div className="text-sm font-semibold text-foreground">{String(job.name || job.job_id || 'unknown')}</div>
-                        <div className="mt-2 text-sm text-muted-foreground">任务 ID：{String(job.task_id || 'N/A')}</div>
+                        <div className="mt-2 text-sm text-muted-foreground">Task ID: {String(job.task_id || 'N/A')}</div>
                       </div>
                     ))}
                   </div>
@@ -569,7 +569,7 @@ export default function MarketAdminPanel() {
                 <div className="rounded-3xl border border-destructive/25 bg-destructive/7 p-4">
                   <div className="flex items-center gap-2 text-sm font-semibold text-destructive">
                     <AlertTriangle className="size-4" />
-                    错误摘要
+                    Error Summary
                   </div>
                   <div className="mt-3 space-y-2 text-sm text-destructive">
                     {selectedRun.details.errors.map((item: Record<string, unknown>, index: number) => (
@@ -583,7 +583,7 @@ export default function MarketAdminPanel() {
             </div>
           ) : (
             <div className="rounded-3xl border border-dashed border-border/70 bg-card/40 p-6 text-sm text-muted-foreground">
-              选择左侧批次后在这里查看更新步骤、错误和自动触发的模拟任务。
+              Select a batch on the left to view update steps, errors, and auto-triggered simulation jobs.
             </div>
           )}
         </SectionCard>
@@ -591,30 +591,30 @@ export default function MarketAdminPanel() {
 
       {loading ? (
         <div className="rounded-3xl border border-dashed border-border/70 bg-card/40 p-6 text-sm text-muted-foreground">
-          正在加载行情数据库面板...
+          Loading market database panel...
         </div>
       ) : null}
 
       {financialTable ? (
         <SectionCard
-          title="补充指标"
-          description="帮助快速判断行情与财报数据是否同步更新。"
+          title="Supplementary Metrics"
+          description="Quickly check if market and financial report data are updated in sync."
         >
           <div className="grid gap-4 md:grid-cols-3">
             <MetricCard
-              label="财报最新披露"
+              label="Latest Financial Report"
               value={financialTable.latest_date || 'N/A'}
               hint={summarizeTable(financialTable)}
             />
             <MetricCard
-              label="最近运行批次"
-              value={overview?.running_update ? '运行中' : lastRun ? formatStatusLabel(lastRun.status) : '无记录'}
+              label="Latest Run Batch"
+              value={overview?.running_update ? 'Running' : lastRun ? formatStatusLabel(lastRun.status) : 'No records'}
               hint={overview?.running_update ? overview.running_update.update_run_id : lastRun?.update_run_id || 'N/A'}
             />
             <MetricCard
-              label="面板刷新时间"
+              label="Panel Refresh Time"
               value={formatDateTime(overview?.generated_at)}
-              hint="运行中批次存在时自动每 5 秒刷新一次"
+              hint="Auto-refreshes every 5 seconds when a batch is running"
             />
           </div>
         </SectionCard>

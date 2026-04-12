@@ -57,12 +57,12 @@ const TradeRow = memo<{
                 e.currentTarget.style.background = 'transparent';
             }}
         >
-            <div style={{ color: 'var(--text-dim)', fontSize: '11px' }}>
+            <div style={{ color: 'var(--color-text-dim)', fontSize: '11px' }}>
                 {displayDate}
             </div>
             <div>
-                <div style={{ fontWeight: 600, color: 'var(--text)' }}>{trade.symbol}</div>
-                <div style={{ fontSize: '11px', color: 'var(--text-dim)' }}>{trade.name}</div>
+                <div style={{ fontWeight: 600, color: 'var(--color-text)' }}>{trade.symbol}</div>
+                <div style={{ fontSize: '11px', color: 'var(--color-text-dim)' }}>{trade.name}</div>
             </div>
             <div>
                 <span style={{
@@ -77,13 +77,13 @@ const TradeRow = memo<{
                     {trade.type}
                 </span>
             </div>
-            <div style={{ textAlign: 'right', color: 'var(--text)' }}>
+            <div style={{ textAlign: 'right', color: 'var(--color-text)' }}>
                 {formatMoney(trade.price)}
             </div>
-            <div style={{ textAlign: 'right', color: 'var(--text)', fontWeight: 500 }}>
+            <div style={{ textAlign: 'right', color: 'var(--color-text)', fontWeight: 500 }}>
                 {formatMoney(trade.amount, { decimals: 0 })}
             </div>
-            <div style={{ textAlign: 'right', color: 'var(--text-dim)', fontSize: '12px' }}>
+            <div style={{ textAlign: 'right', color: 'var(--color-text-dim)', fontSize: '12px' }}>
                 {trade.commission ? formatMoney(trade.commission, { decimals: 1 }) : '-'}
             </div>
         </div>
@@ -105,7 +105,7 @@ const TradeHeader: React.FC<{ showDate: boolean }> = memo(({ showDate }) => (
         borderBottom: '1px solid rgba(255,255,255,0.1)',
         fontSize: '11px',
         fontWeight: 600,
-        color: 'var(--text-dim)',
+        color: 'var(--color-text-dim)',
         textTransform: 'uppercase',
         letterSpacing: '0.5px',
     }}>
@@ -140,7 +140,7 @@ export const VirtualizedTradeList: React.FC<VirtualizedTradeListProps> = memo(({
                 alignItems: 'center',
                 justifyContent: 'center',
                 height: height || 200,
-                color: 'var(--text-dim)',
+                color: 'var(--color-text-dim)',
                 fontSize: '14px',
             }}>
                 No trades

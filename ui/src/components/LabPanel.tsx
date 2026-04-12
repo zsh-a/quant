@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useMemo } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import type { SessionSummary, StrategyMeta } from '../types';
 import NewSessionForm from './NewSessionForm';
 import SessionList from './SessionList';
 import SimulationPanel from './SimulationPanel';
 import AlphaLabWorkspace from './AlphaLabWorkspace';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { PageHeader } from './layout/PageHeader';
 
 interface LabPanelProps {
   strategies: StrategyMeta[];
@@ -17,7 +17,13 @@ interface LabPanelProps {
   onStopSession: (id: string) => void;
   onDeleteSession: (id: string) => void;
   onOpenMarketAdmin: () => void;
-  error: string | null;
+  error?: string | null;
+}
+
+function getSubtab(pathname: string): 'manual' | 'simulation' | 'alpha' {
+  if (pathname.endsWith('/simulation')) return 'simulation';
+  if (pathname.endsWith('/alpha')) return 'alpha';
+  return 'manual';
 }
 
 const LabPanel: React.FC<LabPanelProps> = ({
@@ -32,48 +38,39 @@ const LabPanel: React.FC<LabPanelProps> = ({
   onOpenMarketAdmin,
   error,
 }) => {
-  const [labSubtab, setLabSubtab] = useState<'manual' | 'simulation' | 'alpha'>(() => {
-    const stored = window.localStorage.getItem('quent.lab.subtab');
-    if (stored === 'alpha') {
-      return 'alpha';
-    }
-    return stored === 'simulation' ? 'simulation' : 'manual';
-  });
-
-  useEffect(() => {
-    window.localStorage.setItem('quent.lab.subtab', labSubtab);
-  }, [labSubtab]);
+  const location = useLocation();
+  const navigate = useNavigate();
+  const subtab = getSubtab(location.pathname);
 
   const manualSessions = useMemo(
-    () => sessions.filter((session) => session.mode !== 'simulation' && session.source !== 'automation'),
+    () => sessions.filter((s) => s.mode !== 'simulation' && s.source !== 'automation'),
     [sessions],
   );
 
   const simulationSessions = useMemo(
-    () => sessions.filter((session) => session.source === 'automation' || session.mode === 'simulation'),
+    () => sessions.filter((s) => s.source === 'automation' || s.mode === 'simulation'),
     [sessions],
   );
 
+  const handleTabChange = (value: string) => {
+    const path = value === 'manual' ? '/lab' : `/lab/${value}`;
+    navigate(path, { replace: true });
+  };
+
   return (
     <div className="space-y-6">
-      <PageHeader
-        eyebrow="Execution Workspace"
-        title="策略实验室"
-        description="策略执行、模拟编排和 Alpha 因子研究统一收纳在同一个实验室工作区。"
-      />
-
-      <Tabs value={labSubtab} onValueChange={(value) => setLabSubtab(value as 'manual' | 'simulation' | 'alpha')}>
+      <Tabs value={subtab} onValueChange={handleTabChange}>
         <TabsList>
-          <TabsTrigger value="manual">手动任务</TabsTrigger>
-          <TabsTrigger value="simulation">模拟任务</TabsTrigger>
+          <TabsTrigger value="manual">Manual</TabsTrigger>
+          <TabsTrigger value="simulation">Simulation</TabsTrigger>
           <TabsTrigger value="alpha">Alpha Lab</TabsTrigger>
         </TabsList>
 
         <TabsContent value="manual">
           <div className="grid gap-6 xl:grid-cols-[minmax(360px,0.9fr)_minmax(0,1.4fr)]">
-            <NewSessionForm strategies={strategies} onStart={onStart} error={error} />
+            <NewSessionForm strategies={strategies} onStart={onStart} error={error || null} />
             <SessionList
-              title="手动任务列表"
+              title="Manual Tasks"
               defaultFilter="manual"
               sessions={manualSessions}
               selectedSessionIds={selectedSessionIds}
@@ -93,7 +90,7 @@ const LabPanel: React.FC<LabPanelProps> = ({
               onOpenMarketAdmin={onOpenMarketAdmin}
             />
             <SessionList
-              title="模拟任务列表"
+              title="Simulation Tasks"
               defaultFilter="simulation"
               sessions={simulationSessions}
               selectedSessionIds={selectedSessionIds}

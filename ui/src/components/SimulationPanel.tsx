@@ -29,7 +29,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
   const [dataUpdating, setDataUpdating] = useState(false);
   const [runTriggering, setRunTriggering] = useState(false);
   const [runningJobKey, setRunningJobKey] = useState<string | null>(null);
-  const [name, setName] = useState('模拟任务');
+  const [name, setName] = useState('Simulation Job');
   const [strategy, setStrategy] = useState('');
   const [symbol, setSymbol] = useState('sh.000300');
   const [startDate, setStartDate] = useState('2024-01-01');
@@ -252,9 +252,9 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
         throw new Error(await resp.text());
       }
       await fetchJobs();
-      setMessage('模拟任务已创建');
+      setMessage('Simulation job created');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '创建模拟任务失败');
+      setError(err instanceof Error ? err.message : 'Failed to create simulation job');
     } finally {
       setSubmitting(false);
     }
@@ -288,7 +288,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
       return;
     }
     await fetchJobs();
-    setMessage(nextEnabled ? '已开启下单通知' : '已关闭下单通知');
+    setMessage(nextEnabled ? 'Order notifications enabled' : 'Order notifications disabled');
   };
 
   const handleRunJob = async (jobId: string, force = false) => {
@@ -304,13 +304,13 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
         throw new Error(await resp.text());
       }
       const data = await resp.json();
-      setMessage(force ? '已提交强制重跑任务，正在刷新批次列表…' : '已提交续跑任务，正在刷新批次列表…');
+      setMessage(force ? 'Force re-run submitted, refreshing run list...' : 'Continue-run submitted, refreshing run list...');
       await refreshRunsWithRetry(jobId);
       if (data.task_id) {
-        setMessage(force ? `强制重跑任务已提交：${data.task_id}` : `续跑任务已提交：${data.task_id}`);
+        setMessage(force ? `Force re-run task submitted: ${data.task_id}` : `Continue-run task submitted: ${data.task_id}`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : force ? '强制重跑失败' : '触发模拟任务失败');
+      setError(err instanceof Error ? err.message : force ? 'Force re-run failed' : 'Failed to trigger simulation job');
     } finally {
       setRunningJobKey((current) => current === actionKey ? null : current);
     }
@@ -329,9 +329,9 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
       if (selectedJobId) {
         await refreshRunsWithRetry(selectedJobId);
       }
-      setMessage('已提交启用任务的续跑请求');
+      setMessage('Continue-run request submitted for enabled jobs');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '仅触发运行失败');
+      setError(err instanceof Error ? err.message : 'Failed to trigger run');
     } finally {
       setRunTriggering(false);
     }
@@ -351,9 +351,9 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
         throw new Error(await resp.text());
       }
       await fetchJobs();
-      setMessage('数据更新任务已提交，可在行情数据库面板查看详细进度');
+      setMessage('Data update task submitted. Check the Market Database panel for detailed progress.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : '更新数据并触发模拟失败');
+      setError(err instanceof Error ? err.message : 'Failed to update data and trigger simulation');
     } finally {
       setDataUpdating(false);
     }
@@ -363,7 +363,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     <div style={{ display: 'grid', gridTemplateColumns: '1.1fr 1fr 1fr', gap: '1rem' }}>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
         <StrategyConfigForm
-          title="模拟任务"
+          title="Simulation Job"
           strategies={strategies}
           selectedStrategy={strategy}
           onStrategyChange={setStrategy}
@@ -380,18 +380,18 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
           headerAction={
             <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', justifyContent: 'flex-end' }}>
               <button className="btn-ghost" onClick={handleRunEnabledJobs} disabled={runTriggering}>
-                {runTriggering ? '触发中...' : '仅触发运行'}
+                {runTriggering ? 'Triggering...' : 'Trigger Run Only'}
               </button>
               <button className="btn-primary" onClick={handleDataUpdate} disabled={dataUpdating}>
-                {dataUpdating ? '更新中...' : '更新数据并触发模拟'}
+                {dataUpdating ? 'Updating...' : 'Update Data & Trigger Simulation'}
               </button>
             </div>
           }
           footer={
             <>
               <div style={{ display: 'grid', gap: '0.4rem' }}>
-                <label className="tagline">模拟任务名称</label>
-                <input className="glass-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="模拟任务名称" />
+                <label className="tagline">Simulation Job Name</label>
+                <input className="glass-input" value={name} onChange={(e) => setName(e.target.value)} placeholder="Simulation job name" />
               </div>
               <label style={{ display: 'flex', alignItems: 'center', gap: '0.65rem' }}>
                 <input
@@ -400,31 +400,31 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                   onChange={(e) => setNotifyOnOrder(e.target.checked)}
                   style={{ width: 'auto' }}
                 />
-                <span className="tagline" style={{ marginBottom: 0 }}>Telegram 下单通知</span>
+                <span className="tagline" style={{ marginBottom: 0 }}>Telegram Order Notifications</span>
               </label>
               {notifyOnOrder && (
                 <div style={{ display: 'grid', gap: '0.4rem' }}>
-                  <label className="tagline">Telegram Chat ID，可留空走服务端默认值</label>
+                  <label className="tagline">Telegram Chat ID (leave empty to use server default)</label>
                   <input
                     className="glass-input"
                     value={telegramChatId}
                     onChange={(e) => setTelegramChatId(e.target.value)}
-                    placeholder="例如 123456789"
+                    placeholder="e.g. 123456789"
                   />
                 </div>
               )}
-              {error && <div style={{ color: 'var(--danger)' }}>{error}</div>}
-              {message && <div style={{ color: 'var(--success)' }}>{message}</div>}
-              <div className="tagline">可选结束时间仅用于首次验证窗口，后续“立即续跑”会自动追到最新日期。</div>
+              {error && <div style={{ color: 'var(--color-danger)' }}>{error}</div>}
+              {message && <div style={{ color: 'var(--color-success)' }}>{message}</div>}
+              <div className="tagline">Optional end date is only used for the initial validation window. Subsequent continue-runs will automatically catch up to the latest date.</div>
               <button className="btn-primary" onClick={handleCreateJob} disabled={submitting || !strategy}>
-                {submitting ? '创建中...' : '创建模拟任务'}
+                {submitting ? 'Creating...' : 'Create Simulation Job'}
               </button>
             </>
           }
         />
 
         <section style={cardStyle}>
-          <h3 style={{ marginTop: 0 }}>模拟任务列表</h3>
+          <h3 style={{ marginTop: 0 }}>Simulation Job List</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
             {jobs.map((job) => (
               <div
@@ -443,40 +443,40 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                     <div style={{ fontWeight: 700 }}>{job.name}</div>
                     <div className="tagline">{job.strategy_name} · {job.symbol}</div>
                   </div>
-                  <span className={`status-badge ${job.enabled ? 'status-backtest' : ''}`}>{job.enabled ? '启用中' : '已停用'}</span>
+                  <span className={`status-badge ${job.enabled ? 'status-backtest' : ''}`}>{job.enabled ? 'Enabled' : 'Disabled'}</span>
                 </div>
                 <div className="tagline" style={{ marginTop: '0.5rem' }}>
-                  首次验证：{job.start_date} → {job.end_date || '最新数据'}
+                  Initial validation: {job.start_date} → {job.end_date || 'Latest data'}
                 </div>
                 <div className="tagline" style={{ marginTop: '0.35rem' }}>
-                  状态：{formatStatusLabel(job.status)} · 最近处理到：{job.last_processed_at || '未开始'}
+                  Status: {formatStatusLabel(job.status)} · Last processed: {job.last_processed_at || 'Not started'}
                 </div>
                 <div className="tagline" style={{ marginTop: '0.35rem' }}>
-                  下单通知：{job.notification?.telegram?.enabled ? '已开启' : '已关闭'}
+                  Order notifications: {job.notification?.telegram?.enabled ? 'On' : 'Off'}
                   {job.notification?.telegram?.chat_id ? ` · Chat ID ${job.notification.telegram.chat_id}` : ''}
                 </div>
                 <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.75rem' }}>
                   <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleToggleJob(job); }}>
-                    {job.enabled ? '停用' : '启用'}
+                    {job.enabled ? 'Disable' : 'Enable'}
                   </button>
                   <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleToggleNotification(job); }}>
-                    {job.notification?.telegram?.enabled ? '关闭通知' : '开启通知'}
+                    {job.notification?.telegram?.enabled ? 'Disable Notifications' : 'Enable Notifications'}
                   </button>
                   <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleRunJob(job.job_id); }} disabled={runningJobKey === `run:${job.job_id}` || runningJobKey === `force:${job.job_id}`}>
-                    {runningJobKey === `run:${job.job_id}` ? '提交中...' : '立即续跑'}
+                    {runningJobKey === `run:${job.job_id}` ? 'Submitting...' : 'Continue Run'}
                   </button>
                   <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleRunJob(job.job_id, true); }} disabled={runningJobKey === `run:${job.job_id}` || runningJobKey === `force:${job.job_id}`}>
-                    {runningJobKey === `force:${job.job_id}` ? '提交中...' : '强制重跑'}
+                    {runningJobKey === `force:${job.job_id}` ? 'Submitting...' : 'Force Re-run'}
                   </button>
                   {job.latest_session_id && (
                     <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); onSelectSession(job.latest_session_id!); }}>
-                      查看会话
+                      View Session
                     </button>
                   )}
                 </div>
               </div>
             ))}
-            {jobs.length === 0 && <div className="tagline">暂无模拟任务</div>}
+            {jobs.length === 0 && <div className="tagline">No simulation jobs</div>}
           </div>
         </section>
       </div>
@@ -484,17 +484,17 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
         <section style={cardStyle}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', marginBottom: '1rem' }}>
             <div>
-              <h3 style={{ margin: 0 }}>数据更新与批次</h3>
+              <h3 style={{ margin: 0 }}>Data Updates & Runs</h3>
               <div className="tagline" style={{ marginTop: '0.35rem' }}>
-                详细的数据库覆盖、批次历史和步骤明细已迁移到独立的行情数据库面板。
+                Detailed database coverage, run history, and step details have been moved to the Market Database panel.
               </div>
             </div>
             <button className="btn-ghost" onClick={onOpenMarketAdmin}>
-              打开行情数据库面板
+              Open Market Database Panel
             </button>
           </div>
 
-          <h3 style={{ marginBottom: '0.75rem', marginTop: '1.2rem' }}>运行批次</h3>
+          <h3 style={{ marginBottom: '0.75rem', marginTop: '1.2rem' }}>Run Batches</h3>
           <div style={{ display: 'grid', gap: '0.75rem' }}>
           {runs.map((run) => (
             <div
@@ -513,44 +513,44 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                 <span className="tagline">{run.progress.toFixed(0)}%</span>
               </div>
               <div className="tagline" style={{ marginTop: '0.4rem' }}>
-                {run.start_date} → {run.end_date || '进行中'}
+                {run.start_date} → {run.end_date || 'In Progress'}
               </div>
-              <div className="tagline">bar 数：{run.bars_processed} · step：{run.steps_recorded}</div>
+              <div className="tagline">Bars: {run.bars_processed} · Steps: {run.steps_recorded}</div>
               {run.session_id && (
                 <button className="btn-ghost" style={{ marginTop: '0.5rem' }} onClick={(e) => { e.stopPropagation(); onSelectSession(run.session_id!); }}>
-                  打开会话
+                  Open Session
                 </button>
               )}
             </div>
           ))}
-          {currentJob && runs.length === 0 && <div className="tagline">该模拟任务暂无运行批次</div>}
+          {currentJob && runs.length === 0 && <div className="tagline">No run batches for this simulation job</div>}
         </div>
       </section>
 
       <section style={cardStyle}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
-          <h3 style={{ marginTop: 0, marginBottom: 0 }}>逐 Bar 执行轨迹</h3>
+          <h3 style={{ marginTop: 0, marginBottom: 0 }}>Bar-by-Bar Execution Trace</h3>
           <div style={{ display: 'flex', gap: '0.4rem', flexWrap: 'wrap' }}>
-            <button className="btn-ghost" onClick={() => setStepFilter('important')} disabled={stepFilter === 'important'}>重要事件</button>
-            <button className="btn-ghost" onClick={() => setStepFilter('trade')} disabled={stepFilter === 'trade'}>仅成交</button>
-            <button className="btn-ghost" onClick={() => setStepFilter('error')} disabled={stepFilter === 'error'}>仅异常</button>
-            <button className="btn-ghost" onClick={() => setStepFilter('all')} disabled={stepFilter === 'all'}>全部</button>
+            <button className="btn-ghost" onClick={() => setStepFilter('important')} disabled={stepFilter === 'important'}>Important</button>
+            <button className="btn-ghost" onClick={() => setStepFilter('trade')} disabled={stepFilter === 'trade'}>Trades Only</button>
+            <button className="btn-ghost" onClick={() => setStepFilter('error')} disabled={stepFilter === 'error'}>Errors Only</button>
+            <button className="btn-ghost" onClick={() => setStepFilter('all')} disabled={stepFilter === 'all'}>All</button>
           </div>
         </div>
-        <div className="tagline" style={{ marginTop: '0.5rem', marginBottom: '0.8rem' }}>默认仅展示生命周期、成交和异常；普通 bar 以紧凑摘要显示。</div>
+        <div className="tagline" style={{ marginTop: '0.5rem', marginBottom: '0.8rem' }}>By default, only lifecycle events, trades, and errors are shown. Regular bars display as compact summaries.</div>
         {selectedRunId ? (
           <div style={{ display: 'grid', gap: '0.55rem', maxHeight: '80vh', overflowY: 'auto' }}>
             {filteredSteps.map((step) => {
               const hasTrades = Boolean(step.payload?.new_trades?.length);
               const hasError = Boolean(step.payload?.error);
               const closePrices = step.payload?.close_prices
-                ? Object.entries(step.payload.close_prices).map(([code, price]) => `${code}=${formatPrice(Number(price), 2)}`).join('，')
+                ? Object.entries(step.payload.close_prices).map(([code, price]) => `${code}=${formatPrice(Number(price), 2)}`).join(', ')
                 : null;
               const summaryLine = [
-                step.payload?.progress !== undefined ? `进度 ${Number(step.payload.progress).toFixed(2)}%` : null,
-                step.payload?.total_equity !== undefined ? `权益 ${step.payload.total_equity}` : null,
-                step.payload?.cash !== undefined ? `现金 ${step.payload.cash}` : null,
-                closePrices ? `行情 ${closePrices}` : null,
+                step.payload?.progress !== undefined ? `Progress ${Number(step.payload.progress).toFixed(2)}%` : null,
+                step.payload?.total_equity !== undefined ? `Equity ${step.payload.total_equity}` : null,
+                step.payload?.cash !== undefined ? `Cash ${step.payload.cash}` : null,
+                closePrices ? `Prices ${closePrices}` : null,
               ].filter(Boolean).join(' · ');
 
               return (
@@ -580,7 +580,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                       {hasTrades && (
                         <span
                           style={{
-                            color: 'var(--success)',
+                            color: 'var(--color-success)',
                             background: 'rgba(34,197,94,0.12)',
                             border: '1px solid rgba(34,197,94,0.25)',
                             borderRadius: 999,
@@ -589,10 +589,10 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                             fontWeight: 700,
                           }}
                         >
-                          成交 {step.payload.new_trades.length}
+                          Filled {step.payload.new_trades.length}
                         </span>
                       )}
-                      {hasError && <span className="tagline" style={{ color: 'var(--danger)' }}>异常</span>}
+                      {hasError && <span className="tagline" style={{ color: 'var(--color-danger)' }}>Error</span>}
                     </div>
                     <span className="tagline">#{step.step_index} · {step.timestamp || step.created_at}</span>
                   </div>
@@ -615,7 +615,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                             fontSize: '0.85rem',
                           }}
                         >
-                          <span style={{ fontWeight: 700, color: 'var(--success)' }}>
+                          <span style={{ fontWeight: 700, color: 'var(--color-success)' }}>
                             {String(trade.type || '').toUpperCase()} {trade.symbol}
                           </span>
                           <span className="tagline">
@@ -627,19 +627,19 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
                   ) : null}
                   {step.event_type !== 'strategy_step' && step.payload?.positions && Object.keys(step.payload.positions).length > 0 ? (
                     <div className="tagline" style={{ marginTop: '0.35rem' }}>
-                      持仓：{Object.entries(step.payload.positions).map(([code, position]: any) => `${code}(${position.qty})`).join('，')}
+                      Positions: {Object.entries(step.payload.positions).map(([code, position]: any) => `${code}(${position.qty})`).join(', ')}
                     </div>
                   ) : null}
                   {hasError && (
-                    <div style={{ color: 'var(--danger)', marginTop: '0.35rem' }}>{step.payload.error}</div>
+                    <div style={{ color: 'var(--color-danger)', marginTop: '0.35rem' }}>{step.payload.error}</div>
                   )}
                 </div>
               );
             })}
-            {filteredSteps.length === 0 && <div className="tagline">当前筛选下暂无轨迹事件</div>}
+            {filteredSteps.length === 0 && <div className="tagline">No trace events match the current filter</div>}
           </div>
         ) : (
-          <div className="tagline">请选择左侧运行批次查看执行轨迹</div>
+          <div className="tagline">Select a run batch on the left to view execution trace</div>
         )}
       </section>
     </div>

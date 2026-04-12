@@ -26,7 +26,7 @@ const SessionList: React.FC<SessionListProps> = ({
     onViewSession,
     onStopSession,
     onDeleteSession,
-    title = '全部会话',
+    title = 'All Sessions',
     defaultFilter = 'all',
 }) => {
     const [filter, setFilter] = useState<SessionFilter>(defaultFilter);
@@ -58,14 +58,14 @@ const SessionList: React.FC<SessionListProps> = ({
     return (
         <SectionCard
             title={title}
-            description="查看会话记录、选择对比对象，并快速回到执行详情。"
+            description="Browse session history, select sessions for comparison, and jump to execution details."
             action={
                 <div className="flex flex-wrap gap-2">
                     {([
-                        ['all', `全部 (${counts.all})`],
-                        ['manual', `手动 (${counts.manual})`],
-                        ['simulation', `模拟 (${counts.simulation})`],
-                        ['running', `运行中 (${counts.running})`],
+                        ['all', `All (${counts.all})`],
+                        ['manual', `Manual (${counts.manual})`],
+                        ['simulation', `Simulation (${counts.simulation})`],
+                        ['running', `Running (${counts.running})`],
                     ] as Array<[SessionFilter, string]>).map(([value, label]) => (
                         <Button
                             key={value}
@@ -85,12 +85,12 @@ const SessionList: React.FC<SessionListProps> = ({
                         <tr>
                             <th style={{ width: '40px' }}></th>
                             <th>ID</th>
-                            <th>策略</th>
-                            <th>时间区间</th>
-                            <th>模式</th>
-                            <th>状态</th>
-                            <th>来源</th>
-                            <th>操作</th>
+                            <th>Strategy</th>
+                            <th>Date Range</th>
+                            <th>Mode</th>
+                            <th>Status</th>
+                            <th>Source</th>
+                            <th>Actions</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -104,14 +104,14 @@ const SessionList: React.FC<SessionListProps> = ({
                                         style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--primary)' }}
                                     />
                                 </td>
-                                <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--text-dim)' }}>{s.id.slice(0, 8)}...</td>
+                                <td style={{ fontFamily: 'monospace', fontSize: '0.8rem', color: 'var(--color-text-dim)' }}>{s.id.slice(0, 8)}...</td>
                                 <td>
                                     <div style={{ fontWeight: 600 }}>{s.strategy}</div>
                                     <div className="tagline" style={{ fontSize: '0.7rem' }}>{s.symbol}</div>
                                 </td>
                                 <td style={{ fontSize: '0.8rem' }}>
                                     {s.start_date}<br />
-                                    {s.end_date || '进行中'}
+                                    {s.end_date || 'In Progress'}
                                 </td>
                                 <td><StatusBadge value={s.mode} /></td>
                                 <td>
@@ -127,28 +127,28 @@ const SessionList: React.FC<SessionListProps> = ({
                                 </td>
                                 <td>
                                     <span className="tagline">{formatSourceLabel(s.source)}</span>
-                                    {s.job_id && <div className="tagline" style={{ fontSize: '0.65rem' }}>任务 {s.job_id.slice(0, 6)}</div>}
+                                    {s.job_id && <div className="tagline" style={{ fontSize: '0.65rem' }}>Job {s.job_id.slice(0, 6)}</div>}
                                 </td>
                                 <td>
                                     <div className="flex gap-2">
                                         <Button variant="outline" size="sm" onClick={() => onViewSession(s.id)}>
-                                            查看
+                                            View
                                         </Button>
                                         {s.status === 'running' && (
                                             <Button variant="danger" size="sm" onClick={() => onStopSession(s.id)}>
-                                                停止
+                                                Stop
                                             </Button>
                                         )}
                                         {s.status !== 'running' && (
                                             <Button variant="danger" size="sm" onClick={() => onDeleteSession(s.id)}>
-                                                删除
+                                                Delete
                                             </Button>
                                         )}
                                     </div>
                                 </td>
                             </tr>
                         ))}
-                        {filteredSessions.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '2rem' }}>未找到会话</td></tr>}
+                        {filteredSessions.length === 0 && <tr><td colSpan={8} style={{ textAlign: 'center', color: 'var(--color-text-dim)', padding: '2rem' }}>No sessions found</td></tr>}
                     </tbody>
                 </table>
             </div>

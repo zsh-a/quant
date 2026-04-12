@@ -20,33 +20,14 @@
   --color-border: hsl(217 20% 23%);
   --color-input: hsl(217 23% 14%);
   --color-ring: hsl(196 79% 53%);
+  --color-success: #34d399;
+  --color-danger: #fb7185;
+  --color-text: #f8fafc;
+  --color-text-dim: #9ca7bb;
   --radius: 1rem;
 }
 
 :root {
-  --background: 220 31% 9%;
-  --foreground: 210 40% 96%;
-  --card: 222 28% 12%;
-  --card-foreground: 210 40% 96%;
-  --popover: 222 28% 11%;
-  --popover-foreground: 210 40% 96%;
-  --primary: 196 79% 53%;
-  --primary-foreground: 222 47% 11%;
-  --secondary: 218 24% 18%;
-  --secondary-foreground: 210 40% 96%;
-  --muted: 218 20% 16%;
-  --muted-foreground: 215 20% 70%;
-  --accent: 217 24% 20%;
-  --accent-foreground: 210 40% 96%;
-  --destructive: 0 75% 58%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217 20% 23%;
-  --input: 217 23% 14%;
-  --ring: 196 79% 53%;
-  --success: #34d399;
-  --danger: #fb7185;
-  --text: #f8fafc;
-  --text-dim: #9ca7bb;
   --card-bg: rgba(20, 28, 45, 0.78);
   --glass-bg: rgba(16, 23, 37, 0.7);
 }

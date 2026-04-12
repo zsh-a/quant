@@ -1,37 +1,37 @@
 const STATUS_LABELS: Record<string, string> = {
-  running: "运行中",
-  completed: "已完成",
-  failed: "失败",
-  failed_timeout: "超时失败",
-  pending: "等待中",
-  success: "成功",
-  failure: "失败",
-  partial_success: "部分成功",
+  running: "Running",
+  completed: "Completed",
+  failed: "Failed",
+  failed_timeout: "Timed Out",
+  pending: "Pending",
+  success: "Success",
+  failure: "Failed",
+  partial_success: "Partial Success",
 }
 
 const MODE_LABELS: Record<string, string> = {
-  live: "实盘",
-  backtest: "回测",
-  simulation: "模拟",
+  live: "Live",
+  backtest: "Backtest",
+  simulation: "Simulation",
 }
 
 const SOURCE_LABELS: Record<string, string> = {
-  manual: "手动",
-  automation: "自动",
-  schedule: "定时",
+  manual: "Manual",
+  automation: "Automation",
+  schedule: "Scheduled",
 }
 
 export function formatStatusLabel(value?: string | null) {
   const normalized = value?.toLowerCase() ?? ""
-  return STATUS_LABELS[normalized] ?? value ?? "未知"
+  return STATUS_LABELS[normalized] ?? value ?? "Unknown"
 }
 
 export function formatModeLabel(value?: string | null) {
   const normalized = value?.toLowerCase() ?? ""
-  return MODE_LABELS[normalized] ?? value ?? "未知"
+  return MODE_LABELS[normalized] ?? value ?? "Unknown"
 }
 
 export function formatSourceLabel(value?: string | null) {
   const normalized = value?.toLowerCase() ?? "manual"
-  return SOURCE_LABELS[normalized] ?? value ?? "未知"
+  return SOURCE_LABELS[normalized] ?? value ?? "Unknown"
 }

@@ -127,7 +127,7 @@ const Comparison: React.FC<ComparisonProps> = ({
 
     if (selectedSessionIds.length === 0) {
         return (
-            <EmptyState title="未选择对比会话" description="前往策略实验室选择需要对比的会话。" />
+            <EmptyState title="No Sessions Selected for Comparison" description="Go to the Strategy Lab to select sessions for comparison." />
         );
     }
 
@@ -135,8 +135,8 @@ const Comparison: React.FC<ComparisonProps> = ({
         <div className="dashboard-view space-y-6">
             <PageHeader
                 eyebrow="Cross-run Analytics"
-                title="策略对比"
-                description={`当前正在比较 ${sessionMetrics.length} 个会话`}
+                title="Strategy Comparison"
+                description={`Currently comparing ${sessionMetrics.length} session(s)`}
                 actions={
                     <Button variant={useLttb ? 'default' : 'outline'} size="sm" onClick={() => setUseLttb(!useLttb)}>
                         LTTB: {useLttb ? 'ON' : 'OFF'}
@@ -144,7 +144,7 @@ const Comparison: React.FC<ComparisonProps> = ({
                 }
             />
 
-            <SectionCard title="指标矩阵" description="对齐展示各会话的收益、风险与交易效率指标。">
+            <SectionCard title="Metrics Matrix" description="Side-by-side comparison of return, risk, and trading efficiency metrics across sessions.">
             <div className="overflow-x-auto">
                 <table className="data-table">
                     <thead>
@@ -162,17 +162,17 @@ const Comparison: React.FC<ComparisonProps> = ({
                     <tbody>
                         {(Object.keys(METRIC_LABELS) as Array<DisplayableMetricKey>).map(key => (
                             <tr key={key}>
-                                <td style={{ color: 'var(--text-dim)' }}>{METRIC_LABELS[key]}</td>
+                                <td style={{ color: 'var(--color-text-dim)' }}>{METRIC_LABELS[key]}</td>
                                 {sessionMetrics.map(s => {
                                     const val = s.metrics[key];
                                     const numVal = typeof val === 'number' ? val : 0;
                                     let color = 'inherit';
                                     if (key === 'totalReturn' || key === 'annualizedReturn' || key === 'sharpeRatio' || key === 'profitFactor') {
-                                        color = numVal > 0 ? 'var(--success)' : (numVal < 0 ? 'var(--danger)' : 'inherit');
-                                        if (key === 'sharpeRatio' && numVal < 1) color = 'var(--text-dim)'; // Neutral if low sharpe
+                                        color = numVal > 0 ? 'var(--color-success)' : (numVal < 0 ? 'var(--color-danger)' : 'inherit');
+                                        if (key === 'sharpeRatio' && numVal < 1) color = 'var(--color-text-dim)'; // Neutral if low sharpe
                                     }
                                     if (key === 'maxDrawdown') {
-                                        color = numVal > 0.2 ? 'var(--danger)' : 'inherit';
+                                        color = numVal > 0.2 ? 'var(--color-danger)' : 'inherit';
                                     }
 
                                     return (
@@ -188,16 +188,16 @@ const Comparison: React.FC<ComparisonProps> = ({
             </div>
             </SectionCard>
 
-            <SectionCard title="收益曲线对比 (%)" description="查看各会话的相对收益轨迹变化。">
+            <SectionCard title="Return Curve Comparison (%)" description="View the relative return trajectory for each session.">
             <div className="chart-container h-[500px]">
                 <ResponsiveContainer width="100%" height="90%">
                     <ComposedChart data={chartData}>
                         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                         <XAxis dataKey="timestamp" hide />
-                        <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
+                        <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
                         <Tooltip
                             contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                            itemStyle={{ color: 'var(--text)' }}
+                            itemStyle={{ color: 'var(--color-text)' }}
                             formatter={(value: any, name: string) => {
                                 const sessionId = name.replace('session_', '');
                                 const session = sessionMetrics.find(s => s.id === sessionId);

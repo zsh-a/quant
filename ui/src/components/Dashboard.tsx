@@ -3,11 +3,12 @@ import {
     Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, Legend, ComposedChart
 } from 'recharts';
 import { lttb } from '../lttb';
-import StatCard from './StatCard';
+import { MetricCard } from './layout/MetricCard';
+import { EmptyState } from './layout/EmptyState';
 import { VirtualizedTradeList } from './VirtualizedTradeList';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
 import { calculateMetrics } from '../utils/metrics';
-import { formatMoney, formatSignedMoney, formatSigned, formatPercent, colorFromValue } from '../utils/format';
+import { formatMoney, formatSignedMoney, formatSigned, formatPercent, colorFromSign, colorFromValue } from '../utils/format';
 import { formatModeLabel } from '../utils/display';
 import { Button } from './ui/button';
 
@@ -25,10 +26,10 @@ interface DashboardProps {
     allSessions: SessionSummary[];
 }
 
-const COLORS = {
-    'sh.000300': '#f59e0b', // Amber
-    'sh.000905': '#38bdf8', // Sky
-    'sz.399006': '#34d399', // Emerald
+const COLORS: Record<string, string> = {
+    'sh.000300': '#f59e0b',
+    'sh.000905': '#38bdf8',
+    'sz.399006': '#34d399',
 };
 
 const SESSION_COMPARE_COLORS = ['#fb7185', '#f59e0b', '#a78bfa', '#22d3ee', '#f97316', '#4ade80'];
@@ -64,42 +65,28 @@ const Dashboard: React.FC<DashboardProps> = ({
         if (!primarySession && comparisonData.length === 0) return [];
 
         const relevantCurves: { id: string, data: EquityPoint[] }[] = [];
-
         if (equityHistory.length > 0) {
             relevantCurves.push({ id: 'Primary', data: equityHistory });
         }
-
         comparisonData
             .filter((c) => visibleComparisonIds.includes(c.id))
-            .forEach(c => {
-            relevantCurves.push({ id: c.id, data: c.data });
-        });
+            .forEach(c => relevantCurves.push({ id: c.id, data: c.data }));
 
         if (relevantCurves.length === 0) return [];
 
         const dataMap = new Map<string, any>();
-
         relevantCurves.forEach(curve => {
             if (curve.data.length === 0) return;
-
             let processedData = curve.data;
             if (useLttb && curve.data.length > 2000) {
                 processedData = lttb(curve.data, 2000, 'total_equity');
             }
-
             const initialEquity = processedData[0].total_equity || 1;
-
             processedData.forEach(pt => {
-                const ts = pt.timestamp;
-                const dateStr = ts.split(' ')[0];
-
-                if (!dataMap.has(dateStr)) {
-                    dataMap.set(dateStr, { timestamp: ts });
-                }
+                const dateStr = pt.timestamp.split(' ')[0];
+                if (!dataMap.has(dateStr)) dataMap.set(dateStr, { timestamp: pt.timestamp });
                 const entry = dataMap.get(dateStr);
-
                 const ret = ((pt.total_equity - initialEquity) / initialEquity) * 100;
-
                 if (curve.id === 'Primary') {
                     entry.equityReturn = ret;
                     entry.equityValue = pt.total_equity;
@@ -109,17 +96,15 @@ const Dashboard: React.FC<DashboardProps> = ({
             });
         });
 
-        // Benchmarks
         const bmMaps: Record<string, { map: Map<string, number>, initial: number }> = {};
         Object.keys(benchmarksData).forEach(code => {
             const data = benchmarksData[code];
-            if (data && data.length > 0) {
-                const map = new Map();
+            if (data?.length > 0) {
+                const map = new Map<string, number>();
                 data.forEach(d => map.set(d.timestamp.split(' ')[0], d.value));
                 bmMaps[code] = { map, initial: data[0].value };
             }
         });
-
         dataMap.forEach((entry, dateStr) => {
             Object.keys(bmMaps).forEach(code => {
                 const { map, initial } = bmMaps[code];
@@ -131,7 +116,6 @@ const Dashboard: React.FC<DashboardProps> = ({
         });
 
         return Array.from(dataMap.values()).sort((a, b) => a.timestamp.localeCompare(b.timestamp));
-
     }, [equityHistory, comparisonData, benchmarksData, useLttb, primarySession, visibleComparisonIds]);
 
     const visibleComparisonData = useMemo(
@@ -141,18 +125,15 @@ const Dashboard: React.FC<DashboardProps> = ({
 
     const toggleComparisonVisibility = (sessionId: string) => {
         setVisibleComparisonIds((prev) =>
-            prev.includes(sessionId)
-                ? prev.filter((id) => id !== sessionId)
-                : [...prev, sessionId]
+            prev.includes(sessionId) ? prev.filter((id) => id !== sessionId) : [...prev, sessionId]
         );
     };
 
-    // Derived Display Data
     const currentPositions = (selectedDay ? selectedDay.positions : positions) || {};
     const positionKeys = Object.keys(currentPositions);
     const visiblePositions = positionKeys.slice((holdingsPage - 1) * PAGE_SIZE, holdingsPage * PAGE_SIZE);
+    const totalHoldingsPages = Math.ceil(positionKeys.length / PAGE_SIZE) || 1;
 
-    // Virtualized trades - no pagination needed
     const filteredTrades = useMemo(() => {
         const list = selectedDay
             ? trades.filter(t => t.timestamp.split(' ')[0] === selectedDay.timestamp.split(' ')[0])
@@ -160,48 +141,32 @@ const Dashboard: React.FC<DashboardProps> = ({
         return [...list].reverse();
     }, [trades, selectedDay]);
 
-    // Alias for backward compatibility in JSX
-    const sortedTrades = filteredTrades;
-
-    const handleDaySelect = (day: EquityPoint) => {
-        setSelectedDay(day);
-        setHoldingsPage(1);
-    };
-
-    const clearDaySelection = () => {
-        setSelectedDay(null);
-        setHoldingsPage(1);
-    };
+    const totalEquityPages = Math.ceil(equityHistory.length / PAGE_SIZE) || 1;
 
     if (!primarySession) {
-        return (
-            <div className="dashboard-view" style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '400px', color: 'var(--text-dim)' }}>
-                <h2>未选择会话</h2>
-                <p>可从总览或实验室中打开一个会话查看详情。</p>
-            </div>
-        );
+        return <EmptyState title="No Session Selected" description="Open a session from the overview or lab to view details." />;
     }
 
     return (
-        <div className="dashboard-view">
-            {/* Header Controls */}
-            <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                        <h2>
-                            会话：{primarySession.strategy || '未知'}
-                            <span className="tagline" style={{ fontSize: '1rem' }}> ({formatModeLabel(primarySession.mode)})</span>
+        <div className="space-y-6">
+            {/* Header */}
+            <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-4">
+                        <h2 className="text-xl font-semibold text-foreground">
+                            {primarySession.strategy || 'Unknown'}
+                            <span className="ml-2 text-base font-normal text-muted-foreground">({formatModeLabel(primarySession.mode)})</span>
                         </h2>
-                        <select className="glass-input" style={{ width: 'auto' }} value={primarySession.id} onChange={e => onSelectSession(e.target.value)}>
+                        <select className="glass-input w-auto" value={primarySession.id} onChange={e => onSelectSession(e.target.value)}>
                             {allSessions.map(s => <option key={s.id} value={s.id}>{s.strategy} - {formatModeLabel(s.mode)} ({s.id.slice(0, 6)}...)</option>)}
                         </select>
                     </div>
-                    {(primarySession.params && Object.keys(primarySession.params).length > 0) && (
-                        <div style={{ fontSize: '0.85rem', color: 'var(--text-dim)', display: 'flex', flexWrap: 'wrap', gap: '0.5rem 1rem', alignItems: 'center' }}>
-                            <span className="tagline">策略参数:</span>
+                    {primarySession.params && Object.keys(primarySession.params).length > 0 && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+                            <span className="text-xs font-medium uppercase tracking-wider">Params:</span>
                             {Object.entries(primarySession.params).map(([k, v]) => (
-                                <span key={k} style={{ background: 'rgba(255,255,255,0.08)', padding: '0.2rem 0.5rem', borderRadius: '4px' }}>
-                                    {k}: <strong style={{ color: 'var(--text)' }}>{String(v)}</strong>
+                                <span key={k} className="rounded bg-white/[0.08] px-2 py-0.5">
+                                    {k}: <strong className="text-foreground">{String(v)}</strong>
                                 </span>
                             ))}
                         </div>
@@ -209,153 +174,136 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
-            {/* Key Stats Grid */}
-            <div className="grid">
-                <StatCard 
-                    label="Total Equity" 
-                    value={equityHistory.length > 0 ? formatMoney(equityHistory[equityHistory.length - 1].total_equity) : "--"} 
-                    delta={equityHistory.length > 1 ? `${formatPercent(metrics.totalReturn, 2)} total` : undefined}
+            {/* Stats Grid */}
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
+                <MetricCard
+                    label="Total Equity"
+                    value={
+                        <span style={{ color: equityHistory.length > 1 ? colorFromSign(formatPercent(metrics.totalReturn, 2)) : undefined }}>
+                            {equityHistory.length > 0 ? formatMoney(equityHistory[equityHistory.length - 1].total_equity) : "--"}
+                        </span>
+                    }
+                    hint={equityHistory.length > 1 ? `${formatPercent(metrics.totalReturn, 2)} total` : undefined}
                 />
-                <StatCard 
-                    label="年化收益" 
-                    value={formatPercent(metrics.annualizedReturn, 2)}
-                    subtext="按年度折算"
+                <MetricCard
+                    label="Annualized"
+                    value={<span style={{ color: colorFromSign(formatPercent(metrics.annualizedReturn, 2)) }}>{formatPercent(metrics.annualizedReturn, 2)}</span>}
+                    hint="Compounded annual return"
                 />
-                <StatCard 
-                    label="夏普比率" 
-                    value={metrics.sharpeRatio.toFixed(2)}
-                    subtext={`Vol: ${formatPercent(metrics.volatility, 2)}`}
+                <MetricCard
+                    label="Sharpe Ratio"
+                    value={<span style={{ color: colorFromValue(metrics.sharpeRatio) }}>{metrics.sharpeRatio.toFixed(2)}</span>}
+                    hint={`Vol: ${formatPercent(metrics.volatility, 2)}`}
                 />
-                <StatCard 
-                    label="最大回撤" 
-                    value={formatPercent(metrics.maxDrawdown, 2)}
-                    delta={metrics.maxDrawdown > 0.2 ? '风险偏高' : '风险可控'}
+                <MetricCard
+                    label="Max Drawdown"
+                    value={<span style={{ color: colorFromValue(-metrics.maxDrawdown) }}>{formatPercent(metrics.maxDrawdown, 2)}</span>}
+                    hint={metrics.maxDrawdown > 0.2 ? 'Elevated risk' : 'Within limits'}
                 />
-                 <StatCard 
-                    label="当日盈亏" 
-                    value={equityHistory.length > 0 ? formatSignedMoney(equityHistory[equityHistory.length - 1].daily_pnl) : "--"}
-                    delta={equityHistory.length > 0 ? formatSigned((equityHistory[equityHistory.length - 1].daily_return ?? 0) * 100, { asPercent: true }) : undefined}
+                <MetricCard
+                    label="Daily P&L"
+                    value={
+                        <span style={{ color: equityHistory.length > 0 ? colorFromValue(equityHistory[equityHistory.length - 1].daily_pnl) : undefined }}>
+                            {equityHistory.length > 0 ? formatSignedMoney(equityHistory[equityHistory.length - 1].daily_pnl) : "--"}
+                        </span>
+                    }
+                    hint={equityHistory.length > 0 ? formatSigned((equityHistory[equityHistory.length - 1].daily_return ?? 0) * 100, { asPercent: true }) : undefined}
                 />
             </div>
 
-            {/* Chart */}
-            <div
-                className="glass card chart-container"
-                style={{
-                    marginTop: '2rem',
-                    minHeight: '520px',
-                    padding: '2rem',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    gap: '1rem',
-                }}
-            >
-                <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', gap: '1rem', alignItems: 'flex-start', flexWrap: 'wrap' }}>
+            {/* Return Chart */}
+            <div className="glass card chart-container mt-0 flex min-h-[520px] flex-col gap-4 p-6">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                     <div>
-                        <h3 style={{ marginBottom: '0.35rem' }}>收益曲线 (%)</h3>
-                        <div className="tagline">默认仅显示当前会话；可按需叠加基准线与对比会话。</div>
+                        <h3 className="mb-1 text-base font-semibold">Return Curve (%)</h3>
+                        <div className="text-sm text-muted-foreground">Primary session shown by default. Overlay benchmarks or comparison sessions as needed.</div>
                     </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem', alignItems: 'flex-end' }}>
-                        <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                            <Button variant={useLttb ? 'default' : 'outline'} size="sm" onClick={() => setUseLttb(!useLttb)}>
-                                LTTB: {useLttb ? '开' : '关'}
-                            </Button>
-                        </div>
-                        {availableBenchmarks.length > 0 ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                {availableBenchmarks.map((benchmark) => (
+                    <div className="flex flex-col items-end gap-3">
+                        <Button variant={useLttb ? 'default' : 'outline'} size="sm" onClick={() => setUseLttb(!useLttb)}>
+                            LTTB: {useLttb ? 'On' : 'Off'}
+                        </Button>
+                        {availableBenchmarks.length > 0 && (
+                            <div className="flex flex-wrap justify-end gap-2">
+                                {availableBenchmarks.map((bm) => (
                                     <Button
-                                        key={benchmark.code}
-                                        variant={selectedBenchmarks.includes(benchmark.code) ? 'default' : 'outline'}
+                                        key={bm.code}
+                                        variant={selectedBenchmarks.includes(bm.code) ? 'default' : 'outline'}
                                         size="sm"
-                                        onClick={() => onToggleBenchmark(benchmark.code)}
-                                        style={{
-                                            borderColor: selectedBenchmarks.includes(benchmark.code)
-                                                ? COLORS[benchmark.code as keyof typeof COLORS]
-                                                : undefined,
-                                            background: selectedBenchmarks.includes(benchmark.code)
-                                                ? COLORS[benchmark.code as keyof typeof COLORS]
-                                                : undefined,
-                                            color: selectedBenchmarks.includes(benchmark.code) ? '#08111f' : undefined,
-                                        }}
+                                        onClick={() => onToggleBenchmark(bm.code)}
+                                        style={selectedBenchmarks.includes(bm.code) ? {
+                                            borderColor: COLORS[bm.code],
+                                            background: COLORS[bm.code],
+                                            color: '#08111f',
+                                        } : undefined}
                                     >
-                                        {benchmark.name}
+                                        {bm.name}
                                     </Button>
                                 ))}
                             </div>
-                        ) : null}
-                        {comparisonData.length > 0 ? (
-                            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                                {comparisonData.map((session, idx) => (
+                        )}
+                        {comparisonData.length > 0 && (
+                            <div className="flex flex-wrap justify-end gap-2">
+                                {comparisonData.map((s, idx) => (
                                     <Button
-                                        key={session.id}
-                                        variant={visibleComparisonIds.includes(session.id) ? 'default' : 'outline'}
+                                        key={s.id}
+                                        variant={visibleComparisonIds.includes(s.id) ? 'default' : 'outline'}
                                         size="sm"
-                                        onClick={() => toggleComparisonVisibility(session.id)}
-                                        style={{
-                                            borderColor: visibleComparisonIds.includes(session.id)
-                                                ? SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length]
-                                                : undefined,
-                                            background: visibleComparisonIds.includes(session.id)
-                                                ? SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length]
-                                                : undefined,
-                                            color: visibleComparisonIds.includes(session.id) ? '#08111f' : undefined,
-                                        }}
+                                        onClick={() => toggleComparisonVisibility(s.id)}
+                                        style={visibleComparisonIds.includes(s.id) ? {
+                                            borderColor: SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length],
+                                            background: SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length],
+                                            color: '#08111f',
+                                        } : undefined}
                                     >
-                                        {session.name}
+                                        {s.name}
                                     </Button>
                                 ))}
                             </div>
-                        ) : null}
+                        )}
                     </div>
                 </div>
-                <div style={{ flex: 1, minHeight: '360px' }}>
+                <div className="min-h-[360px] flex-1">
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
                             <defs>
                                 <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
                                     <stop offset="5%" stopColor="#22d3ee" stopOpacity={0.38} />
-                                    <stop offset="95%" stopColor="var(--primary)" stopOpacity={0} />
+                                    <stop offset="95%" stopColor="#22d3ee" stopOpacity={0} />
                                 </linearGradient>
                             </defs>
                             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" vertical={false} />
                             <XAxis dataKey="timestamp" hide />
-                            <YAxis domain={['auto', 'auto']} stroke="var(--text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} width={56} />
+                            <YAxis domain={['auto', 'auto']} stroke="var(--color-text-dim)" fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} width={56} />
                             <Tooltip
                                 contentStyle={{ backgroundColor: 'var(--card-bg)', borderColor: 'rgba(255,255,255,0.1)', borderRadius: '8px' }}
-                                itemStyle={{ color: 'var(--text)' }}
+                                itemStyle={{ color: 'var(--color-text)' }}
                                 formatter={(value: any, name: string) => [
                                     `${value.toFixed(2)}%`,
-                                    name === 'equityReturn' ? '策略收益' : availableBenchmarks.find(b => b.code === name)?.name || name
+                                    name === 'equityReturn' ? 'Strategy' : availableBenchmarks.find(b => b.code === name)?.name || name
                                 ]}
                                 labelFormatter={(label) => label.split(' ')[0]}
                             />
                             <Legend wrapperStyle={{ paddingTop: '12px' }} verticalAlign="bottom" />
                             <Area type="monotone" dataKey="equityReturn" name="Primary" stroke="#22d3ee" fillOpacity={1} fill="url(#colorEquity)" strokeWidth={3} />
-                            
-                            {visibleComparisonData.map((c, idx) => {
-                                 const color = SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length];
-                                 return (
-                                     <Line
-                                         key={c.id}
-                                         type="monotone"
-                                         dataKey={`session_${c.id}`}
-                                         name={`${c.name} (${c.id.slice(0,4)})`}
-                                         stroke={color}
-                                         strokeWidth={2.25}
-                                         dot={false}
-                                         strokeDasharray="6 5"
-                                     />
-                                 );
-                            })}
-
+                            {visibleComparisonData.map((c, idx) => (
+                                <Line
+                                    key={c.id}
+                                    type="monotone"
+                                    dataKey={`session_${c.id}`}
+                                    name={`${c.name} (${c.id.slice(0, 4)})`}
+                                    stroke={SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length]}
+                                    strokeWidth={2.25}
+                                    dot={false}
+                                    strokeDasharray="6 5"
+                                />
+                            ))}
                             {selectedBenchmarks.map(code => (
                                 <Line
                                     key={code}
                                     type="monotone"
                                     dataKey={code}
                                     name={availableBenchmarks.find(b => b.code === code)?.name}
-                                    stroke={COLORS[code as keyof typeof COLORS] || 'var(--secondary)'}
+                                    stroke={COLORS[code] || 'var(--color-secondary)'}
                                     strokeWidth={2.25}
                                     dot={false}
                                 />
@@ -365,123 +313,128 @@ const Dashboard: React.FC<DashboardProps> = ({
                 </div>
             </div>
 
-             {/* Holdings & Trades Table Sections */}
-             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '2rem', marginTop: '2rem' }}>
-
-                {/* Holdings Card */}
+            {/* Holdings & Trades */}
+            <div className="grid gap-6 lg:grid-cols-2">
+                {/* Holdings */}
                 <div className="glass card">
-                <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {selectedDay ? `持仓快照 · ${selectedDay.timestamp.split(' ')[0]}` : '当前持仓'}
-                    <div style={{ display: 'flex', gap: '0.5rem', alignItems: 'center' }}>
-                    {selectedDay && <button className="tagline" style={{ marginRight: '0.5rem', padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={clearDaySelection}>返回实时视图</button>}
-                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setHoldingsPage(p => Math.max(1, p - 1))} disabled={holdingsPage === 1}>Prev</button>
-                    <span className="tagline" style={{ fontSize: '0.7rem' }}>{holdingsPage} / {Math.ceil(positionKeys.length / PAGE_SIZE) || 1}</span>
-                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setHoldingsPage(p => Math.min(Math.ceil(positionKeys.length / PAGE_SIZE), p + 1))} disabled={holdingsPage >= Math.ceil(positionKeys.length / PAGE_SIZE)}>Next</button>
+                    <div className="mb-4 flex items-center justify-between">
+                        <h3 className="text-base font-semibold">
+                            {selectedDay ? `Holdings · ${selectedDay.timestamp.split(' ')[0]}` : 'Current Holdings'}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                            {selectedDay && (
+                                <Button variant="ghost" size="sm" onClick={() => { setSelectedDay(null); setHoldingsPage(1); }}>
+                                    Live View
+                                </Button>
+                            )}
+                            <Button variant="ghost" size="sm" onClick={() => setHoldingsPage(p => Math.max(1, p - 1))} disabled={holdingsPage === 1}>Prev</Button>
+                            <span className="text-xs tabular-nums text-muted-foreground">{holdingsPage}/{totalHoldingsPages}</span>
+                            <Button variant="ghost" size="sm" onClick={() => setHoldingsPage(p => Math.min(totalHoldingsPages, p + 1))} disabled={holdingsPage >= totalHoldingsPages}>Next</Button>
+                        </div>
                     </div>
-                </h3>
-                <div style={{ overflowX: 'auto' }}>
-                    <table className="data-table">
-                    <thead>
-                        <tr>
-                        <th>Symbol</th>
-                        <th style={{ textAlign: 'right' }}>Qty</th>
-                        <th style={{ textAlign: 'right' }}>Avg Cost</th>
-                        <th style={{ textAlign: 'right' }}>Price</th>
-                        <th style={{ textAlign: 'right' }}>Value</th>
-                        <th style={{ textAlign: 'right' }}>P&L</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {visiblePositions.map((sym) => {
-                        const pos = currentPositions[sym];
-                        const qty = typeof pos === 'number' ? pos : pos.qty;
-                        const price = typeof pos === 'number' ? 0 : (pos.price || 0);
-                        const value = typeof pos === 'number' ? 0 : (pos.value || qty * price);
-                        const avgCost = pos.avg_cost || 0;
-                        const pnl = pos.unrealized_pnl || 0;
-                        const pnlPct = (pos.pnl_pct || 0) * 100;
-
-                        return (
-                            <tr key={sym}>
-                            <td>
-                                <div>{sym}</div>
-                                <div style={{ fontSize: '0.7rem', color: 'var(--text-dim)' }}>{pos.name}</div>
-                            </td>
-                            <td style={{ textAlign: 'right' }}>{qty}</td>
-                            <td style={{ textAlign: 'right' }}>{avgCost > 0 ? formatMoney(avgCost) : '-'}</td>
-                            <td style={{ textAlign: 'right' }}>{formatMoney(price)}</td>
-                            <td style={{ textAlign: 'right', fontWeight: 700 }}>{formatMoney(value)}</td>
-                            <td style={{ textAlign: 'right' }}>
-                                <div style={{ color: colorFromValue(pnl) }}>
-                                {formatSignedMoney(pnl)}
-                                </div>
-                                <div style={{ fontSize: '0.7rem', color: colorFromValue(pnlPct) }}>
-                                {formatSigned(pnlPct, { asPercent: true })}
-                                </div>
-                            </td>
-                            </tr>
-                        );
-                        })}
-                        {positionKeys.length === 0 && <tr><td colSpan={6} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>暂无持仓</td></tr>}
-                    </tbody>
-                    </table>
-                </div>
+                    <div className="overflow-x-auto">
+                        <table className="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Symbol</th>
+                                    <th className="text-right">Qty</th>
+                                    <th className="text-right">Avg Cost</th>
+                                    <th className="text-right">Price</th>
+                                    <th className="text-right">Value</th>
+                                    <th className="text-right">P&L</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {visiblePositions.map((sym) => {
+                                    const pos = currentPositions[sym];
+                                    const qty = typeof pos === 'number' ? pos : pos.qty;
+                                    const price = typeof pos === 'number' ? 0 : (pos.price || 0);
+                                    const value = typeof pos === 'number' ? 0 : (pos.value || qty * price);
+                                    const avgCost = pos.avg_cost || 0;
+                                    const pnl = pos.unrealized_pnl || 0;
+                                    const pnlPct = (pos.pnl_pct || 0) * 100;
+                                    return (
+                                        <tr key={sym}>
+                                            <td>
+                                                <div className="font-medium">{sym}</div>
+                                                <div className="text-xs text-muted-foreground">{pos.name}</div>
+                                            </td>
+                                            <td className="text-right tabular-nums">{qty}</td>
+                                            <td className="text-right tabular-nums">{avgCost > 0 ? formatMoney(avgCost) : '-'}</td>
+                                            <td className="text-right tabular-nums">{formatMoney(price)}</td>
+                                            <td className="text-right tabular-nums font-bold">{formatMoney(value)}</td>
+                                            <td className="text-right tabular-nums">
+                                                <div style={{ color: colorFromValue(pnl) }}>{formatSignedMoney(pnl)}</div>
+                                                <div className="text-xs" style={{ color: colorFromValue(pnlPct) }}>{formatSigned(pnlPct, { asPercent: true })}</div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                                {positionKeys.length === 0 && (
+                                    <tr><td colSpan={6} className="p-4 text-center text-muted-foreground">No holdings</td></tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
 
-                {/* Trades Card - Virtualized */}
-                <div className="glass card" style={{ display: 'flex', flexDirection: 'column' }}>
-                <h3 style={{ marginBottom: '0.5rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    {selectedDay ? `成交记录 · ${selectedDay.timestamp.split(' ')[0]}` : '全部成交'}
-                    <span className="tagline" style={{ fontSize: '0.7rem' }}>
-                        {sortedTrades.length} trades
-                    </span>
-                </h3>
-                <VirtualizedTradeList 
-                    trades={sortedTrades} 
-                    height={350}
-                    showDate={!selectedDay}
-                />
+                {/* Trades */}
+                <div className="glass card flex flex-col">
+                    <div className="mb-2 flex items-center justify-between">
+                        <h3 className="text-base font-semibold">
+                            {selectedDay ? `Trades · ${selectedDay.timestamp.split(' ')[0]}` : 'All Trades'}
+                        </h3>
+                        <span className="text-xs tabular-nums text-muted-foreground">{filteredTrades.length} trades</span>
+                    </div>
+                    <VirtualizedTradeList trades={filteredTrades} height={350} showDate={!selectedDay} />
                 </div>
             </div>
 
-            {/* Daily Evolution Card */}
-            <div className="glass card" style={{ marginTop: '2rem' }}>
-                <h3 style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                每日历史
-                <div style={{ display: 'flex', gap: '0.5rem' }}>
-                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.max(1, p - 1))} disabled={equityPage === 1}>Prev</button>
-                    <span className="tagline" style={{ fontSize: '0.7rem' }}>{equityPage} / {Math.ceil(equityHistory.length / PAGE_SIZE) || 1}</span>
-                    <button className="tagline" style={{ padding: '0.2rem 0.5rem', background: 'rgba(255,255,255,0.1)', fontSize: '0.6rem' }} onClick={() => setEquityPage(p => Math.min(Math.ceil(equityHistory.length / PAGE_SIZE), p + 1))} disabled={equityPage >= Math.ceil(equityHistory.length / PAGE_SIZE)}>Next</button>
+            {/* Daily History */}
+            <div className="glass card">
+                <div className="mb-4 flex items-center justify-between">
+                    <h3 className="text-base font-semibold">Daily History</h3>
+                    <div className="flex items-center gap-2">
+                        <Button variant="ghost" size="sm" onClick={() => setEquityPage(p => Math.max(1, p - 1))} disabled={equityPage === 1}>Prev</Button>
+                        <span className="text-xs tabular-nums text-muted-foreground">{equityPage}/{totalEquityPages}</span>
+                        <Button variant="ghost" size="sm" onClick={() => setEquityPage(p => Math.min(totalEquityPages, p + 1))} disabled={equityPage >= totalEquityPages}>Next</Button>
+                    </div>
                 </div>
-                </h3>
                 <table className="data-table">
-                <thead>
-                    <tr>
-                    <th>Date</th>
-                    <th style={{ textAlign: 'right' }}>Equity</th>
-                    <th style={{ textAlign: 'right' }}>Daily P&L</th>
-                    <th style={{ textAlign: 'right' }}>Return</th>
-                    <th>Holdings Summary</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {[...equityHistory].reverse().slice((equityPage - 1) * PAGE_SIZE, equityPage * PAGE_SIZE).map((day, idx) => (
-                    <tr key={idx} style={{ cursor: 'pointer', backgroundColor: selectedDay?.timestamp === day.timestamp ? 'rgba(99, 102, 241, 0.1)' : 'transparent' }} onClick={() => handleDaySelect(day)}>
-                        <td>{day.timestamp.split(' ')[0]}</td>
-                        <td style={{ textAlign: 'right' }}>{formatMoney(day.total_equity)}</td>
-                        <td style={{ textAlign: 'right', color: colorFromValue(day.daily_pnl) }}>
-                        {formatSignedMoney(day.daily_pnl)}
-                        </td>
-                        <td style={{ textAlign: 'right', color: colorFromValue((day.daily_return ?? 0) * 100), fontWeight: 600 }}>
-                        {formatSigned((day.daily_return ?? 0) * 100, { asPercent: true })}
-                        </td>
-                        <td style={{ color: 'var(--text-dim)', fontSize: '0.8rem' }}>
-                        {Object.values(day.positions || {}).map(p => `${p.name} (${p.qty})`).slice(0, 3).join(', ')}{Object.keys(day.positions || {}).length > 3 ? '...' : ''}
-                        </td>
-                    </tr>
-                    ))}
-                    {equityHistory.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: 'var(--text-dim)', padding: '1rem' }}>暂无历史数据</td></tr>}
-                </tbody>
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th className="text-right">Equity</th>
+                            <th className="text-right">Daily P&L</th>
+                            <th className="text-right">Return</th>
+                            <th>Holdings</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {[...equityHistory].reverse().slice((equityPage - 1) * PAGE_SIZE, equityPage * PAGE_SIZE).map((day, idx) => (
+                            <tr
+                                key={idx}
+                                className={`cursor-pointer ${selectedDay?.timestamp === day.timestamp ? 'bg-primary/10' : ''}`}
+                                onClick={() => { setSelectedDay(day); setHoldingsPage(1); }}
+                            >
+                                <td className="tabular-nums">{day.timestamp.split(' ')[0]}</td>
+                                <td className="text-right tabular-nums">{formatMoney(day.total_equity)}</td>
+                                <td className="text-right tabular-nums" style={{ color: colorFromValue(day.daily_pnl) }}>
+                                    {formatSignedMoney(day.daily_pnl)}
+                                </td>
+                                <td className="text-right tabular-nums font-semibold" style={{ color: colorFromValue((day.daily_return ?? 0) * 100) }}>
+                                    {formatSigned((day.daily_return ?? 0) * 100, { asPercent: true })}
+                                </td>
+                                <td className="text-xs text-muted-foreground">
+                                    {Object.values(day.positions || {}).map(p => `${p.name} (${p.qty})`).slice(0, 3).join(', ')}
+                                    {Object.keys(day.positions || {}).length > 3 ? '...' : ''}
+                                </td>
+                            </tr>
+                        ))}
+                        {equityHistory.length === 0 && (
+                            <tr><td colSpan={5} className="p-4 text-center text-muted-foreground">No history data</td></tr>
+                        )}
+                    </tbody>
                 </table>
             </div>
         </div>

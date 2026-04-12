@@ -66,8 +66,8 @@ export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
 
     if (loading) {
         return (
-            <SectionCard title="归因分析" description="正在加载收益来源、行业贡献和时间维度表现。">
-                <div className="empty-state">归因分析加载中...</div>
+            <SectionCard title="Attribution Analysis" description="Loading return sources, sector contributions, and time-based performance.">
+                <div className="empty-state">Loading attribution analysis...</div>
             </SectionCard>
         );
     }
@@ -75,8 +75,8 @@ export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
     if (!data) {
         return (
             <EmptyState
-                title="暂无归因分析"
-                description="选择一个已有收益数据的会话后，这里会展示资产、行业与时间维度的收益归因。"
+                title="No Attribution Data"
+                description="Select a session with return data to view asset, sector, and time-based return attribution."
             />
         );
     }
@@ -84,59 +84,59 @@ export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
     return (
         <div className="space-y-6">
             <SectionCard
-                title="归因分析"
-                description="直接在前端查看收益来源、结构分布和月度节奏，无需生成额外报告文件。"
+                title="Attribution Analysis"
+                description="View return sources, structural distribution, and monthly rhythm directly without generating report files."
             >
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
                     <MetricCard
-                        label="总收益"
+                        label="Total Return"
                         value={<span style={{ color: colorFromValue(data.total_return * 100) }}>{formatPercent(data.total_return, 2)}</span>}
-                        hint="整体收益表现"
+                        hint="Overall return performance"
                     />
                     <MetricCard
-                        label="胜率"
+                        label="Win Rate"
                         value={formatPercent(data.win_rate, 1)}
-                        hint="盈利交易占比"
+                        hint="Percentage of profitable trades"
                     />
                     <MetricCard
-                        label="盈亏比"
+                        label="Profit Factor"
                         value={data.profit_factor.toFixed(2)}
-                        hint="盈利与亏损的效率比"
+                        hint="Ratio of gross profit to gross loss"
                     />
                     <MetricCard
-                        label="平均盈利"
-                        value={<span style={{ color: 'var(--success)' }}>{formatPercent(data.avg_win, 2)}</span>}
-                        hint="单笔盈利均值"
+                        label="Avg Win"
+                        value={<span style={{ color: 'var(--color-success)' }}>{formatPercent(data.avg_win, 2)}</span>}
+                        hint="Average profit per winning trade"
                     />
                     <MetricCard
-                        label="平均亏损"
-                        value={<span style={{ color: 'var(--danger)' }}>{formatPercent(data.avg_loss, 2)}</span>}
-                        hint="单笔亏损均值"
+                        label="Avg Loss"
+                        value={<span style={{ color: 'var(--color-danger)' }}>{formatPercent(data.avg_loss, 2)}</span>}
+                        hint="Average loss per losing trade"
                     />
                 </div>
             </SectionCard>
 
             <div className="grid gap-6 xl:grid-cols-2">
-                <SectionCard title="资产贡献" description="识别最主要的收益来源与拖累资产。">
+                <SectionCard title="Asset Contribution" description="Identify the top return contributors and detractors.">
                     <div className="space-y-3">
                         {sortedAssets.slice(0, 8).map(([symbol, pnl]) => (
                             <ContributionBar key={symbol} label={symbol} value={pnl} entries={sortedAssets.map((item) => item[1])} />
                         ))}
-                        {sortedAssets.length === 0 ? <div className="empty-state">暂无资产维度数据</div> : null}
+                        {sortedAssets.length === 0 ? <div className="empty-state">No asset-level data available</div> : null}
                     </div>
                 </SectionCard>
 
-                <SectionCard title="行业贡献" description="查看不同行业对整体收益的推动或拖累。">
+                <SectionCard title="Sector Contribution" description="View how each sector drives or drags overall returns.">
                     <div className="space-y-3">
                         {sortedSectors.map(([sector, pnl]) => (
                             <ContributionBar key={sector} label={sector} value={pnl} entries={sortedSectors.map((item) => item[1])} />
                         ))}
-                        {sortedSectors.length === 0 ? <div className="empty-state">暂无行业维度数据</div> : null}
+                        {sortedSectors.length === 0 ? <div className="empty-state">No sector-level data available</div> : null}
                     </div>
                 </SectionCard>
             </div>
 
-            <SectionCard title="月度节奏" description="快速查看按月份聚合后的收益分布。">
+            <SectionCard title="Monthly Rhythm" description="View the return distribution aggregated by month.">
                 <div className="flex flex-wrap gap-3">
                     {sortedPeriods.map(([month, ret]) => (
                         <div
@@ -152,7 +152,7 @@ export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
                             <div className="mt-1 text-base font-semibold tracking-[-0.02em]">{formatPercent(ret, 1)}</div>
                         </div>
                     ))}
-                    {sortedPeriods.length === 0 ? <div className="empty-state">暂无月度收益数据</div> : null}
+                    {sortedPeriods.length === 0 ? <div className="empty-state">No monthly return data available</div> : null}
                 </div>
             </SectionCard>
         </div>
@@ -176,7 +176,7 @@ const ContributionBar: React.FC<{ label: string; value: number; entries: number[
                     }}
                 />
             </div>
-            <div className="text-right text-sm font-semibold" style={{ color: positive ? 'var(--success)' : 'var(--danger)' }}>
+            <div className="text-right text-sm font-semibold" style={{ color: positive ? 'var(--color-success)' : 'var(--color-danger)' }}>
                 {formatMoney(value, { symbol: '¥' })}
             </div>
         </div>

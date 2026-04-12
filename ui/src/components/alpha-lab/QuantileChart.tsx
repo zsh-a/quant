@@ -62,14 +62,14 @@ export const QuantileChart: React.FC<{ analysis: QuantileAnalysis }> = ({ analys
       grid: { left: 48, right: 12, top: 36, bottom: hasTime ? 56 : 44 },
       legend: {
         top: 0, left: 'center',
-        textStyle: { color: 'hsl(var(--muted-foreground))', fontSize: 10 },
+        textStyle: { color: 'var(--color-muted-foreground)', fontSize: 10 },
         itemWidth: 14, itemHeight: 2, itemGap: 8,
       },
       tooltip: {
         trigger: 'axis',
-        backgroundColor: 'hsl(var(--card))',
-        borderColor: 'hsl(var(--border))',
-        textStyle: { color: 'hsl(var(--foreground))', fontSize: 11 },
+        backgroundColor: 'var(--color-card)',
+        borderColor: 'var(--color-border)',
+        textStyle: { color: 'var(--color-foreground)', fontSize: 11 },
         formatter: (params: any) => {
           const label = hasTime ? fmtAxisLabel(params[0].axisValue) : `#${params[0].dataIndex * step}`
           const lines = params.map((p: any) => {
@@ -78,13 +78,13 @@ export const QuantileChart: React.FC<{ analysis: QuantileAnalysis }> = ({ analys
           })
           return `${label}<br/>${lines.join('<br/>')}`
         },
-        axisPointer: { type: 'cross', lineStyle: { type: 'dashed', color: 'hsl(var(--muted-foreground))' } },
+        axisPointer: { type: 'cross', lineStyle: { type: 'dashed', color: 'var(--color-muted-foreground)' } },
       },
       xAxis: {
         type: 'category' as const,
         data: xData,
         axisLabel: hasTime ? {
-          color: 'hsl(var(--muted-foreground))', fontSize: 9,
+          color: 'var(--color-muted-foreground)', fontSize: 9,
           formatter: (v: string) => fmtAxisLabel(v),
         } : { show: false },
         axisLine: { show: false },
@@ -92,19 +92,19 @@ export const QuantileChart: React.FC<{ analysis: QuantileAnalysis }> = ({ analys
       },
       yAxis: {
         type: 'value' as const,
-        splitLine: { lineStyle: { color: 'hsl(var(--border))', opacity: 0.3 } },
+        splitLine: { lineStyle: { color: 'var(--color-border)', opacity: 0.3 } },
         axisLabel: {
-          color: 'hsl(var(--muted-foreground))', fontSize: 10,
+          color: 'var(--color-muted-foreground)', fontSize: 10,
           formatter: (v: number) => `${((v - 1) * 100).toFixed(0)}%`,
         },
       },
       dataZoom: [{
         type: 'slider', height: 16, bottom: 4,
         borderColor: 'transparent',
-        backgroundColor: 'hsl(var(--border))',
+        backgroundColor: 'var(--color-border)',
         fillerColor: LS_COLOR + '30',
         handleStyle: { color: LS_COLOR },
-        textStyle: { color: 'hsl(var(--muted-foreground))', fontSize: 9 },
+        textStyle: { color: 'var(--color-muted-foreground)', fontSize: 9 },
         labelFormatter: hasTime ? (_: number, val: string) => fmtAxisLabel(val) : undefined,
       }],
       series,

@@ -61,18 +61,18 @@ export function formatSigned(value: number | string | undefined | null, opts?: {
 /** Get CSS color from formatted sign string (for consistent green/red display). */
 export function colorFromSign(str: string): string {
   const s = String(str).trim();
-  if (s.startsWith('+') || (s.startsWith('$') && s.includes('+'))) return 'var(--success)';
-  if (s.startsWith('-') || (s.startsWith('$') && s.charAt(1) === '-') || s.startsWith('\u2212')) return 'var(--danger)';
-  return 'var(--text-dim)';
+  if (s.startsWith('+') || (s.startsWith('$') && s.includes('+'))) return 'var(--color-success)';
+  if (s.startsWith('-') || (s.startsWith('$') && s.charAt(1) === '-') || s.startsWith('\u2212')) return 'var(--color-danger)';
+  return 'var(--color-text-dim)';
 }
 
 /** Get color from numeric value - use this for guaranteed consistency (avoids string parsing). */
 export function colorFromValue(value: number | undefined | null): string {
   const n = Number(value ?? 0);
-  if (!Number.isFinite(n)) return 'var(--text-dim)';
-  if (n > 0) return 'var(--success)';
-  if (n < 0) return 'var(--danger)';
-  return 'var(--text-dim)';
+  if (!Number.isFinite(n)) return 'var(--color-text-dim)';
+  if (n > 0) return 'var(--color-success)';
+  if (n < 0) return 'var(--color-danger)';
+  return 'var(--color-text-dim)';
 }
 
 /** Format percent: 0.0523 -> "5.23%" */

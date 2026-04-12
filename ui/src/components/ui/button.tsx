@@ -10,15 +10,15 @@ const buttonVariants = cva(
     variants: {
       variant: {
         default:
-          "bg-primary text-primary-foreground shadow-[0_18px_36px_-18px_hsl(var(--primary)/0.95)] hover:bg-[color-mix(in_oklab,hsl(var(--primary))_88%,white)]",
+          "bg-primary text-primary-foreground shadow-[0_18px_36px_-18px_var(--color-primary)] hover:bg-[color-mix(in_oklab,var(--color-primary)_88%,white)]",
         secondary:
-          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklab,hsl(var(--secondary))_82%,white)]",
+          "bg-secondary text-secondary-foreground hover:bg-[color-mix(in_oklab,var(--color-secondary)_82%,white)]",
         outline:
           "border border-primary/25 bg-card text-foreground shadow-[inset_0_1px_0_rgba(255,255,255,0.04)] hover:border-primary/45 hover:bg-accent hover:text-accent-foreground",
         ghost:
           "text-foreground/82 hover:bg-accent hover:text-accent-foreground",
         danger:
-          "bg-destructive text-destructive-foreground shadow-[0_18px_36px_-20px_rgba(244,63,94,0.9)] hover:bg-[color-mix(in_oklab,hsl(var(--destructive))_90%,white)]",
+          "bg-destructive text-destructive-foreground shadow-[0_18px_36px_-20px_rgba(244,63,94,0.9)] hover:bg-[color-mix(in_oklab,var(--color-destructive)_90%,white)]",
       },
       size: {
         default: "h-10 px-4 py-2",
