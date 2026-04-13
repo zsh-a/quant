@@ -1,7 +1,9 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import {
-    Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, Legend, ComposedChart
-} from 'recharts';
+import ReactEChartsCore from 'echarts-for-react/lib/core';
+import * as echarts from 'echarts/core';
+import { LineChart as ELineChart } from 'echarts/charts';
+import { GridComponent, TooltipComponent, LegendComponent, DataZoomComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
 import { lttb } from '../lttb';
 import { MetricCard } from './layout/MetricCard';
 import { EmptyState } from './layout/EmptyState';
@@ -12,6 +14,8 @@ import { formatMoney, formatSignedMoney, formatSigned, formatPercent, colorFromS
 import { formatModeLabel } from '../utils/display';
 import { Button } from './ui/button';
 import { useChartTheme } from '../hooks/useChartTheme';
+
+echarts.use([ELineChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent, CanvasRenderer]);
 
 interface DashboardProps {
     primarySession: SessionSummary | undefined;
@@ -36,6 +40,128 @@ const COLORS: Record<string, string> = {
 const SESSION_COMPARE_COLORS = ['#C4626A', '#C07D2F', '#8B75C6', '#3D8EB8', '#C97C3A', '#368A72'];
 
 const PAGE_SIZE = 10;
+
+/** ECharts-based return curve with area gradient, comparison sessions, and benchmarks. */
+function ReturnChart({
+    chartData,
+    chart,
+    visibleComparisonData,
+    selectedBenchmarks,
+    availableBenchmarks,
+}: {
+    chartData: any[];
+    chart: ReturnType<typeof useChartTheme>;
+    visibleComparisonData: { id: string; name: string; data: EquityPoint[] }[];
+    selectedBenchmarks: string[];
+    availableBenchmarks: { code: string; name: string }[];
+}) {
+    const option = useMemo(() => {
+        const timestamps = chartData.map((d) => d.timestamp);
+
+        const series: any[] = [
+            {
+                name: 'Primary',
+                type: 'line',
+                data: chartData.map((d) => d.equityReturn ?? null),
+                smooth: 0.3,
+                symbol: 'none',
+                lineStyle: { width: 2.5, color: chart.stroke },
+                areaStyle: {
+                    color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                        { offset: 0, color: chart.stroke + '38' },
+                        { offset: 1, color: chart.stroke + '00' },
+                    ]),
+                },
+                z: 2,
+            },
+        ];
+
+        visibleComparisonData.forEach((c, idx) => {
+            series.push({
+                name: `${c.name} (${c.id.slice(0, 4)})`,
+                type: 'line',
+                data: chartData.map((d) => d[`session_${c.id}`] ?? null),
+                smooth: 0.3,
+                symbol: 'none',
+                lineStyle: {
+                    width: 2,
+                    color: SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length],
+                    type: 'dashed',
+                },
+            });
+        });
+
+        selectedBenchmarks.forEach((code) => {
+            series.push({
+                name: availableBenchmarks.find((b) => b.code === code)?.name ?? code,
+                type: 'line',
+                data: chartData.map((d) => d[code] ?? null),
+                smooth: 0.3,
+                symbol: 'none',
+                lineStyle: { width: 2, color: COLORS[code] || 'var(--color-secondary)' },
+            });
+        });
+
+        return {
+            backgroundColor: 'transparent',
+            grid: { left: 56, right: 20, top: 16, bottom: 56 },
+            tooltip: {
+                trigger: 'axis' as const,
+                backgroundColor: chart.tooltipBg,
+                borderColor: chart.tooltipBorder,
+                textStyle: { color: 'var(--color-foreground)', fontSize: 12 },
+                formatter: (params: any) => {
+                    const label = params[0]?.axisValue?.split(' ')[0] ?? '';
+                    const lines = params.map(
+                        (p: any) =>
+                            `<span style="color:${p.color}">●</span> ${p.seriesName}: ${p.value != null ? p.value.toFixed(2) : '-'}%`,
+                    );
+                    return `${label}<br/>${lines.join('<br/>')}`;
+                },
+                axisPointer: { type: 'cross' as const, lineStyle: { type: 'dashed' as const } },
+            },
+            legend: {
+                bottom: 0,
+                textStyle: { color: chart.textDim, fontSize: 12 },
+                itemWidth: 16,
+                itemHeight: 3,
+            },
+            xAxis: {
+                type: 'category' as const,
+                data: timestamps,
+                axisLabel: { show: false },
+                axisLine: { show: false },
+                axisTick: { show: false },
+            },
+            yAxis: {
+                type: 'value' as const,
+                splitLine: { lineStyle: { color: chart.grid, type: 'dashed' as const } },
+                axisLabel: {
+                    color: chart.textDim,
+                    fontSize: 12,
+                    formatter: (v: number) => `${v.toFixed(0)}%`,
+                },
+            },
+            dataZoom: [
+                {
+                    type: 'inside' as const,
+                    xAxisIndex: 0,
+                },
+            ],
+            series,
+        };
+    }, [chartData, chart, visibleComparisonData, selectedBenchmarks, availableBenchmarks]);
+
+    return (
+        <ReactEChartsCore
+            echarts={echarts}
+            option={option}
+            style={{ height: 400 }}
+            notMerge
+            lazyUpdate
+        />
+    );
+}
 
 const Dashboard: React.FC<DashboardProps> = ({
     primarySession,
@@ -264,55 +390,13 @@ const Dashboard: React.FC<DashboardProps> = ({
                         )}
                     </div>
                 </div>
-                <div style={{ height: 400 }}>
-                    <ResponsiveContainer width="100%" height="100%">
-                        <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
-                            <defs>
-                                <linearGradient id="colorEquity" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="5%" stopColor={chart.stroke} stopOpacity={0.22} />
-                                    <stop offset="95%" stopColor={chart.stroke} stopOpacity={0} />
-                                </linearGradient>
-                            </defs>
-                            <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
-                            <XAxis dataKey="timestamp" hide />
-                            <YAxis domain={['auto', 'auto']} stroke={chart.textDim} fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} width={56} />
-                            <Tooltip
-                                contentStyle={{ backgroundColor: chart.tooltipBg, borderColor: chart.tooltipBorder, borderRadius: '10px' }}
-                                itemStyle={{ color: 'var(--color-text)' }}
-                                formatter={(value: any, name: string) => [
-                                    `${value.toFixed(2)}%`,
-                                    name === 'equityReturn' ? 'Strategy' : availableBenchmarks.find(b => b.code === name)?.name || name
-                                ]}
-                                labelFormatter={(label) => label.split(' ')[0]}
-                            />
-                            <Legend wrapperStyle={{ paddingTop: '12px' }} verticalAlign="bottom" />
-                            <Area type="monotone" dataKey="equityReturn" name="Primary" stroke={chart.stroke} fillOpacity={1} fill="url(#colorEquity)" strokeWidth={2.5} />
-                            {visibleComparisonData.map((c, idx) => (
-                                <Line
-                                    key={c.id}
-                                    type="monotone"
-                                    dataKey={`session_${c.id}`}
-                                    name={`${c.name} (${c.id.slice(0, 4)})`}
-                                    stroke={SESSION_COMPARE_COLORS[idx % SESSION_COMPARE_COLORS.length]}
-                                    strokeWidth={2}
-                                    dot={false}
-                                    strokeDasharray="6 5"
-                                />
-                            ))}
-                            {selectedBenchmarks.map(code => (
-                                <Line
-                                    key={code}
-                                    type="monotone"
-                                    dataKey={code}
-                                    name={availableBenchmarks.find(b => b.code === code)?.name}
-                                    stroke={COLORS[code] || 'var(--color-secondary)'}
-                                    strokeWidth={2}
-                                    dot={false}
-                                />
-                            ))}
-                        </ComposedChart>
-                    </ResponsiveContainer>
-                </div>
+                <ReturnChart
+                    chartData={chartData}
+                    chart={chart}
+                    visibleComparisonData={visibleComparisonData}
+                    selectedBenchmarks={selectedBenchmarks}
+                    availableBenchmarks={availableBenchmarks}
+                />
             </div>
 
             {/* Holdings & Trades */}

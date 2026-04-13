@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
-import {
-    Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend, ComposedChart
-} from 'recharts';
+import ReactEChartsCore from 'echarts-for-react/lib/core';
+import * as echarts from 'echarts/core';
+import { LineChart as ELineChart } from 'echarts/charts';
+import { GridComponent, TooltipComponent, LegendComponent, DataZoomComponent } from 'echarts/components';
+import { CanvasRenderer } from 'echarts/renderers';
 import { lttb } from '../lttb';
 import { SessionSummary, EquityPoint, Trade, Position, BenchmarkData } from '../types';
 import { calculateMetrics, PerformanceMetrics } from '../utils/metrics';
@@ -11,6 +13,8 @@ import { PageHeader } from './layout/PageHeader';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
 import { useChartTheme } from '../hooks/useChartTheme';
+
+echarts.use([ELineChart, GridComponent, TooltipComponent, LegendComponent, DataZoomComponent, CanvasRenderer]);
 
 interface ComparisonProps {
     selectedSessionIds: string[];
@@ -60,6 +64,82 @@ const FORMATTERS: Record<DisplayableMetricKey, (val: number) => string> = {
     avgWin: (v) => formatMoney(v),
     avgLoss: (v) => formatMoney(v)
 };
+
+function ComparisonChart({
+    chartData,
+    chart,
+    sessionMetrics,
+}: {
+    chartData: any[];
+    chart: ReturnType<typeof useChartTheme>;
+    sessionMetrics: { id: string; name: string; mode: string; metrics: PerformanceMetrics; equity: EquityPoint[] }[];
+}) {
+    const option = useMemo(() => {
+        const timestamps = chartData.map((d) => d.timestamp);
+        const series = sessionMetrics.map((s, idx) => ({
+            name: s.name,
+            type: 'line' as const,
+            data: chartData.map((d) => d[`session_${s.id}`] ?? null),
+            smooth: 0.3,
+            symbol: 'none' as const,
+            lineStyle: { width: 2.2, color: COLORS[idx % COLORS.length] },
+        }));
+
+        return {
+            backgroundColor: 'transparent',
+            grid: { left: 52, right: 16, top: 16, bottom: 56 },
+            tooltip: {
+                trigger: 'axis' as const,
+                backgroundColor: chart.tooltipBg,
+                borderColor: chart.tooltipBorder,
+                textStyle: { color: 'var(--color-foreground)', fontSize: 12 },
+                formatter: (params: any) => {
+                    const label = params[0]?.axisValue?.split(' ')[0] ?? '';
+                    const lines = params.map(
+                        (p: any) =>
+                            `<span style="color:${p.color}">●</span> ${p.seriesName}: ${p.value != null ? p.value.toFixed(2) : '-'}%`,
+                    );
+                    return `${label}<br/>${lines.join('<br/>')}`;
+                },
+                axisPointer: { type: 'cross' as const, lineStyle: { type: 'dashed' as const } },
+            },
+            legend: {
+                bottom: 0,
+                textStyle: { color: chart.textDim, fontSize: 12 },
+                itemWidth: 16,
+                itemHeight: 3,
+            },
+            xAxis: {
+                type: 'category' as const,
+                data: timestamps,
+                axisLabel: { show: false },
+                axisLine: { show: false },
+                axisTick: { show: false },
+            },
+            yAxis: {
+                type: 'value' as const,
+                splitLine: { lineStyle: { color: chart.grid, type: 'dashed' as const } },
+                axisLabel: {
+                    color: chart.textDim,
+                    fontSize: 12,
+                    formatter: (v: number) => `${v.toFixed(0)}%`,
+                },
+            },
+            dataZoom: [{ type: 'inside' as const, xAxisIndex: 0 }],
+            series,
+        };
+    }, [chartData, chart, sessionMetrics]);
+
+    return (
+        <ReactEChartsCore
+            echarts={echarts}
+            option={option}
+            style={{ height: 450 }}
+            notMerge
+            lazyUpdate
+        />
+    );
+}
 
 const Comparison: React.FC<ComparisonProps> = ({
     selectedSessionIds,
@@ -184,37 +264,7 @@ const Comparison: React.FC<ComparisonProps> = ({
             </SectionCard>
 
             <SectionCard title="Return Curve Comparison (%)" description="View the relative return trajectory for each session.">
-            <div className="chart-container h-[500px]">
-                <ResponsiveContainer width="100%" height="90%">
-                    <ComposedChart data={chartData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke={chart.grid} vertical={false} />
-                        <XAxis dataKey="timestamp" hide />
-                        <YAxis domain={['auto', 'auto']} stroke={chart.textDim} fontSize={12} tickFormatter={(val) => `${val.toFixed(0)}%`} />
-                        <Tooltip
-                            contentStyle={{ backgroundColor: chart.tooltipBg, borderColor: chart.tooltipBorder, borderRadius: '10px' }}
-                            itemStyle={{ color: 'var(--color-text)' }}
-                            formatter={(value: any, name: string) => {
-                                const sessionId = name.replace('session_', '');
-                                const session = sessionMetrics.find(s => s.id === sessionId);
-                                return [`${value.toFixed(2)}%`, session ? session.name : name];
-                            }}
-                            labelFormatter={(label) => label.split(' ')[0]}
-                        />
-                        <Legend wrapperStyle={{ paddingTop: '12px' }} />
-                        {sessionMetrics.map((s, idx) => (
-                            <Line
-                                key={s.id}
-                                type="monotone"
-                                dataKey={`session_${s.id}`}
-                                name={s.name}
-                                stroke={COLORS[idx % COLORS.length]}
-                                strokeWidth={2.2}
-                                dot={false}
-                            />
-                        ))}
-                    </ComposedChart>
-                </ResponsiveContainer>
-            </div>
+            <ComparisonChart chartData={chartData} chart={chart} sessionMetrics={sessionMetrics} />
             </SectionCard>
         </div>
     );
