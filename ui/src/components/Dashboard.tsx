@@ -264,7 +264,7 @@ const Dashboard: React.FC<DashboardProps> = ({
                         )}
                     </div>
                 </div>
-                <div className="min-h-[360px] flex-1">
+                <div style={{ height: 400 }}>
                     <ResponsiveContainer width="100%" height="100%">
                         <ComposedChart data={chartData} margin={{ top: 8, right: 20, bottom: 28, left: 4 }}>
                             <defs>

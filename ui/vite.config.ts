@@ -18,9 +18,11 @@ export default defineConfig({
       '/ws/': {
         target: 'ws://localhost:8000',
         ws: true,
-        on: {
-          error(_err: Error, _req: any, _res: any) { /* silence proxy errors when API is down */ },
-          proxyReqWs(_proxyReq: any, _req: any, socket: any) { socket.on('error', () => {}); },
+        configure: (proxy) => {
+          proxy.on('error', () => {});
+          proxy.on('proxyReqWs', (_proxyReq, _req, socket) => {
+            (socket as any).on('error', () => {});
+          });
         },
       },
     },
