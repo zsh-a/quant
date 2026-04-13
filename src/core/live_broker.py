@@ -2,9 +2,8 @@ from typing import Dict, Any, List
 from .base import Broker, Order, Bar
 from loguru import logger
 from datetime import datetime
-import requests
+import httpx
 import uuid
-import json
 
 class LiveBroker(Broker):
     def __init__(self, server_url: str):
@@ -12,6 +11,7 @@ class LiveBroker(Broker):
         self.orders: Dict[str, Order] = {}
         self.stock_names: Dict[str, str] = {}
         self.positions: Dict[str, float] = {}
+        self._http = httpx.Client(base_url=server_url, timeout=10)
         self._load_stock_names()
         self.sync_state()
 
@@ -48,23 +48,20 @@ class LiveBroker(Broker):
             if order.price:
                 params["price"] = order.price
                 
-            url = f"{self.server_url}{endpoint}"
-            logger.info(f"LiveBroker submitting: {url} {params}")
-            
-            # 增加超时控制
-            resp = requests.get(url, params=params, timeout=10)
+            logger.info(f"LiveBroker submitting: {endpoint} {params}")
+
+            resp = self._http.get(endpoint, params=params)
             resp.raise_for_status()
             data = resp.json()
-            
+
             if data.get("status") == -1:
                 order.status = "REJECTED"
                 logger.error(f"Order rejected: {data}")
             else:
                 order.status = "FILLED"
-                # 记录成交时间
                 order.updated_at = datetime.now()
-                
-        except requests.exceptions.RequestException as e:
+
+        except httpx.HTTPError as e:
             logger.error(f"Network error during order submission: {e}")
             order.status = "ERROR"
         except Exception as e:
@@ -79,8 +76,7 @@ class LiveBroker(Broker):
 
     def get_account_info(self) -> Dict[str, Any]:
         try:
-            # Fetch balance with timeout
-            bal_resp = requests.get(f"{self.server_url}/balance", timeout=5)
+            bal_resp = self._http.get("/balance")
             bal_resp.raise_for_status()
             bal_data = bal_resp.json()
             
@@ -88,8 +84,7 @@ class LiveBroker(Broker):
             if isinstance(bal_data, dict):
                  cash = float(bal_data.get("zj", 0) if isinstance(bal_data, dict) else 0)
 
-            # Fetch positions with timeout
-            pos_resp = requests.get(f"{self.server_url}/position", timeout=5)
+            pos_resp = self._http.get("/position")
             pos_resp.raise_for_status()
             pos_data = pos_resp.json()
             

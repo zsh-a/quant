@@ -3,7 +3,7 @@ Alert system with Feishu webhook integration.
 Monitors system metrics and sends notifications when thresholds are exceeded.
 """
 
-import requests
+import httpx
 import time
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
@@ -132,7 +132,7 @@ class FeishuNotifier:
         )
 
         try:
-            response = requests.post(self.webhook_url, json=card, timeout=10)
+            response = httpx.post(self.webhook_url, json=card, timeout=10)
 
             if response.status_code == 200:
                 logger.info(f"Alert sent to Feishu: {title}")

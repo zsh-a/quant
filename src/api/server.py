@@ -12,19 +12,16 @@ try:
 except ImportError:
     WsConnectionClosed = None
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
 from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
+import orjson
 import os
 import sys
 import uuid
 import asyncio
 import anyio
 
-# Patch requests timeout globally to prevent 20s stalls
-import requests
-from functools import partial
-requests.get = partial(requests.get, timeout=5)
-requests.post = partial(requests.post, timeout=5)
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
@@ -91,7 +88,7 @@ api_config = get_api_config()
 data_stream_config = get_data_stream_config()
 broker_config = get_broker_config()
 
-app = FastAPI()
+app = FastAPI(default_response_class=ORJSONResponse)
 session_db = SessionDB()
 session_service = SessionService(session_db, persistence)
 
@@ -428,7 +425,7 @@ async def websocket_endpoint(websocket: WebSocket, session_id: str):
         closed_exc = (WebSocketDisconnect, WsConnectionClosed)
     try:
         while True:
-            data = await websocket.receive_json()
+            data = orjson.loads(await websocket.receive_text())
             await handle_websocket_message(websocket, data)
     except closed_exc:
         ws_manager.disconnect(websocket)

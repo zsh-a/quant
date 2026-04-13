@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-import requests
+import httpx
 from loguru import logger
 
 from src.config.settings import TelegramConfig
@@ -35,7 +35,7 @@ class TelegramNotifier:
             "disable_web_page_preview": True,
         }
         try:
-            response = requests.post(url, json=payload, timeout=self.config.timeout_seconds)
+            response = httpx.post(url, json=payload, timeout=self.config.timeout_seconds)
             response.raise_for_status()
             body = response.json()
             if not body.get("ok", False):

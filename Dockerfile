@@ -67,4 +67,4 @@ ENV QUANT_PROJECT_ROOT=/app
 
 EXPOSE 8000
 
-CMD ["hypercorn", "src.api.server:app", "--bind", "0.0.0.0:8000", "--keep-alive", "75", "--websocket-ping-interval", "60"]
+CMD ["uvicorn", "src.api.server:app", "--host", "0.0.0.0", "--port", "8000", "--ws", "wsproto", "--ws-ping-timeout", "60", "--timeout-keep-alive", "75"]

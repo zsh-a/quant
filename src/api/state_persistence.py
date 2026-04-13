@@ -3,7 +3,7 @@ Session state persistence and recovery module.
 Handles serialization, checkpoint saving, and state restoration.
 """
 
-import json
+import orjson
 import sqlite3
 import gzip
 from pathlib import Path
@@ -62,7 +62,7 @@ class StatePersistence:
         """Serialize session state to bytes"""
         try:
             # Convert to JSON
-            json_str = json.dumps(state, default=str)
+            json_str = orjson.dumps(state, default=str).decode()
             json_bytes = json_str.encode("utf-8")
 
             # Compress if enabled
@@ -86,7 +86,7 @@ class StatePersistence:
 
             # Parse JSON
             json_str = json_bytes.decode("utf-8")
-            return json.loads(json_str)
+            return orjson.loads(json_str)
 
         except Exception as e:
             logger.error(f"Failed to deserialize state: {e}")
@@ -120,7 +120,7 @@ class StatePersistence:
                     session_id,
                     checkpoint_time,
                     state_data,
-                    json.dumps(metadata) if metadata else None,
+                    orjson.dumps(metadata).decode() if metadata else None,
                 ),
             )
 
@@ -178,7 +178,7 @@ class StatePersistence:
             return {
                 "state": state,
                 "checkpoint_time": checkpoint_time,
-                "metadata": json.loads(metadata) if metadata else None,
+                "metadata": orjson.loads(metadata) if metadata else None,
             }
 
         except Exception as e:
@@ -208,7 +208,7 @@ class StatePersistence:
                 {
                     "checkpoint_time": row[0],
                     "size_bytes": row[1],
-                    "metadata": json.loads(row[2]) if row[2] else None,
+                    "metadata": orjson.loads(row[2]) if row[2] else None,
                 }
                 for row in rows
             ]

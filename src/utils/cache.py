@@ -3,7 +3,7 @@ Redis-based caching layer for backtest data.
 Provides caching for session results, equity history, and trades.
 """
 
-import json
+import orjson
 import hashlib
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta
@@ -98,7 +98,7 @@ class RedisCache:
             full_key = self._make_key(key)
             value = self.client.get(full_key)
             if value:
-                return json.loads(value)
+                return orjson.loads(value)
             return None
         except Exception as e:
             logger.warning(f"Cache get error: {e}")
@@ -112,7 +112,7 @@ class RedisCache:
         try:
             full_key = self._make_key(key)
             ttl = ttl or self.config.default_ttl
-            serialized = json.dumps(value, default=str)
+            serialized = orjson.dumps(value, default=str).decode()
             self.client.setex(full_key, ttl, serialized)
             return True
         except Exception as e:
@@ -200,7 +200,7 @@ class BacktestCache:
         params: Dict[str, Any],
     ) -> str:
         """Generate unique key for backtest configuration"""
-        params_str = json.dumps(params, sort_keys=True, default=str)
+        params_str = orjson.dumps(params, option=orjson.OPT_SORT_KEYS, default=str).decode()
         key_data = f"{strategy}:{symbol}:{start_date}:{end_date}:{params_str}"
         hash_key = hashlib.md5(key_data.encode()).hexdigest()[:16]
         return f"backtest:{strategy}:{symbol}:{hash_key}"

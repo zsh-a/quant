@@ -4,7 +4,7 @@ Handles connection lifecycle, broadcasting, heartbeat, and message throttling.
 """
 
 import asyncio
-import json
+import orjson
 import time
 from typing import Dict, Set, List, Any, Optional
 from datetime import datetime
@@ -188,7 +188,7 @@ class ConnectionManager:
     async def send_personal_message(self, message: dict, websocket: WebSocket):
         """Send message to a specific connection"""
         try:
-            await websocket.send_json(message)
+            await websocket.send_text(orjson.dumps(message).decode())
         except Exception as e:
             logger.error(f"Failed to send message: {e}")
             self.disconnect(websocket)
@@ -203,7 +203,7 @@ class ConnectionManager:
         disconnected = []
         for connection in self.active_connections[session_id]:
             try:
-                await connection.send_json(message)
+                await connection.send_text(orjson.dumps(message).decode())
             except Exception as e:
                 logger.error(f"Failed to broadcast to connection: {e}")
                 disconnected.append(connection)
@@ -241,9 +241,9 @@ class ConnectionManager:
                     break
 
                 try:
-                    await websocket.send_json(
+                    await websocket.send_text(orjson.dumps(
                         {"type": "ping", "timestamp": datetime.now().isoformat()}
-                    )
+                    ).decode())
                 except Exception:
                     break
 

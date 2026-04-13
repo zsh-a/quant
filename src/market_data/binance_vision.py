@@ -33,7 +33,7 @@ from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
 import pandas as pd
-import requests
+import httpx
 from loguru import logger
 
 from src.market_data.clickhouse import create_clickhouse_client
@@ -128,10 +128,10 @@ class BinanceVisionSyncer:
     def __init__(self, client=None):
         self.client = client or create_clickhouse_client()
         self._ensure_schema()
-        self.session = requests.Session()
-        self.session.headers["User-Agent"] = "quent/3.0"
-        # (connect_timeout, read_timeout) – generous read timeout for large monthly ZIPs
-        self._timeout = (10, 120)
+        self.session = httpx.Client(
+            headers={"User-Agent": "quent/3.0"},
+            timeout=httpx.Timeout(10, read=120),
+        )
 
     def _ensure_schema(self) -> None:
         self.client.command("CREATE DATABASE IF NOT EXISTS crypto_data")
@@ -158,7 +158,6 @@ class BinanceVisionSyncer:
         try:
             info_resp = self.session.get(
                 "https://fapi.binance.com/fapi/v1/exchangeInfo",
-                timeout=self._timeout,
             )
             info_resp.raise_for_status()
             exchange_info = info_resp.json()
@@ -178,7 +177,6 @@ class BinanceVisionSyncer:
         try:
             ticker_resp = self.session.get(
                 "https://fapi.binance.com/fapi/v1/ticker/24hr",
-                timeout=self._timeout,
             )
             ticker_resp.raise_for_status()
             tickers = ticker_resp.json()
@@ -387,8 +385,8 @@ class BinanceVisionSyncer:
         fname = url.split("/")[-1]
         for attempt in range(_retries + 1):
             try:
-                resp = self.session.get(url, timeout=self._timeout)
-            except requests.RequestException as exc:
+                resp = self.session.get(url)
+            except httpx.HTTPError as exc:
                 if attempt < _retries:
                     logger.debug("retry {}/{} for {}: {}", attempt + 1, _retries, fname, exc)
                     continue

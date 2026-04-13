@@ -5,7 +5,7 @@ output stay consistent across processes.
 """
 
 import contextvars
-import json
+import orjson
 import logging
 import sys
 from functools import wraps
@@ -163,7 +163,7 @@ def json_serializer(record: Dict[str, Any]) -> str:
             "traceback": record["exception"].traceback is not None,
         }
 
-    return json.dumps(log_entry, default=str) + "\n"
+    return orjson.dumps(log_entry, default=str).decode() + "\n"
 
 
 def format_context_string(record: Dict[str, Any]) -> str:
