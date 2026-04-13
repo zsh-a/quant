@@ -38,7 +38,7 @@ const NAV_ITEMS = [
     { key: 'optimizer', label: 'Optimizer', icon: Sparkles },
 ] as const;
 
-const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect, hasSelectedSession, theme, onToggleTheme }) => {
+const SidebarInner: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect, hasSelectedSession, theme, onToggleTheme }) => {
     return (
         <nav className="flex h-full flex-col bg-sidebar-background">
             {/* Brand */}
@@ -103,7 +103,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
                                 key={s.id}
                                 type="button"
                                 onClick={() => onSessionSelect(s.id)}
-                                className="w-full cursor-pointer rounded-lg border border-transparent bg-sidebar-accent/40 p-3 text-left transition-all duration-200 hover:border-sidebar-border/50 hover:bg-sidebar-accent"
+                                className="w-full cursor-pointer rounded-lg border border-transparent bg-sidebar-accent/40 p-3 text-left transition-colors duration-200 hover:border-sidebar-border/50 hover:bg-sidebar-accent"
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
@@ -132,5 +132,7 @@ const Sidebar: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSession
         </nav>
     );
 };
+
+const Sidebar = React.memo(SidebarInner);
 
 export default Sidebar;

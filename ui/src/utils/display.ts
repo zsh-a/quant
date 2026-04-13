@@ -7,6 +7,7 @@ const STATUS_LABELS: Record<string, string> = {
   success: "Success",
   failure: "Failed",
   partial_success: "Partial Success",
+  idle: "Idle",
 }
 
 const MODE_LABELS: Record<string, string> = {

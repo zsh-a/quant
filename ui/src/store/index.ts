@@ -1,1 +1,1 @@
-export { useSessionStore, useSessionActions, useSessions, useSelectedSessions, usePrimarySession, useSessionDataCache } from './sessionStore'
+export { useSessionStore, useSessionActions, useSessions, useSelectedSessions, usePrimarySession, useSessionDataCache, useActiveSessions } from './sessionStore'

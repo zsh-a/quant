@@ -12,6 +12,7 @@ type StatusKind =
   | "pending"
   | "success"
   | "partial_success"
+  | "idle"
   | "default"
 
 const variantMap: Record<StatusKind, "default" | "success" | "warning" | "danger" | "info"> = {
@@ -25,6 +26,7 @@ const variantMap: Record<StatusKind, "default" | "success" | "warning" | "danger
   pending: "warning",
   success: "success",
   partial_success: "info",
+  idle: "default",
   default: "default",
 }
 

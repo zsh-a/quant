@@ -15,6 +15,7 @@ import {
   useSessionDataCache,
   useSessionActions,
   useSessionStore,
+  useActiveSessions,
 } from './store';
 
 import Sidebar from './components/Sidebar';
@@ -107,14 +108,18 @@ const App = () => {
     }
   }, []);
 
-  const activeSessions = sessions.filter((s) => s.status === 'running');
-  const comparisonData = selectedSessionIds
-    .filter((id) => id !== primarySessionId && sessionDataCache[id])
-    .map((id) => ({
-      id,
-      name: sessions.find((s) => s.id === id)?.strategy || id,
-      data: sessionDataCache[id]?.equity || [],
-    }));
+  const activeSessions = useActiveSessions();
+  const comparisonData = useMemo(
+    () =>
+      selectedSessionIds
+        .filter((id) => id !== primarySessionId && sessionDataCache[id])
+        .map((id) => ({
+          id,
+          name: sessions.find((s) => s.id === id)?.strategy || id,
+          data: sessionDataCache[id]?.equity || [],
+        })),
+    [selectedSessionIds, primarySessionId, sessionDataCache, sessions]
+  );
 
   const meta = useMemo(() => getRouteMeta(location.pathname), [location.pathname]);
 
@@ -165,8 +170,8 @@ const App = () => {
           <PageHeader title={meta.title} description={meta.description} />
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 text-[12px] text-muted-foreground">
-              <StatusBadge value={isConnected || usePolling ? 'running' : 'failed'} />
-              <span>{isConnected ? 'WS' : usePolling ? 'Poll' : 'Off'}</span>
+              <StatusBadge value={!primarySessionId ? 'idle' : isConnected || usePolling ? 'running' : 'failed'} />
+              <span>{!primarySessionId ? '待机' : isConnected ? 'WS' : usePolling ? 'Poll' : '断开'}</span>
             </div>
             <div className="h-4 w-px bg-border" />
             <div className="text-[12px] text-muted-foreground">

@@ -132,3 +132,21 @@ export const useSessions = (): SessionSummary[] => useSessionStore(state => stat
 export const useSelectedSessions = (): string[] => useSessionStore(state => state.selectedSessionIds || [])
 export const usePrimarySession = (): string | null => useSessionStore(state => state.primarySessionId)
 export const useSessionDataCache = (): Record<string, SessionData> => useSessionStore(state => state.sessionDataCache || {})
+
+/**
+ * Stable selector for active (running) sessions.
+ * Uses shallow compare on id+status+progress to avoid unnecessary re-renders
+ * when unrelated session fields change.
+ */
+let _prevActiveKey = ''
+let _prevActiveResult: SessionSummary[] = []
+
+export const useActiveSessions = (): SessionSummary[] =>
+  useSessionStore((state) => {
+    const active = (state.sessions || []).filter((s) => s.status === 'running')
+    const key = active.map((s) => `${s.id}:${s.status}:${s.progress}`).join('|')
+    if (key === _prevActiveKey) return _prevActiveResult
+    _prevActiveKey = key
+    _prevActiveResult = active
+    return active
+  })
