@@ -17,8 +17,6 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - name: Install dependencies
-        run: uv sync --no-dev --extra gpu || uv sync --no-dev
       - name: Lint with ruff
         run: uvx ruff check src/ tests/
 
@@ -33,7 +31,7 @@ jobs:
         with:
           python-version: "3.12"
       - name: Install dependencies
-        run: uv sync
+        run: uv sync --python 3.12
       - name: Run tests
         run: uv run pytest tests/test_engine_broker.py tests/test_api.py -v --tb=short
 
