@@ -50,7 +50,7 @@ SymbolStr = Annotated[str, AfterValidator(_validate_symbol)]
 # ---------------------------------------------------------------------------
 # Mode validation
 # ---------------------------------------------------------------------------
-_VALID_MODES = {"backtest", "simulation", "live"}
+_VALID_MODES = {"backtest", "simulation", "live", "paper"}
 
 
 def _validate_mode(v: str) -> str:

@@ -150,7 +150,9 @@ def execute_session(
         symbols = [s.strip() for s in config.symbol.split(",") if s.strip()]
     else:
         symbols = [config.symbol]
-    if config.mode == "live":
+    use_realtime = config.mode in ("live", "paper")
+
+    if use_realtime:
         stream = RealtimeDataStream(
             symbols,
             interval_seconds=data_stream_config.realtime.interval_seconds,
@@ -173,6 +175,7 @@ def execute_session(
     if config.mode == "live":
         broker = LiveBroker(server_url=broker_config.live.server_url)
     else:
+        # backtest, simulation, paper 都使用模拟 broker
         broker = BacktestBroker(
             db_client=db_client,
             initial_cash=config.initial_cash

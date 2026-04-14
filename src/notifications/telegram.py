@@ -132,3 +132,60 @@ def is_trade_notification_enabled(
 ) -> bool:
     telegram_job_config = (notification_config or {}).get("telegram") or {}
     return bool(telegram_config.enabled and telegram_job_config.get("enabled", False))
+
+
+# ---------------------------------------------------------------------------
+# 实盘交易通知
+# ---------------------------------------------------------------------------
+
+
+def build_live_trade_message(*, trade: Dict[str, Any], strategy: str = "") -> str:
+    """构建实盘成交通知消息。"""
+    action = "买入" if trade.get("type") == "buy" else "卖出"
+    return "\n".join([
+        "✅ *实盘成交通知*",
+        f"*策略*: `{strategy}`" if strategy else "",
+        f"*标的*: `{trade.get('symbol', '')}` {trade.get('name', '')}",
+        f"*方向*: {action}",
+        f"*数量*: `{trade.get('quantity', 0):g}`",
+        f"*成交价*: `{trade.get('price', 0):.4f}`",
+        f"*成交额*: `{trade.get('amount', 0):.2f}`",
+        f"*手续费*: `{trade.get('commission', 0):.2f}`",
+        f"*时间*: `{trade.get('timestamp', '')}`",
+    ])
+
+
+def build_live_rejection_message(*, symbol: str, order_type: str, reason: str) -> str:
+    """构建实盘拒单通知消息。"""
+    action = "买入" if order_type == "buy" else "卖出"
+    return "\n".join([
+        "❌ *实盘拒单通知*",
+        f"*标的*: `{symbol}`",
+        f"*方向*: {action}",
+        f"*原因*: {reason}",
+        f"*时间*: `{datetime.now().isoformat()}`",
+    ])
+
+
+def build_risk_alert_message(*, alert_type: str, message: str) -> str:
+    """构建风控告警通知消息。"""
+    return "\n".join([
+        "⚠️ *风控告警*",
+        f"*类型*: {alert_type}",
+        f"*详情*: {message}",
+        f"*时间*: `{datetime.now().isoformat()}`",
+    ])
+
+
+def build_daily_pnl_message(
+    *, strategy: str, date: str, pnl: float, return_pct: float, equity: float,
+) -> str:
+    """构建每日 P&L 汇总消息。"""
+    emoji = "📈" if pnl >= 0 else "📉"
+    return "\n".join([
+        f"{emoji} *每日 P&L 汇总*",
+        f"*策略*: `{strategy}`",
+        f"*日期*: `{date}`",
+        f"*日盈亏*: `{pnl:+,.2f}` ({return_pct:+.2%})",
+        f"*总权益*: `{equity:,.2f}`",
+    ])

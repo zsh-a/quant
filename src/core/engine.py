@@ -22,7 +22,14 @@ class TradingEngine:
         logger.info(f"TradingEngine initialized with risk_manager={risk_manager is not None}")
 
     def submit_order(self, order: Order):
-        """Submit order with optional risk check"""
+        """Submit order with optional risk check + circuit breaker."""
+        # Circuit breaker: check broker consecutive error count
+        if hasattr(self.broker, 'consecutive_errors') and self.broker.consecutive_errors >= 5:
+            logger.error("熔断器触发: 连续 {} 次下单失败，暂停交易", self.broker.consecutive_errors)
+            order.status = "REJECTED"
+            order.id = "CIRCUIT_BREAKER"
+            return order.id
+
         # Risk check if risk manager is enabled
         if self.risk_manager and self.risk_manager.enabled:
             current_price = 0.0

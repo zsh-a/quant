@@ -139,6 +139,19 @@ class AlphaLabConfig(BaseModel):
     max_ast_nodes: int = 24
 
 
+class LiveTradingConfig(BaseModel):
+    """Live trading operational parameters."""
+
+    order_poll_interval_seconds: float = 1.0
+    order_timeout_seconds: int = 30
+    max_consecutive_errors: int = 5
+    error_cooldown_seconds: int = 60
+    auto_flatten_at_close: bool = False
+    notify_on_fill: bool = True
+    notify_on_rejection: bool = True
+    equity_sync_interval_seconds: int = 10
+
+
 class BitgetConfig(BaseModel):
     """Bitget market data defaults."""
 
@@ -180,6 +193,7 @@ class Settings(BaseSettings):
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
     alpha_lab: AlphaLabConfig = Field(default_factory=AlphaLabConfig)
+    live_trading: LiveTradingConfig = Field(default_factory=LiveTradingConfig)
     bitget: BitgetConfig = Field(default_factory=BitgetConfig)
     crypto_market: CryptoMarketConfig = Field(default_factory=CryptoMarketConfig)
 

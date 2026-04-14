@@ -101,6 +101,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                     <select className="glass-input" style={{ width: 'auto' }} value={mode} onChange={(e) => setMode(e.target.value)}>
                         <option value="backtest">Backtest</option>
+                        <option value="paper">Paper Trading</option>
                         <option value="live">Live</option>
                     </select>
                 </div>

@@ -7,6 +7,7 @@ import { RiskPanel } from './RiskPanel';
 import { CheckpointList } from './CheckpointList';
 import { AttributionPanel } from './AttributionPanel';
 import { StrategyLogViewer } from './StrategyLogViewer';
+import { LiveTradingPanel } from './LiveTradingPanel';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
 import { EmptyState } from './layout/EmptyState';
@@ -30,7 +31,8 @@ interface SessionDetailProps {
   onRestoreCheckpoint: () => void;
 }
 
-function getSubtab(pathname: string): 'overview' | 'risk' | 'analysis' | 'logs' {
+function getSubtab(pathname: string): 'overview' | 'trading' | 'risk' | 'analysis' | 'logs' {
+  if (pathname.endsWith('/trading')) return 'trading';
   if (pathname.endsWith('/risk')) return 'risk';
   if (pathname.endsWith('/analysis')) return 'analysis';
   if (pathname.endsWith('/logs')) return 'logs';
@@ -128,6 +130,9 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
       <Tabs value={subtab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
+          {(primarySession.mode === 'live' || primarySession.mode === 'paper') && (
+            <TabsTrigger value="trading">Trading</TabsTrigger>
+          )}
           <TabsTrigger value="risk">Risk</TabsTrigger>
           <TabsTrigger value="analysis">Analysis</TabsTrigger>
           <TabsTrigger value="logs">Logs</TabsTrigger>
@@ -148,6 +153,12 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
             allSessions={allSessions}
           />
         </TabsContent>
+
+        {(primarySession.mode === 'live' || primarySession.mode === 'paper') && (
+          <TabsContent value="trading">
+            <LiveTradingPanel sessionId={primarySession.id} />
+          </TabsContent>
+        )}
 
         <TabsContent value="risk">
           <div className="grid gap-6">
