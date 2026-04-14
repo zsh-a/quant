@@ -146,6 +146,42 @@ async def generate_report(
         raise HTTPException(500, str(e))
 
 
+@router.get("/report/{session_id}/pdf")
+async def generate_pdf_report(session_id: str):
+    """Generate and download PDF backtest report."""
+    if not session_db:
+        raise HTTPException(500, "Session database not available")
+    try:
+        session = session_db.get_session(session_id)
+        if not session:
+            raise HTTPException(404, "Session not found")
+
+        equity_history = session_db.get_equity_history(session_id)
+        trades = session_db.get_trades(session_id)
+        positions = session.get("positions", {})
+
+        from src.analysis.reports.html_generator import HTMLReportGenerator
+        gen = HTMLReportGenerator()
+        pdf_path = gen.generate_pdf(
+            session_id=session_id,
+            strategy_name=session.get("strategy", "Unknown"),
+            equity_history=equity_history,
+            trades=trades,
+            positions=positions,
+            params=session.get("params", {}),
+        )
+        return FileResponse(
+            pdf_path,
+            media_type="application/pdf",
+            filename=f"report_{session_id}.pdf",
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"PDF report generation error: {e}")
+        raise HTTPException(500, str(e))
+
+
 @router.get("/summary/{session_id}")
 async def get_session_summary(session_id: str):
     """Get quick session summary"""

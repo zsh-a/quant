@@ -1067,3 +1067,91 @@ async def get_factor_catalog_stats():
                 pass
 
     return stats
+
+
+# ---------------------------------------------------------------------------
+# Factor Factory
+# ---------------------------------------------------------------------------
+
+
+class FactoryRunRequest(BaseModel):
+    markets: list[str] = Field(default_factory=lambda: ["crypto"])
+    symbols_per_market: dict[str, list[str]] = Field(default_factory=dict)
+    generations: int = 5
+    top_k: int = 30
+    strategy: str = ""
+    combine_method: str = "ic_weighted"
+
+
+@router.post("/factory/run")
+async def run_factor_factory(req: FactoryRunRequest, background_tasks: BackgroundTasks):
+    """启动自动化因子工厂流水线。"""
+    from src.alpha.factory import FactorFactory, FactoryConfig
+
+    config = FactoryConfig(
+        markets=req.markets,
+        symbols_per_market=req.symbols_per_market,
+        generations=req.generations,
+        top_k=req.top_k,
+        strategy=req.strategy,
+        combine_method=req.combine_method,
+    )
+
+    job_id = str(uuid.uuid4())[:8]
+    _SEARCH_JOBS[job_id] = {
+        "status": "running",
+        "type": "factory",
+        "params": {"markets": req.markets, "generations": req.generations},
+        "result": None,
+        "error": None,
+        "created_at": datetime.utcnow().isoformat(),
+    }
+
+    def _run():
+        try:
+            factory = FactorFactory()
+            result = factory.run_pipeline(config)
+            _SEARCH_JOBS[job_id].update(
+                status="completed",
+                result={
+                    "search_results": result.search_results,
+                    "zoo_count": result.zoo_count,
+                    "combination": result.combination_result,
+                    "decaying_factors": result.decaying_factors,
+                    "timing": result.timing,
+                },
+            )
+        except Exception as exc:
+            _SEARCH_JOBS[job_id].update(status="failed", error=str(exc))
+            logger.error("factory.run failed: {}", exc)
+
+    background_tasks.add_task(_run)
+    return {"job_id": job_id, "status": "running"}
+
+
+# ---------------------------------------------------------------------------
+# Cross-market Factor Migration
+# ---------------------------------------------------------------------------
+
+
+class MigrateRequest(BaseModel):
+    formula: str
+    source_market: str = "crypto"
+    target_market: str = "a_share"
+
+
+@router.post("/migrate")
+async def migrate_factor(req: MigrateRequest):
+    """将因子公式从一个市场迁移到另一个市场。"""
+    from src.alpha.core.factor_migration import migrate_formula
+
+    result = migrate_formula(req.formula, req.source_market, req.target_market)
+    return {
+        "original_formula": result.original_formula,
+        "migrated_formula": result.migrated_formula,
+        "source_market": result.source_market,
+        "target_market": result.target_market,
+        "field_mappings": result.field_mappings,
+        "unmappable_fields": result.unmappable_fields,
+        "is_viable": result.is_viable,
+    }

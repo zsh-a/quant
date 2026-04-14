@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
+import { FileDown } from 'lucide-react';
 import type { BenchmarkData, EquityPoint, Position, SessionSummary, Trade } from '../types';
 import Dashboard from './Dashboard';
 import { RiskPanel } from './RiskPanel';
@@ -7,10 +8,12 @@ import { CheckpointList } from './CheckpointList';
 import { AttributionPanel } from './AttributionPanel';
 import { StrategyLogViewer } from './StrategyLogViewer';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Button } from './ui/button';
 import { EmptyState } from './layout/EmptyState';
 import { SectionCard } from './layout/SectionCard';
 import { StatusBadge } from './layout/StatusBadge';
 import { Progress } from './ui/progress';
+import { API_BASE, getToken } from '../utils/api';
 
 interface SessionDetailProps {
   primarySession?: SessionSummary;
@@ -72,7 +75,22 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
         description={`${primarySession.strategy} · ${primarySession.symbol}`}
         action={
           <div className="min-w-[280px] space-y-2">
-            <div className="text-xs font-medium text-muted-foreground">Switch Session</div>
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-medium text-muted-foreground">Switch Session</div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 gap-1.5 text-xs"
+                onClick={() => {
+                  const token = getToken();
+                  const qs = token ? `?token=${encodeURIComponent(token)}` : '';
+                  window.open(`${API_BASE}/analysis/report/${primarySession.id}/pdf${qs}`, '_blank');
+                }}
+              >
+                <FileDown size={13} />
+                PDF Report
+              </Button>
+            </div>
             <select className="glass-input" value={primarySession.id} onChange={(e) => onSelectSession(e.target.value)}>
               {allSessions.map((session) => (
                 <option key={session.id} value={session.id}>

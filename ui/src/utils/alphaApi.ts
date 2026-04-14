@@ -119,4 +119,20 @@ export const alphaApi = {
   // Event Engine Backtest
   runEventBacktest: (params: EventBacktestParams) =>
     post<EventBacktestResponse>('/alpha-lab/event-backtest', params),
+
+  // Factor Factory
+  runFactory: (params: Record<string, unknown>) =>
+    post<{ job_id: string; status: string }>('/alpha-lab/factory/run', params),
+
+  // Cross-market Migration
+  migrateFormula: (params: { formula: string; source_market: string; target_market: string }) =>
+    post<{
+      original_formula: string
+      migrated_formula: string | null
+      source_market: string
+      target_market: string
+      field_mappings: Record<string, string>
+      unmappable_fields: string[]
+      is_viable: boolean
+    }>('/alpha-lab/migrate', params),
 }

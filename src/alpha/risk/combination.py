@@ -289,15 +289,25 @@ class FactorCombiner:
                 f"materialized={len(all_factors)}, min_ic={min_abs_ic})"
             )
 
+        # Optional orthogonalization before combining
+        t_orth_start = perf_counter()
+        if len(selected) > 1:
+            from .orthogonalization import orthogonalize_sequential
+            stacked = np.stack([f.signal.reshape(-1) for f in selected])
+            orth_flat = orthogonalize_sequential(stacked)
+            for i, f in enumerate(selected):
+                f.signal = orth_flat[i].reshape(f.signal.shape)
+        t_orth = perf_counter() - t_orth_start
+
         t2 = perf_counter()
         combined = self.combine(selected, dataset, method=method, ic_lookback=ic_lookback)
         t_combine = perf_counter() - t2
 
         logger.info(
             "combination.combine_from_zoo zoo={} materialized={} selected={} method={} "
-            "materialize={:.3f}s select={:.3f}s combine={:.3f}s",
+            "materialize={:.3f}s select={:.3f}s orth={:.3f}s combine={:.3f}s",
             len(zoo_entries), len(all_factors), len(selected), method,
-            t_materialize, t_select, t_combine,
+            t_materialize, t_select, t_orth, t_combine,
         )
 
         return {
@@ -315,6 +325,7 @@ class FactorCombiner:
             "timing": {
                 "materialize_seconds": t_materialize,
                 "select_seconds": t_select,
+                "orthogonalize_seconds": t_orth,
                 "combine_seconds": t_combine,
                 "total_seconds": perf_counter() - t0,
             },

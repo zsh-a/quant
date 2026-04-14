@@ -176,3 +176,76 @@ class HTMLReportGenerator:
 
         logger.info(f"HTML report saved: {filepath}")
         return filepath
+
+    def generate_pdf(
+        self,
+        session_id: str,
+        strategy_name: str,
+        equity_history: List[Dict],
+        trades: List[Dict],
+        positions: Dict,
+        params: Optional[Dict] = None,
+    ) -> str:
+        """Generate PDF report by converting HTML to PDF via weasyprint."""
+        html_path = self.generate(
+            session_id, strategy_name, equity_history, trades, positions, params,
+        )
+        pdf_path = html_path.replace(".html", ".pdf")
+        try:
+            from weasyprint import HTML as WeasyHTML
+            WeasyHTML(filename=html_path).write_pdf(pdf_path)
+            logger.info(f"PDF report saved: {pdf_path}")
+        except ImportError:
+            # Fallback: simple HTML-to-text with basic PDF
+            logger.warning("weasyprint not installed, using lightweight HTML-to-PDF fallback")
+            self._fallback_pdf(html_path, pdf_path, session_id, strategy_name, equity_history, trades)
+        return pdf_path
+
+    @staticmethod
+    def _fallback_pdf(
+        html_path: str,
+        pdf_path: str,
+        session_id: str,
+        strategy_name: str,
+        equity_history: List[Dict],
+        trades: List[Dict],
+    ):
+        """Lightweight PDF fallback without weasyprint — text-based summary."""
+        try:
+            from reportlab.lib.pagesizes import A4
+            from reportlab.pdfgen import canvas
+
+            c = canvas.Canvas(pdf_path, pagesize=A4)
+            w, h = A4
+            y = h - 50
+
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(50, y, f"Backtest Report: {strategy_name}")
+            y -= 25
+            c.setFont("Helvetica", 10)
+            c.drawString(50, y, f"Session: {session_id}")
+            y -= 30
+
+            if equity_history:
+                initial = equity_history[0].get("total_equity", 0)
+                final = equity_history[-1].get("total_equity", 0)
+                ret = (final - initial) / initial if initial else 0
+                c.setFont("Helvetica-Bold", 12)
+                c.drawString(50, y, "Performance Summary")
+                y -= 20
+                c.setFont("Helvetica", 10)
+                for label, val in [
+                    ("Initial Equity", f"{initial:,.2f}"),
+                    ("Final Equity", f"{final:,.2f}"),
+                    ("Total Return", f"{ret:.2%}"),
+                    ("Total Trades", str(len(trades))),
+                    ("Trading Days", str(len(equity_history))),
+                ]:
+                    c.drawString(60, y, f"{label}: {val}")
+                    y -= 15
+
+            c.save()
+            logger.info(f"Fallback PDF saved: {pdf_path}")
+        except ImportError:
+            logger.error("Neither weasyprint nor reportlab available for PDF generation")
+            raise ImportError("Install weasyprint or reportlab for PDF: pip install weasyprint")

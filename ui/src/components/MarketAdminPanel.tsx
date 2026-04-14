@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, Database, Play, RefreshCw, TableProperties } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AlertTriangle, Database, Play, RefreshCw, ShieldCheck, TableProperties } from 'lucide-react';
 
 import type {
   DataUpdateRun,
@@ -65,6 +65,14 @@ export default function MarketAdminPanel() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
+  const [dataQuality, setDataQuality] = useState<Record<string, any> | null>(null);
+
+  const fetchDataQuality = useCallback(async () => {
+    try {
+      const resp = await apiFetch('/market-admin/data-quality');
+      if (resp.ok) setDataQuality(await resp.json());
+    } catch { /* ignore */ }
+  }, []);
 
   const fetchAll = async (background = false) => {
     if (!background) {
@@ -116,6 +124,7 @@ export default function MarketAdminPanel() {
 
   useEffect(() => {
     fetchAll();
+    fetchDataQuality();
   }, []);
 
   useEffect(() => {
@@ -618,6 +627,69 @@ export default function MarketAdminPanel() {
           </div>
         </SectionCard>
       ) : null}
+
+      {dataQuality && (
+        <SectionCard
+          title="Data Quality"
+          description="数据完整性、异常值检测、新鲜度报告"
+          action={
+            <Button variant="ghost" size="sm" onClick={fetchDataQuality}>
+              <RefreshCw size={13} />
+            </Button>
+          }
+        >
+          <div className="grid gap-4 md:grid-cols-2">
+            {dataQuality.stock_daily?.status === 'ok' && (
+              <div className="rounded-xl border border-border/60 bg-secondary/30 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <ShieldCheck size={14} className={dataQuality.stock_daily.zero_close_pct < 1 ? 'text-emerald-500' : 'text-amber-500'} />
+                  Stock Daily
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <div>Rows: <span className="text-foreground tabular-nums">{dataQuality.stock_daily.total_rows?.toLocaleString()}</span></div>
+                  <div>Codes: <span className="text-foreground tabular-nums">{dataQuality.stock_daily.unique_codes?.toLocaleString()}</span></div>
+                  <div>Zero Close: <span className="text-foreground tabular-nums">{dataQuality.stock_daily.zero_close_pct}%</span></div>
+                  <div>Invalid OHLC: <span className="text-foreground tabular-nums">{dataQuality.stock_daily.invalid_ohlc_count}</span></div>
+                </div>
+              </div>
+            )}
+            {dataQuality.crypto_futures?.status === 'ok' && (
+              <div className="rounded-xl border border-border/60 bg-secondary/30 p-4 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                  <ShieldCheck size={14} className={dataQuality.crypto_futures.zero_close_pct < 1 ? 'text-emerald-500' : 'text-amber-500'} />
+                  Crypto Futures
+                </div>
+                <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                  <div>Rows: <span className="text-foreground tabular-nums">{dataQuality.crypto_futures.total_rows?.toLocaleString()}</span></div>
+                  <div>Symbols: <span className="text-foreground tabular-nums">{dataQuality.crypto_futures.unique_symbols}</span></div>
+                  <div>Zero Close: <span className="text-foreground tabular-nums">{dataQuality.crypto_futures.zero_close_pct}%</span></div>
+                  <div>Invalid OHLC: <span className="text-foreground tabular-nums">{dataQuality.crypto_futures.invalid_ohlc_count}</span></div>
+                </div>
+              </div>
+            )}
+          </div>
+          {dataQuality.freshness && (
+            <div className="mt-3 grid gap-2 md:grid-cols-2">
+              {dataQuality.freshness.stock_daily && (
+                <div className="flex items-center justify-between rounded-lg bg-secondary/20 px-3 py-2 text-xs">
+                  <span>Stock Daily Freshness</span>
+                  <span className={dataQuality.freshness.stock_daily.stale ? 'text-amber-500 font-medium' : 'text-emerald-500'}>
+                    {dataQuality.freshness.stock_daily.stale ? `Stale (${dataQuality.freshness.stock_daily.age_days}d)` : 'Fresh'}
+                  </span>
+                </div>
+              )}
+              {dataQuality.freshness.crypto_futures && (
+                <div className="flex items-center justify-between rounded-lg bg-secondary/20 px-3 py-2 text-xs">
+                  <span>Crypto Futures Freshness</span>
+                  <span className={dataQuality.freshness.crypto_futures.stale ? 'text-amber-500 font-medium' : 'text-emerald-500'}>
+                    {dataQuality.freshness.crypto_futures.stale ? `Stale (${dataQuality.freshness.crypto_futures.age_hours}h)` : 'Fresh'}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+        </SectionCard>
+      )}
     </div>
   );
 }

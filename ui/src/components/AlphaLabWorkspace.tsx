@@ -8,15 +8,18 @@ import type { AlphaLabWorkspace as WorkspacePayload } from '../types'
 import { useSearchJobs } from '../hooks/useSearchJobs'
 import { Badge } from './ui/badge'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs'
+import { ArrowRightLeft, Factory } from 'lucide-react'
 import { ResearchTab } from './alpha-lab/ResearchTab'
 import { SearchTab } from './alpha-lab/SearchTab'
 import { FactorsTab } from './alpha-lab/FactorsTab'
 import { HistoryTab } from './alpha-lab/HistoryTab'
 import { MonitorTab } from './alpha-lab/MonitorTab'
+import { FactoryTab } from './alpha-lab/FactoryTab'
+import { MigrationTab } from './alpha-lab/MigrationTab'
 import { dtDate, DEFAULT_LOOKBACK_YEARS } from './alpha-lab/shared'
 import { alphaApi } from '../utils/alphaApi'
 
-type Tab = 'research' | 'search' | 'factors' | 'history' | 'monitor'
+type Tab = 'research' | 'search' | 'factors' | 'factory' | 'migration' | 'history' | 'monitor'
 
 const MARKET_LABELS: Record<string, string> = { crypto: 'Crypto', a_share: 'A 股' }
 
@@ -140,6 +143,8 @@ export const AlphaLabWorkspace: React.FC<AlphaLabWorkspaceProps> = ({ onViewSess
             {activeCount > 0 && <Badge variant="info" className="ml-1 text-[9px] px-1 py-0">{activeCount}</Badge>}
           </TabsTrigger>
           <TabsTrigger value="factors"><LibraryBig className="mr-1 size-3" />Factors</TabsTrigger>
+          <TabsTrigger value="factory"><Factory className="mr-1 size-3" />Factory</TabsTrigger>
+          <TabsTrigger value="migration"><ArrowRightLeft className="mr-1 size-3" />Migration</TabsTrigger>
           <TabsTrigger value="history"><Workflow className="mr-1 size-3" />History</TabsTrigger>
           <TabsTrigger value="monitor"><Cpu className="mr-1 size-3" />Monitor</TabsTrigger>
         </TabsList>
@@ -185,6 +190,14 @@ export const AlphaLabWorkspace: React.FC<AlphaLabWorkspaceProps> = ({ onViewSess
             onRefresh={() => void loadWorkspace()} setErr={setErr}
             onViewSession={onViewSession}
           />
+        </TabsContent>
+
+        <TabsContent value="factory">
+          <FactoryTab />
+        </TabsContent>
+
+        <TabsContent value="migration">
+          <MigrationTab />
         </TabsContent>
 
         <TabsContent value="history">
