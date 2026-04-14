@@ -5,13 +5,15 @@ from loguru import logger
 import uuid
 
 class BacktestBroker(Broker):
-    def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0003, 
+    def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0003,
                  slippage: float = 0.001, db_client=None, risk_manager=None,
-                 on_order_submitted: Optional[Callable[[Order], None]] = None):
+                 on_order_submitted: Optional[Callable[[Order], None]] = None,
+                 allow_short: bool = False):
         self.cash = initial_cash
         self.initial_cash = initial_cash
         self.commission = commission
-        self.slippage = slippage  # 新增滑点参数
+        self.slippage = slippage
+        self.allow_short = allow_short
         self.db_client = db_client
         self.risk_manager = risk_manager
         
@@ -196,9 +198,27 @@ class BacktestBroker(Broker):
             execution_price = self._apply_slippage(order, raw_price)
             self._execute_order(order, execution_price, current_ts)
 
+    def _check_stop_triggers(self, bars: Dict[str, Bar]):
+        """Check pending stop orders and trigger them if price crosses stop_price."""
+        for order_id in list(self.orders.keys()):
+            order = self.orders[order_id]
+            if order.stop_price is None or order.status != "SUBMITTED":
+                continue
+            bar = bars.get(order.symbol)
+            if bar is None:
+                continue
+            # Stop-sell: triggers when price drops to/below stop_price
+            if order.type in ('sell', 'sell_short') and bar.low <= order.stop_price:
+                order.status = "TRIGGERED"
+                logger.info(f"Stop order TRIGGERED: {order.type} {order.symbol} stop={order.stop_price}")
+            # Stop-buy: triggers when price rises to/above stop_price
+            elif order.type in ('buy', 'buy_to_cover') and bar.high >= order.stop_price:
+                order.status = "TRIGGERED"
+                logger.info(f"Stop order TRIGGERED: {order.type} {order.symbol} stop={order.stop_price}")
+
     def _apply_slippage(self, order, price):
         """应用滑点：买入价更高，卖出价更低"""
-        if order.type == 'buy':
+        if order.type in ('buy', 'buy_to_cover'):
             return price * (1 + self.slippage)
         else:
             return price * (1 - self.slippage)
@@ -291,7 +311,37 @@ class BacktestBroker(Broker):
             else:
                 order.status = "REJECTED"
                 logger.warning(f"Order REJECTED (Insufficient qty): {order.symbol}")
-        
+        elif order.type == 'sell_short':
+            if not self.allow_short:
+                order.status = "REJECTED"
+                logger.warning(f"Order REJECTED (Short selling disabled): {order.symbol}")
+            else:
+                # Short sale: receive cash, create negative position
+                self.cash += (amount - fee)
+                curr_qty = self.positions.get(order.symbol, 0)
+                self.positions[order.symbol] = curr_qty - order.quantity
+                self.position_costs[order.symbol] = execution_price
+                order.status = "FILLED"
+                order.avg_fill_price = execution_price
+                order.filled_quantity = order.quantity
+        elif order.type == 'buy_to_cover':
+            curr_qty = self.positions.get(order.symbol, 0)
+            if curr_qty < 0:  # has short position
+                cover_qty = min(order.quantity, abs(curr_qty))
+                self.cash -= (execution_price * cover_qty + fee)
+                new_qty = curr_qty + cover_qty
+                if new_qty == 0:
+                    self.positions.pop(order.symbol, None)
+                    self.position_costs.pop(order.symbol, None)
+                else:
+                    self.positions[order.symbol] = new_qty
+                order.status = "FILLED"
+                order.avg_fill_price = execution_price
+                order.filled_quantity = cover_qty
+            else:
+                order.status = "REJECTED"
+                logger.warning(f"Order REJECTED (No short position to cover): {order.symbol}")
+
         if order.status == "FILLED":
             logger.info(f"ORDER FILLED ({order.execution_type}): {order.type} {order.quantity} {order.symbol} at {execution_price} on {current_ts}")
             self.trades.append({
@@ -352,11 +402,24 @@ class BacktestBroker(Broker):
             
             # Update capital
             self.risk_manager.current_capital = self.get_total_equity()
-        
-        # Process NEXT_OPEN orders (Standard Backtest behavior)
+
+            # Check portfolio-level limits
+            halt, reason = self.risk_manager.check_daily_loss_limit()
+            if halt:
+                logger.warning(f"RISK HALT — {reason}")
+            halt, reason = self.risk_manager.check_max_drawdown()
+            if halt:
+                logger.warning(f"RISK HALT — {reason}")
+
+        # Check stop order triggers
+        self._check_stop_triggers(bars)
+
+        # Process NEXT_OPEN orders and TRIGGERED stop orders
         for order_id in list(self.orders.keys()):
             order = self.orders[order_id]
-            if order.execution_type != "NEXT_OPEN":
+            is_next_open = order.execution_type == "NEXT_OPEN" and order.stop_price is None
+            is_triggered_stop = order.status == "TRIGGERED"
+            if not is_next_open and not is_triggered_stop:
                 continue
                 
             bar = bars.get(order.symbol)

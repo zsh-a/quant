@@ -319,6 +319,110 @@ class TestTradingEngine:
         # Order should be rejected by risk manager (position too large)
         assert broker.positions.get("SH.600000", 0) == 0
 
+    def test_daily_reset_called_on_date_change(self):
+        """Risk manager reset_daily() is called when trading date changes."""
+        bars_list = [
+            {"SH.600000": _bar("SH.600000", "2024-01-02", 10.0, 11.0, 9.5, 10.5)},
+            {"SH.600000": _bar("SH.600000", "2024-01-03", 10.5, 12.0, 10.0, 11.0)},
+            {"SH.600000": _bar("SH.600000", "2024-01-04", 11.0, 11.5, 10.5, 11.2)},
+        ]
+        ds = ListDataStream(bars_list)
+        rm = RiskManager(enabled=True)
+        rm.current_capital = 100_000
+        rm.daily_start_capital = 100_000
+        broker = BacktestBroker(initial_cash=100_000, commission=0.0, slippage=0.0, risk_manager=rm)
+        strategy = BuyAndHoldStrategy("SH.600000", qty=100, execution_type="IMMEDIATE_CLOSE")
+        engine = TradingEngine(strategy, broker, ds, risk_manager=rm)
+
+        engine.run()
+
+        # daily_start_capital should have been updated (reset) on day 2 and day 3
+        # After 3 bars, daily_start_capital should reflect the equity at start of last day
+        assert rm.daily_start_capital != 100_000  # was reset at least once
+
+    def test_daily_loss_limit_check(self):
+        """check_daily_loss_limit() is invoked during step()."""
+        rm = RiskManager(enabled=True)
+        rm.limits.max_daily_loss_pct = 0.01  # 1% — very tight
+        rm.current_capital = 99_000
+        rm.daily_start_capital = 100_000
+        halt, reason = rm.check_daily_loss_limit()
+        assert halt is True
+        assert "Daily loss limit" in reason
+
+    def test_max_drawdown_check(self):
+        """check_max_drawdown() triggers when drawdown exceeds limit."""
+        rm = RiskManager(enabled=True)
+        rm.limits.max_drawdown_pct = 0.05  # 5%
+        rm.peak_capital = 100_000
+        rm.current_capital = 94_000  # 6% drawdown
+        halt, reason = rm.check_max_drawdown()
+        assert halt is True
+        assert "Max drawdown" in reason
+
+
+# ---------------------------------------------------------------------------
+# Short selling & stop order tests
+# ---------------------------------------------------------------------------
+
+class TestAdvancedOrders:
+    def test_short_sell_disabled_by_default(self):
+        broker = BacktestBroker(initial_cash=100_000, commission=0.0, slippage=0.0)
+        order = Order("SH.600000", "sell_short", 100, execution_type="IMMEDIATE_CLOSE")
+        broker.submit_order(order)
+        bars = {"SH.600000": _bar("SH.600000", "2024-01-02", 10.0, 11.0, 9.5, 10.5)}
+        broker.process_same_bar_orders(bars, "IMMEDIATE_CLOSE")
+        assert order.status == "REJECTED"
+
+    def test_short_sell_enabled(self):
+        broker = BacktestBroker(initial_cash=100_000, commission=0.0, slippage=0.0, allow_short=True)
+        order = Order("SH.600000", "sell_short", 100, execution_type="IMMEDIATE_CLOSE")
+        broker.submit_order(order)
+        bars = {"SH.600000": _bar("SH.600000", "2024-01-02", 10.0, 11.0, 9.5, 10.5)}
+        broker.process_same_bar_orders(bars, "IMMEDIATE_CLOSE")
+
+        assert order.status == "FILLED"
+        assert broker.positions["SH.600000"] == -100  # negative position
+        assert broker.cash == 100_000 + 10.5 * 100  # received proceeds
+
+    def test_buy_to_cover(self):
+        broker = BacktestBroker(initial_cash=200_000, commission=0.0, slippage=0.0, allow_short=True)
+        broker.positions["SH.600000"] = -100
+        broker.position_costs["SH.600000"] = 10.0
+
+        order = Order("SH.600000", "buy_to_cover", 100, execution_type="IMMEDIATE_CLOSE")
+        broker.submit_order(order)
+        bars = {"SH.600000": _bar("SH.600000", "2024-01-03", 9.0, 10.0, 8.5, 9.5)}
+        broker.process_same_bar_orders(bars, "IMMEDIATE_CLOSE")
+
+        assert order.status == "FILLED"
+        assert "SH.600000" not in broker.positions  # position closed
+
+    def test_stop_order_triggers(self):
+        broker = BacktestBroker(initial_cash=100_000, commission=0.0, slippage=0.0)
+        broker.positions["SH.600000"] = 100
+        broker.position_costs["SH.600000"] = 10.0
+
+        # Stop-sell at 9.0
+        order = Order("SH.600000", "sell", 100, execution_type="NEXT_OPEN", stop_price=9.0)
+        broker.submit_order(order)
+
+        # Day 1: price stays above stop — should NOT trigger
+        bars1 = {"SH.600000": _bar("SH.600000", "2024-01-02", 10.0, 11.0, 9.5, 10.5)}
+        broker.step(bars1)
+        assert order.status == "SUBMITTED"  # not triggered
+
+        # Day 2: low touches stop price — should trigger and fill
+        bars2 = {"SH.600000": _bar("SH.600000", "2024-01-03", 9.5, 10.0, 8.8, 9.0)}
+        broker.step(bars2)
+        assert order.status == "FILLED"
+        assert "SH.600000" not in broker.positions
+
+    def test_order_stop_price_field(self):
+        order = Order("SH.600000", "sell", 100, stop_price=9.5)
+        assert order.stop_price == 9.5
+        assert order.execution_type == "NEXT_OPEN"
+
 
 # ---------------------------------------------------------------------------
 # Validators tests

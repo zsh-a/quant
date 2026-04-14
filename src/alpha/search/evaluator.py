@@ -82,6 +82,8 @@ class FormulaEvaluator:
 
         # Compile cache
         self._program_cache: dict[str, BytecodeProgram | None] = {}
+        # Metrics cache — avoids re-evaluating identical formulas (keyed by expr_hash)
+        self._metrics_cache: dict[str, float] = {}
 
     def _compile(self, formula: str) -> BytecodeProgram | None:
         """Compile with caching. Returns None on failure."""
@@ -101,11 +103,17 @@ class FormulaEvaluator:
         program = self._compile(formula)
         if program is None:
             return 0.0
+        # Check metrics cache by expr_hash
+        if program.expr_hash in self._metrics_cache:
+            return self._metrics_cache[program.expr_hash]
         try:
             alpha = self.vm.run(program, self._store)
             alpha_np = to_numpy(alpha)
-            return compute_rank_ic(alpha_np, self._fwd_returns)
+            ic = compute_rank_ic(alpha_np, self._fwd_returns)
+            self._metrics_cache[program.expr_hash] = ic
+            return ic
         except Exception:
+            self._metrics_cache[program.expr_hash] = 0.0
             return 0.0
 
     def eval_ic_batch(

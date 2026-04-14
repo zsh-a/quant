@@ -4,6 +4,7 @@ from fastapi import (
     BackgroundTasks,
     HTTPException,
     Query,
+    Request,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -90,7 +91,16 @@ api_config = get_api_config()
 data_stream_config = get_data_stream_config()
 broker_config = get_broker_config()
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
+limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+
 app = FastAPI(default_response_class=ORJSONResponse)
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
 session_db = SessionDB()
 session_service = SessionService(session_db, persistence)
 
@@ -141,7 +151,8 @@ async def get_strategies():
 
 
 @app.post("/session/run", dependencies=[Depends(require_auth)])
-async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
+@limiter.limit("5/minute")
+async def run_session(req: SessionRequest, background_tasks: BackgroundTasks, request: Request = None):
     session_id = str(uuid.uuid4())
     runtime = session_service.create_session(
         session_id=session_id,
@@ -243,7 +254,8 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
 
 
 @app.post("/session/run_async", dependencies=[Depends(require_auth)])
-async def run_session_async(req: SessionRequest):
+@limiter.limit("10/minute")
+async def run_session_async(req: SessionRequest, request: Request = None):
     """
     Submit a backtest session to Celery queue for async processing.
     Returns immediately with session_id and task_id for progress tracking.
@@ -261,7 +273,8 @@ async def run_session_async(req: SessionRequest):
         register_runtime=False,
     )
 
-    # Build config for Celery task
+    # Build config for Celery task (include request_id for tracing)
+    from src.utils.logging_config import request_id_ctx
     config = {
         "symbol": req.symbol,
         "strategy": req.strategy,
@@ -273,6 +286,7 @@ async def run_session_async(req: SessionRequest):
         "slippage": broker_config.backtest.slippage,
         "enable_risk_management": True,
         "chunk_size_months": data_stream_config.chunk_size_months,
+        "request_id": request_id_ctx.get(),
     }
 
     # Submit to Celery

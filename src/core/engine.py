@@ -56,15 +56,22 @@ class TradingEngine:
     def run(self):
         self.running = True
         logger.info("Trading engine started.")
-        
+        last_date = None
+
         while self.running:
             bars = self.data_stream.next_bar()
             if bars is None:
                 logger.info("End of data stream.")
                 break
-            
+
             self.current_bars = bars
-            
+
+            # 0. Reset risk manager at start of new trading day
+            current_date = next(iter(bars.values())).timestamp.date()
+            if self.risk_manager and last_date and current_date != last_date:
+                self.risk_manager.reset_daily()
+            last_date = current_date
+
             # 1. Update broker state and process pending NEXT_OPEN orders
             # These are orders from PREVIOUS bars being filled at CURRENT bar's OPEN
             self.broker.step(bars)

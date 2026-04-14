@@ -310,6 +310,28 @@ class SearchOrchestrator:
                     if not candidates:
                         continue
 
+                    # 1b. Dedup against previously evaluated formulas
+                    before_dedup = len(candidates)
+                    candidates = [
+                        ind for ind in candidates
+                        if ind.expr_hash not in ctx.seen_hashes
+                    ]
+                    dedup_removed = before_dedup - len(candidates)
+                    if dedup_removed > 0:
+                        logger.info(
+                            "alpha.dedup strategy={} removed={} kept={}",
+                            strategy_name, dedup_removed, len(candidates),
+                        )
+                    gen_stage.metadata["dedup_removed"] = dedup_removed
+                    gen_stage.output_count = len(candidates)
+
+                    # Mark as seen immediately so other strategies in this round skip them
+                    for ind in candidates:
+                        ctx.seen_hashes.add(ind.expr_hash)
+
+                    if not candidates:
+                        continue
+
                     # 2. Quick screen
                     screened = candidates
                     quick_rejected = 0

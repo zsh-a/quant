@@ -60,8 +60,14 @@ def run_backtest_task(self, session_id: str, config: dict):
     Returns:
         dict: Backtest results
     """
+    # Bind correlation ID from API request for distributed tracing
+    req_id = config.get("request_id")
+    if req_id:
+        from src.utils.logging_config import set_request_context
+        set_request_context(req_id, session_id)
+
     logger.info(f"Starting backtest task for session {session_id}")
-    
+
     session_db = SessionDB()
 
     def handle_progress(progress: float, status: str):
@@ -98,6 +104,10 @@ def run_backtest_task(self, session_id: str, config: dict):
         logger.error(f"Backtest task failed for session {session_id}: {e}")
         session_db.update_session_status(session_id, "failed", error=str(e))
         raise
+    finally:
+        if req_id:
+            from src.utils.logging_config import clear_request_context
+            clear_request_context()
 
 
 @app.task(name='src.tasks.backtest.cancel_backtest')
