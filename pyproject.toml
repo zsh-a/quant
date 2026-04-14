@@ -3,7 +3,7 @@ name = "quent"
 version = "3.0.0"
 description = "AI-Powered Quantitative Trading Platform"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.14"
 dependencies = [
     # Core dependencies
     "akshare>=1.18.12",
