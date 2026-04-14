@@ -101,10 +101,20 @@ class TelegramConfig(BaseModel):
     timeout_seconds: int = 10
 
 
+class WebhookConfig(BaseModel):
+    """Generic webhook notification configuration (Slack/Discord/custom)."""
+
+    enabled: bool = False
+    url: str = ""
+    format: str = "plain"  # slack | discord | plain
+    timeout_seconds: int = 10
+
+
 class NotificationsConfig(BaseModel):
     """Notification configuration"""
 
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
+    webhook: WebhookConfig = Field(default_factory=WebhookConfig)
 
 
 class AuthConfig(BaseModel):

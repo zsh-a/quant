@@ -184,6 +184,7 @@ def execute_session(
             slippage=config.slippage
             if config.slippage is not None
             else broker_config.backtest.slippage,
+            session_id=config.session_id,
         )
 
     risk_manager = None

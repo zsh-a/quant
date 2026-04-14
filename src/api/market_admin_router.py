@@ -239,6 +239,14 @@ async def get_market_update_capabilities():
     return get_update_step_capabilities()
 
 
+@router.get("/data-quality")
+async def get_data_quality_report():
+    """数据质量报告：缺失率、异常值、新鲜度。"""
+    from src.market_data.data_quality import DataQualityChecker
+    checker = DataQualityChecker()
+    return await anyio.to_thread.run_sync(checker.full_report)
+
+
 @router.get("/update-runs")
 async def list_market_update_runs(limit: int = 20):
     return await anyio.to_thread.run_sync(session_db.list_data_update_runs, limit)

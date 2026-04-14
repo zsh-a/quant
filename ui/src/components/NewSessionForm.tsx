@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
+import { ShieldCheck, Layers } from 'lucide-react';
 import { StrategyMeta } from '../types';
 import StrategyConfigForm from './StrategyConfigForm';
 import { Button } from './ui/button';
+import { Switch } from './ui/switch';
 
 interface NewSessionFormProps {
     strategies: StrategyMeta[];
@@ -17,6 +19,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
     const [endDate, setEndDate] = useState<string>('');
     const [mode, setMode] = useState('backtest');
     const [useAsync, setUseAsync] = useState(true);
+    const [enableRisk, setEnableRisk] = useState(true);
 
     useEffect(() => {
         if (strategies.length > 0 && !selectedStrategy) {
@@ -72,6 +75,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
             mode,
             params: finalParams,
             async: useAsync && mode === 'backtest',
+            enable_risk_management: enableRisk,
         };
 
         if (endDate) payload.end_date = endDate;
@@ -102,19 +106,38 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                 </div>
             }
             footer={
-                <div className="space-y-4">
-                    {mode === 'backtest' && (
-                        <label className="flex items-center gap-3 rounded-2xl border border-border/70 bg-secondary/35 px-4 py-3">
-                            <input
-                                type="checkbox"
-                                checked={useAsync}
-                                onChange={(e) => setUseAsync(e.target.checked)}
-                                style={{ width: 'auto' }}
-                            />
-                            <span className="tagline !mb-0">Run in background (Celery queue)</span>
+                <div className="space-y-3">
+                    <div className="rounded-2xl border border-border/60 bg-secondary/30 divide-y divide-border/40">
+                        <label
+                            htmlFor="sw-risk"
+                            className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none"
+                        >
+                            <div className="flex items-center gap-2.5">
+                                <ShieldCheck size={15} className={enableRisk ? 'text-emerald-500' : 'text-muted-foreground/50'} />
+                                <div>
+                                    <span className="text-sm font-medium leading-none">Risk Control</span>
+                                    <p className="text-xs text-muted-foreground mt-0.5">止损 / 止盈 / 仓位限制 / 回撤控制</p>
+                                </div>
+                            </div>
+                            <Switch id="sw-risk" checked={enableRisk} onCheckedChange={setEnableRisk} />
                         </label>
-                    )}
-                    {error && <div style={{ color: 'var(--color-danger)' }}>{error}</div>}
+                        {mode === 'backtest' && (
+                            <label
+                                htmlFor="sw-async"
+                                className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none"
+                            >
+                                <div className="flex items-center gap-2.5">
+                                    <Layers size={15} className={useAsync ? 'text-blue-500' : 'text-muted-foreground/50'} />
+                                    <div>
+                                        <span className="text-sm font-medium leading-none">Background</span>
+                                        <p className="text-xs text-muted-foreground mt-0.5">Celery 后台队列异步执行</p>
+                                    </div>
+                                </div>
+                                <Switch id="sw-async" checked={useAsync} onCheckedChange={setUseAsync} />
+                            </label>
+                        )}
+                    </div>
+                    {error && <div className="text-sm text-destructive">{error}</div>}
                     <Button className="w-full" onClick={handleStart} disabled={!selectedStrategy}>
                         Start Session
                     </Button>

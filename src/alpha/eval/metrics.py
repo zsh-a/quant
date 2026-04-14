@@ -141,6 +141,41 @@ def compute_ic_metrics(
     return metrics
 
 
+def compute_ic_trend(ic_values: list[float]) -> dict[str, float]:
+    """Analyze IC trend over time: slope, half-life, significance.
+
+    Args:
+        ic_values: Time-ordered IC measurements (e.g., per-round evaluations).
+
+    Returns:
+        dict with: trend_slope, half_life_rounds, is_decaying (bool as 0/1).
+    """
+    n = len(ic_values)
+    if n < 3:
+        return {"trend_slope": 0.0, "half_life_rounds": float("inf"), "is_decaying": 0.0}
+
+    arr = np.array(ic_values, dtype=np.float64)
+    x = np.arange(n, dtype=np.float64)
+    x_mean = x.mean()
+    y_mean = arr.mean()
+    ss_xy = np.sum((x - x_mean) * (arr - y_mean))
+    ss_xx = np.sum((x - x_mean) ** 2)
+    slope = float(ss_xy / ss_xx) if ss_xx > 0 else 0.0
+
+    # Half-life: rounds until IC drops to 50% of current (assuming linear decline)
+    current_ic = abs(arr[-1])
+    if slope < 0 and current_ic > 1e-6:
+        half_life = current_ic / (2.0 * abs(slope))
+    else:
+        half_life = float("inf")
+
+    return {
+        "trend_slope": round(slope, 6),
+        "half_life_rounds": round(half_life, 1) if half_life != float("inf") else float("inf"),
+        "is_decaying": 1.0 if slope < -1e-4 else 0.0,
+    }
+
+
 def compute_quantile_returns(
     alpha: np.ndarray,
     close: np.ndarray,

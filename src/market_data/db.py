@@ -18,8 +18,12 @@ _VALID_STOCK_COLUMNS = frozenset({
 
 _VALID_FINANCIAL_COLUMNS = frozenset({
     "code", "publish_date", "report_date", "circulating_a",
-    "total_share", "revenue", "net_profit", "roe", "roa",
-    "gross_profit_margin", "net_profit_margin", "eps", "bps",
+    "total_shares", "total_share", "revenue", "net_profit", "roe", "roa",
+    "adjusted_profit", "adjusted_profit_diff",
+    "total_operating_revenue", "subtotal_operate_cash_inflow",
+    "inc_net_profit_year_on_year", "nav_per_share", "eps",
+    "market_cap", "circulating_market_cap", "pe_ratio", "pb_ratio",
+    "gross_profit_margin", "net_profit_margin", "bps",
     "operating_cash_flow", "total_assets", "total_liabilities",
     "equity", "debt_to_assets", "current_ratio", "quick_ratio",
 })

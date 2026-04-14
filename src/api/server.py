@@ -140,6 +140,7 @@ class SessionRequest(BaseModel):
     end_date: Optional[DateStr] = None
     mode: ModeStr = "backtest"
     params: Dict[str, Any] = Field(default_factory=dict)
+    enable_risk_management: bool = True
 
 # Register strategies once at startup
 StrategyRegistry.register_all()
@@ -242,7 +243,7 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks, re
                 initial_cash=broker_config.backtest.initial_cash,
                 commission=broker_config.backtest.commission,
                 slippage=broker_config.backtest.slippage,
-                enable_risk_management=True,
+                enable_risk_management=req.enable_risk_management,
                 chunk_size_months=data_stream_config.chunk_size_months,
             ),
             session_db=session_db,
@@ -284,7 +285,7 @@ async def run_session_async(req: SessionRequest, request: Request = None):
         "initial_cash": broker_config.backtest.initial_cash,
         "commission": broker_config.backtest.commission,
         "slippage": broker_config.backtest.slippage,
-        "enable_risk_management": True,
+        "enable_risk_management": req.enable_risk_management,
         "chunk_size_months": data_stream_config.chunk_size_months,
         "request_id": request_id_ctx.get(),
     }

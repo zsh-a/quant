@@ -8,7 +8,7 @@ class BacktestBroker(Broker):
     def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0003,
                  slippage: float = 0.001, db_client=None, risk_manager=None,
                  on_order_submitted: Optional[Callable[[Order], None]] = None,
-                 allow_short: bool = False):
+                 allow_short: bool = False, session_id: Optional[str] = None):
         self.cash = initial_cash
         self.initial_cash = initial_cash
         self.commission = commission
@@ -16,6 +16,13 @@ class BacktestBroker(Broker):
         self.allow_short = allow_short
         self.db_client = db_client
         self.risk_manager = risk_manager
+        self._session_log = None
+        if session_id:
+            try:
+                from src.utils.session_logger import get_session_logger
+                self._session_log = get_session_logger(session_id)
+            except ImportError:
+                pass
         
         self.positions: Dict[str, float] = {}  # symbol -> quantity
         self.orders: Dict[str, Order] = {}
@@ -56,6 +63,18 @@ class BacktestBroker(Broker):
         except Exception as e:
             logger.warning(f"Failed to load stock names from DB: {e}")
 
+    def _risk_log(self, message: str, level: str = "WARNING", **kwargs):
+        """Log risk event to both loguru and session log (visible in frontend)."""
+        date_str = ""
+        if self.current_bars:
+            ts = next(iter(self.current_bars.values())).timestamp
+            date_str = str(ts.date())
+            message = f"[{date_str}] {message}"
+            kwargs.setdefault("date", date_str)
+        getattr(logger, level.lower())(message)
+        if self._session_log:
+            self._session_log.add(level, "risk", message, kwargs)
+
     def submit_order(self, order: Order) -> str:
         # 统一风险检查入口
         if self.risk_manager and self.risk_manager.enabled:
@@ -68,7 +87,7 @@ class BacktestBroker(Broker):
             if order.type == 'buy' and price > 0:
                 allowed, reason = self.risk_manager.check_position_limit(order.symbol, order.quantity, price)
                 if not allowed:
-                    logger.warning(f"Order REJECTED by RiskManager: {reason}")
+                    self._risk_log(f"订单被风控拒绝: {order.type} {order.symbol} qty={order.quantity} — {reason}")
                     return "REJECTED_BY_RISK"
 
         order.id = str(uuid.uuid4())
@@ -374,7 +393,7 @@ class BacktestBroker(Broker):
                     # Check stop loss and take profit
                     stop_triggered, stop_reason = self.risk_manager.check_stop_loss(symbol, current_price)
                     if stop_triggered:
-                        logger.warning(f"Stop loss triggered for {symbol}: {stop_reason}")
+                        self._risk_log(f"止损触发: {symbol} — {stop_reason}")
                         # Auto-create sell order
                         qty = self.positions.get(symbol, 0)
                         if qty > 0:
@@ -388,7 +407,7 @@ class BacktestBroker(Broker):
                     
                     profit_triggered, profit_reason = self.risk_manager.check_take_profit(symbol, current_price)
                     if profit_triggered:
-                        logger.info(f"Take profit triggered for {symbol}: {profit_reason}")
+                        self._risk_log(f"止盈触发: {symbol} — {profit_reason}", level="INFO")
                         # Auto-create sell order
                         qty = self.positions.get(symbol, 0)
                         if qty > 0:
@@ -406,10 +425,10 @@ class BacktestBroker(Broker):
             # Check portfolio-level limits
             halt, reason = self.risk_manager.check_daily_loss_limit()
             if halt:
-                logger.warning(f"RISK HALT — {reason}")
+                self._risk_log(f"⚠ 日损限额触发: {reason}", level="ERROR")
             halt, reason = self.risk_manager.check_max_drawdown()
             if halt:
-                logger.warning(f"RISK HALT — {reason}")
+                self._risk_log(f"⚠ 最大回撤触发: {reason}", level="ERROR")
 
         # Check stop order triggers
         self._check_stop_triggers(bars)

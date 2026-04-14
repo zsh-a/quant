@@ -12,6 +12,8 @@ try:
 except Exception:  # pragma: no cover - torch is optional for this scaffold
     torch = None
 
+from loguru import logger as _logger
+
 try:
     from ..eval.gpu_ops import (
         TRITON_AVAILABLE as _TRITON_OK,
@@ -23,8 +25,7 @@ try:
         decay_linear as _triton_decay_linear,
     )
 except Exception as _exc:  # pragma: no cover
-    import logging as _logging
-    _logging.getLogger(__name__).warning("Triton import failed: %s", _exc)
+    _logger.warning("Triton GPU 加速不可用 ({}), 将使用 CPU 计算。性能可能显著下降。", _exc)
     _TRITON_OK = False
 
 
@@ -108,6 +109,14 @@ class StackVM:
             and self.device.type == "cuda"
         )
         self.persistent_cache: SubexprCache | None = None
+
+        # User-visible GPU status warnings
+        if self.backend == "numpy":
+            _logger.warning("StackVM: PyTorch 不可用，使用 NumPy 后端。大规模因子评估将显著变慢。")
+        elif self.device is not None and self.device.type == "cpu":
+            _logger.info("StackVM: 使用 PyTorch CPU 后端 (无 CUDA GPU 可用)")
+        if use_triton and not self.use_triton and self.backend == "torch":
+            _logger.warning("StackVM: Triton 加速未启用，rolling/cross-section 算子将使用 PyTorch 实现")
 
     def enable_persistent_cache(self, max_entries: int = 4096) -> None:
         """Enable cross-batch subexpression cache for repeated evaluations."""
