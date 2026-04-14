@@ -18,6 +18,7 @@ from src.alpha.core.market import list_market_types
 from src.alpha.search.pipeline import RoundRecord, StageRecord
 from src.alpha.infra.tracing import InMemoryCollector, tracer
 from src.config.settings import get_alpha_lab_config, get_bitget_config, get_crypto_market_config
+from src.config.paths import SEARCH_JOBS_STATE_PATH
 
 router = APIRouter(prefix="/alpha-lab", tags=["alpha-lab"])
 
@@ -39,6 +40,50 @@ tracer.add_collector(_memory_collector)
 
 _SEARCH_JOBS: dict[str, dict[str, Any]] = {}
 _SEARCH_EVENTS: dict[str, asyncio.Queue[dict[str, Any]]] = {}
+
+
+def _persist_search_jobs() -> None:
+    """Save non-running job metadata to disk for crash recovery."""
+    try:
+        snapshot = {}
+        for jid, job in _SEARCH_JOBS.items():
+            if job.get("status") in ("completed", "failed"):
+                snapshot[jid] = {
+                    "status": job["status"],
+                    "params": job.get("params"),
+                    "error": job.get("error"),
+                    "created_at": job.get("created_at"),
+                }
+        SEARCH_JOBS_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
+        SEARCH_JOBS_STATE_PATH.write_text(
+            _json.dumps(snapshot, ensure_ascii=False, default=str), encoding="utf-8",
+        )
+    except Exception as exc:
+        logger.warning("Failed to persist search jobs: {}", exc)
+
+
+def _load_search_jobs() -> None:
+    """Restore completed/failed job metadata from disk."""
+    if not SEARCH_JOBS_STATE_PATH.exists():
+        return
+    try:
+        data = _json.loads(SEARCH_JOBS_STATE_PATH.read_text("utf-8"))
+        for jid, job in data.items():
+            if jid not in _SEARCH_JOBS:
+                _SEARCH_JOBS[jid] = {
+                    "status": job.get("status", "unknown"),
+                    "params": job.get("params"),
+                    "result": None,
+                    "error": job.get("error"),
+                    "created_at": job.get("created_at"),
+                }
+        logger.info("Restored {} search job records from disk", len(data))
+    except Exception as exc:
+        logger.warning("Failed to load search jobs: {}", exc)
+
+
+# Restore previous job records on module load
+_load_search_jobs()
 
 
 def _run_search_job(
@@ -80,10 +125,12 @@ def _run_search_job(
         )
         _SEARCH_JOBS[job_id].update(status="completed", result=result)
         _push({"type": "complete", "data": {"status": "completed"}})
+        _persist_search_jobs()
         logger.info("alpha.search job={} completed", job_id)
     except Exception as exc:
         _SEARCH_JOBS[job_id].update(status="failed", error=str(exc))
         _push({"type": "complete", "data": {"status": "failed", "error": str(exc)}})
+        _persist_search_jobs()
         logger.error("alpha.search job={} failed: {}", job_id, exc)
 
 

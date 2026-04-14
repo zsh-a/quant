@@ -3,7 +3,7 @@ import { PageHeader } from './layout/PageHeader';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 
 const HeatmapChart = lazy(() => import('./charts/HeatmapChart'));
 
@@ -32,7 +32,7 @@ export const IndustryHeatmap: React.FC = () => {
     setLoading(true);
     try {
       const endpoint = metric === 'breadth' ? 'industry_breadth' : 'industry_amount';
-      const resp = await fetch(`${API_BASE}/market/${endpoint}?start_date=${startDate}&end_date=${endDate}`);
+      const resp = await apiFetch(`/market/${endpoint}?start_date=${startDate}&end_date=${endDate}`);
       if (resp.ok) {
         const data = await resp.json();
         setHeatmapData(data);

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { EquityPoint, Trade, Position } from '../types';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 import {
   useSessions,
   useSelectedSessions,
@@ -53,7 +53,7 @@ export function useSessionData(activeRoute: string) {
           let hasMore = true;
           const items: any[] = [];
           while (hasMore) {
-            const resp = await fetch(`${API_BASE}${path}?limit=${limit}&offset=${offset}`);
+            const resp = await apiFetch(`${path}?limit=${limit}&offset=${offset}`);
             if (resp.status === 404) {
               removeSession(id);
               return [];
@@ -89,10 +89,10 @@ export function useSessionData(activeRoute: string) {
       try {
         inFlightRef.current = true;
         const since = lastUpdatedRef.current;
-        const url = since
-          ? `${API_BASE}/session/${id}/status?since=${encodeURIComponent(since)}`
-          : `${API_BASE}/session/${id}/status`;
-        const resp = await fetch(url);
+        const path = since
+          ? `/session/${id}/status?since=${encodeURIComponent(since)}`
+          : `/session/${id}/status`;
+        const resp = await apiFetch(path);
 
         if (resp.status === 404) {
           removeSession(id);

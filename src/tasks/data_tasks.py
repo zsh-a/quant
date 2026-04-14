@@ -7,7 +7,12 @@ from loguru import logger
 from src.market_data.processors.tdx import TDXProcess
 from src.tasks.celery_app import app
 
-@app.task(name='src.tasks.data_tasks.sync_financial_data')
+@app.task(
+    name='src.tasks.data_tasks.sync_financial_data',
+    autoretry_for=(ConnectionError, OSError, TimeoutError),
+    retry_backoff=True,
+    max_retries=3,
+)
 def sync_financial_data(start_year=None):
     """
     Synchronize financial data from TDX incrementally.

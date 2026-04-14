@@ -3,7 +3,7 @@ import { FixedSizeList as List } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -315,7 +315,7 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
             const params = new URLSearchParams({ limit: '2000', format: 'json' });
             if (levelFilter) params.append('level', levelFilter);
             if (sourceFilter) params.append('source', sourceFilter);
-            const resp = await fetch(`${API_BASE}/logs/${sessionId}?${params}`);
+            const resp = await apiFetch(`/logs/${sessionId}?${params}`);
             if (!resp.ok) { setError(`Fetch failed: ${resp.statusText}`); return; }
             const data = await resp.json();
             setEntries(data.logs || []);
@@ -411,7 +411,7 @@ export const StrategyLogViewer: React.FC<LogViewerProps> = ({ sessionId }) => {
     const handleClear = async () => {
         if (!sessionId) return;
         try {
-            await fetch(`${API_BASE}/logs/${sessionId}`, { method: 'DELETE' });
+            await apiFetch(`/logs/${sessionId}`, { method: 'DELETE' });
             setEntries([]);
         } catch (err) {
             console.error('Failed to clear logs:', err);

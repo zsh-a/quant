@@ -107,6 +107,17 @@ class NotificationsConfig(BaseModel):
     telegram: TelegramConfig = Field(default_factory=TelegramConfig)
 
 
+class AuthConfig(BaseModel):
+    """Authentication configuration."""
+
+    enabled: bool = False
+    secret_key: str = "quent-change-me-in-production"
+    algorithm: str = "HS256"
+    access_token_expire_minutes: int = 1440  # 24h
+    default_username: str = "admin"
+    default_password: str = "admin"
+
+
 class AlphaLabConfig(BaseModel):
     """Configuration for the alpha lab research pipeline."""
 
@@ -155,6 +166,7 @@ class Settings(BaseSettings):
     broker: BrokerConfig = Field(default_factory=BrokerConfig)
     database: DatabaseConfig = Field(default_factory=DatabaseConfig)
     api: APIConfig = Field(default_factory=APIConfig)
+    auth: AuthConfig = Field(default_factory=AuthConfig)
     logging: LoggingConfig = Field(default_factory=LoggingConfig)
     notifications: NotificationsConfig = Field(default_factory=NotificationsConfig)
     alpha_lab: AlphaLabConfig = Field(default_factory=AlphaLabConfig)
@@ -241,6 +253,11 @@ def get_logging_config() -> LoggingConfig:
 def get_notifications_config() -> NotificationsConfig:
     """Get notification configuration"""
     return get_settings().notifications
+
+
+def get_auth_config() -> AuthConfig:
+    """Get authentication configuration."""
+    return get_settings().auth
 
 
 def get_alpha_lab_config() -> AlphaLabConfig:

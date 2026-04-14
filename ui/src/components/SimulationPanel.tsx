@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { SimulationJob, SimulationRun, SimulationStep, StrategyMeta } from '../types';
 import StrategyConfigForm from './StrategyConfigForm';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 import { formatPrice } from '../utils/format';
 import { formatStatusLabel } from '../utils/display';
 
@@ -133,7 +133,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     jobsAbortRef.current?.abort();
     const controller = new AbortController();
     jobsAbortRef.current = controller;
-    const resp = await fetch(`${API_BASE}/simulation-jobs`, { signal: controller.signal });
+    const resp = await apiFetch(`/simulation-jobs`, { signal: controller.signal });
     const data = await resp.json();
     setJobs(data);
     setSelectedJobId((prev) => {
@@ -147,7 +147,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     runsAbortRef.current?.abort();
     const controller = new AbortController();
     runsAbortRef.current = controller;
-    const resp = await fetch(`${API_BASE}/simulation-jobs/${jobId}/runs?limit=20`, { signal: controller.signal });
+    const resp = await apiFetch(`/simulation-jobs/${jobId}/runs?limit=20`, { signal: controller.signal });
     const data = await resp.json();
     setRuns(data);
     if (data.length > 0) {
@@ -164,7 +164,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     stepsAbortRef.current = controller;
     const latestStep = steps[0]?.run_id === runId ? Math.max(...steps.map((step) => step.step_index)) : null;
     const query = latestStep !== null ? `?limit=300&since_step=${latestStep}` : '?limit=120';
-    const resp = await fetch(`${API_BASE}/simulation-runs/${runId}/steps${query}`, { signal: controller.signal });
+    const resp = await apiFetch(`/simulation-runs/${runId}/steps${query}`, { signal: controller.signal });
     const data = await resp.json();
     setSteps((prev) => {
       if (latestStep === null) {
@@ -228,9 +228,8 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     setMessage(null);
     setSubmitting(true);
     try {
-      const resp = await fetch(`${API_BASE}/simulation-jobs`, {
+      const resp = await apiFetch(`/simulation-jobs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name,
           strategy,
@@ -262,7 +261,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
 
   const handleToggleJob = async (job: SimulationJob) => {
     const endpoint = job.enabled ? 'disable' : 'enable';
-    await fetch(`${API_BASE}/simulation-jobs/${job.job_id}/${endpoint}`, { method: 'POST' });
+    await apiFetch(`/simulation-jobs/${job.job_id}/${endpoint}`, { method: 'POST' });
     await fetchJobs();
   };
 
@@ -271,9 +270,8 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     setMessage(null);
     const telegram = job.notification?.telegram;
     const nextEnabled = !telegram?.enabled;
-    const resp = await fetch(`${API_BASE}/simulation-jobs/${job.job_id}/notification`, {
+    const resp = await apiFetch(`/simulation-jobs/${job.job_id}/notification`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         notification: {
           telegram: {
@@ -299,7 +297,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     setRunningJobKey(actionKey);
     try {
       const query = force ? '?force=true' : '';
-      const resp = await fetch(`${API_BASE}/simulation-jobs/${jobId}/run${query}`, { method: 'POST' });
+      const resp = await apiFetch(`/simulation-jobs/${jobId}/run${query}`, { method: 'POST' });
       if (!resp.ok) {
         throw new Error(await resp.text());
       }
@@ -321,7 +319,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     setMessage(null);
     setRunTriggering(true);
     try {
-      const resp = await fetch(`${API_BASE}/simulation-jobs/run-enabled`, { method: 'POST' });
+      const resp = await apiFetch(`/simulation-jobs/run-enabled`, { method: 'POST' });
       if (!resp.ok) {
         throw new Error(await resp.text());
       }
@@ -342,9 +340,8 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ strategies, on
     setMessage(null);
     setDataUpdating(true);
     try {
-      const resp = await fetch(`${API_BASE}/data-update/run`, {
+      const resp = await apiFetch(`/data-update/run`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({}),
       });
       if (!resp.ok) {

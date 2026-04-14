@@ -2,7 +2,7 @@
  * Typed API client for Alpha Lab endpoints.
  * Replaces inline fetch() calls in AlphaLabWorkspace.
  */
-import { API_BASE } from './api'
+import { API_BASE, authHeaders } from './api'
 import type {
   AlphaLabCombineResult,
   AlphaLabEvaluationSummary,
@@ -28,7 +28,8 @@ class AlphaApiError extends Error {
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const r = await fetch(`${API_BASE}${path}`, init)
+  const headers = authHeaders(init?.headers as Record<string, string> | undefined)
+  const r = await fetch(`${API_BASE}${path}`, { ...init, headers })
   const body = await r.json().catch(() => null)
   if (!r.ok) throw new AlphaApiError(r.status, body?.detail ?? 'request failed')
   return body as T

@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatMoney } from '../utils/format';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 
 interface Checkpoint {
     id: string;
@@ -30,7 +30,7 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
 
     const fetchCheckpoints = async () => {
         try {
-            const response = await fetch(`${API_BASE}/session/${sessionId}/checkpoints`);
+            const response = await apiFetch(`/session/${sessionId}/checkpoints`);
             if (response.ok) {
                 const data = await response.json();
                 setCheckpoints(data.checkpoints || []);
@@ -49,9 +49,8 @@ export const CheckpointList: React.FC<CheckpointListProps> = ({ sessionId, onRes
 
         setRestoring(checkpointId);
         try {
-            const response = await fetch(`${API_BASE}/session/${sessionId}/restore`, {
+            const response = await apiFetch(`/session/${sessionId}/restore`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ checkpoint_id: checkpointId })
             });
 

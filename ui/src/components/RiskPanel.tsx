@@ -1,6 +1,6 @@
 import React from 'react';
 import { formatMoney } from '../utils/format';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 import { formatStatusLabel } from '../utils/display';
 
 interface RiskMetric {
@@ -30,7 +30,7 @@ export const RiskPanel: React.FC<RiskPanelProps> = ({ sessionId }) => {
     React.useEffect(() => {
         const fetchRiskData = async () => {
             try {
-                const response = await fetch(`${API_BASE}/session/${sessionId}/risk`);
+                const response = await apiFetch(`/session/${sessionId}/risk`);
                 if (response.ok) {
                     const data = await response.json();
                     setRiskData(data);

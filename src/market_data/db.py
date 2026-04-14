@@ -1,3 +1,5 @@
+import re
+
 import pandas as pd
 
 from loguru import logger
@@ -5,33 +7,93 @@ from loguru import logger
 from src.market_data.clickhouse import create_clickhouse_client
 
 
+# ---------------------------------------------------------------------------
+# Column / table allowlists — prevent injection via dynamic identifiers
+# ---------------------------------------------------------------------------
+_VALID_STOCK_COLUMNS = frozenset({
+    "code", "date", "open", "high", "low", "close", "volume", "amount",
+    "adjfactor", "turn", "tradestatus", "pctChg", "isST", "peTTM",
+    "pbMRQ", "psTTM", "pcfNcfTTM",
+})
+
+_VALID_FINANCIAL_COLUMNS = frozenset({
+    "code", "publish_date", "report_date", "circulating_a",
+    "total_share", "revenue", "net_profit", "roe", "roa",
+    "gross_profit_margin", "net_profit_margin", "eps", "bps",
+    "operating_cash_flow", "total_assets", "total_liabilities",
+    "equity", "debt_to_assets", "current_ratio", "quick_ratio",
+})
+
+_VALID_TABLES = frozenset({
+    "stock_data.stock_daily",
+    "stock_data.stock_daily_meta",
+    "stock_data.all_stock",
+    "stock_data.finicial_data",
+    "stock_data.finicial_report",
+    "stock_data.industry_info",
+    "stock_data.shares_info",
+    "stock_data.index_stocks",
+})
+
+_IDENTIFIER_RE = re.compile(r"^[a-zA-Z_][a-zA-Z0-9_.]*$")
+
+
+def _validate_identifier(name: str) -> str:
+    """Raise if *name* is not a safe SQL identifier."""
+    if not _IDENTIFIER_RE.match(name):
+        raise ValueError(f"非法标识符: {name!r}")
+    return name
+
+
+def _validate_columns(fields: list[str], allowed: frozenset[str]) -> list[str]:
+    """Return *fields* after checking every element is in *allowed*."""
+    bad = set(fields) - allowed
+    if bad:
+        raise ValueError(f"不允许的列名: {bad}")
+    return fields
+
+
+def _validate_table(table: str) -> str:
+    if table not in _VALID_TABLES:
+        raise ValueError(f"不允许的表名: {table!r}")
+    return table
+
+
 class DB:
     def __init__(self):
         self.client = create_clickhouse_client()
         self._cache = {}
 
+    # ------------------------------------------------------------------
+    # K-line data
+    # ------------------------------------------------------------------
     def get_kline(self, code, start_date, end_date):
-        query = f"""
-        SELECT *
-        FROM stock_data.stock_daily
-        WHERE code = '{code}'"""
+        params = {"code": code}
+        query = (
+            "SELECT * FROM stock_data.stock_daily "
+            "WHERE code = {code:String}"
+        )
         if start_date:
-            query += f" AND date >= '{start_date}'"
+            query += " AND date >= {start_date:String}"
+            params["start_date"] = start_date
         if end_date:
-            query += f" AND date <= '{end_date}'"
+            query += " AND date <= {end_date:String}"
+            params["end_date"] = end_date
+        query += " ORDER BY date"
 
-        query += "ORDER BY date"
-
-        data = self.client.query(query)
+        data = self.client.query(query, parameters=params)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         try:
             df.rename(columns={"date": "datetime"}, inplace=True)
             df.set_index("datetime", inplace=True)
             df.index = pd.to_datetime(df.index)
         except Exception as exc:
-            print(exc)
+            logger.warning("get_kline 索引处理异常: {}", exc)
         return df
 
+    # ------------------------------------------------------------------
+    # Meta
+    # ------------------------------------------------------------------
     def update_meta(self):
         """Update stock names in meta table from all_stock table in DB."""
         data = self.client.query(
@@ -43,40 +105,43 @@ class DB:
         for code, name in data.result_rows:
             if not name:
                 continue
-            self.client.command(f"""
-            INSERT INTO stock_data.stock_daily_meta
-                (code, last_update_date, last_adjfactor, error_update_count, name)
-            SELECT code, last_update_date, last_adjfactor, error_update_count, '{name}'
-            FROM stock_data.stock_daily_meta
-            WHERE code = '{code}'
-            ORDER BY last_update_date DESC
-            LIMIT 1
-            """)
+            self.client.command(
+                "INSERT INTO stock_data.stock_daily_meta "
+                "    (code, last_update_date, last_adjfactor, error_update_count, name) "
+                "SELECT code, last_update_date, last_adjfactor, error_update_count, "
+                "    {name:String} "
+                "FROM stock_data.stock_daily_meta "
+                "WHERE code = {code:String} "
+                "ORDER BY last_update_date DESC "
+                "LIMIT 1",
+                parameters={"name": name, "code": code},
+            )
 
     def get_meta(self, code):
-        query = f"""
-        SELECT *
-        FROM stock_data.stock_daily_meta
-        WHERE code = '{code}'
-        """
-
-        data = self.client.query(query)
+        data = self.client.query(
+            "SELECT * FROM stock_data.stock_daily_meta "
+            "WHERE code = {code:String}",
+            parameters={"code": code},
+        )
         assert len(data.result_rows) == 1
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         return df
 
+    # ------------------------------------------------------------------
+    # Table maintenance
+    # ------------------------------------------------------------------
     def opt_table(self, table_name):
-        query = f"""
-        OPTIMIZE TABLE {table_name} FINAL;
-        """
-        self.client.command(query)
+        _validate_table(table_name)
+        self.client.command(f"OPTIMIZE TABLE {table_name} FINAL")
 
+    # ------------------------------------------------------------------
+    # Price data
+    # ------------------------------------------------------------------
     def get_price(
         self, stocks, end_date, fields, count, price_adj=True, start_date=None
     ):
         if not isinstance(stocks, list):
             stocks = [stocks]
-
         if not isinstance(fields, list):
             fields = [fields]
 
@@ -94,30 +159,34 @@ class DB:
         if "adjfactor" not in db_fields and price_adj:
             db_fields.append("adjfactor")
 
+        _validate_columns(db_fields, _VALID_STOCK_COLUMNS)
         fields_str = ", ".join(db_fields)
-        stocks_str = ", ".join([f"'{code}'" for code in stocks])
 
-        query = f"""
-        SELECT * FROM (
-            SELECT
-                code,
-                date,
-                {fields_str},
-                tradestatus,
-                ROW_NUMBER() OVER(PARTITION BY code ORDER BY date DESC) AS rn
-            FROM stock_data.stock_daily FINAL
-            WHERE code IN ({stocks_str})
-            AND date <= '{end_date}'
-            """
+        params: dict = {
+            "stocks": stocks,
+            "end_date": end_date,
+            "count": count,
+        }
+
+        query = (
+            "SELECT * FROM ("
+            "    SELECT"
+            f"        code, date, {fields_str}, tradestatus,"
+            "        ROW_NUMBER() OVER(PARTITION BY code ORDER BY date DESC) AS rn"
+            "    FROM stock_data.stock_daily FINAL"
+            "    WHERE code IN {stocks:Array(String)}"
+            "    AND date <= {end_date:String}"
+        )
         if start_date:
-            query += f" AND date >= '{start_date}'"
-        query += f"""
-        ) t
-        WHERE rn <= {count}
-        ORDER BY code, date
-        """
+            query += " AND date >= {start_date:String}"
+            params["start_date"] = start_date
+        query += (
+            ") t "
+            "WHERE rn <= {count:UInt32} "
+            "ORDER BY code, date"
+        )
 
-        data = self.client.query(query)
+        data = self.client.query(query, parameters=params)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
 
         if len(df) == 0:
@@ -142,36 +211,35 @@ class DB:
         self._cache[cache_key] = df
         return df
 
+    # ------------------------------------------------------------------
+    # Industry
+    # ------------------------------------------------------------------
     def get_stock_industry(self, stocks, date=None):
         if not isinstance(stocks, list):
             stocks = [stocks]
 
-        stocks_str = ", ".join([f"'{code}'" for code in stocks])
-
-        query = f"""
-        SELECT code, industry
-        FROM (
-            SELECT
-                code,
-                industry,
-                ROW_NUMBER() OVER(PARTITION BY code ORDER BY date DESC) AS rn
-            FROM stock_data.finicial_data
-            WHERE code IN ({stocks_str})"""
-
+        params: dict = {"stocks": stocks}
+        query = (
+            "SELECT code, industry FROM ("
+            "    SELECT"
+            "        code, industry,"
+            "        ROW_NUMBER() OVER(PARTITION BY code ORDER BY date DESC) AS rn"
+            "    FROM stock_data.finicial_data"
+            "    WHERE code IN {stocks:Array(String)}"
+        )
         if date:
-            query += f" AND date <= '{date}'"
+            query += " AND date <= {date:String}"
+            params["date"] = date
+        query += ") t WHERE rn = 1 ORDER BY code"
 
-        query += """
-        ) t
-        WHERE rn = 1
-        ORDER BY code
-        """
-
-        data = self.client.query(query)
+        data = self.client.query(query, parameters=params)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         df.set_index("code", inplace=True)
         return df
 
+    # ------------------------------------------------------------------
+    # Index stocks
+    # ------------------------------------------------------------------
     def get_index_stocks(self, index_code, date=None):
         if not isinstance(index_code, list):
             index_code = [index_code]
@@ -180,14 +248,11 @@ class DB:
         if cache_key in self._cache:
             return self._cache[cache_key]
 
-        index_code_str = ", ".join([f"'{code}'" for code in index_code])
-
-        sql = f"""
-        SELECT code
-        FROM stock_data.index_stocks
-        WHERE index in ({index_code_str})
-        """
-        data = self.client.query(sql)
+        data = self.client.query(
+            "SELECT code FROM stock_data.index_stocks "
+            "WHERE index IN {codes:Array(String)}",
+            parameters={"codes": index_code},
+        )
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         if df.empty or "code" not in df.columns:
             return []
@@ -195,95 +260,99 @@ class DB:
         self._cache[cache_key] = res
         return res
 
+    # ------------------------------------------------------------------
+    # Financial data
+    # ------------------------------------------------------------------
     def get_stock_fincial(self, stocks, fields, date=None):
         if not isinstance(stocks, list):
             stocks = [stocks]
-
         if not isinstance(fields, list):
             fields = [fields]
+
+        _validate_columns(fields, _VALID_FINANCIAL_COLUMNS)
         fields_str = ", ".join(fields)
-        stocks_str = ", ".join([f"'{code}'" for code in stocks])
-        query = f"""
-        SELECT * FROM (
-            SELECT
-                code,{fields_str},
-                ROW_NUMBER() OVER(PARTITION BY code ORDER BY (publish_date,report_date) DESC) AS rn
-            FROM stock_data.finicial_report
-            WHERE code IN ({stocks_str})
-            AND circulating_a > 0
-            """
+
+        params: dict = {"stocks": stocks}
+        query = (
+            "SELECT * FROM ("
+            "    SELECT"
+            f"        code, {fields_str},"
+            "        ROW_NUMBER() OVER(PARTITION BY code ORDER BY (publish_date,report_date) DESC) AS rn"
+            "    FROM stock_data.finicial_report"
+            "    WHERE code IN {stocks:Array(String)}"
+            "    AND circulating_a > 0"
+        )
         if date:
-            query += f" AND publish_date <= '{date}'"
-        query += """
-        ) t
-        WHERE rn = 1
-        ORDER BY code
-        """
-        data = self.client.query(query)
+            query += " AND publish_date <= {date:String}"
+            params["date"] = date
+        query += ") t WHERE rn = 1 ORDER BY code"
+
+        data = self.client.query(query, parameters=params)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         df.set_index("code", inplace=True)
         return df
 
+    # ------------------------------------------------------------------
+    # SW industry
+    # ------------------------------------------------------------------
     def get_stock_industry_sw(self, stocks, date=None):
         cache_key = f"industry_sw_{len(stocks)}_{stocks[0] if stocks else ''}_{date}"
         if cache_key in self._cache:
             return self._cache[cache_key].copy()
 
-        stocks_str = ", ".join([f"'{code}'" for code in stocks])
-
-        sql = f"""
-        SELECT * FROM (
-            SELECT
-                *,
-                ROW_NUMBER() OVER(PARTITION BY code ORDER BY enter_date DESC) AS rn
-            FROM stock_data.industry_info
-            WHERE code IN ({stocks_str})
-        """
+        params: dict = {"stocks": stocks}
+        query = (
+            "SELECT * FROM ("
+            "    SELECT *, "
+            "        ROW_NUMBER() OVER(PARTITION BY code ORDER BY enter_date DESC) AS rn"
+            "    FROM stock_data.industry_info"
+            "    WHERE code IN {stocks:Array(String)}"
+        )
         if date:
-            sql += f" AND enter_date <= '{date}'"
-        sql += """
-        ) t
-        WHERE rn = 1
-        """
-        data = self.client.query(sql)
+            query += " AND enter_date <= {date:String}"
+            params["date"] = date
+        query += ") t WHERE rn = 1"
+
+        data = self.client.query(query, parameters=params)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         df.set_index(keys="code", inplace=True)
 
         self._cache[cache_key] = df
         return df
 
+    # ------------------------------------------------------------------
+    # Shares info
+    # ------------------------------------------------------------------
     def get_stock_shares_info(self, stocks, date=None):
-        stocks_str = ", ".join([f"'{code}'" for code in stocks])
-
-        sql = f"""
-        SELECT * FROM (
-            SELECT
-                *,
-                ROW_NUMBER() OVER(PARTITION BY code ORDER BY change_date DESC) AS rn
-            FROM stock_data.shares_info
-            WHERE code IN ({stocks_str})
-        """
+        params: dict = {"stocks": stocks}
+        query = (
+            "SELECT * FROM ("
+            "    SELECT *, "
+            "        ROW_NUMBER() OVER(PARTITION BY code ORDER BY change_date DESC) AS rn"
+            "    FROM stock_data.shares_info"
+            "    WHERE code IN {stocks:Array(String)}"
+        )
         if date:
-            sql += f" AND change_date <= '{date}'"
-        sql += """
-        ) t
-        WHERE rn = 1
-        """
-        data = self.client.query(sql)
+            query += " AND change_date <= {date:String}"
+            params["date"] = date
+        query += ") t WHERE rn = 1"
+
+        data = self.client.query(query, parameters=params)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         df.set_index(keys="code", inplace=True)
-
         return df
 
+    # ------------------------------------------------------------------
+    # Utility
+    # ------------------------------------------------------------------
     def get_all_etf_code(self):
         from src.market_data.static_data import get_etf_codes
         return get_etf_codes()
 
     def get_all_stock_code(self):
-        sql = """
-        SELECT code FROM stock_data.stock_daily_meta
-        """
-        data = self.client.query(sql)
+        data = self.client.query(
+            "SELECT code FROM stock_data.stock_daily_meta"
+        )
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         stocks = df["code"].tolist()
         return [
@@ -300,12 +369,15 @@ class DB:
         return TradingCalendar(self)
 
     def get_swindustry_stocks(self, industry_code, date=None):
-        sql = f"""
-        SELECT code FROM stock_data.industry_info
-        WHERE industry_code = '{industry_code}'
-        """
+        params: dict = {"industry_code": industry_code}
+        query = (
+            "SELECT code FROM stock_data.industry_info "
+            "WHERE industry_code = {industry_code:String}"
+        )
         if date:
-            sql += f" AND enter_date <= '{date}'"
-        data = self.client.query(sql)
+            query += " AND enter_date <= {date:String}"
+            params["date"] = date
+
+        data = self.client.query(query, parameters=params)
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         return df["code"].tolist()

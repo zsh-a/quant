@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { BenchmarkData, SessionSummary } from '../types';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 
 export const AVAILABLE_BENCHMARKS = [
   { code: 'sh.000300', name: 'HS300' },
@@ -28,9 +28,9 @@ export function useBenchmarks(primarySession: SessionSummary | undefined) {
     await Promise.all(
       selectedBenchmarks.map(async (benchmarkCode) => {
         try {
-          let url = `${API_BASE}/market/benchmark?symbol=${benchmarkCode}&start_date=${primarySession.start_date}`;
+          let url = `/market/benchmark?symbol=${benchmarkCode}&start_date=${primarySession.start_date}`;
           if (primarySession.end_date) url += `&end_date=${primarySession.end_date}`;
-          const resp = await fetch(url);
+          const resp = await apiFetch(url);
           if (resp.ok) {
             newData[benchmarkCode] = await resp.json();
           }

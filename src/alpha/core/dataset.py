@@ -248,9 +248,9 @@ class CryptoMinuteDatasetLoader:
         client = self._get_client()
         upper_symbols = [s.upper() for s in symbols]
 
-        symbols_clause = ",".join(f"'{s}'" for s in upper_symbols)
         start_str = start_time.strftime("%Y-%m-%d %H:%M:%S")
         end_str = end_time.strftime("%Y-%m-%d %H:%M:%S")
+        query_params = {"symbols": upper_symbols, "start": start_str, "end": end_str}
 
         from time import perf_counter as _pc
         _t0 = _pc()
@@ -259,19 +259,19 @@ class CryptoMinuteDatasetLoader:
         resample_minutes = self._interval_minutes(requested_interval)
         if resample_minutes is not None and resample_minutes > _BASE_INTERVAL_MINUTES:
             query = self._build_ch_resample_query(
-                symbols_clause, start_str, end_str, resample_minutes,
+                start_str, end_str, resample_minutes,
             )
         else:
             cols = ", ".join(_SELECT_COLUMNS)
             query = (
                 f"SELECT {cols} FROM {_FUTURES_TABLE} "
-                f"WHERE symbol IN ({symbols_clause}) "
-                f"AND open_time >= toDateTime64('{start_str}', 3, 'UTC') "
-                f"AND open_time < toDateTime64('{end_str}', 3, 'UTC') "
-                f"ORDER BY open_time, symbol"
+                "WHERE symbol IN {symbols:Array(String)} "
+                "AND open_time >= toDateTime64({start:String}, 3, 'UTC') "
+                "AND open_time < toDateTime64({end:String}, 3, 'UTC') "
+                "ORDER BY open_time, symbol"
             )
 
-        df = client.query_df(query)
+        df = client.query_df(query, parameters=query_params)
         _t_query = _pc()
 
         if df.empty:
@@ -385,12 +385,16 @@ class CryptoMinuteDatasetLoader:
 
     @staticmethod
     def _build_ch_resample_query(
-        symbols_clause: str, start_str: str, end_str: str, minutes: int,
+        start_str: str, end_str: str, minutes: int,
     ) -> str:
         """Build a ClickHouse query that resamples 5m data server-side.
 
         Uses ``_ot`` as the interval alias to avoid ambiguity with the raw
         ``open_time`` column used inside ``argMin`` / ``argMax``.
+
+        NOTE: The returned query uses {symbols:Array(String)}, {start:String},
+        {end:String} parameter placeholders — the caller must pass these via
+        ``parameters=`` to the ClickHouse client.
         """
         interval_expr = f"toStartOfInterval(open_time, INTERVAL {minutes} MINUTE)"
         selects = ["symbol", f"{interval_expr} AS _ot"]
@@ -403,11 +407,11 @@ class CryptoMinuteDatasetLoader:
                 selects.append(f"{agg}({col}) AS {col}")
         return (
             f"SELECT {', '.join(selects)} FROM {_FUTURES_TABLE} "
-            f"WHERE symbol IN ({symbols_clause}) "
-            f"AND open_time >= toDateTime64('{start_str}', 3, 'UTC') "
-            f"AND open_time < toDateTime64('{end_str}', 3, 'UTC') "
+            "WHERE symbol IN {symbols:Array(String)} "
+            "AND open_time >= toDateTime64({start:String}, 3, 'UTC') "
+            "AND open_time < toDateTime64({end:String}, 3, 'UTC') "
             f"GROUP BY symbol, {interval_expr} "
-            f"ORDER BY _ot, symbol"
+            "ORDER BY _ot, symbol"
         )
 
     def _should_resample(self, interval: str) -> bool:
@@ -522,20 +526,21 @@ class AShareDailyDatasetLoader:
         start_str = start_time.strftime("%Y-%m-%d")
         end_str = end_time.strftime("%Y-%m-%d")
         cols = ", ".join(_STOCK_SELECT_COLUMNS)
+        query_params: dict = {"start": start_str, "end": end_str}
 
         if symbols:
-            codes_clause = ",".join(f"'{s}'" for s in symbols)
-            where_symbols = f"AND code IN ({codes_clause})"
+            where_symbols = "AND code IN {codes:Array(String)}"
+            query_params["codes"] = symbols
         else:
             where_symbols = ""
 
         query = (
             f"SELECT {cols} FROM {_STOCK_TABLE} FINAL "
-            f"WHERE date >= '{start_str}' AND date <= '{end_str}' "
+            "WHERE date >= {start:String} AND date <= {end:String} "
             f"{where_symbols} "
-            f"ORDER BY date, code"
+            "ORDER BY date, code"
         )
-        df = client.query_df(query)
+        df = client.query_df(query, parameters=query_params)
 
         if df.empty:
             raise ValueError("No A-share data found for the requested symbols/time range")
@@ -647,10 +652,10 @@ class AShareDailyDatasetLoader:
     def _resolve_universe(client, universe: str) -> list[str]:
         """Resolve index code(s) to constituent stock codes via stock_data.index_stocks."""
         codes = [c.strip() for c in universe.split(",") if c.strip()]
-        codes_clause = ",".join(f"'{c}'" for c in codes)
         result = client.query(
-            f"SELECT DISTINCT code FROM stock_data.index_stocks "
-            f"WHERE index IN ({codes_clause})"
+            "SELECT DISTINCT code FROM stock_data.index_stocks "
+            "WHERE index IN {codes:Array(String)}",
+            parameters={"codes": codes},
         )
         if not result.result_rows:
             return []

@@ -32,7 +32,16 @@ class BacktestTask(Task):
         )
 
 
-@app.task(bind=True, base=BacktestTask, name='src.tasks.backtest.run_backtest')
+@app.task(
+    bind=True,
+    base=BacktestTask,
+    name='src.tasks.backtest.run_backtest',
+    autoretry_for=(ConnectionError, OSError, TimeoutError),
+    retry_backoff=True,
+    retry_backoff_max=300,
+    max_retries=3,
+    retry_jitter=True,
+)
 def run_backtest_task(self, session_id: str, config: dict):
     """
     Run a backtest task asynchronously.
@@ -75,7 +84,7 @@ def run_backtest_task(self, session_id: str, config: dict):
                 initial_cash=config.get("initial_cash"),
                 commission=config.get("commission"),
                 slippage=config.get("slippage"),
-                enable_risk_management=config.get("enable_risk_management", False),
+                enable_risk_management=config.get("enable_risk_management", True),
                 chunk_size_months=config.get("chunk_size_months"),
             ),
             session_db=session_db,

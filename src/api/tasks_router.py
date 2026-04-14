@@ -15,17 +15,20 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 broker_config = get_broker_config()
 
 
+from src.api.validators import DateStr, SymbolStr, NonNegativeFloat, Ratio
+
+
 class BacktestTaskRequest(BaseModel):
     """Request model for creating a backtest task"""
     session_id: str
-    symbol: str
+    symbol: SymbolStr
     strategy: str
-    start_date: str
-    end_date: str
+    start_date: DateStr
+    end_date: DateStr
     params: dict = {}
-    initial_cash: float = broker_config.backtest.initial_cash
-    commission: float = broker_config.backtest.commission
-    slippage: float = broker_config.backtest.slippage
+    initial_cash: NonNegativeFloat = broker_config.backtest.initial_cash
+    commission: Ratio = broker_config.backtest.commission
+    slippage: Ratio = broker_config.backtest.slippage
     enable_risk_management: bool = True
     chunk_size_months: Optional[int] = None
 

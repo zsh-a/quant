@@ -4,7 +4,7 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { API_BASE, WS_BASE } from '../utils/api';
+import { API_BASE, WS_BASE, getToken, apiFetch } from '../utils/api';
 
 interface WebSocketMessage {
     type: string;
@@ -74,7 +74,11 @@ export const useWebSocket = ({
         if (!enabled || !sessionId) return;
 
         try {
-            const ws = new WebSocket(`${WS_BASE}/ws/${sessionId}`);
+            const token = getToken();
+            const wsUrl = token
+                ? `${WS_BASE}/ws/${sessionId}?token=${encodeURIComponent(token)}`
+                : `${WS_BASE}/ws/${sessionId}`;
+            const ws = new WebSocket(wsUrl);
             wsRef.current = ws;
 
             ws.onopen = () => {
@@ -140,11 +144,11 @@ export const useWebSocket = ({
 
         const poll = async () => {
             try {
-                const url = lastMessageTimeRef.current
-                    ? `${API_BASE}/session/${sessionId}/status?since=${encodeURIComponent(lastMessageTimeRef.current)}`
-                    : `${API_BASE}/session/${sessionId}/status`;
+                const path = lastMessageTimeRef.current
+                    ? `/session/${sessionId}/status?since=${encodeURIComponent(lastMessageTimeRef.current)}`
+                    : `/session/${sessionId}/status`;
 
-                const response = await fetch(url);
+                const response = await apiFetch(path);
                 if (response.status === 404) {
                     console.warn(`[Polling] Session ${sessionId} not found, stopping polling`);
                     setUsePolling(false);

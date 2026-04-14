@@ -13,14 +13,16 @@ from src.portfolio.portfolio_manager import (
     WeightMethod
 )
 from src.portfolio.backtest import PortfolioBacktester, PortfolioBacktestResult
+from src.portfolio import persistence as portfolio_db
 from src.strategies.registry import StrategyRegistry
 
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
-# In-memory portfolio storage (can be replaced with DB)
+# In-memory cache — loaded from DB on startup
 PORTFOLIOS: Dict[str, PortfolioManager] = {}
 BACKTEST_RESULTS: Dict[str, PortfolioBacktestResult] = {}
+_PORTFOLIO_CONFIGS: Dict[str, Dict] = {}  # raw config for persistence
 
 
 class CreatePortfolioRequest(BaseModel):
@@ -36,12 +38,15 @@ class UpdateWeightsRequest(BaseModel):
     weights: Dict[str, float]
 
 
+from src.api.validators import DateStr, NonNegativeFloat
+
+
 class PortfolioBacktestRequest(BaseModel):
     """Request to run portfolio backtest"""
-    start_date: str
-    end_date: str
+    start_date: DateStr
+    end_date: DateStr
     symbols: List[str]
-    initial_capital: float = 1000000.0
+    initial_capital: NonNegativeFloat = 1000000.0
 
 
 @router.post("")
@@ -83,7 +88,15 @@ async def create_portfolio(req: CreatePortfolioRequest):
         
         portfolio_id = f"pf_{req.name}_{len(PORTFOLIOS)}"
         PORTFOLIOS[portfolio_id] = portfolio
-        
+
+        raw_config = {
+            "strategies": req.strategies,
+            "weight_method": req.weight_method,
+            "rebalance_frequency": req.rebalance_frequency,
+        }
+        _PORTFOLIO_CONFIGS[portfolio_id] = raw_config
+        portfolio_db.save_portfolio(portfolio_id, req.name, raw_config)
+
         logger.info(f"Created portfolio: {portfolio_id}")
         
         return {
@@ -159,9 +172,20 @@ async def run_portfolio_backtest(portfolio_id: str, req: PortfolioBacktestReques
             symbols=req.symbols
         )
         
-        # Store result
+        # Store result (memory + DB)
         BACKTEST_RESULTS[portfolio_id] = result
-        
+        portfolio_db.save_backtest_result(portfolio_id, {
+            "portfolio_id": result.portfolio_id,
+            "total_return": result.total_return,
+            "sharpe_ratio": result.sharpe_ratio,
+            "max_drawdown": result.max_drawdown,
+            "final_equity": result.final_equity,
+            "strategy_results": result.strategy_results,
+            "trades": result.trades,
+            "equity_history": result.equity_history,
+            "weights_history": result.weights_history,
+        })
+
         return {
             "portfolio_id": result.portfolio_id,
             "total_return": result.total_return,

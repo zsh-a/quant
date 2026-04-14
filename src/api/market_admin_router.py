@@ -26,6 +26,20 @@ class MarketAdminUpdateRequest(BaseModel):
 
 
 class MarketDbOverviewService:
+
+    _ALLOWED_TABLES = frozenset({
+        "stock_data.trade_dates", "stock_data.all_stock",
+        "stock_data.stock_daily", "stock_data.stock_daily_meta",
+        "stock_data.finicial_report", "stock_data.finicial_data",
+        "stock_data.shares_info", "stock_data.industry_info",
+        "stock_data.index_stocks",
+    })
+
+    _ALLOWED_COLUMNS = frozenset({
+        "code", "date", "day", "calendar_date", "last_update_date",
+        "report_date", "publish_date", "change_date", "enter_date", "index",
+    })
+
     def __init__(self):
         self.db = DB()
 
@@ -49,6 +63,12 @@ class MarketDbOverviewService:
         date_column: Optional[str],
         distinct_column: Optional[str] = "code",
     ) -> Dict[str, Any]:
+        if table not in self._ALLOWED_TABLES:
+            raise ValueError(f"不允许的表名: {table!r}")
+        if distinct_column and distinct_column not in self._ALLOWED_COLUMNS:
+            raise ValueError(f"不允许的列名: {distinct_column!r}")
+        if date_column and date_column not in self._ALLOWED_COLUMNS:
+            raise ValueError(f"不允许的列名: {date_column!r}")
         try:
             summary = {
                 "table": table,

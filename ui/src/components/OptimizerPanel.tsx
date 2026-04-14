@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 import { PageHeader } from './layout/PageHeader';
 import { SectionCard } from './layout/SectionCard';
 import { Button } from './ui/button';
@@ -48,7 +48,7 @@ export const OptimizerPanel: React.FC = () => {
         if (!running.length) return;
         const id = setInterval(async () => {
             for (const t of running) {
-                const resp = await fetch(`${API_BASE}/optimize/${t.task_id}`);
+                const resp = await apiFetch(`/optimize/${t.task_id}`);
                 const data = await resp.json();
                 setTasks(prev => prev.map(x => x.task_id === t.task_id ? { ...x, ...data } : x));
             }
@@ -58,9 +58,8 @@ export const OptimizerPanel: React.FC = () => {
 
     const submit = async () => {
         setLoading(true);
-        const resp = await fetch(`${API_BASE}/optimize`, {
+        const resp = await apiFetch(`/optimize`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 strategy, param_space: params, method, objective,
                 n_iterations: iterations,

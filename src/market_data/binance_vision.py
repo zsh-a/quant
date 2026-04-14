@@ -252,7 +252,8 @@ class BinanceVisionSyncer:
 
     def _latest_time(self, symbol: str) -> datetime | None:
         r = self.client.query(
-            f"SELECT max(open_time) FROM {TABLE} WHERE symbol = '{symbol}'"
+            f"SELECT max(open_time) FROM {TABLE} WHERE symbol = {{symbol:String}}",
+            parameters={"symbol": symbol},
         )
         val = r.result_rows[0][0] if r.result_rows else None
         if val is None:
@@ -429,9 +430,10 @@ class BinanceVisionSyncer:
         e = end.strftime("%Y-%m-%d %H:%M:%S")
         r = self.client.query(
             f"SELECT DISTINCT open_time FROM {TABLE} "
-            f"WHERE symbol = '{symbol}' "
-            f"AND open_time >= toDateTime64('{s}', 3, 'UTC') "
-            f"AND open_time <= toDateTime64('{e}', 3, 'UTC')"
+            "WHERE symbol = {symbol:String} "
+            "AND open_time >= toDateTime64({s:String}, 3, 'UTC') "
+            "AND open_time <= toDateTime64({e:String}, 3, 'UTC')",
+            parameters={"symbol": symbol, "s": s, "e": e},
         )
         return {
             (row[0].replace(tzinfo=UTC) if row[0].tzinfo is None else row[0])

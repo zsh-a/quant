@@ -3,7 +3,7 @@
  */
 import { formatPercent, formatPrice } from '../../utils/format'
 
-import { API_BASE } from '../../utils/api'
+import { API_BASE, apiFetch, getToken } from '../../utils/api'
 
 export const METRIC_KEYS = ['sharpe', 'rank_ic', 'ic_ir', 'total_return', 'max_drawdown', 'avg_turnover', 'signal_coverage', 'pnl_per_turnover'] as const
 export const IC_DETAIL_KEYS = ['rank_ic_1d', 'rank_ic_5d', 'rank_ic_10d', 'ic_decay', 'ic_std', 'turnover_proxy'] as const
@@ -58,7 +58,7 @@ export function fmtTokens(n: number) {
   return String(n)
 }
 
-export { API_BASE }
+export { API_BASE, apiFetch, getToken }
 
 /** Shared context shape for tab components */
 export interface AlphaLabContext {

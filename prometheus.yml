@@ -7,7 +7,7 @@ scrape_configs:
   # Quant API metrics
   - job_name: 'quant_api'
     static_configs:
-      - targets: ['api:8000']
+      - targets: ['localhost:8000']
     metrics_path: '/monitoring/metrics'
     scrape_interval: 15s
 

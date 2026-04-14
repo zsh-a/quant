@@ -1,6 +1,6 @@
 import { useCallback } from 'react';
 import { toast } from 'sonner';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 import {
   useSessions,
   usePrimarySession,
@@ -24,7 +24,7 @@ export function useSessionCrud({
 
   const fetchSessions = useCallback(async () => {
     try {
-      const resp = await fetch(`${API_BASE}/sessions`);
+      const resp = await apiFetch(`/sessions`);
       const data = await resp.json();
       setSessions(data);
     } catch (err) {
@@ -36,7 +36,7 @@ export function useSessionCrud({
     (sessionId: string, taskId: string) => {
       const poll = async () => {
         try {
-          const resp = await fetch(`${API_BASE}/tasks/backtest/${taskId}`);
+          const resp = await apiFetch(`/tasks/backtest/${taskId}`);
           const data = await resp.json();
 
           updateSession(sessionId, {
@@ -73,7 +73,7 @@ export function useSessionCrud({
         delete payload.async;
 
         const endpoint = useAsync ? '/session/run_async' : '/session/run';
-        const resp = await fetch(`${API_BASE}${endpoint}`, {
+        const resp = await apiFetch(`${endpoint}`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload),
@@ -98,7 +98,7 @@ export function useSessionCrud({
   const stopSession = useCallback(
     async (id: string) => {
       try {
-        await fetch(`${API_BASE}/session/${id}/stop`, { method: 'POST' });
+        await apiFetch(`/session/${id}/stop`, { method: 'POST' });
         toast.success('Session stopped');
         fetchSessions();
       } catch {
@@ -119,7 +119,7 @@ export function useSessionCrud({
       if (!confirmed) return;
 
       try {
-        const resp = await fetch(`${API_BASE}/session/${id}`, { method: 'DELETE' });
+        const resp = await apiFetch(`/session/${id}`, { method: 'DELETE' });
         if (!resp.ok) {
           const data = await resp.json().catch(() => null);
           throw new Error(data?.detail || 'Failed to delete session');

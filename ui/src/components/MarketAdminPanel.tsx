@@ -7,7 +7,7 @@ import type {
   MarketTableSummary,
   MarketUpdateCapabilities,
 } from '../types';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 import { formatSourceLabel, formatStatusLabel } from '../utils/display';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
@@ -74,9 +74,9 @@ export default function MarketAdminPanel() {
     setter(true);
     try {
       const [overviewResp, capabilitiesResp, historyResp] = await Promise.all([
-        fetch(`${API_BASE}/market-admin/overview`),
-        fetch(`${API_BASE}/market-admin/update-capabilities`),
-        fetch(`${API_BASE}/market-admin/update-runs?limit=12`),
+        apiFetch(`/market-admin/overview`),
+        apiFetch(`/market-admin/update-capabilities`),
+        apiFetch(`/market-admin/update-runs?limit=12`),
       ]);
 
       if (!overviewResp.ok || !capabilitiesResp.ok || !historyResp.ok) {
@@ -154,9 +154,8 @@ export default function MarketAdminPanel() {
     setError(null);
     setMessage(null);
     try {
-      const resp = await fetch(`${API_BASE}/market-admin/update-runs`, {
+      const resp = await apiFetch(`/market-admin/update-runs`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           selected_steps: selectedSteps,
           share_start_date: shareStartDate || null,

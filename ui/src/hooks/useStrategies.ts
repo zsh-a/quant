@@ -1,13 +1,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { StrategyMeta } from '../types';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 
 export function useStrategies() {
   const [strategies, setStrategies] = useState<StrategyMeta[]>([]);
 
   const fetchStrategies = useCallback(async () => {
     try {
-      const resp = await fetch(`${API_BASE}/strategies`);
+      const resp = await apiFetch('/strategies');
       const data = await resp.json();
       setStrategies(data);
     } catch (err) {

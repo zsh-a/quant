@@ -1,4 +1,5 @@
 from fastapi import (
+    Depends,
     FastAPI,
     BackgroundTasks,
     HTTPException,
@@ -61,6 +62,7 @@ from src.services import (
     SessionService,
     execute_session,
 )
+from src.api.auth import router as auth_router, require_auth
 from src.api.tasks_router import router as tasks_router
 from src.api.monitoring_router import router as monitoring_router
 from src.api.portfolio_router import router as portfolio_router
@@ -101,40 +103,44 @@ app.add_middleware(
 app.middleware("http")(logging_middleware)
 
 # Include routers
-app.include_router(tasks_router)
-app.include_router(monitoring_router)
-app.include_router(portfolio_router)
-app.include_router(optimizer_router)
-app.include_router(analysis_router)
-app.include_router(logs_router)
-app.include_router(market_router)
-app.include_router(automation_router)
-app.include_router(market_admin_router)
+app.include_router(auth_router)          # /auth — always public
+app.include_router(tasks_router, dependencies=[Depends(require_auth)])
+app.include_router(monitoring_router)    # health/metrics — keep public
+app.include_router(portfolio_router, dependencies=[Depends(require_auth)])
+app.include_router(optimizer_router, dependencies=[Depends(require_auth)])
+app.include_router(analysis_router, dependencies=[Depends(require_auth)])
+app.include_router(logs_router, dependencies=[Depends(require_auth)])
+app.include_router(market_router, dependencies=[Depends(require_auth)])
+app.include_router(automation_router, dependencies=[Depends(require_auth)])
+app.include_router(market_admin_router, dependencies=[Depends(require_auth)])
 if _ALPHA_AVAILABLE:
-    app.include_router(alpha_lab_router)
-app.include_router(crypto_market_router)
+    app.include_router(alpha_lab_router, dependencies=[Depends(require_auth)])
+app.include_router(crypto_market_router, dependencies=[Depends(require_auth)])
 
 logger.info(f"API Server starting with config: port={api_config.port}")
 
 
+from src.api.validators import DateStr, SymbolStr, ModeStr
+
+
 class SessionRequest(BaseModel):
     strategy: str
-    symbol: str
-    start_date: str
-    end_date: Optional[str] = None
-    mode: str = "backtest"  # backtest, simulation, live
+    symbol: SymbolStr
+    start_date: DateStr
+    end_date: Optional[DateStr] = None
+    mode: ModeStr = "backtest"
     params: Dict[str, Any] = Field(default_factory=dict)
 
 # Register strategies once at startup
 StrategyRegistry.register_all()
 
 
-@app.get("/strategies")
+@app.get("/strategies", dependencies=[Depends(require_auth)])
 async def get_strategies():
     return StrategyRegistry.list_strategies()
 
 
-@app.post("/session/run")
+@app.post("/session/run", dependencies=[Depends(require_auth)])
 async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
     session_id = str(uuid.uuid4())
     runtime = session_service.create_session(
@@ -225,7 +231,7 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
                 initial_cash=broker_config.backtest.initial_cash,
                 commission=broker_config.backtest.commission,
                 slippage=broker_config.backtest.slippage,
-                enable_risk_management=False,
+                enable_risk_management=True,
                 chunk_size_months=data_stream_config.chunk_size_months,
             ),
             session_db=session_db,
@@ -236,7 +242,7 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks):
     return {"session_id": session_id}
 
 
-@app.post("/session/run_async")
+@app.post("/session/run_async", dependencies=[Depends(require_auth)])
 async def run_session_async(req: SessionRequest):
     """
     Submit a backtest session to Celery queue for async processing.
@@ -265,7 +271,7 @@ async def run_session_async(req: SessionRequest):
         "initial_cash": broker_config.backtest.initial_cash,
         "commission": broker_config.backtest.commission,
         "slippage": broker_config.backtest.slippage,
-        "enable_risk_management": False,
+        "enable_risk_management": True,
         "chunk_size_months": data_stream_config.chunk_size_months,
     }
 
@@ -282,19 +288,19 @@ async def run_session_async(req: SessionRequest):
     }
 
 
-@app.get("/sessions")
+@app.get("/sessions", dependencies=[Depends(require_auth)])
 async def get_sessions():
     # Return sessions from DB (persistent)
     return await anyio.to_thread.run_sync(session_db.get_all_sessions)
 
 
-@app.delete("/session/{session_id}")
+@app.delete("/session/{session_id}", dependencies=[Depends(require_auth)])
 async def delete_session(session_id: str):
     deleted = await anyio.to_thread.run_sync(session_service.delete_session, session_id)
     return {"session_id": session_id, "deleted": deleted}
 
 
-@app.get("/session/{session_id}/risk")
+@app.get("/session/{session_id}/risk", dependencies=[Depends(require_auth)])
 async def get_session_risk(session_id: str):
     """Risk metrics and alerts for a session. Returns 404 if session not found."""
     runtime, persisted = await anyio.to_thread.run_sync(
@@ -315,7 +321,7 @@ async def get_session_risk(session_id: str):
     }
 
 
-@app.get("/session/{session_id}/status")
+@app.get("/session/{session_id}/status", dependencies=[Depends(require_auth)])
 async def get_session_status(
     session_id: str,
     since: Optional[str] = Query(None, description="Return data since this timestamp"),
@@ -327,7 +333,7 @@ async def get_session_status(
     )
 
 
-@app.get("/sessions/{session_id}/equity")
+@app.get("/sessions/{session_id}/equity", dependencies=[Depends(require_auth)])
 async def get_session_equity(
     session_id: str,
     since: Optional[str] = Query(None, description="Return data since this timestamp"),
@@ -347,7 +353,7 @@ async def get_session_equity(
     return {"session_id": session_id, **page}
 
 
-@app.get("/sessions/{session_id}/trades")
+@app.get("/sessions/{session_id}/trades", dependencies=[Depends(require_auth)])
 async def get_session_trades(
     session_id: str,
     since: Optional[str] = Query(None, description="Return data since this timestamp"),
@@ -367,7 +373,7 @@ async def get_session_trades(
     return {"session_id": session_id, **page}
 
 
-@app.get("/session/{session_id}/metrics")
+@app.get("/session/{session_id}/metrics", dependencies=[Depends(require_auth)])
 async def get_session_metrics(session_id: str):
     """
     Calculate and return performance metrics for a session.
@@ -390,7 +396,7 @@ async def get_session_metrics(session_id: str):
     return {"session_id": session_id, "metrics": metrics.to_dict()}
 
 
-@app.post("/session/{session_id}/stop")
+@app.post("/session/{session_id}/stop", dependencies=[Depends(require_auth)])
 async def stop_session(session_id: str):
     result = await anyio.to_thread.run_sync(session_service.stop_session, session_id)
     await emit_session_stopped(session_id)
@@ -398,8 +404,8 @@ async def stop_session(session_id: str):
     return result
 
 
-@app.get("/market/benchmark")
-async def get_benchmark(symbol: str, start_date: str, end_date: Optional[str] = None):
+@app.get("/market/benchmark", dependencies=[Depends(require_auth)])
+async def get_benchmark(symbol: SymbolStr, start_date: DateStr, end_date: Optional[DateStr] = None):
     try:
         db = DB()
         df = db.get_kline(symbol, start_date, end_date)
@@ -452,7 +458,7 @@ logger.info("WebSocket event listeners registered")
 
 
 # State persistence and recovery endpoints
-@app.post("/session/{session_id}/checkpoint")
+@app.post("/session/{session_id}/checkpoint", dependencies=[Depends(require_auth)])
 async def create_checkpoint(session_id: str):
     """Create a checkpoint for a session"""
     state, metadata = await anyio.to_thread.run_sync(
@@ -466,14 +472,14 @@ async def create_checkpoint(session_id: str):
         raise HTTPException(status_code=500, detail="Failed to create checkpoint")
 
 
-@app.get("/session/{session_id}/checkpoints")
+@app.get("/session/{session_id}/checkpoints", dependencies=[Depends(require_auth)])
 async def list_checkpoints(session_id: str):
     """List all checkpoints for a session"""
     checkpoints = persistence.list_checkpoints(session_id)
     return {"session_id": session_id, "checkpoints": checkpoints}
 
 
-@app.post("/session/{session_id}/restore")
+@app.post("/session/{session_id}/restore", dependencies=[Depends(require_auth)])
 async def restore_session(session_id: str):
     """Restore a session from the latest checkpoint"""
     checkpoint = persistence.load_latest_checkpoint(session_id)
@@ -499,14 +505,14 @@ async def restore_session(session_id: str):
     }
 
 
-@app.get("/persistence/stats")
+@app.get("/persistence/stats", dependencies=[Depends(require_auth)])
 async def persistence_stats():
     """Get persistence statistics"""
     stats = persistence.get_stats()
     return stats
 
 
-@app.get("/cache/stats")
+@app.get("/cache/stats", dependencies=[Depends(require_auth)])
 async def cache_stats():
     """Get cache statistics"""
     cache = get_cache()
@@ -514,7 +520,7 @@ async def cache_stats():
     return {"redis": cache.get_stats(), "backtest_cache": backtest_cache.get_stats()}
 
 
-@app.post("/cache/clear")
+@app.post("/cache/clear", dependencies=[Depends(require_auth)])
 async def cache_clear(pattern: str = "*"):
     """Clear cache by pattern"""
     cache = get_cache()

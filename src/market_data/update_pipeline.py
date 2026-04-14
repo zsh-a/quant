@@ -30,8 +30,8 @@ class DataUpdateError(Exception):
 def get_reference_latest_date(symbol: str = REFERENCE_SYMBOL) -> Optional[str]:
     try:
         db = DB()
-        query = f"SELECT max(date) AS latest_date FROM stock_data.stock_daily WHERE code = '{symbol}'"
-        result = db.client.query(query)
+        query = "SELECT max(date) AS latest_date FROM stock_data.stock_daily WHERE code = {symbol:String}"
+        result = db.client.query(query, parameters={"symbol": symbol})
         if not result.result_rows:
             return None
         latest = result.result_rows[0][0]

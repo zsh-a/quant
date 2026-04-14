@@ -140,9 +140,9 @@ class BaoStockProcessor:
             return None
         return dt
 
-    def _query_scalar(self, sql: str):
+    def _query_scalar(self, sql: str, params: dict | None = None):
         try:
-            result = self.client.query(sql)
+            result = self.client.query(sql, parameters=params)
         except Exception as exc:
             logger.warning(f"Scalar query failed: {exc}")
             return None
@@ -213,9 +213,9 @@ class BaoStockProcessor:
             return
 
         codes = [u["code"] for u in updates]
-        placeholders = ", ".join([f"'{c}'" for c in codes])
         name_rows = self.client.query(
-            f"SELECT code, name FROM stock_data.stock_daily_meta WHERE code IN ({placeholders})"
+            "SELECT code, name FROM stock_data.stock_daily_meta WHERE code IN {codes:Array(String)}",
+            parameters={"codes": codes},
         ).result_rows
         name_map = {r[0]: r[1] for r in name_rows}
 
@@ -435,7 +435,8 @@ class BaoStockProcessor:
 
         if not force:
             existing = self._query_scalar(
-                f"SELECT count() FROM stock_data.all_stock WHERE day = '{day}'"
+                "SELECT count() FROM stock_data.all_stock WHERE day = {day:String}",
+                params={"day": day},
             )
             if existing and int(existing) > 0:
                 return {"day": day, "rows": 0, "message": "already ingested"}

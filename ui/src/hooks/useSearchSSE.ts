@@ -6,7 +6,7 @@
  * Falls back to polling if SSE is unavailable.
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { API_BASE } from '../utils/api'
+import { API_BASE, getToken } from '../utils/api'
 import type {
   AlphaRoundRecord,
   AlphaStageRecord,
@@ -41,7 +41,9 @@ export function useSearchSSE(jobId: string | null): SearchSSEState {
     }
 
     reset()
-    const url = `${API_BASE}/alpha-lab/search-jobs/${jobId}/events`
+    const token = getToken()
+    const qs = token ? `?token=${encodeURIComponent(token)}` : ''
+    const url = `${API_BASE}/alpha-lab/search-jobs/${jobId}/events${qs}`
     const es = new EventSource(url)
     esRef.current = es
 

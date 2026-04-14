@@ -30,7 +30,7 @@ class SessionExecutionConfig:
     initial_cash: Optional[float] = None
     commission: Optional[float] = None
     slippage: Optional[float] = None
-    enable_risk_management: bool = False
+    enable_risk_management: bool = True
     chunk_size_months: Optional[int] = None
     simulation_delay_seconds: float = 1.0
 

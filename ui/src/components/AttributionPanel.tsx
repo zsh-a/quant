@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 import { formatMoney, formatPercent, colorFromValue } from '../utils/format';
 import { EmptyState } from './layout/EmptyState';
 import { MetricCard } from './layout/MetricCard';
@@ -34,7 +34,7 @@ export const AttributionPanel: React.FC<Props> = ({ sessionId }) => {
         const fetchAttribution = async () => {
             setLoading(true);
             try {
-                const resp = await fetch(`${API_BASE}/analysis/attribution/${sessionId}`);
+                const resp = await apiFetch(`/analysis/attribution/${sessionId}`);
                 if (resp.ok) {
                     setData(await resp.json());
                 } else {

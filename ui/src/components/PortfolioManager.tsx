@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { formatMoney } from '../utils/format';
 import { PageHeader } from './layout/PageHeader';
-import { API_BASE } from '../utils/api';
+import { apiFetch } from '../utils/api';
 
 interface Strategy {
     name: string;
@@ -62,7 +62,7 @@ export const PortfolioManager: React.FC = () => {
 
     const fetchPortfolios = async () => {
         try {
-            const resp = await fetch(`${API_BASE}/portfolio`);
+            const resp = await apiFetch(`/portfolio`);
             const data = await resp.json();
             setPortfolios(data.portfolios || []);
         } catch (err) {
@@ -97,9 +97,8 @@ export const PortfolioManager: React.FC = () => {
 
         setLoading(true);
         try {
-            const resp = await fetch(`${API_BASE}/portfolio`, {
+            const resp = await apiFetch(`/portfolio`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     name: newPortfolioName,
                     strategies: selectedStrategies,
@@ -128,9 +127,8 @@ export const PortfolioManager: React.FC = () => {
         setBacktestResult(null);
 
         try {
-            const resp = await fetch(`${API_BASE}/portfolio/${selectedPortfolio}/backtest`, {
+            const resp = await apiFetch(`/portfolio/${selectedPortfolio}/backtest`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     start_date: startDate,
                     end_date: endDate,

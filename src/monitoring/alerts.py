@@ -157,9 +157,16 @@ class AlertManager:
         self.load_config()
 
     def load_config(self):
-        """Load alert configuration"""
-        self.enabled = False
-        logger.info("Alerting system configuration simplified")
+        """Load alert configuration from environment."""
+        import os
+        webhook_url = os.getenv("QUANT_ALERT_FEISHU_WEBHOOK", "")
+        if webhook_url:
+            self.notifiers.append(FeishuNotifier(webhook_url=webhook_url))
+            self.enabled = True
+            logger.info("Alerting system enabled (Feishu webhook configured)")
+        else:
+            self.enabled = False
+            logger.info("Alerting system disabled (no QUANT_ALERT_FEISHU_WEBHOOK set)")
 
     def register_default_rules(self, rule_configs: List[Dict]):
         """Register default alert rules"""

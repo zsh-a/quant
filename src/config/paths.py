@@ -40,6 +40,7 @@ ALPHA_LAB_CHECKPOINTS_DIR: Path = ALPHA_LAB_DIR / "checkpoints"
 ALPHA_LAB_NEURAL_DIR: Path = ALPHA_LAB_DIR / "neural"
 STRATEGY_MEMORY_PATH: Path = ALPHA_LAB_DIR / "strategy_memory.json"
 AUTO_SEARCH_STATE_PATH: Path = ALPHA_LAB_DIR / "auto_search_state.json"
+SEARCH_JOBS_STATE_PATH: Path = ALPHA_LAB_DIR / "search_jobs_state.json"
 
 # ── Market data sync state ────────────────────────────────────────────────────
 
