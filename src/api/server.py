@@ -145,6 +145,15 @@ class SessionRequest(BaseModel):
 # Register strategies once at startup
 StrategyRegistry.register_all()
 
+# Activate template-based strategies
+try:
+    from src.strategies.templates import activate_templates
+    n = activate_templates()
+    if n:
+        logger.info(f"Activated {n} template strategies")
+except Exception as e:
+    logger.warning(f"Template activation skipped: {e}")
+
 
 @app.get("/strategies", dependencies=[Depends(require_auth)])
 async def get_strategies():

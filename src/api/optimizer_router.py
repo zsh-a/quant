@@ -38,7 +38,7 @@ class OptimizeRequest(BaseModel):
     """Optimization request"""
     strategy: str  # jsg, rotation
     param_space: List[ParamSpecRequest]
-    method: str = "grid"  # grid, random, bayesian
+    method: str = "grid"  # grid, random, bayesian, optuna
     objective: str = "max_sharpe"  # max_sharpe, max_return, min_drawdown, max_calmar
     n_iterations: int = 50
     backtest_config: Dict  # start_date, end_date, symbols, etc.
@@ -215,6 +215,14 @@ def _run_optimization(task_id: str, req: OptimizeRequest):
             report = optimizer.random_search(backtest_fn, n_iterations=req.n_iterations)
         elif req.method == 'bayesian':
             report = optimizer.bayesian_optimize(backtest_fn, n_iterations=req.n_iterations)
+        elif req.method == 'optuna':
+            from src.optimizer.optuna_optimizer import optuna_optimize
+            report = optuna_optimize(
+                param_space=optimizer.param_space,
+                backtest_fn=backtest_fn,
+                objective=optimizer.objective,
+                n_trials=req.n_iterations,
+            )
         else:
             raise ValueError(f"Unknown method: {req.method}")
         

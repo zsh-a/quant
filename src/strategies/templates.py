@@ -462,6 +462,34 @@ def export_templates(filepath: str) -> None:
     logger.info(f"Exported {len(data)} templates to {filepath}")
 
 
+def activate_templates() -> int:
+    """将所有已注册模板自动转换为可用的 Strategy 子类并注册到 StrategyRegistry。
+
+    每个模板生成一个 TemplateBasedStrategy 子类，on_bar 使用安全的声明式逻辑。
+    """
+    from src.strategies.registry import StrategyRegistry
+
+    count = 0
+    for template in TemplateRegistry.list_all():
+        class_name = f"Template_{template.name}"
+
+        # 跳过已注册的
+        if StrategyRegistry.get_strategy_class(f"tpl_{template.name}") is not None:
+            continue
+
+        # 动态创建子类 (不使用 exec，只设置类属性)
+        cls = type(class_name, (TemplateBasedStrategy,), {
+            "template": template,
+            "__doc__": f"Auto-generated from template: {template.label}",
+        })
+
+        StrategyRegistry.register(f"tpl_{template.name}")(cls)
+        count += 1
+        logger.info("Template activated: tpl_{} ({})", template.name, template.label)
+
+    return count
+
+
 def import_templates(filepath: str) -> int:
     """Import templates from JSON file"""
     with open(filepath, "r") as f:

@@ -18,6 +18,7 @@ class OptimizationMethod(Enum):
     GRID_SEARCH = "grid"
     RANDOM_SEARCH = "random"
     BAYESIAN = "bayesian"
+    OPTUNA = "optuna"
 
 
 class OptimizationObjective(Enum):

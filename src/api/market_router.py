@@ -11,6 +11,7 @@ from loguru import logger
 from datetime import datetime, timedelta
 
 from src.market_data.db import DB
+from src.analysis.regime_detector import RegimeDetector
 
 router = APIRouter(prefix="/market", tags=["market"])
 
@@ -164,4 +165,38 @@ async def get_industry_amount(
         
     except Exception as e:
         logger.exception(f"Error calculating industry amount: {e}")
+        raise HTTPException(500, str(e))
+
+
+@router.get("/regime")
+async def get_market_regime(
+    symbol: str = "sh.000300",
+    lookback_days: int = Query(400, ge=100, le=2000),
+):
+    """检测当前市场 Regime (bull / bear / sideways)。"""
+    db_client = DB()
+    try:
+        end = datetime.now().strftime("%Y-%m-%d")
+        start = (datetime.now() - timedelta(days=lookback_days)).strftime("%Y-%m-%d")
+        df = db_client.get_kline(symbol, start, end)
+        if df.empty or len(df) < 80:
+            raise HTTPException(400, "Insufficient price data for regime detection")
+
+        detector = RegimeDetector()
+        snap = detector.detect(df["close"].values)
+        return {
+            "symbol": symbol,
+            "regime": snap.regime.value,
+            "confidence": snap.confidence,
+            "volatility_zscore": snap.volatility_zscore,
+            "trend_slope": snap.trend_slope,
+            "current_price": snap.current_price,
+            "ma_fast": snap.ma_fast,
+            "ma_slow": snap.ma_slow,
+            "annualized_vol": snap.annualized_vol,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Regime detection error: {e}")
         raise HTTPException(500, str(e))

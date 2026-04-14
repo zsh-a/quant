@@ -1,5 +1,7 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 import type { SessionSummary } from '../types';
+import { apiFetch } from '../utils/api';
 import { Button } from './ui/button';
 import { SectionCard } from './layout/SectionCard';
 import { MetricCard } from './layout/MetricCard';
@@ -25,13 +27,40 @@ const GlobalOverview: React.FC<GlobalOverviewProps> = ({
   const simulationSessions = sessions.filter((s) => s.source === 'automation');
   const recentSessions = sessions.slice(0, 12);
 
+  const [regime, setRegime] = useState<{ regime: string; confidence: number; annualized_vol: number } | null>(null);
+  useEffect(() => {
+    apiFetch('/market/regime?symbol=sh.000300')
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => d && setRegime(d))
+      .catch(() => {});
+  }, []);
+
+  const regimeIcon = regime?.regime === 'bull'
+    ? <TrendingUp size={15} className="text-emerald-500" />
+    : regime?.regime === 'bear'
+      ? <TrendingDown size={15} className="text-red-500" />
+      : <Minus size={15} className="text-amber-500" />;
+  const regimeLabel = regime?.regime === 'bull' ? 'Bull' : regime?.regime === 'bear' ? 'Bear' : 'Sideways';
+  const regimeColor = regime?.regime === 'bull' ? 'text-emerald-500' : regime?.regime === 'bear' ? 'text-red-500' : 'text-amber-500';
+
   return (
     <div className="space-y-6">
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-5">
         <MetricCard label="Total Sessions" value={sessions.length} hint="Including history and active tasks" />
         <MetricCard label="Running" value={<span className="text-primary">{activeSessions.length}</span>} hint="Currently executing backtests or live tasks" />
         <MetricCard label="Completed" value={completedSessions.length} hint="Sessions with persisted results" />
         <MetricCard label="Simulations" value={simulationSessions.length} hint="Sessions triggered by automation" />
+        <MetricCard
+          label="Market Regime"
+          value={
+            regime ? (
+              <span className={`flex items-center gap-1.5 ${regimeColor}`}>
+                {regimeIcon} {regimeLabel}
+              </span>
+            ) : '--'
+          }
+          hint={regime ? `Vol: ${(regime.annualized_vol * 100).toFixed(1)}% · Confidence: ${(regime.confidence * 100).toFixed(0)}%` : 'HS300 regime detection'}
+        />
       </div>
 
       {primarySession && (
