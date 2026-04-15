@@ -6,7 +6,7 @@ import { Button } from './ui/button';
 import { Progress } from './ui/progress';
 import { formatSourceLabel } from '../utils/display';
 
-type SessionFilter = 'all' | 'manual' | 'simulation' | 'running';
+type SessionFilter = 'all' | 'manual' | 'automation' | 'running';
 
 interface SessionListProps {
     sessions: SessionSummary[];
@@ -37,17 +37,17 @@ const SessionList: React.FC<SessionListProps> = ({
 
     const counts = useMemo(() => ({
         all: sessions.length,
-        manual: sessions.filter((s) => s.source !== 'automation' && s.mode !== 'simulation').length,
-        simulation: sessions.filter((s) => s.source === 'automation' || s.mode === 'simulation').length,
+        manual: sessions.filter((s) => s.source !== 'automation').length,
+        automation: sessions.filter((s) => s.source === 'automation').length,
         running: sessions.filter((s) => s.status === 'running').length,
     }), [sessions]);
 
     const filteredSessions = useMemo(() => {
         switch (filter) {
             case 'manual':
-                return sessions.filter((s) => s.source !== 'automation' && s.mode !== 'simulation');
-            case 'simulation':
-                return sessions.filter((s) => s.source === 'automation' || s.mode === 'simulation');
+                return sessions.filter((s) => s.source !== 'automation');
+            case 'automation':
+                return sessions.filter((s) => s.source === 'automation');
             case 'running':
                 return sessions.filter((s) => s.status === 'running');
             default:
@@ -64,7 +64,7 @@ const SessionList: React.FC<SessionListProps> = ({
                     {([
                         ['all', `All (${counts.all})`],
                         ['manual', `Manual (${counts.manual})`],
-                        ['simulation', `Simulation (${counts.simulation})`],
+                        ['automation', `Automation (${counts.automation})`],
                         ['running', `Running (${counts.running})`],
                     ] as Array<[SessionFilter, string]>).map(([value, label]) => (
                         <Button

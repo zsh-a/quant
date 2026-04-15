@@ -214,9 +214,9 @@ class SessionDB:
         except (TypeError, ValueError):
             return default
 
-    def _get_conn(self):
-        conn = sqlite3.connect(self.db_path, timeout=30.0)
-        conn.execute("PRAGMA journal_mode=WAL")
+    def _get_conn(self, *, timeout: float = 10.0):
+        conn = sqlite3.connect(self.db_path, timeout=timeout)
+        conn.execute("PRAGMA synchronous=NORMAL")
         return conn
 
     def create_session(
@@ -383,6 +383,60 @@ class SessionDB:
 
     def add_trade(self, session_id, trade: Dict):
         self.add_trades(session_id, [trade])
+
+    def persist_snapshot(
+        self,
+        session_id: str,
+        equity_points: List[Dict],
+        trades: List[Dict],
+        status: str = "running",
+        progress: Optional[float] = None,
+    ):
+        """Batch-write equity points, trades, and status in a single transaction."""
+        with self._get_conn() as conn:
+            if equity_points:
+                data = [
+                    (
+                        session_id,
+                        str(p["timestamp"]),
+                        p["total_equity"],
+                        p.get("cash", 0.0),
+                        p.get("daily_pnl", 0.0),
+                        p.get("daily_return", 0.0),
+                        self._json_dumps(p.get("positions", {})),
+                    )
+                    for p in equity_points
+                ]
+                conn.executemany(
+                    "INSERT INTO equity_history (session_id, timestamp, total_assets, cash, daily_pnl, daily_return, positions) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                    data,
+                )
+            if trades:
+                data = [
+                    (
+                        session_id,
+                        str(t.get("timestamp")),
+                        t.get("symbol"),
+                        t.get("name", "Unknown"),
+                        t.get("type") or t.get("side"),
+                        t.get("price"),
+                        t.get("quantity"),
+                        t.get("amount") or (t.get("price", 0) * t.get("quantity", 0)),
+                        t.get("commission", 0.0),
+                    )
+                    for t in trades
+                ]
+                conn.executemany(
+                    "INSERT INTO trades (session_id, timestamp, symbol, name, type, price, quantity, amount, commission) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    data,
+                )
+            updates = ["status = ?"]
+            params: list = [status]
+            if progress is not None:
+                updates.append("progress = ?")
+                params.append(progress)
+            params.append(session_id)
+            conn.execute(f"UPDATE sessions SET {', '.join(updates)} WHERE session_id = ?", params)
 
     def get_session(self, session_id):
         with self._get_conn() as conn:

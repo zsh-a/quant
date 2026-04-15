@@ -12,8 +12,13 @@ const STATUS_LABELS: Record<string, string> = {
 
 const MODE_LABELS: Record<string, string> = {
   live: "Live",
+  paper: "Paper",
   backtest: "Backtest",
   simulation: "Simulation",
+}
+
+export function isRealtimeMode(mode?: string | null): boolean {
+  return mode === 'live' || mode === 'paper';
 }
 
 const SOURCE_LABELS: Record<string, string> = {

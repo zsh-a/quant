@@ -84,6 +84,11 @@ class StrategyRegistry:
             _ = precomputed_alpha_strategy
         except Exception:
             pass
+        try:
+            from src.strategies import brooks_strategy
+            _ = brooks_strategy
+        except Exception:
+            pass
 
 
 # Auto-register all strategies on module import

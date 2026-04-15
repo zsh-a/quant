@@ -15,6 +15,7 @@ import { SectionCard } from './layout/SectionCard';
 import { StatusBadge } from './layout/StatusBadge';
 import { Progress } from './ui/progress';
 import { API_BASE, getToken } from '../utils/api';
+import { isRealtimeMode } from '../utils/display';
 
 interface SessionDetailProps {
   primarySession?: SessionSummary;
@@ -130,7 +131,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
       <Tabs value={subtab} onValueChange={handleTabChange}>
         <TabsList>
           <TabsTrigger value="overview">Overview</TabsTrigger>
-          {(primarySession.mode === 'live' || primarySession.mode === 'paper') && (
+          {isRealtimeMode(primarySession.mode) && (
             <TabsTrigger value="trading">Trading</TabsTrigger>
           )}
           <TabsTrigger value="risk">Risk</TabsTrigger>
@@ -154,7 +155,7 @@ const SessionDetail: React.FC<SessionDetailProps> = ({
           />
         </TabsContent>
 
-        {(primarySession.mode === 'live' || primarySession.mode === 'paper') && (
+        {isRealtimeMode(primarySession.mode) && (
           <TabsContent value="trading">
             <LiveTradingPanel sessionId={primarySession.id} />
           </TabsContent>

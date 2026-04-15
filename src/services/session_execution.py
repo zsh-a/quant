@@ -100,16 +100,17 @@ def _persist_runtime_snapshot(
     clear_buffers = isinstance(broker, BacktestBroker)
 
     new_equity_points = list(info.get("equity_history", []))
-    if new_equity_points and session_db is not None:
-        session_db.add_equity_points(session_id, new_equity_points)
+    new_trades = list(info.get("trades", []))
+
+    # Single-transaction batch write instead of 3 separate connections
+    if session_db is not None and (new_equity_points or new_trades):
+        session_db.persist_snapshot(session_id, new_equity_points, new_trades)
+
     for point in new_equity_points:
         _emit(hooks.on_equity_point, point)
     if clear_buffers and new_equity_points:
         broker.equity_history.clear()
 
-    new_trades = list(info.get("trades", []))
-    if new_trades and session_db is not None:
-        session_db.add_trades(session_id, new_trades)
     for trade in new_trades:
         _emit(hooks.on_trade, trade)
     if clear_buffers and new_trades:
@@ -218,7 +219,7 @@ def execute_session(
     def on_step(_bars):
         nonlocal last_persist_at
 
-        if config.mode in {"backtest", "simulation"} and total_bars > 0:
+        if not use_realtime and total_bars > 0:
             progress = (getattr(stream, "idx", 0) / total_bars) * 100
         else:
             progress = 50.0
