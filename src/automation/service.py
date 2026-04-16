@@ -50,6 +50,9 @@ class AutomationService:
     def disable_job(self, job_id: str):
         return self.session_db.set_simulation_job_enabled(job_id, False)
 
+    def delete_job(self, job_id: str) -> bool:
+        return self.session_db.delete_simulation_job(job_id)
+
     def get_run_window(
         self,
         job: Dict[str, Any],

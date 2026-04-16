@@ -84,6 +84,15 @@ async def get_simulation_job(job_id: str):
     return job
 
 
+@router.delete("/simulation-jobs/{job_id}")
+async def delete_simulation_job(job_id: str):
+    job = await anyio.to_thread.run_sync(automation_service.get_job, job_id, False)
+    if not job:
+        raise HTTPException(status_code=404, detail="Simulation job not found")
+    ok = await anyio.to_thread.run_sync(automation_service.delete_job, job_id)
+    return {"job_id": job_id, "deleted": ok}
+
+
 @router.post("/simulation-jobs/{job_id}/notification")
 async def update_simulation_job_notification(job_id: str, req: SimulationJobNotificationRequest):
     job = await anyio.to_thread.run_sync(automation_service.get_job, job_id, False)

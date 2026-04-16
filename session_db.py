@@ -319,6 +319,18 @@ class SessionDB:
             result = conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
             return result.rowcount > 0
 
+    def delete_simulation_job(self, job_id: str) -> bool:
+        with self._get_conn() as conn:
+            conn.execute(
+                "DELETE FROM simulation_run_steps WHERE run_id IN "
+                "(SELECT run_id FROM simulation_runs WHERE job_id = ?)",
+                (job_id,),
+            )
+            conn.execute("DELETE FROM simulation_runs WHERE job_id = ?", (job_id,))
+            conn.execute("UPDATE sessions SET job_id = NULL WHERE job_id = ?", (job_id,))
+            result = conn.execute("DELETE FROM simulation_jobs WHERE job_id = ?", (job_id,))
+            return result.rowcount > 0
+
     def add_equity_points(self, session_id, points: List[Dict]):
         if not points:
             return

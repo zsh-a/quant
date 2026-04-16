@@ -2,11 +2,13 @@
  * Automation Jobs — job 管理 + 运行触发，不含策略配置（已统一到 NewSessionForm）。
  */
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 import type { SimulationJob, SimulationRun } from '../types';
 import { apiFetch } from '../utils/api';
 import { formatStatusLabel } from '../utils/display';
 import { Button } from './ui/button';
 import { SectionCard } from './layout/SectionCard';
+import { StatusBadge } from './layout/StatusBadge';
 
 interface SimulationPanelProps {
   onSelectSession: (sessionId: string) => void;
@@ -63,7 +65,7 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ onSelectSessio
     return () => { active = false; window.clearInterval(id); jobsAbort.current?.abort(); runsAbort.current?.abort(); };
   }, [selectedJobId]);
 
-  useEffect(() => { if (selectedJobId) fetchRuns(selectedJobId); }, [selectedJobId]);
+  useEffect(() => { if (selectedJobId) fetchRuns(selectedJobId); else setRuns([]); }, [selectedJobId]);
 
   // ── Actions ──
 
@@ -107,6 +109,20 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ onSelectSessio
     }
   };
 
+  const handleDeleteJob = async (job: SimulationJob) => {
+    const confirmed = window.confirm(`Delete job "${job.name}" and all its run history? Associated sessions will be kept.`);
+    if (!confirmed) return;
+    try {
+      const resp = await apiFetch(`/simulation-jobs/${job.job_id}`, { method: 'DELETE' });
+      if (!resp.ok) throw new Error(await resp.text());
+      toast.success('Job deleted');
+      if (selectedJobId === job.job_id) setSelectedJobId(null);
+      await fetchJobs();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Delete failed');
+    }
+  };
+
   const handleRunEnabled = async () => {
     setFeedback(null); setRunTriggering(true);
     try {
@@ -134,15 +150,12 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ onSelectSessio
 
   // ── Render ──
 
-  if (jobs.length === 0) return null;
-
   return (
-    <SectionCard title="Automation Jobs">
-      <div className="flex items-center justify-between gap-3 flex-wrap mb-4">
-        <span className="text-sm text-muted-foreground">
-          {jobs.length} job{jobs.length !== 1 ? 's' : ''}
-        </span>
-        <div className="flex gap-2 flex-wrap">
+    <SectionCard
+      title="Scheduled Backtests"
+      description="Recurring backtests that replay incrementally as new market data arrives."
+      action={
+        <div className="flex flex-wrap gap-2">
           <Button variant="outline" size="sm" onClick={handleRunEnabled} disabled={runTriggering}>
             {runTriggering ? '...' : 'Trigger All'}
           </Button>
@@ -151,63 +164,100 @@ export const SimulationPanel: React.FC<SimulationPanelProps> = ({ onSelectSessio
           </Button>
           <Button variant="ghost" size="sm" onClick={onOpenMarketAdmin}>Market DB</Button>
         </div>
-      </div>
+      }
+    >
       {feedback && (
-        <div className={`text-sm mb-3 ${feedback.type === 'ok' ? 'text-emerald-500' : 'text-destructive'}`}>{feedback.text}</div>
+        <div className={`text-sm ${feedback.type === 'ok' ? 'text-emerald-500' : 'text-destructive'}`}>{feedback.text}</div>
       )}
 
-      {/* Jobs */}
-      <div className="grid gap-3">
-        {jobs.map((job) => (
-          <div
-            key={job.job_id}
-            onClick={() => setSelectedJobId(job.job_id)}
-            className="rounded-xl border p-4 cursor-pointer transition-colors"
-            style={{
-              borderColor: selectedJobId === job.job_id ? 'var(--primary)' : 'rgba(255,255,255,0.08)',
-              background: selectedJobId === job.job_id ? 'rgba(99,102,241,0.08)' : 'rgba(255,255,255,0.03)',
-            }}
-          >
-            <div className="flex justify-between gap-3">
-              <div>
-                <div className="font-bold">{job.name}</div>
-                <div className="tagline mt-1">{job.strategy_name} · {job.symbol}</div>
-              </div>
-              <span className={`status-badge ${job.enabled ? 'status-backtest' : ''}`}>
-                {job.enabled ? 'On' : 'Off'}
-              </span>
-            </div>
-            <div className="tagline mt-2">
-              {formatStatusLabel(job.status)} · Last: {job.last_processed_at || '—'}
-            </div>
-            <div className="flex gap-2 mt-3 flex-wrap">
-              <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleToggleJob(job); }}>
-                {job.enabled ? 'Disable' : 'Enable'}
-              </button>
-              <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleToggleNotify(job); }}>
-                {job.notification?.telegram?.enabled ? 'Mute' : 'Notify'}
-              </button>
-              <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleRunJob(job.job_id); }}
-                disabled={!!runningJobKey}>
-                {runningJobKey === `run:${job.job_id}` ? '...' : 'Run'}
-              </button>
-              <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); handleRunJob(job.job_id, true); }}
-                disabled={!!runningJobKey}>
-                {runningJobKey === `force:${job.job_id}` ? '...' : 'Force'}
-              </button>
-              {job.latest_session_id && (
-                <button className="btn-ghost" onClick={(e) => { e.stopPropagation(); onSelectSession(job.latest_session_id!); }}>
-                  View
-                </button>
-              )}
-            </div>
-          </div>
-        ))}
+      <div className="overflow-x-auto">
+        <table className="data-table">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Strategy · Symbol</th>
+              <th>Status</th>
+              <th>Notify</th>
+              <th>Last Processed</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {jobs.map((job) => (
+              <tr
+                key={job.job_id}
+                onClick={() => setSelectedJobId(job.job_id)}
+                style={{
+                  backgroundColor: selectedJobId === job.job_id ? 'rgba(34, 211, 238, 0.08)' : 'transparent',
+                  cursor: 'pointer',
+                }}
+              >
+                <td><div style={{ fontWeight: 600 }}>{job.name}</div></td>
+                <td>
+                  <div>{job.strategy_name}</div>
+                  <div className="tagline" style={{ fontSize: '0.7rem' }}>{job.symbol}</div>
+                </td>
+                <td>
+                  <div className="space-y-1">
+                    <StatusBadge value={job.enabled ? 'running' : 'idle'} />
+                    <div className="tagline" style={{ fontSize: '0.7rem' }}>{formatStatusLabel(job.status)}</div>
+                  </div>
+                </td>
+                <td>
+                  {job.notification?.telegram?.enabled
+                    ? <StatusBadge value="success" />
+                    : <span className="tagline">Muted</span>}
+                </td>
+                <td style={{ fontSize: '0.8rem' }}>{job.last_processed_at || '—'}</td>
+                <td onClick={(e) => e.stopPropagation()}>
+                  <div className="flex flex-wrap gap-2">
+                    <Button variant="outline" size="sm" onClick={() => handleToggleJob(job)}>
+                      {job.enabled ? 'Disable' : 'Enable'}
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleToggleNotify(job)}>
+                      {job.notification?.telegram?.enabled ? 'Mute' : 'Notify'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={!!runningJobKey}
+                      onClick={() => handleRunJob(job.job_id)}
+                    >
+                      {runningJobKey === `run:${job.job_id}` ? '...' : 'Run'}
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={!!runningJobKey}
+                      onClick={() => handleRunJob(job.job_id, true)}
+                    >
+                      {runningJobKey === `force:${job.job_id}` ? '...' : 'Force'}
+                    </Button>
+                    {job.latest_session_id && (
+                      <Button variant="ghost" size="sm" onClick={() => onSelectSession(job.latest_session_id!)}>
+                        View
+                      </Button>
+                    )}
+                    <Button variant="danger" size="sm" onClick={() => handleDeleteJob(job)}>
+                      Delete
+                    </Button>
+                  </div>
+                </td>
+              </tr>
+            ))}
+            {jobs.length === 0 && (
+              <tr>
+                <td colSpan={6} style={{ textAlign: 'center', color: 'var(--color-text-dim)', padding: '2rem' }}>
+                  No automation jobs
+                </td>
+              </tr>
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Runs for selected job */}
       {currentJob && (
-        <div className="mt-5">
+        <div className="mt-2">
           <div className="text-sm font-medium mb-3">Runs — {currentJob.name}</div>
           <div className="grid gap-3">
             {runs.map((run) => (

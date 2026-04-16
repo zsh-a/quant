@@ -109,7 +109,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
             start_date: startDate,
             mode: actualMode,
             params: buildParams(),
-            async: useAsync && (mode === 'backtest' || mode === 'simulation'),
+            async: useAsync && mode === 'backtest',
             enable_risk_management: enableRisk,
         };
         if (endDate) payload.end_date = endDate;
@@ -170,7 +170,6 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
             headerAction={
                 <select className="glass-input" style={{ width: 'auto' }} value={mode} onChange={(e) => setMode(e.target.value)}>
                     <option value="backtest">Backtest</option>
-                    <option value="simulation">Simulation</option>
                     <option value="live">Live Trading</option>
                 </select>
             }
@@ -200,7 +199,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                                 <Switch id="sw-paper" checked={paperMode} onCheckedChange={setPaperMode} />
                             </label>
                         )}
-                        {(mode === 'backtest' || mode === 'simulation') && (
+                        {mode === 'backtest' && (
                             <label htmlFor="sw-async" className="flex items-center justify-between gap-3 px-4 py-3 cursor-pointer select-none">
                                 <div className="flex items-center gap-2.5">
                                     <Layers size={15} className={useAsync ? 'text-blue-500' : 'text-muted-foreground/50'} />
@@ -228,7 +227,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                         onClick={() => setShowJobConfig(!showJobConfig)}
                     >
                         <CalendarClock size={14} />
-                        {showJobConfig ? 'Cancel Scheduling' : 'Schedule as Automation Job'}
+                        {showJobConfig ? 'Cancel Scheduling' : 'Schedule Recurring Backtest'}
                     </button>
 
                     {showJobConfig && (
@@ -249,7 +248,7 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                             )}
                             {jobMessage && <div className={`text-sm ${jobMessage === 'Job created' ? 'text-emerald-500' : 'text-destructive'}`}>{jobMessage}</div>}
                             <Button variant="outline" className="w-full" onClick={handleCreateJob} disabled={creatingJob || !selectedStrategy}>
-                                {creatingJob ? 'Creating...' : 'Create Automation Job'}
+                                {creatingJob ? 'Creating...' : 'Create Scheduled Backtest'}
                             </Button>
                         </div>
                     )}
