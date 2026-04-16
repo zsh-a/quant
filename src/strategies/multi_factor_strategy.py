@@ -63,6 +63,7 @@ def _rank_cross_section(factor: pd.DataFrame) -> pd.DataFrame:
     name="multi_factor",
     label="Multi-Factor Alpha",
     description="多因子Alpha策略 - 基于MCTS挖掘的因子组合进行周度轮动选股",
+    requires_symbol=False,
 )
 class MultiFactorStrategy(Strategy):
     """

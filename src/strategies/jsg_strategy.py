@@ -14,6 +14,7 @@ NUM_STOCKS = 6
     name="jsg",
     label="JSG Quantitative",
     description="JSG量化策略 - 基于行业轮动策略",
+    requires_symbol=False,
 )
 class JSGStrategy(Strategy):
 

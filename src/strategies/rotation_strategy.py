@@ -56,6 +56,7 @@ SW1 = {
     name="rotation",
     label="Advanced Rotation",
     description="高级轮动策略 - 基于行业动量的轮动策略",
+    requires_symbol=False,
 )
 class RotationStrategy(Strategy):
 

@@ -231,6 +231,179 @@ class DBDataStream(DataStream):
         self.idx = 0
         self._load_next_chunk()
 
+class CryptoDBDataStream(DataStream):
+    """Chunked crypto data stream from ClickHouse ``crypto_data.futures_5m``."""
+
+    _TABLE = "crypto_data.futures_5m"
+    _BASE_MINUTES = 5
+
+    _AGG = {
+        "close_time": "max",
+        "open": "argMin", "high": "max", "low": "min", "close": "argMax",
+        "volume": "sum", "quote_volume": "sum", "trade_count": "sum",
+    }
+
+    def __init__(
+        self,
+        symbols: List[str],
+        start_date: str,
+        end_date: Optional[str] = None,
+        interval: str = "1h",
+        chunk_days: int = 90,
+    ):
+        from clickhouse_driver import Client as CHClient
+        from src.config.settings import get_settings
+
+        settings = get_settings()
+        self.ch = CHClient(
+            host=settings.database.host,
+            port=settings.database.port,
+            database="crypto_data",
+        )
+        self.symbols = symbols
+        self.interval = interval
+        self.chunk_days = chunk_days
+
+        self.start_dt = pd.to_datetime(start_date)
+        self.end_dt = pd.to_datetime(end_date) if end_date else pd.Timestamp.now(tz="UTC")
+        if self.start_dt.tzinfo is None:
+            self.start_dt = self.start_dt.tz_localize("UTC")
+        if self.end_dt.tzinfo is None:
+            self.end_dt = self.end_dt.tz_localize("UTC")
+
+        # Parse interval minutes
+        iv = interval.strip().lower()
+        if iv.endswith("h"):
+            self._minutes = int(iv[:-1]) * 60
+        elif iv.endswith("m"):
+            self._minutes = int(iv[:-1])
+        elif iv == "1d":
+            self._minutes = 1440
+        else:
+            self._minutes = 60
+
+        # Load timeline by querying distinct timestamps for reference symbol
+        self._load_timeline()
+        self.total_bars = len(self.timestamps)
+        self.global_idx = 0
+        self.idx = 0
+
+        self.current_chunk: Dict[str, pd.DataFrame] = {}
+        self.chunk_end_idx = 0
+        self.chunks_loaded = 0
+
+        logger.info(
+            f"CryptoDBDataStream: {len(symbols)} symbols, interval={interval}, "
+            f"{self.total_bars} bars from {self.start_dt} to {self.end_dt}"
+        )
+        if self.total_bars > 0:
+            self._load_next_chunk()
+
+    def _load_timeline(self):
+        """Get sorted unique timestamps for the first symbol."""
+        ref = self.symbols[0] if self.symbols else "BTCUSDT"
+        interval_expr = f"toStartOfInterval(open_time, INTERVAL {self._minutes} MINUTE)"
+        q = (
+            f"SELECT DISTINCT {interval_expr} AS t FROM {self._TABLE} "
+            "WHERE symbol = %(sym)s "
+            "AND open_time >= %(s)s AND open_time < %(e)s "
+            "ORDER BY t"
+        )
+        rows = self.ch.execute(
+            q,
+            {"sym": ref, "s": self.start_dt.isoformat(), "e": self.end_dt.isoformat()},
+        )
+        self.timestamps = [r[0] for r in rows]
+
+    def _build_query(self) -> str:
+        interval_expr = f"toStartOfInterval(open_time, INTERVAL {self._minutes} MINUTE)"
+        cols = ["symbol", f"{interval_expr} AS _ot"]
+        for col, agg in self._AGG.items():
+            if agg == "argMin":
+                cols.append(f"argMin({col}, open_time) AS {col}")
+            elif agg == "argMax":
+                cols.append(f"argMax({col}, open_time) AS {col}")
+            else:
+                cols.append(f"{agg}({col}) AS {col}")
+        return (
+            f"SELECT {', '.join(cols)} FROM {self._TABLE} "
+            "WHERE symbol IN %(syms)s "
+            "AND open_time >= %(s)s AND open_time < %(e)s "
+            f"GROUP BY symbol, {interval_expr} ORDER BY _ot, symbol"
+        )
+
+    def _load_next_chunk(self):
+        if self.global_idx >= self.total_bars:
+            self.current_chunk = {}
+            return
+
+        chunk_start = self.timestamps[self.global_idx]
+        chunk_end_limit = chunk_start + pd.Timedelta(days=self.chunk_days)
+        chunk_ts = [t for t in self.timestamps if chunk_start <= t < chunk_end_limit]
+        if not chunk_ts:
+            return
+        self.chunk_end_idx = self.global_idx + len(chunk_ts)
+
+        rows = self.ch.execute(
+            self._build_query(),
+            {
+                "syms": self.symbols,
+                "s": chunk_start.isoformat(),
+                "e": (chunk_ts[-1] + pd.Timedelta(minutes=self._minutes)).isoformat(),
+            },
+            with_column_types=True,
+        )
+        data, col_types = rows
+        col_names = [c[0] for c in col_types]
+        df = pd.DataFrame(data, columns=col_names)
+
+        self.current_chunk = {}
+        if not df.empty:
+            for sym, gdf in df.groupby("symbol"):
+                self.current_chunk[str(sym)] = gdf.set_index("_ot").sort_index()
+
+        self.chunks_loaded += 1
+        logger.info(
+            f"Crypto chunk {self.chunks_loaded}: {len(chunk_ts)} bars, "
+            f"{len(self.current_chunk)} symbols loaded"
+        )
+
+    def next_bar(self) -> Optional[Dict[str, Bar]]:
+        if self.global_idx >= self.total_bars:
+            return None
+        if self.global_idx >= self.chunk_end_idx:
+            self._load_next_chunk()
+            if self.global_idx >= self.total_bars:
+                return None
+
+        ts = self.timestamps[self.global_idx]
+        bars = {}
+        for symbol, df in self.current_chunk.items():
+            if ts in df.index:
+                row = df.loc[ts]
+                if isinstance(row, pd.DataFrame):
+                    row = row.iloc[0]
+                bars[symbol] = Bar(
+                    symbol=symbol,
+                    timestamp=ts,
+                    open=float(row.get("open", 0)),
+                    high=float(row.get("high", 0)),
+                    low=float(row.get("low", 0)),
+                    close=float(row.get("close", 0)),
+                    volume=float(row.get("volume", 0)),
+                    amount=float(row.get("quote_volume", 0)),
+                )
+        self.global_idx += 1
+        self.idx = self.global_idx
+        return bars
+
+    def reset(self):
+        self.global_idx = 0
+        self.idx = 0
+        if self.total_bars > 0:
+            self._load_next_chunk()
+
+
 class RealtimeDataStream(DataStream):
     """
     Event-driven realtime data stream for live trading.

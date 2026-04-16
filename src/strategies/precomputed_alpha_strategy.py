@@ -22,6 +22,7 @@ from src.strategies.registry import StrategyRegistry
     name="precomputed_alpha",
     label="多因子Alpha策略",
     description="基于Alpha因子组合的预计算权重策略，支持定期调仓",
+    requires_symbol=False,
 )
 class PrecomputedAlphaStrategy(Strategy):
     """

@@ -130,15 +130,17 @@ app.include_router(crypto_market_router, dependencies=[Depends(require_auth)])
 logger.info(f"API Server starting with config: port={api_config.port}")
 
 
-from src.api.validators import DateStr, SymbolStr, ModeStr
+from src.api.validators import DateStr, SymbolStr, ModeStr, MarketStr, IntervalStr
 
 
 class SessionRequest(BaseModel):
     strategy: str
-    symbol: SymbolStr
+    symbol: Optional[SymbolStr] = "sh.000300"
     start_date: DateStr
     end_date: Optional[DateStr] = None
     mode: ModeStr = "backtest"
+    market: MarketStr = "a_share"
+    interval: IntervalStr = "1d"
     params: Dict[str, Any] = Field(default_factory=dict)
     enable_risk_management: bool = True
 
@@ -248,6 +250,8 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks, re
                 start_date=req.start_date,
                 end_date=req.end_date,
                 mode=req.mode,
+                market=req.market,
+                interval=req.interval,
                 params=req.params,
                 initial_cash=broker_config.backtest.initial_cash,
                 commission=broker_config.backtest.commission,
@@ -290,6 +294,8 @@ async def run_session_async(req: SessionRequest, request: Request = None):
         "strategy": req.strategy,
         "start_date": req.start_date,
         "end_date": req.end_date,
+        "market": req.market,
+        "interval": req.interval,
         "params": req.params or {},
         "initial_cash": broker_config.backtest.initial_cash,
         "commission": broker_config.backtest.commission,

@@ -62,6 +62,7 @@ export interface StrategyMeta {
     name: string;
     label: string;
     params: Record<string, StrategyParam>;
+    requires_symbol?: boolean;
 }
 
 export interface TelegramNotificationConfig {

@@ -5,6 +5,16 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Separator } from './ui/separator';
 
+const MARKET_INTERVALS: Record<string, { value: string; label: string }[]> = {
+  a_share: [{ value: '1d', label: '日线' }],
+  crypto: [
+    { value: '5m', label: '5m' },
+    { value: '15m', label: '15m' },
+    { value: '1h', label: '1h' },
+    { value: '4h', label: '4h' },
+  ],
+};
+
 interface StrategyConfigFormProps {
   title: string;
   strategies: StrategyMeta[];
@@ -22,6 +32,12 @@ interface StrategyConfigFormProps {
   headerAction?: React.ReactNode;
   footer?: React.ReactNode;
   showEndDate?: boolean;
+  // Market / interval / symbol visibility
+  requiresSymbol?: boolean;
+  market?: string;
+  onMarketChange?: (value: string) => void;
+  interval?: string;
+  onIntervalChange?: (value: string) => void;
 }
 
 const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
@@ -41,6 +57,11 @@ const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
   headerAction,
   footer,
   showEndDate = true,
+  requiresSymbol = true,
+  market = 'a_share',
+  onMarketChange,
+  interval = '1d',
+  onIntervalChange,
 }) => {
   const currentStrategy = strategies.find((strategy) => strategy.name === selectedStrategy);
 
@@ -87,6 +108,8 @@ const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
     );
   };
 
+  const intervals = MARKET_INTERVALS[market] ?? MARKET_INTERVALS.a_share;
+
   return (
     <SectionCard
       title={title}
@@ -104,10 +127,38 @@ const StrategyConfigForm: React.FC<StrategyConfigFormProps> = ({
           </select>
         </div>
 
-        <div className={fieldClassName}>
-          <label className="tagline">Symbol</label>
-          <Input value={symbol} onChange={(e) => onSymbolChange(e.target.value)} placeholder="例如 sh.000300" />
-        </div>
+        {/* Market + Interval */}
+        {onMarketChange && onIntervalChange && (
+          <div className="grid md:grid-cols-2 gap-4">
+            <div className={fieldClassName}>
+              <label className="tagline">Market</label>
+              <select className="glass-input" value={market} onChange={(e) => onMarketChange(e.target.value)}>
+                <option value="a_share">A 股</option>
+                <option value="crypto">Crypto</option>
+              </select>
+            </div>
+            <div className={fieldClassName}>
+              <label className="tagline">Interval</label>
+              <select className="glass-input" value={interval} onChange={(e) => onIntervalChange(e.target.value)}>
+                {intervals.map((iv) => (
+                  <option key={iv.value} value={iv.value}>{iv.label}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
+        {/* Symbol — conditional */}
+        {requiresSymbol && (
+          <div className={fieldClassName}>
+            <label className="tagline">Symbol</label>
+            <Input
+              value={symbol}
+              onChange={(e) => onSymbolChange(e.target.value)}
+              placeholder={market === 'crypto' ? 'e.g. BTCUSDT' : '例如 sh.000300'}
+            />
+          </div>
+        )}
 
         <div className={`grid gap-4 ${showEndDate ? 'md:grid-cols-2' : ''}`}>
           <div className={fieldClassName}>

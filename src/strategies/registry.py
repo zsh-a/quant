@@ -13,15 +13,17 @@ class StrategyRegistry:
     _strategies: Dict[str, Type[Strategy]] = {}
     _labels: Dict[str, str] = {}
     _descriptions: Dict[str, str] = {}
+    _requires_symbol: Dict[str, bool] = {}
 
     @classmethod
-    def register(cls, name: str, label: str = None, description: str = None):
+    def register(cls, name: str, label: str = None, description: str = None, requires_symbol: bool = True):
         """Decorator to register a strategy class"""
 
         def decorator(strategy_cls: Type[Strategy]):
             cls._strategies[name] = strategy_cls
             cls._labels[name] = label or name
             cls._descriptions[name] = description or ""
+            cls._requires_symbol[name] = requires_symbol
             return strategy_cls
 
         return decorator
@@ -60,6 +62,7 @@ class StrategyRegistry:
                 "label": cls._labels.get(name, name),
                 "description": cls._descriptions.get(name, ""),
                 "params": cls.get_parameters(name),
+                "requires_symbol": cls._requires_symbol.get(name, True),
             }
             for name in cls._strategies
         ]

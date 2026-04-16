@@ -17,6 +17,8 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
     const [selectedStrategy, setSelectedStrategy] = useState<string>('');
     const [paramValues, setParamValues] = useState<Record<string, any>>({});
     const [symbol, setSymbol] = useState('sh.000300');
+    const [market, setMarket] = useState('a_share');
+    const [interval, setInterval] = useState('1d');
     const [startDate, setStartDate] = useState('2024-01-01');
     const [endDate, setEndDate] = useState<string>('');
     const [mode, setMode] = useState('backtest');
@@ -58,6 +60,22 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
         setParamValues(defaults);
     };
 
+    const currentStrategy = strategies.find((s) => s.name === selectedStrategy);
+    const requiresSymbol = currentStrategy?.requires_symbol !== false;
+
+    const handleMarketChange = (m: string) => {
+        setMarket(m);
+        if (m === 'crypto') {
+            setInterval('1h');
+            if (requiresSymbol) setSymbol('BTCUSDT');
+            setStartDate('2025-01-01');
+        } else {
+            setInterval('1d');
+            if (requiresSymbol) setSymbol('sh.000300');
+            setStartDate('2024-01-01');
+        }
+    };
+
     const buildParams = () => {
         const strat = strategies.find((item) => item.name === selectedStrategy);
         const finalParams: Record<string, any> = {};
@@ -79,11 +97,15 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
         return finalParams;
     };
 
+    const effectiveSymbol = requiresSymbol ? symbol : (market === 'crypto' ? 'BTCUSDT' : 'sh.000300');
+
     const handleStart = () => {
         const actualMode = mode === 'live' && paperMode ? 'paper' : mode;
         const payload: any = {
             strategy: selectedStrategy,
-            symbol,
+            symbol: effectiveSymbol,
+            market,
+            interval,
             start_date: startDate,
             mode: actualMode,
             params: buildParams(),
@@ -103,7 +125,9 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
                 body: JSON.stringify({
                     name: jobName || `${selectedStrategy} Job`,
                     strategy: selectedStrategy,
-                    symbol,
+                    symbol: effectiveSymbol,
+                    market,
+                    interval,
                     start_date: startDate,
                     end_date: endDate || null,
                     params: buildParams(),
@@ -138,6 +162,11 @@ const NewSessionForm: React.FC<NewSessionFormProps> = ({ strategies, onStart, er
             paramValues={paramValues}
             onParamChange={(key, value) => setParamValues((prev) => ({ ...prev, [key]: value }))}
             onResetDefaults={resetDefaults}
+            requiresSymbol={requiresSymbol}
+            market={market}
+            onMarketChange={handleMarketChange}
+            interval={interval}
+            onIntervalChange={setInterval}
             headerAction={
                 <select className="glass-input" style={{ width: 'auto' }} value={mode} onChange={(e) => setMode(e.target.value)}>
                     <option value="backtest">Backtest</option>

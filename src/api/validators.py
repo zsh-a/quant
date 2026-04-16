@@ -62,6 +62,34 @@ def _validate_mode(v: str) -> str:
 ModeStr = Annotated[str, AfterValidator(_validate_mode)]
 
 # ---------------------------------------------------------------------------
+# Market validation
+# ---------------------------------------------------------------------------
+_VALID_MARKETS = {"a_share", "crypto"}
+
+
+def _validate_market(v: str) -> str:
+    if v not in _VALID_MARKETS:
+        raise ValueError(f"market 必须为 {_VALID_MARKETS} 之一，收到: {v!r}")
+    return v
+
+
+MarketStr = Annotated[str, AfterValidator(_validate_market)]
+
+# ---------------------------------------------------------------------------
+# Interval validation
+# ---------------------------------------------------------------------------
+_VALID_INTERVALS = {"1d", "5m", "15m", "1h", "4h"}
+
+
+def _validate_interval(v: str) -> str:
+    if v not in _VALID_INTERVALS:
+        raise ValueError(f"interval 必须为 {_VALID_INTERVALS} 之一，收到: {v!r}")
+    return v
+
+
+IntervalStr = Annotated[str, AfterValidator(_validate_interval)]
+
+# ---------------------------------------------------------------------------
 # Reusable Field aliases
 # ---------------------------------------------------------------------------
 PositiveInt = Annotated[int, Field(gt=0)]

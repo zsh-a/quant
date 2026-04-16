@@ -10,7 +10,7 @@ from session_db import SessionDB
 from src.utils.session_logger import get_session_logger
 from src.config.settings import get_broker_config, get_data_stream_config
 from src.core.backtest_broker import BacktestBroker
-from src.core.data_stream import DBDataStream, RealtimeDataStream
+from src.core.data_stream import CryptoDBDataStream, DBDataStream, RealtimeDataStream
 from src.core.engine import TradingEngine
 from src.core.live_broker import LiveBroker
 from src.core.risk_manager import RiskManager
@@ -26,6 +26,8 @@ class SessionExecutionConfig:
     start_date: str
     end_date: Optional[str] = None
     mode: str = "backtest"
+    market: str = "a_share"
+    interval: str = "1d"
     params: Dict[str, Any] = field(default_factory=dict)
     initial_cash: Optional[float] = None
     commission: Optional[float] = None
@@ -161,6 +163,14 @@ def execute_session(
             enable_trading_hours_check=True,
         )
         total_bars = 0
+    elif config.market == "crypto":
+        stream = CryptoDBDataStream(
+            symbols,
+            config.start_date,
+            config.end_date,
+            interval=config.interval,
+        )
+        total_bars = getattr(stream, "total_bars", 1)
     else:
         stream = DBDataStream(
             db_client,
