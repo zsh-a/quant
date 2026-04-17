@@ -18,7 +18,8 @@ except Exception:  # pragma: no cover
 
 
 def compute_forward_returns_gpu(
-    close: torch.Tensor, periods: int = 1,
+    close: torch.Tensor,
+    periods: int = 1,
 ) -> torch.Tensor:
     """GPU version of compute_forward_returns. Input/output: CUDA float32 tensors."""
     fwd = torch.full_like(close, float("nan"))
@@ -28,7 +29,8 @@ def compute_forward_returns_gpu(
 
 
 def compute_rank_ic_gpu(
-    alpha: torch.Tensor, forward_returns: torch.Tensor,
+    alpha: torch.Tensor,
+    forward_returns: torch.Tensor,
 ) -> float:
     """GPU version of compute_rank_ic. Returns scalar mean IC."""
     mask = ~torch.isnan(alpha) & ~torch.isnan(forward_returns)
@@ -59,7 +61,8 @@ def compute_rank_ic_gpu(
 
 
 def compute_rank_ic_batch_gpu(
-    alphas: torch.Tensor, forward_returns: torch.Tensor,
+    alphas: torch.Tensor,
+    forward_returns: torch.Tensor,
 ) -> torch.Tensor:
     """Compute IC for N factors simultaneously using Triton batch kernel.
 
@@ -139,7 +142,7 @@ def compute_ic_metrics_gpu(
             ap = torch.where(mask_tp, a_prev, torch.zeros_like(a_prev)).flatten()
             ac_c = ac - ac.mean()
             ap_c = ap - ap.mean()
-            denom_corr = torch.sqrt((ac_c ** 2).sum() * (ap_c ** 2).sum())
+            denom_corr = torch.sqrt((ac_c**2).sum() * (ap_c**2).sum())
             autocorr = (ac_c * ap_c).sum() / (denom_corr + 1e-12) if denom_corr > 1e-12 else 0.0
             turnover_proxy = 1 - abs(float(autocorr))
         else:
@@ -147,7 +150,7 @@ def compute_ic_metrics_gpu(
     else:
         turnover_proxy = 1.0
 
-    fitness = (rank_ic ** 2) / (ic_std + 1e-9)
+    fitness = (rank_ic**2) / (ic_std + 1e-9)
 
     metrics: dict[str, float] = {
         "rank_ic": rank_ic,

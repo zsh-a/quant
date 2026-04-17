@@ -32,9 +32,7 @@ def sync_minute_bars_task(
     start_time: str | None = None,
     end_time: str | None = None,
 ):
-    logger.info(
-        f"Starting crypto minute-bar sync provider={provider} interval={interval} symbols={symbols}"
-    )
+    logger.info(f"Starting crypto minute-bar sync provider={provider} interval={interval} symbols={symbols}")
     service = CryptoMinuteSyncService()
     result = service.sync_minute_bars(
         provider=provider,
@@ -88,9 +86,7 @@ def bootstrap_crypto_market_data_task(
     symbols: list[str] | None = None,
     interval: str | None = None,
 ):
-    logger.info(
-        f"Bootstrapping crypto market database provider={provider} interval={interval} symbols={symbols}"
-    )
+    logger.info(f"Bootstrapping crypto market database provider={provider} interval={interval} symbols={symbols}")
     service = CryptoMinuteSyncService()
     return service.bootstrap_default_dataset(
         provider=provider,

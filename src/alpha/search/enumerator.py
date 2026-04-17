@@ -21,10 +21,16 @@ from ..core.dsl import TensorSchema
 
 # Fields most useful for alpha construction (subset of full schema)
 _CORE_FIELDS = [
-    "close", "volume", "turnover", "vwap",
-    "open_interest", "funding_rate",
-    "taker_buy_volume", "long_short_ratio",
-    "premium_close", "bid_ask_spread",
+    "close",
+    "volume",
+    "turnover",
+    "vwap",
+    "open_interest",
+    "funding_rate",
+    "taker_buy_volume",
+    "long_short_ratio",
+    "premium_close",
+    "bid_ask_spread",
 ]
 
 _PAIR_FIELDS = [
@@ -92,7 +98,9 @@ class FormulaEnumerator:
                 continue
 
         logger.info(
-            "enumerator.generate produced={} max_count={}", len(results), max_count,
+            "enumerator.generate produced={} max_count={}",
+            len(results),
+            max_count,
         )
         return results
 
@@ -168,10 +176,15 @@ class FormulaEnumerator:
             "cs_rank(ts_corr(close, volume, 10))",
         ]
         mutations = [
-            ("close", "vwap"), ("close", "mark_close"),
-            ("volume", "turnover"), ("volume", "taker_buy_volume"),
-            ("ts_mean", "ts_ema"), ("ts_std", "volatility_n"),
-            ("5", "10"), ("10", "20"), ("20", "40"),
+            ("close", "vwap"),
+            ("close", "mark_close"),
+            ("volume", "turnover"),
+            ("volume", "taker_buy_volume"),
+            ("ts_mean", "ts_ema"),
+            ("ts_std", "volatility_n"),
+            ("5", "10"),
+            ("10", "20"),
+            ("20", "40"),
         ]
         for base in base_formulas:
             for old, new in mutations:

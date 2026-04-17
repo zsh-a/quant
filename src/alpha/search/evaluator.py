@@ -76,7 +76,9 @@ class FormulaEvaluator:
         self._fwd_returns_gpu = None
         if _torch is not None and vm.backend == "torch" and vm.device is not None:
             self._fwd_returns_gpu = _torch.as_tensor(
-                self._fwd_returns, device=vm.device, dtype=_torch.float32,
+                self._fwd_returns,
+                device=vm.device,
+                dtype=_torch.float32,
             )
 
         # Compile cache
@@ -131,14 +133,11 @@ class FormulaEvaluator:
         if not compiled:
             return []
 
-        use_gpu = (
-            self._fwd_returns_gpu is not None
-            and self._store.uses_torch()
-        )
+        use_gpu = self._fwd_returns_gpu is not None and self._store.uses_torch()
 
         results: list[tuple[str, float]] = []
         for start in range(0, len(compiled), chunk_size):
-            chunk = compiled[start:start + chunk_size]
+            chunk = compiled[start : start + chunk_size]
             programs = [prog for _, prog in chunk]
             chunk_formulas = [f for f, _ in chunk]
             try:

@@ -21,18 +21,20 @@ from loguru import logger
 
 class TrailStopMode(str, Enum):
     """动态止盈止损模式。"""
-    BELOW_PRIOR_BAR = "below_prior_bar"    # 止损跟踪到前一根 bar 低点 (多头)
-    ABOVE_PRIOR_BAR = "above_prior_bar"    # 止损跟踪到前一根 bar 高点 (空头)
-    BREAKEVEN = "breakeven"                 # 到达 1R 盈利后移到保本
-    ATR_TRAIL = "atr_trail"                 # ATR 倍数跟踪
+
+    BELOW_PRIOR_BAR = "below_prior_bar"  # 止损跟踪到前一根 bar 低点 (多头)
+    ABOVE_PRIOR_BAR = "above_prior_bar"  # 止损跟踪到前一根 bar 高点 (空头)
+    BREAKEVEN = "breakeven"  # 到达 1R 盈利后移到保本
+    ATR_TRAIL = "atr_trail"  # ATR 倍数跟踪
     NONE = "none"
 
 
 @dataclass
 class OrderMonitorResult:
     """订单监控结果。"""
+
     order_id: str
-    status: str            # filled, cancelled, pending, timeout
+    status: str  # filled, cancelled, pending, timeout
     fill_price: float = 0.0
     fill_quantity: float = 0.0
     reason: str = ""
@@ -41,6 +43,7 @@ class OrderMonitorResult:
 @dataclass
 class SyncResult:
     """持仓同步结果。"""
+
     synced: bool
     local_positions: int
     exchange_positions: int
@@ -79,6 +82,7 @@ class PositionManager:
             return OrderMonitorResult(order_id, "no_broker", reason="broker not configured")
 
         import time
+
         timeout_seconds = timeout_bars * bar_interval_seconds
         start_time = time.time()
 
@@ -90,7 +94,8 @@ class PositionManager:
                         status_val = order.status if isinstance(order.status, str) else order.status.value
                         if status_val.lower() in ("filled", "closed"):
                             return OrderMonitorResult(
-                                order_id, "filled",
+                                order_id,
+                                "filled",
                                 fill_price=getattr(order, "avg_fill_price", 0),
                                 fill_quantity=getattr(order, "filled_quantity", 0),
                             )
@@ -133,9 +138,11 @@ class PositionManager:
             local_pos = getattr(self.broker, "positions", {})
 
             local_symbols = set(k for k, v in local_pos.items() if v != 0)
-            exchange_symbols = set(k for k, v in (
-                exchange_pos.items() if isinstance(exchange_pos, dict) else {}
-            ) if (v if isinstance(v, (int, float)) else getattr(v, "quantity", 0)) != 0)
+            exchange_symbols = set(
+                k
+                for k, v in (exchange_pos.items() if isinstance(exchange_pos, dict) else {})
+                if (v if isinstance(v, (int, float)) else getattr(v, "quantity", 0)) != 0
+            )
 
             # 本地有但交易所没有
             for sym in local_symbols - exchange_symbols:

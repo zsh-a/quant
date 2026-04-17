@@ -44,6 +44,7 @@ class AKDataProcessor:
 
     def insert_sw_index(self):
         from src.market_data.static_data import load_sw_industry
+
         df = load_sw_industry(index_col="代码")
 
         for index, _ in df.iterrows():
@@ -65,6 +66,7 @@ class AKDataProcessor:
 
     def insert_sw_industry(self):
         from src.market_data.static_data import load_sw_industry
+
         df = load_sw_industry(index_col="index")
         for index, row in df.iterrows():
             index = index.split(".")[0]

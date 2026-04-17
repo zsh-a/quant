@@ -64,9 +64,7 @@ async def list_templates(category: Optional[str] = None):
 @router.get("/categories")
 async def list_categories():
     """List all template categories"""
-    return {
-        "categories": [{"name": c.name, "value": c.value} for c in TemplateCategory]
-    }
+    return {"categories": [{"name": c.name, "value": c.value} for c in TemplateCategory]}
 
 
 @router.get("/{template_name}", response_model=TemplateResponse)
@@ -74,9 +72,7 @@ async def get_template(template_name: str):
     """Get a specific template by name"""
     template = TemplateRegistry.get(template_name)
     if not template:
-        raise HTTPException(
-            status_code=404, detail=f"Template not found: {template_name}"
-        )
+        raise HTTPException(status_code=404, detail=f"Template not found: {template_name}")
     return template.to_dict()
 
 
@@ -85,9 +81,7 @@ async def get_template_defaults(template_name: str):
     """Get default parameter values for a template"""
     template = TemplateRegistry.get(template_name)
     if not template:
-        raise HTTPException(
-            status_code=404, detail=f"Template not found: {template_name}"
-        )
+        raise HTTPException(status_code=404, detail=f"Template not found: {template_name}")
     return {
         "template": template_name,
         "defaults": template.get_default_params(),
@@ -105,9 +99,7 @@ async def validate_params(template_name: str, request: ValidateParamsRequest):
     """Validate parameters for a template"""
     template = TemplateRegistry.get(template_name)
     if not template:
-        raise HTTPException(
-            status_code=404, detail=f"Template not found: {template_name}"
-        )
+        raise HTTPException(status_code=404, detail=f"Template not found: {template_name}")
 
     errors = []
     validated = {}

@@ -24,10 +24,10 @@ class MarketProfile:
     market_type: MarketType
     schema: TensorSchema
     field_aliases: dict[str, str]
-    field_descriptions: str          # LLM prompt 中的可用字段说明
-    seeds: tuple[str, ...]           # HeuristicBackend 种子公式
+    field_descriptions: str  # LLM prompt 中的可用字段说明
+    seeds: tuple[str, ...]  # HeuristicBackend 种子公式
     supported_intervals: tuple[str, ...]
-    persona: str                     # LLM system prompt 角色
+    persona: str  # LLM system prompt 角色
 
     # HeuristicBackend 变异替换表: list of (source, target)
     mutation_replacements: tuple[tuple[str, str], ...] = ()
@@ -133,30 +133,38 @@ _CRYPTO_SEEDS = (
 )
 
 _CRYPTO_MUTATIONS = (
-    ("ts_mean(", "ts_std("), ("ts_std(", "ts_mean("),
-    ("ts_max(", "ts_rank("), ("ts_rank(", "ts_mean("),
-    ("close", "vwap"), ("close", "mark_close"),
-    ("volume", "turnover"), ("volume", "taker_buy_volume"),
-    ("close", "hlc3(high, low, close)"), ("turnover", "adv_n(turnover, 5)"),
+    ("ts_mean(", "ts_std("),
+    ("ts_std(", "ts_mean("),
+    ("ts_max(", "ts_rank("),
+    ("ts_rank(", "ts_mean("),
+    ("close", "vwap"),
+    ("close", "mark_close"),
+    ("volume", "turnover"),
+    ("volume", "taker_buy_volume"),
+    ("close", "hlc3(high, low, close)"),
+    ("turnover", "adv_n(turnover, 5)"),
     ("close", "ohlc4(open, high, low, close)"),
     ("volatility_n(close, 20)", "atr_n(high, low, close, 14)"),
     ("funding_rate", "ts_zscore(funding_rate, 20)"),
     ("open_interest", "delta(open_interest, 5)"),
-    ("close", "premium_close"), ("volume", "trade_count"),
+    ("close", "premium_close"),
+    ("volume", "trade_count"),
 )
 
-register_profile(MarketProfile(
-    market_type=MarketType.CRYPTO,
-    schema=TensorSchema.default_market_schema(),
-    field_aliases=_CRYPTO_FIELD_ALIASES,
-    field_descriptions=_CRYPTO_FIELDS_DESC,
-    seeds=_CRYPTO_SEEDS,
-    supported_intervals=("5m", "15m", "1h", "4h"),
-    persona="You are a senior crypto quant researcher.",
-    mutation_replacements=_CRYPTO_MUTATIONS,
-    eval_methods=("long_short",),
-    default_eval_method="long_short",
-))
+register_profile(
+    MarketProfile(
+        market_type=MarketType.CRYPTO,
+        schema=TensorSchema.default_market_schema(),
+        field_aliases=_CRYPTO_FIELD_ALIASES,
+        field_descriptions=_CRYPTO_FIELDS_DESC,
+        seeds=_CRYPTO_SEEDS,
+        supported_intervals=("5m", "15m", "1h", "4h"),
+        persona="You are a senior crypto quant researcher.",
+        mutation_replacements=_CRYPTO_MUTATIONS,
+        eval_methods=("long_short",),
+        default_eval_method="long_short",
+    )
+)
 
 
 # ---------------------------------------------------------------------------
@@ -207,10 +215,14 @@ _ASTOCK_SEEDS = (
 )
 
 _ASTOCK_MUTATIONS = (
-    ("ts_mean(", "ts_std("), ("ts_std(", "ts_mean("),
-    ("ts_max(", "ts_rank("), ("ts_rank(", "ts_mean("),
-    ("close", "vwap"), ("close", "preclose"),
-    ("volume", "amount"), ("volume", "turn"),
+    ("ts_mean(", "ts_std("),
+    ("ts_std(", "ts_mean("),
+    ("ts_max(", "ts_rank("),
+    ("ts_rank(", "ts_mean("),
+    ("close", "vwap"),
+    ("close", "preclose"),
+    ("volume", "amount"),
+    ("volume", "turn"),
     ("close", "hlc3(high, low, close)"),
     ("close", "ohlc4(open, high, low, close)"),
     ("volatility_n(close, 20)", "atr_n(high, low, close, 14)"),
@@ -259,24 +271,26 @@ _ASTOCK_SYMBOL_PRESETS = (
     },
 )
 
-register_profile(MarketProfile(
-    market_type=MarketType.A_SHARE,
-    schema=TensorSchema.default_stock_schema(),
-    field_aliases=_ASTOCK_FIELD_ALIASES,
-    field_descriptions=_ASTOCK_FIELDS_DESC,
-    seeds=_ASTOCK_SEEDS,
-    supported_intervals=("1d",),
-    persona="You are a senior A-share (中国 A 股) quant researcher.",
-    mutation_replacements=_ASTOCK_MUTATIONS,
-    symbol_presets=_ASTOCK_SYMBOL_PRESETS,
-    eval_methods=("long_only", "quantile", "long_short"),
-    default_eval_method="quantile",
-    cost_model_kwargs={
-        "taker_fee_bps": 1.0,     # A股佣金 ~万1
-        "maker_fee_bps": 0.5,
-        "slippage_bps": 1.5,      # 日线滑点较小
-        "funding_bps_per_event": 0.0,  # 无资金费率
-        "spread_weight": 0.1,
-        "impact_coefficient_bps": 0.2,
-    },
-))
+register_profile(
+    MarketProfile(
+        market_type=MarketType.A_SHARE,
+        schema=TensorSchema.default_stock_schema(),
+        field_aliases=_ASTOCK_FIELD_ALIASES,
+        field_descriptions=_ASTOCK_FIELDS_DESC,
+        seeds=_ASTOCK_SEEDS,
+        supported_intervals=("1d",),
+        persona="You are a senior A-share (中国 A 股) quant researcher.",
+        mutation_replacements=_ASTOCK_MUTATIONS,
+        symbol_presets=_ASTOCK_SYMBOL_PRESETS,
+        eval_methods=("long_only", "quantile", "long_short"),
+        default_eval_method="quantile",
+        cost_model_kwargs={
+            "taker_fee_bps": 1.0,  # A股佣金 ~万1
+            "maker_fee_bps": 0.5,
+            "slippage_bps": 1.5,  # 日线滑点较小
+            "funding_bps_per_event": 0.0,  # 无资金费率
+            "spread_weight": 0.1,
+            "impact_coefficient_bps": 0.2,
+        },
+    )
+)

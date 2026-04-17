@@ -87,9 +87,7 @@ class SessionResult:
             "positions": self.positions,
             "error": self.error,
             "started_at": self.started_at.isoformat() if self.started_at else None,
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": self.completed_at.isoformat() if self.completed_at else None,
             "duration_seconds": self.duration_seconds,
         }
 
@@ -170,9 +168,7 @@ class TradingService:
 
         try:
             # Create components using factories
-            strategy = self.strategy_factory(
-                config.strategy_name, {**config.params, "session_id": session_id}
-            )
+            strategy = self.strategy_factory(config.strategy_name, {**config.params, "session_id": session_id})
 
             broker = self.broker_factory(config.mode, config.initial_capital)
 
@@ -186,9 +182,7 @@ class TradingService:
             # Risk manager
             risk_manager = None
             if config.risk_enabled:
-                risk_manager = RiskManager(
-                    initial_capital=config.initial_capital, enabled=True
-                )
+                risk_manager = RiskManager(initial_capital=config.initial_capital, enabled=True)
 
             # Progress tracking
             total_bars = getattr(data_stream, "total_bars", 0)
@@ -307,10 +301,12 @@ def run_backtest(
     def strategy_factory(name, params):
         # Some strategies require db_client as first argument
         import inspect
+
         sig = inspect.signature(strategy_class.__init__)
 
-        if 'db_client' in sig.parameters:
+        if "db_client" in sig.parameters:
             from src.market_data.db import DB
+
             db_client = DB()
             return strategy_class(db_client, **params)
 

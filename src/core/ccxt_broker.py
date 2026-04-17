@@ -52,6 +52,7 @@ class CcxtBroker(BrokerInterface):
     def connect(self) -> bool:
         try:
             import ccxt
+
             exchange_class = getattr(ccxt, self.exchange_name, None)
             if exchange_class is None:
                 logger.error("Unsupported exchange: {}", self.exchange_name)
@@ -120,8 +121,12 @@ class CcxtBroker(BrokerInterface):
             self._orders[order.order_id] = order
             logger.info(
                 "Order submitted: {} {} {} qty={} price={} id={}",
-                self.exchange_name, side, order.symbol, order.quantity,
-                order.price, order.order_id,
+                self.exchange_name,
+                side,
+                order.symbol,
+                order.quantity,
+                order.price,
+                order.order_id,
             )
             return order.order_id
         except Exception as exc:
@@ -236,8 +241,7 @@ class CcxtBroker(BrokerInterface):
                         order_id=oid,
                         status=OrderStatus.SUBMITTED,
                     )
-            logger.info("State synced: {} positions, {} open orders",
-                        len(self._positions), len(open_orders))
+            logger.info("State synced: {} positions, {} open orders", len(self._positions), len(open_orders))
             return True
         except Exception as exc:
             logger.error("Sync state failed: {}", exc)

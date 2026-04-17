@@ -38,17 +38,42 @@ from .base import BaseStrategy, StrategyMeta
 # ---------------------------------------------------------------------------
 
 _CORE_FIELDS = (
-    "close", "open", "high", "low", "volume",
-    "open_interest", "funding_rate", "mark_close",
-    "premium_close", "vwap", "long_short_ratio", "taker_buy_volume",
+    "close",
+    "open",
+    "high",
+    "low",
+    "volume",
+    "open_interest",
+    "funding_rate",
+    "mark_close",
+    "premium_close",
+    "vwap",
+    "long_short_ratio",
+    "taker_buy_volume",
 )
 
 _CORE_OPS = (
-    "abs", "log", "sign", "neg", "sigmoid",
-    "add", "sub", "mul", "div",
-    "ts_mean", "ts_std", "ts_sum", "ts_rank", "ts_zscore",
-    "decay_linear", "delta", "returns_n", "ts_ema",
-    "cs_rank", "cs_zscore", "cs_demean",
+    "abs",
+    "log",
+    "sign",
+    "neg",
+    "sigmoid",
+    "add",
+    "sub",
+    "mul",
+    "div",
+    "ts_mean",
+    "ts_std",
+    "ts_sum",
+    "ts_rank",
+    "ts_zscore",
+    "decay_linear",
+    "delta",
+    "returns_n",
+    "ts_ema",
+    "cs_rank",
+    "cs_zscore",
+    "cs_demean",
 )
 
 _WINDOW_CONSTANTS = (3, 5, 10, 20, 40, 60)
@@ -63,7 +88,7 @@ _IC_REWARD_SCALE = 20.0  # scale rank_ic (~0.02-0.10) to meaningful reward range
 class VocabToken:
     idx: int
     name: str
-    kind: str        # "field", "op", "const", "bos"
+    kind: str  # "field", "op", "const", "bos"
     arity: int = 0
     const_value: int | float | None = None
 
@@ -82,13 +107,16 @@ class FormulaVocab:
         # Precompute arity tensor for vectorized masking
         self.arity_tensor = torch.tensor([t.arity for t in tokens], dtype=torch.long)
         self.is_operator_tensor = torch.tensor(
-            [1 if t.kind == "op" else 0 for t in tokens], dtype=torch.bool,
+            [1 if t.kind == "op" else 0 for t in tokens],
+            dtype=torch.bool,
         )
         self.is_operand_tensor = torch.tensor(
-            [1 if t.kind in ("field", "const") else 0 for t in tokens], dtype=torch.bool,
+            [1 if t.kind in ("field", "const") else 0 for t in tokens],
+            dtype=torch.bool,
         )
         self.is_bos_tensor = torch.tensor(
-            [1 if t.kind == "bos" else 0 for t in tokens], dtype=torch.bool,
+            [1 if t.kind == "bos" else 0 for t in tokens],
+            dtype=torch.bool,
         )
 
     @classmethod
@@ -152,8 +180,8 @@ def rpn_to_dsl(token_ids: list[int], vocab: FormulaVocab) -> str | None:
         elif tok.kind == "op":
             if len(stack) < tok.arity:
                 return None
-            args = stack[-tok.arity:]
-            stack = stack[:-tok.arity]
+            args = stack[-tok.arity :]
+            stack = stack[: -tok.arity]
             stack.append(f"{tok.name}({', '.join(args)})")
         else:
             return None
@@ -187,10 +215,10 @@ def compute_action_mask_batch(
     V = vocab.size
     remaining = max_len - step - 1
 
-    arity = vocab.arity_tensor.to(device)          # [V]
-    is_op = vocab.is_operator_tensor.to(device)     # [V]
-    is_operand = vocab.is_operand_tensor.to(device) # [V]
-    is_bos = vocab.is_bos_tensor.to(device)         # [V]
+    arity = vocab.arity_tensor.to(device)  # [V]
+    is_op = vocab.is_operator_tensor.to(device)  # [V]
+    is_operand = vocab.is_operand_tensor.to(device)  # [V]
+    is_bos = vocab.is_bos_tensor.to(device)  # [V]
 
     # new_depth after applying each token: [B, V]
     # operators: depth - arity + 1;  operands: depth + 1
@@ -345,7 +373,8 @@ class TrainingHistory:
     def to_dict(self) -> list[dict[str, Any]]:
         return [
             {
-                "round": s.round_idx, "step": s.step,
+                "round": s.round_idx,
+                "step": s.step,
                 "loss": round(s.loss, 5),
                 "avg_reward": round(s.avg_reward, 5),
                 "best_reward": round(s.best_reward, 5),
@@ -364,6 +393,7 @@ class TrainingHistory:
     def plot(self, path: str | Path) -> None:
         try:
             import matplotlib
+
             matplotlib.use("Agg")
             import matplotlib.pyplot as plt
         except ImportError:
@@ -390,9 +420,8 @@ class TrainingHistory:
         # Running average
         if len(steps) >= 5:
             window = min(10, len(steps) // 3)
-            avg = np.convolve([s.avg_reward for s in self.snapshots],
-                              np.ones(window) / window, mode="valid")
-            ax.plot(steps[window - 1:], avg, "b-", lw=2, label=f"avg (ma{window})")
+            avg = np.convolve([s.avg_reward for s in self.snapshots], np.ones(window) / window, mode="valid")
+            ax.plot(steps[window - 1 :], avg, "b-", lw=2, label=f"avg (ma{window})")
         ax.axhline(0, color="gray", ls=":", lw=0.8)
         ax.set_ylabel("Reward")
         ax.set_xlabel("Step")
@@ -483,6 +512,7 @@ class NeuralFormulaStrategy(BaseStrategy):
         self._min_round = min_round
         if not output_dir:
             from src.config.paths import ALPHA_LAB_NEURAL_DIR
+
             output_dir = str(ALPHA_LAB_NEURAL_DIR)
         self._output_dir = Path(output_dir)
 
@@ -493,7 +523,9 @@ class NeuralFormulaStrategy(BaseStrategy):
         self._vocab = FormulaVocab.from_registry(self._registry, self._schema)
         self._model = FormulaTransformer(
             vocab_size=self._vocab.size,
-            d_model=d_model, nhead=nhead, num_layers=num_layers,
+            d_model=d_model,
+            nhead=nhead,
+            num_layers=num_layers,
             max_len=self._max_len,
         ).to(self._device)
         self._optimizer = torch.optim.AdamW(self._model.parameters(), lr=lr)
@@ -509,9 +541,7 @@ class NeuralFormulaStrategy(BaseStrategy):
 
     def should_activate(self, ctx: SearchContext) -> bool:
         return (
-            ctx.round_idx >= self._min_round
-            and ctx.round_idx % self._activation_freq == 0
-            and ctx.dataset is not None
+            ctx.round_idx >= self._min_round and ctx.round_idx % self._activation_freq == 0 and ctx.dataset is not None
         )
 
     # ------------------------------------------------------------------
@@ -522,8 +552,10 @@ class NeuralFormulaStrategy(BaseStrategy):
         from ..infra.tracing import tracer
 
         with tracer.start_span(
-            "neural_generate", kind="search",
-            round=ctx.round_idx, train_steps=self._train_steps,
+            "neural_generate",
+            kind="search",
+            round=ctx.round_idx,
+            train_steps=self._train_steps,
         ) as span:
             # Lazy init: build internal evaluation cache from dataset
             self._ensure_eval_cache(ctx)
@@ -556,13 +588,18 @@ class NeuralFormulaStrategy(BaseStrategy):
             span.set("candidates", len(candidates))
             logger.info(
                 "neural_formula.generate round={} steps={} formulas={} candidates={}",
-                ctx.round_idx, self._train_steps, len(all_formulas), len(candidates),
+                ctx.round_idx,
+                self._train_steps,
+                len(all_formulas),
+                len(candidates),
             )
 
         return candidates
 
     def on_evaluation_complete(
-        self, ctx: SearchContext, evaluated: list[Individual],
+        self,
+        ctx: SearchContext,
+        evaluated: list[Individual],
     ) -> None:
         super().on_evaluation_complete(ctx, evaluated)
 
@@ -645,6 +682,7 @@ class NeuralFormulaStrategy(BaseStrategy):
             return
         from ..core.vm import TensorStore
         from ..eval.metrics import compute_forward_returns
+
         ds = ctx.dataset
         close = np.asarray(ds.fields["close"], dtype=np.float32)
         self._fwd_returns = compute_forward_returns(close, periods=5)
@@ -704,9 +742,12 @@ class NeuralFormulaStrategy(BaseStrategy):
 
         # Use shared evaluator for batch IC if available
         if ctx.evaluator is not None and dsl_by_idx:
-            batch_results = dict(ctx.evaluator.eval_ic_batch(
-                list(dsl_by_idx.values()), min_coverage=0.05,
-            ))
+            batch_results = dict(
+                ctx.evaluator.eval_ic_batch(
+                    list(dsl_by_idx.values()),
+                    min_coverage=0.05,
+                )
+            )
             for i, dsl in dsl_by_idx.items():
                 ic = batch_results.get(dsl)
                 if ic is None:
@@ -722,6 +763,7 @@ class NeuralFormulaStrategy(BaseStrategy):
         else:
             # Fallback: per-formula evaluation
             from ..core.vm import to_numpy
+
             vm = ctx.vm or StackVM()
             for i, dsl in dsl_by_idx.items():
                 try:
@@ -761,23 +803,30 @@ class NeuralFormulaStrategy(BaseStrategy):
         avg_r = rewards.mean().item()
         best_r = rewards.max().item()
 
-        self.history.record(TrainingSnapshot(
-            round_idx=ctx.round_idx,
-            step=self._global_step,
-            loss=loss.item(),
-            avg_reward=avg_r,
-            best_reward=best_r,
-            valid_ratio=n_valid / bs,
-            unique=len(valid_formulas),
-            best_formula=self._best_formula,
-        ))
+        self.history.record(
+            TrainingSnapshot(
+                round_idx=ctx.round_idx,
+                step=self._global_step,
+                loss=loss.item(),
+                avg_reward=avg_r,
+                best_reward=best_r,
+                valid_ratio=n_valid / bs,
+                unique=len(valid_formulas),
+                best_formula=self._best_formula,
+            )
+        )
 
         if self._global_step % 5 == 0 or self._global_step <= 3:
             logger.info(
-                "neural_formula.step {} loss={:.3f} avg_r={:.3f} best_r={:.3f} "
-                "valid={}/{} unique={} best_ic={:.4f}",
-                self._global_step, loss.item(), avg_r, best_r,
-                n_valid, bs, len(valid_formulas), self._best_ic,
+                "neural_formula.step {} loss={:.3f} avg_r={:.3f} best_r={:.3f} valid={}/{} unique={} best_ic={:.4f}",
+                self._global_step,
+                loss.item(),
+                avg_r,
+                best_r,
+                n_valid,
+                bs,
+                len(valid_formulas),
+                self._best_ic,
             )
 
         return valid_formulas

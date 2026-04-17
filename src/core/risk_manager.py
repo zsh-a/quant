@@ -57,13 +57,10 @@ class RiskManager:
         self.alerts: List[Dict[str, Any]] = []
 
         logger.info(
-            f"Risk manager initialized: enabled={self.enabled}, "
-            f"initial_capital={initial_capital}, limits={self.limits}"
+            f"Risk manager initialized: enabled={self.enabled}, initial_capital={initial_capital}, limits={self.limits}"
         )
 
-    def check_position_limit(
-        self, symbol: str, quantity: float, price: float
-    ) -> tuple[bool, Optional[str]]:
+    def check_position_limit(self, symbol: str, quantity: float, price: float) -> tuple[bool, Optional[str]]:
         """Check if a new position would exceed limits"""
         if not self.enabled:
             return True, None
@@ -73,34 +70,25 @@ class RiskManager:
 
         # Check single position limit
         if position_pct > self.limits.max_position_pct:
-            reason = (
-                f"Position size {position_pct:.1%} exceeds limit "
-                f"{self.limits.max_position_pct:.1%}"
-            )
+            reason = f"Position size {position_pct:.1%} exceeds limit {self.limits.max_position_pct:.1%}"
             logger.warning(f"Position limit exceeded: {symbol} - {reason}")
             return False, reason
 
         # Check total exposure (including new position)
         total_exposure = sum(
-            pos["quantity"] * pos.get("current_price", pos["entry_price"])
-            for pos in self.positions.values()
+            pos["quantity"] * pos.get("current_price", pos["entry_price"]) for pos in self.positions.values()
         )
         new_total_exposure = total_exposure + position_value
         total_exposure_pct = new_total_exposure / self.current_capital
 
         if total_exposure_pct > self.limits.max_total_position:
-            reason = (
-                f"Total exposure {total_exposure_pct:.1%} would exceed limit "
-                f"{self.limits.max_total_position:.1%}"
-            )
+            reason = f"Total exposure {total_exposure_pct:.1%} would exceed limit {self.limits.max_total_position:.1%}"
             logger.warning(f"Total exposure limit exceeded: {reason}")
             return False, reason
 
         return True, None
 
-    def check_stop_loss(
-        self, symbol: str, current_price: float
-    ) -> tuple[bool, Optional[str]]:
+    def check_stop_loss(self, symbol: str, current_price: float) -> tuple[bool, Optional[str]]:
         """Check if stop loss should be triggered"""
         if not self.enabled or symbol not in self.positions:
             return False, None
@@ -119,9 +107,7 @@ class RiskManager:
 
         return False, None
 
-    def check_take_profit(
-        self, symbol: str, current_price: float
-    ) -> tuple[bool, Optional[str]]:
+    def check_take_profit(self, symbol: str, current_price: float) -> tuple[bool, Optional[str]]:
         """Check if take profit should be triggered"""
         if not self.enabled or symbol not in self.positions:
             return False, None
@@ -146,9 +132,7 @@ class RiskManager:
             return False, None
 
         daily_pnl = self.current_capital - self.daily_start_capital
-        daily_loss_pct = (
-            abs(daily_pnl) / self.daily_start_capital if daily_pnl < 0 else 0
-        )
+        daily_loss_pct = abs(daily_pnl) / self.daily_start_capital if daily_pnl < 0 else 0
 
         if daily_loss_pct >= self.limits.max_daily_loss_pct:
             reason = f"Daily loss limit exceeded: {daily_loss_pct:.1%} (limit: {self.limits.max_daily_loss_pct:.1%})"
@@ -202,9 +186,7 @@ class RiskManager:
         position["pnl"] = pnl
         position["pnl_pct"] = pnl_pct
 
-    def close_position(
-        self, symbol: str, exit_price: float
-    ) -> Optional[Dict[str, Any]]:
+    def close_position(self, symbol: str, exit_price: float) -> Optional[Dict[str, Any]]:
         """Close a position"""
         if symbol not in self.positions:
             return None

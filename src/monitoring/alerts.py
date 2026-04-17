@@ -101,9 +101,7 @@ class FeishuNotifier:
                     "title": {"tag": "plain_text", "content": f"🚨 {title}"},
                     "template": color,
                 },
-                "elements": [
-                    {"tag": "div", "text": {"tag": "lark_md", "content": message}}
-                ],
+                "elements": [{"tag": "div", "text": {"tag": "lark_md", "content": message}}],
             },
         }
 
@@ -159,6 +157,7 @@ class AlertManager:
     def load_config(self):
         """Load alert configuration from environment."""
         import os
+
         webhook_url = os.getenv("QUANT_ALERT_FEISHU_WEBHOOK", "")
         if webhook_url:
             self.notifiers.append(FeishuNotifier(webhook_url=webhook_url))
@@ -181,20 +180,20 @@ class AlertManager:
                 if ">" in condition_str:
                     metric, threshold = condition_str.split(">")
                     threshold = float(threshold.strip())
+
                     def condition(x):
                         return x > threshold
                 elif "<" in condition_str:
                     metric, threshold = condition_str.split("<")
                     threshold = float(threshold.strip())
+
                     def condition(x):
                         return x < threshold
                 else:
                     logger.warning(f"Invalid condition format: {condition_str}")
                     continue
 
-                rule = AlertRule(
-                    name=name, condition=condition, severity=severity, duration=duration
-                )
+                rule = AlertRule(name=name, condition=condition, severity=severity, duration=duration)
                 self.rules.append(rule)
                 logger.info(f"Registered alert rule: {name}")
 

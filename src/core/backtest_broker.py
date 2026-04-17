@@ -8,10 +8,17 @@ from .base import Bar, Broker, Order
 
 
 class BacktestBroker(Broker):
-    def __init__(self, initial_cash: float = 1000000.0, commission: float = 0.0003,
-                 slippage: float = 0.001, db_client=None, risk_manager=None,
-                 on_order_submitted: Optional[Callable[[Order], None]] = None,
-                 allow_short: bool = False, session_id: Optional[str] = None):
+    def __init__(
+        self,
+        initial_cash: float = 1000000.0,
+        commission: float = 0.0003,
+        slippage: float = 0.001,
+        db_client=None,
+        risk_manager=None,
+        on_order_submitted: Optional[Callable[[Order], None]] = None,
+        allow_short: bool = False,
+        session_id: Optional[str] = None,
+    ):
         self.cash = initial_cash
         self.initial_cash = initial_cash
         self.commission = commission
@@ -23,6 +30,7 @@ class BacktestBroker(Broker):
         if session_id:
             try:
                 from src.utils.session_logger import get_session_logger
+
                 self._session_log = get_session_logger(session_id)
             except ImportError:
                 pass
@@ -38,7 +46,7 @@ class BacktestBroker(Broker):
         self.last_prices: Dict[str, float] = {}
 
         # New: Track cost basis per position
-        self.position_costs: Dict[str, float] = {} # symbol -> avg_price
+        self.position_costs: Dict[str, float] = {}  # symbol -> avg_price
 
         # Optimization: Track last equity for PnL calc even if history is cleared
         self._last_equity = initial_cash
@@ -58,9 +66,7 @@ class BacktestBroker(Broker):
         if self.db_client is None:
             return
         try:
-            data = self.db_client.client.query(
-                "SELECT code, name FROM stock_data.stock_daily_meta WHERE name != ''"
-            )
+            data = self.db_client.client.query("SELECT code, name FROM stock_data.stock_daily_meta WHERE name != ''")
             for code, name in data.result_rows:
                 self.stock_names[code] = name
         except Exception as e:
@@ -87,7 +93,7 @@ class BacktestBroker(Broker):
             elif order.symbol in self.last_prices:
                 price = self.last_prices[order.symbol]
 
-            if order.type == 'buy' and price > 0:
+            if order.type == "buy" and price > 0:
                 allowed, reason = self.risk_manager.check_position_limit(order.symbol, order.quantity, price)
                 if not allowed:
                     self._risk_log(f"订单被风控拒绝: {order.type} {order.symbol} qty={order.quantity} — {reason}")
@@ -142,7 +148,7 @@ class BacktestBroker(Broker):
                 "value": market_value,
                 "avg_cost": avg_cost,
                 "unrealized_pnl": unrealized_pnl,
-                "pnl_pct": pnl_pct
+                "pnl_pct": pnl_pct,
             }
 
         return {
@@ -152,7 +158,7 @@ class BacktestBroker(Broker):
             "total_equity": self.get_total_equity(),
             "equity_history": self.equity_history,
             "trades": self.trades,
-            "pending_orders": [vars(o) for o in self.orders.values()]
+            "pending_orders": [vars(o) for o in self.orders.values()],
         }
 
     def get_total_equity(self) -> float:
@@ -199,17 +205,17 @@ class BacktestBroker(Broker):
             raw_price = None
 
             if bar:
-                if timing == 'IMMEDIATE_OPEN':
+                if timing == "IMMEDIATE_OPEN":
                     raw_price = bar.open
-                elif timing == 'IMMEDIATE_CLOSE':
+                elif timing == "IMMEDIATE_CLOSE":
                     raw_price = bar.close
             elif self.db_client:
                 try:
                     df = self.db_client.get_price(order.symbol, str(current_ts.date()), ["open", "close"], 1)
                     if not df.empty:
-                        if timing == 'IMMEDIATE_OPEN':
+                        if timing == "IMMEDIATE_OPEN":
                             raw_price = df.iloc[0]["open"]
-                        elif timing == 'IMMEDIATE_CLOSE':
+                        elif timing == "IMMEDIATE_CLOSE":
                             raw_price = df.iloc[0]["close"]
                 except Exception as e:
                     logger.error(f"Failed to fetch price for {order.symbol}: {e}")
@@ -231,17 +237,17 @@ class BacktestBroker(Broker):
             if bar is None:
                 continue
             # Stop-sell: triggers when price drops to/below stop_price
-            if order.type in ('sell', 'sell_short') and bar.low <= order.stop_price:
+            if order.type in ("sell", "sell_short") and bar.low <= order.stop_price:
                 order.status = "TRIGGERED"
                 logger.info(f"Stop order TRIGGERED: {order.type} {order.symbol} stop={order.stop_price}")
             # Stop-buy: triggers when price rises to/above stop_price
-            elif order.type in ('buy', 'buy_to_cover') and bar.high >= order.stop_price:
+            elif order.type in ("buy", "buy_to_cover") and bar.high >= order.stop_price:
                 order.status = "TRIGGERED"
                 logger.info(f"Stop order TRIGGERED: {order.type} {order.symbol} stop={order.stop_price}")
 
     def _apply_slippage(self, order, price):
         """应用滑点：买入价更高，卖出价更低"""
-        if order.type in ('buy', 'buy_to_cover'):
+        if order.type in ("buy", "buy_to_cover"):
             return price * (1 + self.slippage)
         else:
             return price * (1 - self.slippage)
@@ -255,14 +261,14 @@ class BacktestBroker(Broker):
         prev_close = self.last_prices.get(order.symbol, 0.0)
 
         is_st = False
-        if bar and hasattr(bar, 'extra') and 'isst' in bar.extra:
-            is_st = bar.extra['isst'] == 1
+        if bar and hasattr(bar, "extra") and "isst" in bar.extra:
+            is_st = bar.extra["isst"] == 1
 
         # Determine limit percentage
         limit_pct = 0.10
         if is_st:
             limit_pct = 0.05
-        elif order.symbol.startswith('sh.68') or order.symbol.startswith('sz.30'):
+        elif order.symbol.startswith("sh.68") or order.symbol.startswith("sz.30"):
             limit_pct = 0.20
 
         # Limit check: use today's open price to decide if the stock hit the limit
@@ -271,12 +277,12 @@ class BacktestBroker(Broker):
             up_limit = round(prev_close * (1 + limit_pct), 2)
             down_limit = round(prev_close * (1 - limit_pct), 2)
 
-            if order.type == 'buy' and raw_open >= up_limit:
+            if order.type == "buy" and raw_open >= up_limit:
                 logger.warning(f"Order REJECTED (Limit Up): {order.symbol} open={raw_open} >= limit={up_limit}")
                 order.status = "REJECTED"
                 self.history.append(self.orders.pop(order.id))
                 return
-            if order.type == 'sell' and raw_open <= down_limit:
+            if order.type == "sell" and raw_open <= down_limit:
                 logger.warning(f"Order REJECTED (Limit Down): {order.symbol} open={raw_open} <= limit={down_limit}")
                 order.status = "REJECTED"
                 self.history.append(self.orders.pop(order.id))
@@ -288,9 +294,9 @@ class BacktestBroker(Broker):
         amount = execution_price * order.quantity
         fee = amount * self.commission
 
-        if order.type == 'buy':
+        if order.type == "buy":
             if self.cash >= amount + fee:
-                self.cash -= (amount + fee)
+                self.cash -= amount + fee
                 curr_qty = self.positions.get(order.symbol, 0)
                 curr_cost = self.position_costs.get(order.symbol, 0.0)
                 total_shares = curr_qty + order.quantity
@@ -312,10 +318,10 @@ class BacktestBroker(Broker):
             else:
                 order.status = "REJECTED"
                 logger.warning(f"Order REJECTED (Insufficient cash): {order.symbol}")
-        elif order.type == 'sell':
+        elif order.type == "sell":
             curr_qty = self.positions.get(order.symbol, 0)
             if curr_qty >= order.quantity:
-                self.cash += (amount - fee)
+                self.cash += amount - fee
                 new_qty = curr_qty - order.quantity
 
                 # Update risk manager before modifying positions
@@ -334,24 +340,24 @@ class BacktestBroker(Broker):
             else:
                 order.status = "REJECTED"
                 logger.warning(f"Order REJECTED (Insufficient qty): {order.symbol}")
-        elif order.type == 'sell_short':
+        elif order.type == "sell_short":
             if not self.allow_short:
                 order.status = "REJECTED"
                 logger.warning(f"Order REJECTED (Short selling disabled): {order.symbol}")
             else:
                 # Short sale: receive cash, create negative position
-                self.cash += (amount - fee)
+                self.cash += amount - fee
                 curr_qty = self.positions.get(order.symbol, 0)
                 self.positions[order.symbol] = curr_qty - order.quantity
                 self.position_costs[order.symbol] = execution_price
                 order.status = "FILLED"
                 order.avg_fill_price = execution_price
                 order.filled_quantity = order.quantity
-        elif order.type == 'buy_to_cover':
+        elif order.type == "buy_to_cover":
             curr_qty = self.positions.get(order.symbol, 0)
             if curr_qty < 0:  # has short position
                 cover_qty = min(order.quantity, abs(curr_qty))
-                self.cash -= (execution_price * cover_qty + fee)
+                self.cash -= execution_price * cover_qty + fee
                 new_qty = curr_qty + cover_qty
                 if new_qty == 0:
                     self.positions.pop(order.symbol, None)
@@ -366,17 +372,21 @@ class BacktestBroker(Broker):
                 logger.warning(f"Order REJECTED (No short position to cover): {order.symbol}")
 
         if order.status == "FILLED":
-            logger.info(f"ORDER FILLED ({order.execution_type}): {order.type} {order.quantity} {order.symbol} at {execution_price} on {current_ts}")
-            self.trades.append({
-                "timestamp": str(current_ts),
-                "symbol": order.symbol,
-                "name": self.stock_names.get(order.symbol, "Unknown"),
-                "type": order.type,
-                "price": float(execution_price),
-                "quantity": float(order.quantity),
-                "amount": float(amount),
-                "commission": float(fee)
-            })
+            logger.info(
+                f"ORDER FILLED ({order.execution_type}): {order.type} {order.quantity} {order.symbol} at {execution_price} on {current_ts}"
+            )
+            self.trades.append(
+                {
+                    "timestamp": str(current_ts),
+                    "symbol": order.symbol,
+                    "name": self.stock_names.get(order.symbol, "Unknown"),
+                    "type": order.type,
+                    "price": float(execution_price),
+                    "quantity": float(order.quantity),
+                    "amount": float(amount),
+                    "commission": float(fee),
+                }
+            )
 
         if order.status in ["FILLED", "REJECTED"]:
             self.history.append(self.orders.pop(order.id))
@@ -403,10 +413,7 @@ class BacktestBroker(Broker):
                         qty = self.positions.get(symbol, 0)
                         if qty > 0:
                             sell_order = Order(
-                                symbol=symbol,
-                                type='sell',
-                                quantity=qty,
-                                execution_type='IMMEDIATE_CLOSE'
+                                symbol=symbol, type="sell", quantity=qty, execution_type="IMMEDIATE_CLOSE"
                             )
                             self.submit_order(sell_order)
 
@@ -417,10 +424,7 @@ class BacktestBroker(Broker):
                         qty = self.positions.get(symbol, 0)
                         if qty > 0:
                             sell_order = Order(
-                                symbol=symbol,
-                                type='sell',
-                                quantity=qty,
-                                execution_type='IMMEDIATE_CLOSE'
+                                symbol=symbol, type="sell", quantity=qty, execution_type="IMMEDIATE_CLOSE"
                             )
                             self.submit_order(sell_order)
 
@@ -486,12 +490,12 @@ class BacktestBroker(Broker):
             if k in bars:
                 price = float(bars[k].close)
             elif self.db_client:
-                 try:
+                try:
                     df = self.db_client.get_price(k, str(current_ts.date()), ["close"], 1)
                     if not df.empty:
                         price = float(df.iloc[0]["close"])
                         self.last_prices[k] = price
-                 except Exception:
+                except Exception:
                     pass
 
             if price == 0 and k in self.last_prices:
@@ -514,17 +518,19 @@ class BacktestBroker(Broker):
                 "value": market_value,
                 "avg_cost": avg_cost,
                 "unrealized_pnl": unrealized_pnl,
-                "pnl_pct": pnl_pct
+                "pnl_pct": pnl_pct,
             }
 
-        self.equity_history.append({
-            "timestamp": str(current_ts),
-            "total_equity": round(current_equity, 2),
-            "daily_pnl": round(daily_pnl, 2),
-            "daily_return": round(daily_return, 4),
-            "cash": round(float(self.cash), 2),
-            "positions": pos_snapshot
-        })
+        self.equity_history.append(
+            {
+                "timestamp": str(current_ts),
+                "total_equity": round(current_equity, 2),
+                "daily_pnl": round(daily_pnl, 2),
+                "daily_return": round(daily_return, 4),
+                "cash": round(float(self.cash), 2),
+                "positions": pos_snapshot,
+            }
+        )
 
         # Update last_prices at end of step so that next bar's NEXT_OPEN
         # order processing can use today's close as prev_close for limit checks
@@ -536,16 +542,18 @@ class BacktestBroker(Broker):
         pending_orders = []
         for order_id, order in self.orders.items():
             if order.status in ("PENDING", "SUBMITTED"):
-                pending_orders.append({
-                    "id": order.id,
-                    "symbol": order.symbol,
-                    "type": order.type,
-                    "quantity": order.quantity,
-                    "price": order.price,
-                    "execution_type": order.execution_type,
-                    "status": order.status,
-                    "created_at": order.created_at.isoformat() if order.created_at else None,
-                })
+                pending_orders.append(
+                    {
+                        "id": order.id,
+                        "symbol": order.symbol,
+                        "type": order.type,
+                        "quantity": order.quantity,
+                        "price": order.price,
+                        "execution_type": order.execution_type,
+                        "status": order.status,
+                        "created_at": order.created_at.isoformat() if order.created_at else None,
+                    }
+                )
 
         return {
             "cash": float(self.cash),
@@ -586,42 +594,46 @@ class BacktestBroker(Broker):
             if order_data.get("created_at"):
                 order.created_at = datetime.fromisoformat(order_data["created_at"])
             self.orders[order.id] = order
-            logger.info(f"Restored pending order: {order.type} {order.symbol} qty={order.quantity} exec={order.execution_type}")
+            logger.info(
+                f"Restored pending order: {order.type} {order.symbol} qty={order.quantity} exec={order.execution_type}"
+            )
 
     def get_report(self):
         if not self.equity_history:
             return "No backtest data available."
 
-        initial_equity = self.equity_history[0]['total_equity']
-        final_equity = self.equity_history[-1]['total_equity']
+        initial_equity = self.equity_history[0]["total_equity"]
+        final_equity = self.equity_history[-1]["total_equity"]
         total_ret = (final_equity - initial_equity) / initial_equity
 
         report = []
-        report.append("="*40)
+        report.append("=" * 40)
         report.append("BACKTEST REPORT summary")
-        report.append("="*40)
+        report.append("=" * 40)
         report.append(f"Initial Equity: {initial_equity:,.2f}")
         report.append(f"Final Equity:   {final_equity:,.2f}")
         report.append(f"Total Return:   {total_ret:.2%}")
         report.append(f"Total Trades:   {len(self.trades)}")
-        report.append("\n" + "="*40)
+        report.append("\n" + "=" * 40)
         report.append("DAILY HOLDINGS & EQUITY")
-        report.append("="*40)
+        report.append("=" * 40)
 
         for entry in self.equity_history:
             report.append(f"\nDate: {entry['timestamp']}")
             report.append(f"Equity: {entry['total_equity']:,.2f} | Cash: {entry['cash']:,.2f}")
-            if entry['positions']:
+            if entry["positions"]:
                 report.append("Holdings:")
-                for symbol, info in entry['positions'].items():
+                for symbol, info in entry["positions"].items():
                     report.append(f"  - {symbol} ({info['name']}): {info['qty']}")
             else:
                 report.append("Holdings: None")
 
-        report.append("\n" + "="*40)
+        report.append("\n" + "=" * 40)
         report.append("TRADE DETAILS")
-        report.append("="*40)
+        report.append("=" * 40)
         for t in self.trades:
-            report.append(f"[{t['timestamp']}] {t['type'].upper()} {t['quantity']} {t['symbol']} ({t['name']}) @ {t['price']:.2f} | Amt: {t['amount']:,.2f}")
+            report.append(
+                f"[{t['timestamp']}] {t['type'].upper()} {t['quantity']} {t['symbol']} ({t['name']}) @ {t['price']:.2f} | Amt: {t['amount']:,.2f}"
+            )
 
         return "\n".join(report)

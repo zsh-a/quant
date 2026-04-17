@@ -31,6 +31,7 @@ def _get_service(market: str = "crypto") -> AlphaService:
         _services[market] = AlphaService(market=market)
     return _services[market]
 
+
 _memory_collector = InMemoryCollector()
 tracer.add_collector(_memory_collector)
 
@@ -56,7 +57,8 @@ def _persist_search_jobs() -> None:
                 }
         SEARCH_JOBS_STATE_PATH.parent.mkdir(parents=True, exist_ok=True)
         SEARCH_JOBS_STATE_PATH.write_text(
-            _json.dumps(snapshot, ensure_ascii=False, default=str), encoding="utf-8",
+            _json.dumps(snapshot, ensure_ascii=False, default=str),
+            encoding="utf-8",
         )
     except Exception as exc:
         logger.warning("Failed to persist search jobs: {}", exc)
@@ -113,8 +115,11 @@ def _run_search_job(
         enum_top_k = params.pop("enum_top_k", 30)
         logger.info("alpha.search creating service strategy={!r} market={!r}", strategy, market)
         svc = AlphaService(
-            market=market, strategy=strategy, neural_sample_batch=neural_batch,
-            enum_max=enum_max, enum_top_k=enum_top_k,
+            market=market,
+            strategy=strategy,
+            neural_sample_batch=neural_batch,
+            enum_max=enum_max,
+            enum_top_k=enum_top_k,
         )
         logger.info("alpha.search strategies={}", [s.name for s in svc.search_engine.strategies])
         result = svc.search_formulas_on_db(
@@ -180,8 +185,8 @@ class SearchDbRequest(BaseModel):
     embargo_window: int = 0
     strategy: str = ""  # extra strategies: "mcts", "neural", "mcts,neural"
     neural_batch: int = 4096
-    enum_max: int = 500       # max formulas to enumerate (round 0)
-    enum_top_k: int = 30      # top-K from enumeration to keep
+    enum_max: int = 500  # max formulas to enumerate (round 0)
+    enum_top_k: int = 30  # top-K from enumeration to keep
 
 
 class CombineZooRequest(BaseModel):
@@ -516,6 +521,7 @@ async def combine_factors_from_zoo(request: CombineZooRequest):
 
 class EventBacktestRequest(BaseModel):
     """多因子策略 event engine 回测请求。"""
+
     # Alpha 参数
     market: str = "a_share"
     symbols: list[str] = Field(default_factory=list)
@@ -722,20 +728,23 @@ async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
     for tr in result.get("top_results", []):
         metrics = tr.get("metrics", {})
         lineage = tr.get("lineage", {})
-        archive_entries.append(ArchiveEntry(
-            formula=tr.get("formula", ""),
-            expr_hash=tr.get("expr_hash", ""),
-            fitness=tr.get("fitness", 0),
-            rank_ic=float(metrics.get("rank_ic", 0) or 0),
-            sharpe=float(metrics.get("sharpe", 0) or 0),
-            turnover=float(metrics.get("avg_turnover", 0) or 0),
-            origin=lineage.get("origin", "unknown") if isinstance(lineage, dict) else "unknown",
-        ))
+        archive_entries.append(
+            ArchiveEntry(
+                formula=tr.get("formula", ""),
+                expr_hash=tr.get("expr_hash", ""),
+                fitness=tr.get("fitness", 0),
+                rank_ic=float(metrics.get("rank_ic", 0) or 0),
+                sharpe=float(metrics.get("sharpe", 0) or 0),
+                turnover=float(metrics.get("avg_turnover", 0) or 0),
+                origin=lineage.get("origin", "unknown") if isinstance(lineage, dict) else "unknown",
+            )
+        )
 
     # Build pipeline record from serialized data
     from src.alpha.search.pipeline import PipelineRecord, StageKind
     from src.alpha.search.pipeline import RoundRecord as RR
     from src.alpha.search.pipeline import StageRecord as SR
+
     pr = PipelineRecord(
         job_id=pipeline_data.get("job_id", job_id),
         total_evaluations=pipeline_data.get("total_evaluations", 0),
@@ -755,15 +764,17 @@ async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
                 kind = StageKind(sd.get("kind", "generate"))
             except ValueError:
                 kind = StageKind.GENERATE
-            rr.stages.append(SR(
-                kind=kind,
-                strategy=sd.get("strategy", ""),
-                round_idx=sd.get("round", 0),
-                input_count=sd.get("input", 0),
-                output_count=sd.get("output", 0),
-                duration_ms=sd.get("duration_ms", 0),
-                best_fitness=sd.get("best_fitness"),
-            ))
+            rr.stages.append(
+                SR(
+                    kind=kind,
+                    strategy=sd.get("strategy", ""),
+                    round_idx=sd.get("round", 0),
+                    input_count=sd.get("input", 0),
+                    output_count=sd.get("output", 0),
+                    duration_ms=sd.get("duration_ms", 0),
+                    best_fitness=sd.get("best_fitness"),
+                )
+            )
         pr.rounds.append(rr)
 
     summary = build_pipeline_summary(
@@ -822,14 +833,16 @@ async def get_tracing_traces():
     for tid in _memory_collector.trace_ids:
         spans = _memory_collector.find(trace_id=tid)
         root = next((s for s in spans if s.parent_id is None), None)
-        traces.append({
-            "trace_id": tid,
-            "operation": root.operation if root else "unknown",
-            "start_time": root.start_time if root else None,
-            "duration_ms": root.duration_ms if root else 0,
-            "span_count": len(spans),
-            "status": root.status if root else "unknown",
-        })
+        traces.append(
+            {
+                "trace_id": tid,
+                "operation": root.operation if root else "unknown",
+                "start_time": root.start_time if root else None,
+                "duration_ms": root.duration_ms if root else 0,
+                "span_count": len(spans),
+                "status": root.status if root else "unknown",
+            }
+        )
     return {"traces": list(reversed(traces))}
 
 
@@ -842,6 +855,7 @@ async def get_neural_history():
     import json
 
     from src.config.paths import ALPHA_LAB_NEURAL_DIR
+
     p = ALPHA_LAB_NEURAL_DIR / "training_history.json"
     if not p.exists():
         return {"history": [], "plot_available": False}
@@ -853,6 +867,7 @@ async def get_neural_history():
 @router.get("/neural/plot")
 async def get_neural_plot():
     from src.config.paths import ALPHA_LAB_NEURAL_DIR
+
     p = ALPHA_LAB_NEURAL_DIR / "training_curves.png"
     if not p.exists():
         raise HTTPException(status_code=404, detail="No training plot available")
@@ -876,10 +891,7 @@ async def get_strategy_state():
         if hasattr(strategy, "get_stats"):
             stats = strategy.get_stats()
             # Exclude large fields like full history
-            info["stats"] = {
-                k: v for k, v in stats.items()
-                if k != "history" and not isinstance(v, (list, bytes))
-            }
+            info["stats"] = {k: v for k, v in stats.items() if k != "history" and not isinstance(v, (list, bytes))}
         strategies_info.append(info)
 
     # Strategy memory summary
@@ -917,15 +929,17 @@ async def list_checkpoints():
             try:
                 manifest = _json.loads(manifest_path.read_text())
                 strategies_saved = manifest.get("strategy_names", [])
-                checkpoints.append({
-                    "job_id": manifest.get("job_id", job_dir.name),
-                    "round_idx": manifest.get("round_idx", 0),
-                    "timestamp": manifest.get("timestamp", 0),
-                    "path": str(ckpt),
-                    "strategies": strategies_saved,
-                    "archive_count": len(manifest.get("archive_formulas", [])),
-                    "context_state": manifest.get("context_state", {}),
-                })
+                checkpoints.append(
+                    {
+                        "job_id": manifest.get("job_id", job_dir.name),
+                        "round_idx": manifest.get("round_idx", 0),
+                        "timestamp": manifest.get("timestamp", 0),
+                        "path": str(ckpt),
+                        "strategies": strategies_saved,
+                        "archive_count": len(manifest.get("archive_formulas", [])),
+                        "context_state": manifest.get("context_state", {}),
+                    }
+                )
             except Exception:
                 continue
 
@@ -955,19 +969,23 @@ async def get_job_checkpoints(job_id: str):
                 meta_path = ckpt / f"strategy_{safe}.meta.json"
                 if meta_path.exists():
                     meta = _json.loads(meta_path.read_text())
-                    strategy_details.append({
-                        "name": name,
-                        "format": meta.get("format"),
-                        "metadata": meta.get("metadata", {}),
-                    })
-            checkpoints.append({
-                "round_idx": manifest.get("round_idx", 0),
-                "timestamp": manifest.get("timestamp", 0),
-                "path": str(ckpt),
-                "strategies": strategy_details,
-                "archive_formulas": manifest.get("archive_formulas", [])[:5],
-                "context_state": manifest.get("context_state", {}),
-            })
+                    strategy_details.append(
+                        {
+                            "name": name,
+                            "format": meta.get("format"),
+                            "metadata": meta.get("metadata", {}),
+                        }
+                    )
+            checkpoints.append(
+                {
+                    "round_idx": manifest.get("round_idx", 0),
+                    "timestamp": manifest.get("timestamp", 0),
+                    "path": str(ckpt),
+                    "strategies": strategy_details,
+                    "archive_formulas": manifest.get("archive_formulas", [])[:5],
+                    "context_state": manifest.get("context_state", {}),
+                }
+            )
         except Exception:
             continue
 
@@ -1001,12 +1019,14 @@ async def get_factor_catalog(
             continue
         # Rebuild catalog from pipeline rounds
         from src.alpha.search.context import FactorCatalog
+
         catalog = FactorCatalog()
         # Try to load from checkpoint if available
         ckpt = _get_service().checkpoint_manager.latest_checkpoint(job_id)
         if ckpt:
             try:
                 from src.alpha.search.checkpoint import SearchCheckpoint
+
                 saved = SearchCheckpoint.load(ckpt)
                 catalog = FactorCatalog.from_json_list(saved.factor_catalog_json)
             except Exception:
@@ -1060,8 +1080,10 @@ async def get_factor_catalog_stats():
         if ckpt:
             try:
                 from src.alpha.search.checkpoint import SearchCheckpoint
+
                 saved = SearchCheckpoint.load(ckpt)
                 from src.alpha.search.context import FactorCatalog
+
                 catalog = FactorCatalog.from_json_list(saved.factor_catalog_json)
                 stats["strategies"] = catalog.stats_by_strategy()
                 stats["total_factors"] = len(catalog)

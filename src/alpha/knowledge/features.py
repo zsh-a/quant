@@ -64,85 +64,99 @@ class FeatureKitchen:
             DerivedFeature(
                 "buy_pressure",
                 "div(taker_buy_volume, volume + 1e-12)",
-                "ratio", ("taker_buy_volume", "volume"),
+                "ratio",
+                ("taker_buy_volume", "volume"),
                 "Fraction of volume from aggressive buyers (0.5 = neutral)",
             ),
             DerivedFeature(
                 "sell_pressure",
                 "div(volume - taker_buy_volume, volume + 1e-12)",
-                "ratio", ("taker_buy_volume", "volume"),
+                "ratio",
+                ("taker_buy_volume", "volume"),
                 "Fraction of volume from aggressive sellers",
             ),
             DerivedFeature(
                 "avg_trade_size",
                 "div(turnover, trade_count + 1e-12)",
-                "ratio", ("turnover", "trade_count"),
+                "ratio",
+                ("turnover", "trade_count"),
                 "Average notional per trade — whale detection proxy",
             ),
             DerivedFeature(
                 "normalized_spread",
                 "spread_ratio(bid_ask_spread, close)",
-                "ratio", ("bid_ask_spread", "close"),
+                "ratio",
+                ("bid_ask_spread", "close"),
                 "Bid-ask spread as fraction of price — liquidity proxy",
             ),
             DerivedFeature(
                 "basis_per_vol",
                 "div(premium_close, volatility_n(close, 20) + 1e-12)",
-                "ratio", ("premium_close", "close"),
+                "ratio",
+                ("premium_close", "close"),
                 "Basis normalized by realized volatility — regime-adjusted carry",
             ),
             DerivedFeature(
                 "funding_oi_intensity",
                 "div(funding_rate, ts_mean(open_interest, 20) + 1e-12)",
-                "ratio", ("funding_rate", "open_interest"),
+                "ratio",
+                ("funding_rate", "open_interest"),
                 "Funding rate per unit of OI — leverage cost intensity",
             ),
             DerivedFeature(
                 "oi_per_volume",
                 "div(open_interest, adv_n(turnover, 20) + 1e-12)",
-                "ratio", ("open_interest", "turnover"),
+                "ratio",
+                ("open_interest", "turnover"),
                 "Outstanding positions vs recent activity — position crowding proxy",
             ),
             DerivedFeature(
                 "price_efficiency",
                 "div(abs(returns_n(close, 5)), ts_sum(abs(returns_n(close, 1)), 5) + 1e-12)",
-                "ratio", ("close",),
+                "ratio",
+                ("close",),
                 "5-bar return / sum of 1-bar |returns| — trend efficiency (1 = straight line)",
             ),
             DerivedFeature(
                 "close_vwap_ratio",
                 "div(close, vwap + 1e-12)",
-                "ratio", ("close", "vwap"),
+                "ratio",
+                ("close", "vwap"),
                 "Price vs volume-weighted avg — intrabar drift indicator",
             ),
             DerivedFeature(
                 "mark_spot_spread",
                 "div(close - mark_close, close + 1e-12)",
-                "ratio", ("close", "mark_close"),
+                "ratio",
+                ("close", "mark_close"),
                 "Normalized mark-spot deviation — premium/stress proxy",
             ),
             DerivedFeature(
                 "high_low_range",
                 "div(high - low, close + 1e-12)",
-                "ratio", ("high", "low", "close"),
+                "ratio",
+                ("high", "low", "close"),
                 "Intrabar range normalized by close — bar-level volatility",
             ),
             DerivedFeature(
                 "upper_shadow",
                 "div(high - max(open, close), high - low + 1e-12)",
-                "ratio", ("high", "low", "open", "close"),
+                "ratio",
+                ("high", "low", "open", "close"),
                 "Upper shadow fraction — selling pressure at highs",
             ),
             DerivedFeature(
                 "lower_shadow",
                 "div(min(open, close) - low, high - low + 1e-12)",
-                "ratio", ("high", "low", "open", "close"),
+                "ratio",
+                ("high", "low", "open", "close"),
                 "Lower shadow fraction — buying pressure at lows",
             ),
             DerivedFeature(
                 "taker_ls_imbalance",
                 "div(taker_long_short_vol_ratio - 1.0, taker_long_short_vol_ratio + 1.0 + 1e-12)",
-                "ratio", ("taker_long_short_vol_ratio",),
+                "ratio",
+                ("taker_long_short_vol_ratio",),
                 "Normalized taker long/short imbalance (-1 to 1 range)",
             ),
         ]
@@ -165,12 +179,15 @@ class FeatureKitchen:
             if field_name not in self.schema.fields:
                 continue
             for w in windows:
-                deltas.append(DerivedFeature(
-                    f"{field_name}_delta_{w}",
-                    f"delta({field_name}, {w})",
-                    "delta", (field_name,),
-                    f"{meaning} over {w} bars",
-                ))
+                deltas.append(
+                    DerivedFeature(
+                        f"{field_name}_delta_{w}",
+                        f"delta({field_name}, {w})",
+                        "delta",
+                        (field_name,),
+                        f"{meaning} over {w} bars",
+                    )
+                )
         return deltas
 
     # ------------------------------------------------------------------
@@ -182,61 +199,71 @@ class FeatureKitchen:
             DerivedFeature(
                 "oi_price_correlation",
                 "ts_corr(delta(open_interest, 10), returns_n(close, 10), 20)",
-                "interaction", ("open_interest", "close"),
+                "interaction",
+                ("open_interest", "close"),
                 "OI-price correlation: positive = trend confirmation, negative = divergence/squeeze",
             ),
             DerivedFeature(
                 "flow_toxicity",
                 "div(taker_buy_volume - div(volume, 2), volume + 1e-12)",
-                "interaction", ("taker_buy_volume", "volume"),
+                "interaction",
+                ("taker_buy_volume", "volume"),
                 "Net taker imbalance as fraction of total volume",
             ),
             DerivedFeature(
                 "funding_basis_spread",
                 "ts_zscore(funding_rate, 20) - ts_zscore(premium_close, 20)",
-                "interaction", ("funding_rate", "premium_close"),
+                "interaction",
+                ("funding_rate", "premium_close"),
                 "Funding vs basis z-score divergence — arbitrage signal",
             ),
             DerivedFeature(
                 "volume_price_divergence",
                 "ts_corr(volume, abs(returns_n(close, 1)), 20)",
-                "interaction", ("volume", "close"),
+                "interaction",
+                ("volume", "close"),
                 "Volume-price correlation: low = stealth accumulation, high = normal trending",
             ),
             DerivedFeature(
                 "smart_dumb_divergence",
                 "delta(top_trader_long_short_ratio, 5) - delta(long_short_ratio, 5)",
-                "interaction", ("top_trader_long_short_ratio", "long_short_ratio"),
+                "interaction",
+                ("top_trader_long_short_ratio", "long_short_ratio"),
                 "Whale vs retail positioning delta — smart money leading signal",
             ),
             DerivedFeature(
                 "oi_volume_divergence",
                 "ts_zscore(delta(open_interest, 10), 20) - ts_zscore(delta(volume, 10), 20)",
-                "interaction", ("open_interest", "volume"),
+                "interaction",
+                ("open_interest", "volume"),
                 "OI growing without volume = speculative positioning build-up",
             ),
             DerivedFeature(
                 "momentum_quality",
                 "ts_corr(returns_n(close, 1), volume, 20)",
-                "interaction", ("close", "volume"),
+                "interaction",
+                ("close", "volume"),
                 "Return-volume correlation — volume-confirmed momentum",
             ),
             DerivedFeature(
                 "spread_vol_stress",
                 "ts_corr(spread_ratio(bid_ask_spread, close), volatility_n(close, 10), 20)",
-                "interaction", ("bid_ask_spread", "close"),
+                "interaction",
+                ("bid_ask_spread", "close"),
                 "Spread-volatility correlation — market stress indicator",
             ),
             DerivedFeature(
                 "funding_momentum",
                 "ts_corr(delta(funding_rate, 5), returns_n(close, 5), 20)",
-                "interaction", ("funding_rate", "close"),
+                "interaction",
+                ("funding_rate", "close"),
                 "Funding-return alignment — persistent when trend is real, divergent at exhaustion",
             ),
             DerivedFeature(
                 "whale_activity_signal",
                 "ts_zscore(div(turnover, trade_count + 1e-12), 20)",
-                "interaction", ("turnover", "trade_count"),
+                "interaction",
+                ("turnover", "trade_count"),
                 "Average trade size z-score — spikes indicate institutional activity",
             ),
         ]
@@ -249,9 +276,7 @@ class FeatureKitchen:
         """Format catalog for injection into LLM prompts."""
         sections: dict[str, list[str]] = defaultdict(list)
         for feat in self.catalog:
-            sections[feat.category].append(
-                f"  - **{feat.name}** = `{feat.formula}`\n    {feat.financial_meaning}"
-            )
+            sections[feat.category].append(f"  - **{feat.name}** = `{feat.formula}`\n    {feat.financial_meaning}")
 
         parts: list[str] = []
         category_names = {"ratio": "Ratios", "delta": "Changes Over Time", "interaction": "Cross-Field Interactions"}
@@ -280,11 +305,7 @@ class FeatureKitchen:
 
         Returns list of (name, mean_fitness, count).
         """
-        ranking = [
-            (name, stats.mean, stats.count)
-            for name, stats in self._importance.items()
-            if stats.count > 0
-        ]
+        ranking = [(name, stats.mean, stats.count) for name, stats in self._importance.items() if stats.count > 0]
         ranking.sort(key=lambda x: x[1], reverse=True)
         return ranking
 

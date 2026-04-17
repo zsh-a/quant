@@ -28,10 +28,10 @@ class StrategyMeta:
     Used by the registry for construction and by the UI for display.
     """
 
-    registry_name: str       # key in registry, also returned by ``name`` property
-    label: str               # human-readable label (中文 for UI)
-    brief: str               # one-line description
-    detail: str = ""         # optional multi-line description
+    registry_name: str  # key in registry, also returned by ``name`` property
+    label: str  # human-readable label (中文 for UI)
+    brief: str  # one-line description
+    detail: str = ""  # optional multi-line description
 
 
 class BaseStrategy(ABC):
@@ -61,7 +61,9 @@ class BaseStrategy(ABC):
     def generate_candidates(self, ctx: SearchContext) -> list[Individual]: ...
 
     def on_evaluation_complete(
-        self, ctx: SearchContext, evaluated: list[Individual],
+        self,
+        ctx: SearchContext,
+        evaluated: list[Individual],
     ) -> None:
         """Default: record each evaluated individual to strategy_memory."""
         if ctx.strategy_memory is not None:
@@ -98,7 +100,10 @@ class BaseStrategy(ABC):
         results: list[Individual] = []
         for formula in formulas:
             ind = build_individual(
-                ctx.compiler, ctx.schema, formula, lineage_fn(formula),
+                ctx.compiler,
+                ctx.schema,
+                formula,
+                lineage_fn(formula),
             )
             if ind is not None and ind.expr_hash not in ctx.seen_hashes:
                 results.append(ind)

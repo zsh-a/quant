@@ -142,9 +142,7 @@ def calculate_metrics(
     negative_returns = [r for r in daily_returns if r < 0]
     if negative_returns:
         downside_variance = sum(r**2 for r in negative_returns) / len(daily_returns)
-        downside_deviation = math.sqrt(downside_variance) * math.sqrt(
-            TRADING_DAYS_PER_YEAR
-        )
+        downside_deviation = math.sqrt(downside_variance) * math.sqrt(TRADING_DAYS_PER_YEAR)
     else:
         downside_deviation = 0.0
 
@@ -180,9 +178,7 @@ def calculate_metrics(
 
     # Sharpe Ratio
     if std_dev > 0:
-        sharpe_ratio = (
-            (mean_return - daily_rf) / std_dev * math.sqrt(TRADING_DAYS_PER_YEAR)
-        )
+        sharpe_ratio = (mean_return - daily_rf) / std_dev * math.sqrt(TRADING_DAYS_PER_YEAR)
     else:
         sharpe_ratio = 0.0
 
@@ -241,9 +237,7 @@ def calculate_metrics(
     )
 
 
-def calculate_rolling_metrics(
-    equity_history: List[Dict[str, Any]], window: int = 30
-) -> List[Dict[str, Any]]:
+def calculate_rolling_metrics(equity_history: List[Dict[str, Any]], window: int = 30) -> List[Dict[str, Any]]:
     """
     Calculate rolling metrics over a sliding window.
 

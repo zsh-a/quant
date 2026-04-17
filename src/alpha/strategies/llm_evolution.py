@@ -54,7 +54,8 @@ class LLMEvolutionStrategy(BaseStrategy):
             # Genesis: use initial population from the LLM
             formulas = self.llm_backend.generate_initial_population(batch_size)
             return self.compile_and_dedup(
-                ctx, formulas,
+                ctx,
+                formulas,
                 lineage_fn=lambda _f: Lineage(origin="llm_genesis"),
             )
 
@@ -105,9 +106,7 @@ class LLMEvolutionStrategy(BaseStrategy):
 
         return self.compile_and_dedup(ctx, formulas, lineage_fn=_make_lineage)
 
-    def on_evaluation_complete(
-        self, ctx: SearchContext, evaluated: list[Individual]
-    ) -> None:
+    def on_evaluation_complete(self, ctx: SearchContext, evaluated: list[Individual]) -> None:
         # Close the RL feedback loop via LLM backend (not strategy_memory)
         if hasattr(self.llm_backend, "record_evaluation_result"):
             for ind in evaluated:

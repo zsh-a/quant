@@ -21,6 +21,7 @@ class ReportGenerator:
     def __init__(self, output_dir: str = ""):
         if not output_dir:
             from src.config.paths import REPORTS_DIR
+
             output_dir = str(REPORTS_DIR)
         self.output_dir = output_dir
 
@@ -32,7 +33,7 @@ class ReportGenerator:
         trades: List[Dict],
         positions: Dict,
         params: Optional[Dict] = None,
-        metadata: Optional[Dict] = None
+        metadata: Optional[Dict] = None,
     ) -> str:
         """
         Generate Markdown report.
@@ -58,14 +59,14 @@ class ReportGenerator:
             attribution=attribution,
             risk_metrics=risk_metrics,
             params=params or {},
-            metadata=metadata or {}
+            metadata=metadata or {},
         )
 
         # Save report
         filename = f"report_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         filepath = os.path.join(self.output_dir, filename)
 
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(report)
 
         logger.info(f"Report saved: {filepath}")
@@ -80,21 +81,21 @@ class ReportGenerator:
         attribution,
         risk_metrics: Dict,
         params: Dict,
-        metadata: Dict
+        metadata: Dict,
     ) -> str:
         """Build report content"""
 
         # Calculate summary stats
         if equity_history:
-            initial = equity_history[0].get('total_equity', 0)
-            final = equity_history[-1].get('total_equity', 0)
+            initial = equity_history[0].get("total_equity", 0)
+            final = equity_history[-1].get("total_equity", 0)
             total_return = (final - initial) / initial if initial > 0 else 0
-            start_date = equity_history[0].get('date', '')
-            end_date = equity_history[-1].get('date', '')
+            start_date = equity_history[0].get("date", "")
+            end_date = equity_history[-1].get("date", "")
         else:
             initial = final = 0
             total_return = 0
-            start_date = end_date = ''
+            start_date = end_date = ""
 
         lines = []
 
@@ -200,11 +201,11 @@ class ReportGenerator:
             lines.append("| 时间 | 代码 | 方向 | 数量 | 价格 |")
             lines.append("|------|------|------|------|------|")
             for trade in trades[-20:]:
-                ts = trade.get('timestamp', '')[:16]
-                symbol = trade.get('symbol', '')
-                side = trade.get('type', trade.get('side', ''))
-                qty = trade.get('quantity', 0)
-                price = trade.get('price', 0)
+                ts = trade.get("timestamp", "")[:16]
+                symbol = trade.get("symbol", "")
+                side = trade.get("type", trade.get("side", ""))
+                qty = trade.get("quantity", 0)
+                price = trade.get("price", 0)
                 lines.append(f"| {ts} | {symbol} | {side} | {qty} | ¥{price:.2f} |")
             lines.append("")
 
@@ -231,23 +232,20 @@ class ReportExporter:
     @staticmethod
     def to_dict(report_path: str) -> Dict:
         """Parse Markdown report to dict"""
-        with open(report_path, 'r', encoding='utf-8') as f:
+        with open(report_path, "r", encoding="utf-8") as f:
             content = f.read()
 
         # Simple parsing - extract key metrics
-        result = {
-            'content': content,
-            'path': report_path
-        }
+        result = {"content": content, "path": report_path}
 
         # Extract summary metrics from table
-        lines = content.split('\n')
+        lines = content.split("\n")
         for line in lines:
-            if '初始资金' in line:
-                result['initial_capital'] = line.split('|')[-2].strip()
-            elif '最终资金' in line:
-                result['final_capital'] = line.split('|')[-2].strip()
-            elif '总收益率' in line:
-                result['total_return'] = line.split('|')[-2].strip()
+            if "初始资金" in line:
+                result["initial_capital"] = line.split("|")[-2].strip()
+            elif "最终资金" in line:
+                result["final_capital"] = line.split("|")[-2].strip()
+            elif "总收益率" in line:
+                result["total_return"] = line.split("|")[-2].strip()
 
         return result

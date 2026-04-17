@@ -57,7 +57,9 @@ def build_parser() -> argparse.ArgumentParser:
     backfill_parser.add_argument("--provider", default=None, help="Provider name, e.g. bitget/binance")
     backfill_parser.add_argument("--symbols", default=None, help="Comma-separated symbols")
     backfill_parser.add_argument("--interval", default=None, help="Bar interval, default from config")
-    backfill_parser.add_argument("--start", default=None, help="ISO8601 start time, defaults to crypto_market.full_history_start")
+    backfill_parser.add_argument(
+        "--start", default=None, help="ISO8601 start time, defaults to crypto_market.full_history_start"
+    )
     backfill_parser.add_argument("--end", default=None, help="ISO8601 end time")
     backfill_parser.add_argument("--verbose", action="store_true", help="Print per-window sync progress")
 
@@ -177,8 +179,7 @@ def _run_vision_sync(args) -> Any:
 
     def _progress(e: dict) -> None:
         print(
-            f"  [{e['symbol']}] {e['period']}  {e['progress']}"
-            f"  rows={e['rows']}  +{e['new']}  total={e['total_new']}"
+            f"  [{e['symbol']}] {e['period']}  {e['progress']}  rows={e['rows']}  +{e['new']}  total={e['total_new']}"
         )
 
     return syncer.sync(

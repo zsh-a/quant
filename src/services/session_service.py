@@ -111,9 +111,7 @@ class SessionService:
             runtime.broker = broker
         return runtime
 
-    def get_runtime_or_persisted(
-        self, session_id: str
-    ) -> Tuple[Optional[SessionRuntime], Optional[Dict[str, Any]]]:
+    def get_runtime_or_persisted(self, session_id: str) -> Tuple[Optional[SessionRuntime], Optional[Dict[str, Any]]]:
         runtime = self.get_runtime(session_id)
         persisted = self.session_db.get_session(session_id)
         return runtime, persisted
@@ -194,9 +192,7 @@ class SessionService:
 
     def count_running_sessions(self) -> int:
         with self._lock:
-            return len(
-                [runtime for runtime in self._active_sessions.values() if runtime.status == "running"]
-            )
+            return len([runtime for runtime in self._active_sessions.values() if runtime.status == "running"])
 
     def build_checkpoint_state(self, session_id: str) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         runtime, persisted = self.get_runtime_or_persisted(session_id)

@@ -49,25 +49,89 @@ DEFAULT_START = "2020-01-01"
 # Excludes stablecoins and de-pegged tokens.
 EXPANDED_SYMBOLS = [
     # Mega-cap (top 10 by market cap — useful as hedges, less alpha)
-    "BTCUSDT", "ETHUSDT", "BNBUSDT", "SOLUSDT", "XRPUSDT",
-    "DOGEUSDT", "ADAUSDT", "AVAXUSDT", "TRXUSDT", "DOTUSDT",
+    "BTCUSDT",
+    "ETHUSDT",
+    "BNBUSDT",
+    "SOLUSDT",
+    "XRPUSDT",
+    "DOGEUSDT",
+    "ADAUSDT",
+    "AVAXUSDT",
+    "TRXUSDT",
+    "DOTUSDT",
     # Large-cap (11-30)
-    "LINKUSDT", "MATICUSDT", "SHIBUSDT", "LTCUSDT", "BCHUSDT",
-    "NEARUSDT", "UNIUSDT", "APTUSDT", "ICPUSDT", "ETCUSDT",
-    "FILUSDT", "STXUSDT", "ATOMUSDT", "IMXUSDT", "RENDERUSDT",
-    "OPUSDT", "ARBUSDT", "INJUSDT", "SUIUSDT", "SEIUSDT",
+    "LINKUSDT",
+    "MATICUSDT",
+    "SHIBUSDT",
+    "LTCUSDT",
+    "BCHUSDT",
+    "NEARUSDT",
+    "UNIUSDT",
+    "APTUSDT",
+    "ICPUSDT",
+    "ETCUSDT",
+    "FILUSDT",
+    "STXUSDT",
+    "ATOMUSDT",
+    "IMXUSDT",
+    "RENDERUSDT",
+    "OPUSDT",
+    "ARBUSDT",
+    "INJUSDT",
+    "SUIUSDT",
+    "SEIUSDT",
     # Mid-cap (31-60) — sweet spot for small-fund alpha
-    "FTMUSDT", "GRTUSDT", "THETAUSDT", "AAVEUSDT", "MKRUSDT",
-    "ALGOUSDT", "SANDUSDT", "MANAUSDT", "AXSUSDT", "SNXUSDT",
-    "CRVUSDT", "LDOUSDT", "DYDXUSDT", "RNDRUSDT", "CFXUSDT",
-    "AGLDUSDT", "APEUSDT", "MASKUSDT", "GMXUSDT", "WOOUSDT",
-    "PENDLEUSDT", "TIAUSDT", "JUPUSDT", "WUSDT", "ENAUSDT",
-    "WLDUSDT", "PYTHUSDT", "JTOUSDT", "ONDOUSDT", "EIGENUSDT",
+    "FTMUSDT",
+    "GRTUSDT",
+    "THETAUSDT",
+    "AAVEUSDT",
+    "MKRUSDT",
+    "ALGOUSDT",
+    "SANDUSDT",
+    "MANAUSDT",
+    "AXSUSDT",
+    "SNXUSDT",
+    "CRVUSDT",
+    "LDOUSDT",
+    "DYDXUSDT",
+    "RNDRUSDT",
+    "CFXUSDT",
+    "AGLDUSDT",
+    "APEUSDT",
+    "MASKUSDT",
+    "GMXUSDT",
+    "WOOUSDT",
+    "PENDLEUSDT",
+    "TIAUSDT",
+    "JUPUSDT",
+    "WUSDT",
+    "ENAUSDT",
+    "WLDUSDT",
+    "PYTHUSDT",
+    "JTOUSDT",
+    "ONDOUSDT",
+    "EIGENUSDT",
     # Small-cap high-volume (61-80) — highest alpha potential
-    "PEOPLEUSDT", "LRCUSDT", "BLURUSDT", "ORBSUSDT", "STRKUSDT",
-    "MOVRUSDT", "1000PEPEUSDT", "1000FLOKIUSDT", "1000BONKUSDT", "WIFUSDT",
-    "NEIROUSDT", "MEMEUSDT", "BRETTUSDT", "POPCATUSDT", "ACTUSDT",
-    "TRUMPUSDT", "COOKIEUSDT", "MOVEUSDT", "LAYERUSDT", "BANUSDT",
+    "PEOPLEUSDT",
+    "LRCUSDT",
+    "BLURUSDT",
+    "ORBSUSDT",
+    "STRKUSDT",
+    "MOVRUSDT",
+    "1000PEPEUSDT",
+    "1000FLOKIUSDT",
+    "1000BONKUSDT",
+    "WIFUSDT",
+    "NEIROUSDT",
+    "MEMEUSDT",
+    "BRETTUSDT",
+    "POPCATUSDT",
+    "ACTUSDT",
+    "TRUMPUSDT",
+    "COOKIEUSDT",
+    "MOVEUSDT",
+    "LAYERUSDT",
+    "BANUSDT",
 ]
 
 TABLE = "crypto_data.futures_5m"
@@ -168,9 +232,7 @@ class BinanceVisionSyncer:
         active_symbols = {
             s["symbol"]
             for s in exchange_info.get("symbols", [])
-            if s.get("status") == "TRADING"
-            and s.get("contractType") == "PERPETUAL"
-            and s["symbol"].endswith("USDT")
+            if s.get("status") == "TRADING" and s.get("contractType") == "PERPETUAL" and s["symbol"].endswith("USDT")
         }
 
         # Fetch 24h volume
@@ -197,11 +259,13 @@ class BinanceVisionSyncer:
         ranked.sort(key=lambda x: x["volume_24h_usd"], reverse=True)
 
         # Apply skip and limit
-        result = ranked[skip_top_n: skip_top_n + max_symbols]
+        result = ranked[skip_top_n : skip_top_n + max_symbols]
         logger.info(
-            "discover_liquid_symbols: found {} active perpetuals, {} pass volume filter, "
-            "returning {} (skip_top={})",
-            len(active_symbols), len(ranked), len(result), skip_top_n,
+            "discover_liquid_symbols: found {} active perpetuals, {} pass volume filter, returning {} (skip_top={})",
+            len(active_symbols),
+            len(ranked),
+            len(result),
+            skip_top_n,
         )
         return result
 
@@ -227,17 +291,20 @@ class BinanceVisionSyncer:
         return results
 
     def status(
-        self, symbols: list[str] | None = None,
+        self,
+        symbols: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         """Show latest synced open_time per symbol."""
         symbols = [s.upper() for s in (symbols or DEFAULT_SYMBOLS)]
         rows: list[dict[str, Any]] = []
         for symbol in symbols:
             latest = self._latest_time(symbol)
-            rows.append({
-                "symbol": symbol,
-                "latest": latest.isoformat() if latest else None,
-            })
+            rows.append(
+                {
+                    "symbol": symbol,
+                    "latest": latest.isoformat() if latest else None,
+                }
+            )
         return rows
 
     # -- sync internals -----------------------------------------------------
@@ -268,7 +335,11 @@ class BinanceVisionSyncer:
         n_daily = len(periods) - n_monthly
         logger.info(
             "{} syncing {} → {}  ({} monthly + {} daily periods)",
-            symbol, start.strftime("%Y-%m-%d"), end.strftime("%Y-%m-%d"), n_monthly, n_daily,
+            symbol,
+            start.strftime("%Y-%m-%d"),
+            end.strftime("%Y-%m-%d"),
+            n_monthly,
+            n_daily,
         )
 
         for i, period in enumerate(periods):
@@ -279,14 +350,16 @@ class BinanceVisionSyncer:
                 inserted = self._insert_rows(symbol, rows)
                 total_inserted += inserted
                 if progress:
-                    progress({
-                        "symbol": symbol,
-                        "period": period["label"],
-                        "progress": f"{i + 1}/{len(periods)}",
-                        "rows": len(rows),
-                        "new": inserted,
-                        "total_new": total_inserted,
-                    })
+                    progress(
+                        {
+                            "symbol": symbol,
+                            "period": period["label"],
+                            "progress": f"{i + 1}/{len(periods)}",
+                            "rows": len(rows),
+                            "new": inserted,
+                            "total_new": total_inserted,
+                        }
+                    )
             except Exception as exc:
                 logger.warning("{} {} failed: {}", symbol, period["label"], exc)
                 errors.append({"period": period["label"], "error": str(exc)})
@@ -320,10 +393,7 @@ class BinanceVisionSyncer:
             return []
 
         # 2) Metrics — daily archives only (parallel within month)
-        metrics = (
-            self._fetch_metrics_month(symbol, label) if is_monthly
-            else self._fetch_metrics_day(symbol, label)
-        )
+        metrics = self._fetch_metrics_month(symbol, label) if is_monthly else self._fetch_metrics_day(symbol, label)
 
         # 3) Funding rate — monthly archives only
         funding: dict[datetime, float] = {}
@@ -335,15 +405,16 @@ class BinanceVisionSyncer:
     # -- downloaders --------------------------------------------------------
 
     def _fetch_kline_csv(
-        self, data_type: str, symbol: str, interval: str, period: dict,
+        self,
+        data_type: str,
+        symbol: str,
+        interval: str,
+        period: dict,
     ) -> list[dict]:
         """Download kline-format CSV (works for klines / premiumIndex / markPrice)."""
         label = period["label"]
         freq = "monthly" if period["type"] == "monthly" else "daily"
-        url = (
-            f"{BASE_URL}/{freq}/{data_type}/{symbol}/{interval}/"
-            f"{symbol}-{interval}-{label}.zip"
-        )
+        url = f"{BASE_URL}/{freq}/{data_type}/{symbol}/{interval}/{symbol}-{interval}-{label}.zip"
         raw = self._fetch_zip_csv(url)
         return _parse_kline_rows(raw) if raw is not None else []
 
@@ -374,10 +445,7 @@ class BinanceVisionSyncer:
         return all_rows
 
     def _fetch_funding_rate(self, symbol: str, month_label: str) -> dict[datetime, float]:
-        url = (
-            f"{BASE_URL}/monthly/fundingRate/{symbol}/"
-            f"{symbol}-fundingRate-{month_label}.zip"
-        )
+        url = f"{BASE_URL}/monthly/fundingRate/{symbol}/{symbol}-fundingRate-{month_label}.zip"
         raw = self._fetch_zip_csv(url)
         return _parse_funding_rate_rows(raw) if raw is not None else {}
 
@@ -435,10 +503,7 @@ class BinanceVisionSyncer:
             "AND open_time <= toDateTime64({e:String}, 3, 'UTC')",
             parameters={"symbol": symbol, "s": s, "e": e},
         )
-        return {
-            (row[0].replace(tzinfo=UTC) if row[0].tzinfo is None else row[0])
-            for row in r.result_rows
-        }
+        return {(row[0].replace(tzinfo=UTC) if row[0].tzinfo is None else row[0]) for row in r.result_rows}
 
 
 # ---------------------------------------------------------------------------
@@ -453,19 +518,21 @@ def _parse_kline_rows(raw: bytes) -> list[dict]:
         try:
             ot = _norm_ts(int(row[0]))
             ct = _norm_ts(int(row[6]))
-            out.append({
-                "open_time": datetime.fromtimestamp(ot / 1000, tz=UTC),
-                "close_time": datetime.fromtimestamp(ct / 1000, tz=UTC),
-                "open": float(row[1]),
-                "high": float(row[2]),
-                "low": float(row[3]),
-                "close": float(row[4]),
-                "volume": float(row[5]),
-                "quote_volume": float(row[7]),
-                "trade_count": int(row[8]),
-                "taker_buy_volume": float(row[9]),
-                "taker_buy_quote_volume": float(row[10]),
-            })
+            out.append(
+                {
+                    "open_time": datetime.fromtimestamp(ot / 1000, tz=UTC),
+                    "close_time": datetime.fromtimestamp(ct / 1000, tz=UTC),
+                    "open": float(row[1]),
+                    "high": float(row[2]),
+                    "low": float(row[3]),
+                    "close": float(row[4]),
+                    "volume": float(row[5]),
+                    "quote_volume": float(row[7]),
+                    "trade_count": int(row[8]),
+                    "taker_buy_volume": float(row[9]),
+                    "taker_buy_quote_volume": float(row[10]),
+                }
+            )
         except (IndexError, ValueError):
             continue
     return out
@@ -477,15 +544,17 @@ def _parse_metrics_rows(raw: bytes) -> list[dict]:
     for row in csv.reader(io.StringIO(raw.decode())):
         try:
             ot = datetime.strptime(row[0], "%Y-%m-%d %H:%M:%S").replace(tzinfo=UTC)
-            out.append({
-                "open_time": ot,
-                "open_interest": float(row[2]),
-                "open_interest_value": float(row[3]),
-                "top_trader_long_short_ratio": float(row[4]),
-                "top_trader_long_short_position_ratio": float(row[5]),
-                "long_short_ratio": float(row[6]),
-                "taker_long_short_vol_ratio": float(row[7]),
-            })
+            out.append(
+                {
+                    "open_time": ot,
+                    "open_interest": float(row[2]),
+                    "open_interest_value": float(row[3]),
+                    "top_trader_long_short_ratio": float(row[4]),
+                    "top_trader_long_short_position_ratio": float(row[5]),
+                    "long_short_ratio": float(row[6]),
+                    "taker_long_short_vol_ratio": float(row[7]),
+                }
+            )
         except (IndexError, ValueError):
             continue
     return out
@@ -524,18 +593,30 @@ def _merge_all(
         rows[ot] = {
             "open_time": ot,
             "close_time": k["close_time"],
-            "open": k["open"], "high": k["high"], "low": k["low"], "close": k["close"],
-            "volume": k["volume"], "quote_volume": k["quote_volume"],
+            "open": k["open"],
+            "high": k["high"],
+            "low": k["low"],
+            "close": k["close"],
+            "volume": k["volume"],
+            "quote_volume": k["quote_volume"],
             "trade_count": k["trade_count"],
             "taker_buy_volume": k["taker_buy_volume"],
             "taker_buy_quote_volume": k["taker_buy_quote_volume"],
             # defaults for optional sources
-            "mark_open": 0.0, "mark_high": 0.0, "mark_low": 0.0, "mark_close": 0.0,
-            "premium_open": 0.0, "premium_high": 0.0, "premium_low": 0.0, "premium_close": 0.0,
-            "open_interest": 0.0, "open_interest_value": 0.0,
+            "mark_open": 0.0,
+            "mark_high": 0.0,
+            "mark_low": 0.0,
+            "mark_close": 0.0,
+            "premium_open": 0.0,
+            "premium_high": 0.0,
+            "premium_low": 0.0,
+            "premium_close": 0.0,
+            "open_interest": 0.0,
+            "open_interest_value": 0.0,
             "top_trader_long_short_ratio": 0.0,
             "top_trader_long_short_position_ratio": 0.0,
-            "long_short_ratio": 0.0, "taker_long_short_vol_ratio": 0.0,
+            "long_short_ratio": 0.0,
+            "taker_long_short_vol_ratio": 0.0,
             "funding_rate": 0.0,
         }
 
@@ -657,13 +738,10 @@ def _build_parser() -> argparse.ArgumentParser:
     st.add_argument("--symbols", help="Comma-separated")
 
     dc = sub.add_parser("discover", help="Auto-discover liquid perpetuals from Binance API")
-    dc.add_argument("--min-volume", type=float, default=10_000_000,
-                     help="Min 24h quote volume in USD (default: 10M)")
+    dc.add_argument("--min-volume", type=float, default=10_000_000, help="Min 24h quote volume in USD (default: 10M)")
     dc.add_argument("--max-symbols", type=int, default=100, help="Max symbols to return")
-    dc.add_argument("--skip-top", type=int, default=0,
-                    help="Skip top N symbols (small-fund: skip mega-caps)")
-    dc.add_argument("--sync", action="store_true",
-                    help="Also sync discovered symbols after listing")
+    dc.add_argument("--skip-top", type=int, default=0, help="Skip top N symbols (small-fund: skip mega-caps)")
+    dc.add_argument("--sync", action="store_true", help="Also sync discovered symbols after listing")
 
     return p
 
@@ -713,9 +791,9 @@ def main(argv: list[str] | None = None) -> int:
         if getattr(args, "sync", False) and discovered:
             print("\nStarting sync for discovered symbols...")
             disc_syms = [d["symbol"] for d in discovered]
-            result = syncer.sync(symbols=disc_syms, progress=lambda e: print(
-                f"  [{e['symbol']}] {e['period']}  +{e['new']}"
-            ))
+            result = syncer.sync(
+                symbols=disc_syms, progress=lambda e: print(f"  [{e['symbol']}] {e['period']}  +{e['new']}")
+            )
             print(json.dumps(result, indent=2, default=str, ensure_ascii=False))
         return 0
     else:

@@ -9,7 +9,7 @@ from src.tasks.celery_app import app
 
 
 @app.task(
-    name='src.tasks.data_tasks.sync_financial_data',
+    name="src.tasks.data_tasks.sync_financial_data",
     autoretry_for=(ConnectionError, OSError, TimeoutError),
     retry_backoff=True,
     max_retries=3,

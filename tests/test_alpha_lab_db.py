@@ -47,8 +47,16 @@ class FakeCryptoStore:
                     "close_time": (open_time + pd.Timedelta(minutes=1) - pd.Timedelta(milliseconds=1)).isoformat(),
                 }
             )
-        start_ts = pd.Timestamp(start_time).tz_convert("UTC") if pd.Timestamp(start_time).tzinfo else pd.Timestamp(start_time, tz="UTC")
-        end_ts = pd.Timestamp(end_time).tz_convert("UTC") if pd.Timestamp(end_time).tzinfo else pd.Timestamp(end_time, tz="UTC")
+        start_ts = (
+            pd.Timestamp(start_time).tz_convert("UTC")
+            if pd.Timestamp(start_time).tzinfo
+            else pd.Timestamp(start_time, tz="UTC")
+        )
+        end_ts = (
+            pd.Timestamp(end_time).tz_convert("UTC")
+            if pd.Timestamp(end_time).tzinfo
+            else pd.Timestamp(end_time, tz="UTC")
+        )
         return [row for row in rows if start_ts <= pd.Timestamp(row["open_time"]) <= end_ts]
 
 
@@ -281,7 +289,9 @@ def test_alpha_lab_cli_benchmark_db():
 def test_alpha_lab_search_persistence(tmp_path):
     service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
-    service.persistence = __import__("src.alpha_lab.persistence", fromlist=["AlphaPersistence"]).AlphaPersistence(str(tmp_path / "alpha_lab"))
+    service.persistence = __import__("src.alpha_lab.persistence", fromlist=["AlphaPersistence"]).AlphaPersistence(
+        str(tmp_path / "alpha_lab")
+    )
     result = service.search_formulas_on_db(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],
@@ -305,7 +315,9 @@ def test_alpha_lab_search_persistence(tmp_path):
 def test_alpha_lab_run_and_zoo_inspection(tmp_path):
     service = AlphaService()
     service.dataset_loader = CryptoMinuteDatasetLoader(store=FakeCryptoStore())
-    service.persistence = __import__("src.alpha_lab.persistence", fromlist=["AlphaPersistence"]).AlphaPersistence(str(tmp_path / "alpha_lab"))
+    service.persistence = __import__("src.alpha_lab.persistence", fromlist=["AlphaPersistence"]).AlphaPersistence(
+        str(tmp_path / "alpha_lab")
+    )
     result = service.search_formulas_on_db(
         provider="bitget",
         symbols=["BTCUSDT", "ETHUSDT"],

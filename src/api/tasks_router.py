@@ -22,6 +22,7 @@ from src.api.validators import DateStr, NonNegativeFloat, Ratio, SymbolStr
 
 class BacktestTaskRequest(BaseModel):
     """Request model for creating a backtest task"""
+
     session_id: str
     symbol: SymbolStr
     strategy: str
@@ -37,6 +38,7 @@ class BacktestTaskRequest(BaseModel):
 
 class TaskResponse(BaseModel):
     """Response model for task operations"""
+
     task_id: str
     session_id: str
     status: str
@@ -45,6 +47,7 @@ class TaskResponse(BaseModel):
 
 class TaskStatusResponse(BaseModel):
     """Response model for task status"""
+
     task_id: str
     status: str
     progress: Optional[float] = None
@@ -62,23 +65,20 @@ async def create_backtest_task(request: BacktestTaskRequest):
     """
     try:
         config = {
-            'symbol': request.symbol,
-            'strategy': request.strategy,
-            'start_date': request.start_date,
-            'end_date': request.end_date,
-            'params': request.params,
-            'initial_cash': request.initial_cash,
-            'commission': request.commission,
-            'slippage': request.slippage,
-            'enable_risk_management': request.enable_risk_management,
-            'chunk_size_months': request.chunk_size_months
+            "symbol": request.symbol,
+            "strategy": request.strategy,
+            "start_date": request.start_date,
+            "end_date": request.end_date,
+            "params": request.params,
+            "initial_cash": request.initial_cash,
+            "commission": request.commission,
+            "slippage": request.slippage,
+            "enable_risk_management": request.enable_risk_management,
+            "chunk_size_months": request.chunk_size_months,
         }
 
         # Submit task to Celery
-        task = run_backtest_task.apply_async(
-            args=[request.session_id, config],
-            queue='backtest'
-        )
+        task = run_backtest_task.apply_async(args=[request.session_id, config], queue="backtest")
 
         logger.info(f"Backtest task submitted: {task.id} for session {request.session_id}")
 
@@ -86,7 +86,7 @@ async def create_backtest_task(request: BacktestTaskRequest):
             task_id=task.id,
             session_id=request.session_id,
             status="submitted",
-            message="Backtest task submitted to queue"
+            message="Backtest task submitted to queue",
         )
 
     except Exception as e:
@@ -104,27 +104,24 @@ async def get_task_status(task_id: str):
     try:
         task = AsyncResult(task_id, app=celery_app)
 
-        response = TaskStatusResponse(
-            task_id=task_id,
-            status=task.state
-        )
+        response = TaskStatusResponse(task_id=task_id, status=task.state)
 
-        if task.state == 'PENDING':
+        if task.state == "PENDING":
             response.message = "Task is waiting in queue"
 
-        elif task.state == 'PROGRESS':
+        elif task.state == "PROGRESS":
             # Task is running, get progress info
             info = task.info or {}
-            response.progress = info.get('progress', 0)
-            response.message = info.get('message', 'Running...')
+            response.progress = info.get("progress", 0)
+            response.message = info.get("message", "Running...")
 
-        elif task.state == 'SUCCESS':
+        elif task.state == "SUCCESS":
             # Task completed successfully
             response.progress = 100.0
             response.result = task.result
             response.message = "Task completed successfully"
 
-        elif task.state == 'FAILURE':
+        elif task.state == "FAILURE":
             # Task failed
             response.error = str(task.info)
             response.message = "Task failed"
@@ -149,7 +146,7 @@ async def cancel_task(task_id: str):
         return {
             "task_id": task_id,
             "status": "cancellation_requested",
-            "message": "Task cancellation has been requested"
+            "message": "Task cancellation has been requested",
         }
 
     except Exception as e:
@@ -177,38 +174,34 @@ async def list_tasks(limit: int = 50):
         # Collect active tasks
         for worker, tasks in active_tasks.items():
             for task in tasks:
-                all_tasks.append({
-                    'task_id': task['id'],
-                    'name': task['name'],
-                    'worker': worker,
-                    'status': 'active',
-                    'args': task.get('args', [])
-                })
+                all_tasks.append(
+                    {
+                        "task_id": task["id"],
+                        "name": task["name"],
+                        "worker": worker,
+                        "status": "active",
+                        "args": task.get("args", []),
+                    }
+                )
 
         # Collect scheduled tasks
         for worker, tasks in scheduled_tasks.items():
             for task in tasks:
-                all_tasks.append({
-                    'task_id': task['request']['id'],
-                    'name': task['request']['name'],
-                    'worker': worker,
-                    'status': 'scheduled'
-                })
+                all_tasks.append(
+                    {
+                        "task_id": task["request"]["id"],
+                        "name": task["request"]["name"],
+                        "worker": worker,
+                        "status": "scheduled",
+                    }
+                )
 
         # Collect reserved tasks
         for worker, tasks in reserved_tasks.items():
             for task in tasks:
-                all_tasks.append({
-                    'task_id': task['id'],
-                    'name': task['name'],
-                    'worker': worker,
-                    'status': 'reserved'
-                })
+                all_tasks.append({"task_id": task["id"], "name": task["name"], "worker": worker, "status": "reserved"})
 
-        return {
-            'tasks': all_tasks[:limit],
-            'total': len(all_tasks)
-        }
+        return {"tasks": all_tasks[:limit], "total": len(all_tasks)}
 
     except Exception as e:
         logger.error(f"Failed to list tasks: {e}")
@@ -228,18 +221,17 @@ async def get_workers():
 
         workers = []
         for worker_name, worker_stats in stats.items():
-            workers.append({
-                'name': worker_name,
-                'status': 'online',
-                'concurrency': worker_stats.get('pool', {}).get('max-concurrency', 0),
-                'active_tasks': len(active.get(worker_name, [])),
-                'total_tasks': worker_stats.get('total', {})
-            })
+            workers.append(
+                {
+                    "name": worker_name,
+                    "status": "online",
+                    "concurrency": worker_stats.get("pool", {}).get("max-concurrency", 0),
+                    "active_tasks": len(active.get(worker_name, [])),
+                    "total_tasks": worker_stats.get("total", {}),
+                }
+            )
 
-        return {
-            'workers': workers,
-            'total': len(workers)
-        }
+        return {"workers": workers, "total": len(workers)}
 
     except Exception as e:
         logger.error(f"Failed to get workers info: {e}")

@@ -68,14 +68,22 @@ class AutomationService:
 
         if force_full_replay:
             start_date = job["start_date"]
-            end_date = configured_end_date if configured_end_date and configured_end_date < latest_end_date else latest_end_date
+            end_date = (
+                configured_end_date
+                if configured_end_date and configured_end_date < latest_end_date
+                else latest_end_date
+            )
         elif last_processed_at:
             start_dt = datetime.fromisoformat(last_processed_at[:10]) + timedelta(days=1)
             start_date = start_dt.strftime("%Y-%m-%d")
             end_date = latest_end_date
         else:
             start_date = job["start_date"]
-            end_date = configured_end_date if configured_end_date and configured_end_date < latest_end_date else latest_end_date
+            end_date = (
+                configured_end_date
+                if configured_end_date and configured_end_date < latest_end_date
+                else latest_end_date
+            )
 
         if start_date > end_date:
             return None

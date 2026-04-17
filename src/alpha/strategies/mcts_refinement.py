@@ -64,7 +64,10 @@ class MCTSRefinementStrategy(BaseStrategy):
         )
         logger.info(
             "mcts.should_activate={} round={} archive={} population={} dataset={}",
-            active, ctx.round_idx, len(ctx.archive), len(ctx.population),
+            active,
+            ctx.round_idx,
+            len(ctx.archive),
+            len(ctx.population),
             ctx.dataset is not None,
         )
         return active
@@ -137,7 +140,8 @@ class MCTSRefinementStrategy(BaseStrategy):
             except Exception as e:
                 logger.warning(
                     "MCTS refinement failed for {}: {}",
-                    member.formula[:40], e,
+                    member.formula[:40],
+                    e,
                 )
 
         logger.info(
@@ -169,14 +173,14 @@ class MCTSRefinementStrategy(BaseStrategy):
         baselines and provides FSA with enough formulas to detect patterns.
         """
         entries = [
-            {"formula": m.formula, "metrics": dict(m.metrics), "fitness": m.fitness}
-            for m in ctx.archive.values()
+            {"formula": m.formula, "metrics": dict(m.metrics), "fitness": m.fitness} for m in ctx.archive.values()
         ]
         added = self.mcts_engine.seed_zoo(entries)
         if added > 0:
             logger.debug(
                 "mcts_refinement.seed_zoo added={} total={}",
-                added, len(self.mcts_engine.alpha_zoo),
+                added,
+                len(self.mcts_engine.alpha_zoo),
             )
 
     # ------------------------------------------------------------------
@@ -216,13 +220,20 @@ from .registry import StrategyInfra, register_strategy  # noqa: E402
 @register_strategy(MCTSRefinementStrategy.meta)
 def _build_mcts(infra: StrategyInfra):
     from .mcts import MCTSEngine, MCTSLLMAdapter
+
     llm_adapter = MCTSLLMAdapter(infra.llm_backend)
     engine = MCTSEngine(
-        compiler=infra.compiler, vm=infra.vm, schema=infra.schema,
+        compiler=infra.compiler,
+        vm=infra.vm,
+        schema=infra.schema,
         llm_agent=llm_adapter,
-        c_puct=1.0, initial_budget=3, budget_increment=1,
-        temperature=1.0, fsa_top_k=3,
-        zoo_threshold=0.015, effectiveness_threshold=0.3,
+        c_puct=1.0,
+        initial_budget=3,
+        budget_increment=1,
+        temperature=1.0,
+        fsa_top_k=3,
+        zoo_threshold=0.015,
+        effectiveness_threshold=0.3,
     )
     return MCTSRefinementStrategy(
         mcts_engine=engine,

@@ -106,6 +106,7 @@ class FactorCombiner:
 
         signals: list[FactorSignal] = []
         from ..core.vm import to_numpy
+
         for entry, program, raw in zip(entries_with_program, programs, raw_outputs):
             arr = to_numpy(raw).astype(np.float32)
             signals.append(
@@ -146,7 +147,10 @@ class FactorCombiner:
 
         logger.info(
             "combination.select candidates={} selected={} min_ic={} max_corr={}",
-            len(candidates), len(selected), min_abs_ic, max_correlation,
+            len(candidates),
+            len(selected),
+            min_abs_ic,
+            max_correlation,
         )
         return selected
 
@@ -200,7 +204,9 @@ class FactorCombiner:
             return []
 
         signals_tensor = torch.tensor(
-            np.stack(flat_signals), dtype=torch.float32, device="cuda",
+            np.stack(flat_signals),
+            dtype=torch.float32,
+            device="cuda",
         )
         corr_matrix = _triton_factor_corr(signals_tensor).cpu().numpy()
 
@@ -296,6 +302,7 @@ class FactorCombiner:
         t_orth_start = perf_counter()
         if len(selected) > 1:
             from .orthogonalization import orthogonalize_sequential
+
             stacked = np.stack([f.signal.reshape(-1) for f in selected])
             orth_flat = orthogonalize_sequential(stacked)
             for i, f in enumerate(selected):
@@ -309,8 +316,14 @@ class FactorCombiner:
         logger.info(
             "combination.combine_from_zoo zoo={} materialized={} selected={} method={} "
             "materialize={:.3f}s select={:.3f}s orth={:.3f}s combine={:.3f}s",
-            len(zoo_entries), len(all_factors), len(selected), method,
-            t_materialize, t_select, t_orth, t_combine,
+            len(zoo_entries),
+            len(all_factors),
+            len(selected),
+            method,
+            t_materialize,
+            t_select,
+            t_orth,
+            t_combine,
         )
 
         return {
@@ -376,9 +389,7 @@ def _ic_weighted_combine(
             # Not enough history → equal weight
             weights = np.ones(n_factors) / n_factors
         else:
-            weights = np.array([
-                np.nanmean(np.abs(ic_series[k, start:t])) for k in range(n_factors)
-            ])
+            weights = np.array([np.nanmean(np.abs(ic_series[k, start:t])) for k in range(n_factors)])
             total = weights.sum()
             weights = weights / total if total > 1e-12 else np.ones(n_factors) / n_factors
         for k in range(n_factors):

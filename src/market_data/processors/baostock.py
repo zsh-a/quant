@@ -369,9 +369,7 @@ class BaoStockProcessor:
             end_date = datetime.date.today().strftime("%Y-%m-%d")
 
         if start_date is None:
-            latest = self._coerce_date(
-                self._query_scalar("SELECT max(calendar_date) FROM stock_data.trade_dates")
-            )
+            latest = self._coerce_date(self._query_scalar("SELECT max(calendar_date) FROM stock_data.trade_dates"))
             if latest is None:
                 start_date = "1990-01-01"
             else:
@@ -387,9 +385,7 @@ class BaoStockProcessor:
         try:
             rs = bs.query_trade_dates(start_date=start_date, end_date=end_date)
             if rs.error_code != "0":
-                raise RuntimeError(
-                    f"query_trade_dates failed: {rs.error_code} {rs.error_msg}"
-                )
+                raise RuntimeError(f"query_trade_dates failed: {rs.error_code} {rs.error_msg}")
 
             data_list = []
             while rs.next():
@@ -400,9 +396,7 @@ class BaoStockProcessor:
                 return {"message": "no trade dates returned", "rows": 0}
 
             df["calendar_date"] = pd.to_datetime(df["calendar_date"])
-            df["is_trading_day"] = pd.to_numeric(
-                df["is_trading_day"], errors="coerce"
-            ).fillna(0).astype(int)
+            df["is_trading_day"] = pd.to_numeric(df["is_trading_day"], errors="coerce").fillna(0).astype(int)
             df = df[["calendar_date", "is_trading_day"]]
 
             self.client.insert_df("stock_data.trade_dates", df)
@@ -421,14 +415,10 @@ class BaoStockProcessor:
     def update_all_stock(self, day=None, force=False):
         if day is None:
             latest_trading = self._coerce_date(
-                self._query_scalar(
-                    "SELECT max(calendar_date) FROM stock_data.trade_dates WHERE is_trading_day = 1"
-                )
+                self._query_scalar("SELECT max(calendar_date) FROM stock_data.trade_dates WHERE is_trading_day = 1")
             )
             if latest_trading is None:
-                latest_trading = self._coerce_date(
-                    self._query_scalar("SELECT max(date) FROM stock_data.stock_daily")
-                )
+                latest_trading = self._coerce_date(self._query_scalar("SELECT max(date) FROM stock_data.stock_daily"))
             if latest_trading is None:
                 latest_trading = datetime.date.today()
             day = latest_trading.strftime("%Y-%m-%d")
@@ -448,9 +438,7 @@ class BaoStockProcessor:
         try:
             rs = bs.query_all_stock(day=day)
             if rs.error_code != "0":
-                raise RuntimeError(
-                    f"query_all_stock failed: {rs.error_code} {rs.error_msg}"
-                )
+                raise RuntimeError(f"query_all_stock failed: {rs.error_code} {rs.error_msg}")
 
             data_list = []
             while rs.next():
@@ -462,9 +450,7 @@ class BaoStockProcessor:
 
             df["day"] = pd.to_datetime(day)
             if "tradeStatus" in df.columns:
-                df["tradeStatus"] = pd.to_numeric(
-                    df["tradeStatus"], errors="coerce"
-                ).fillna(0).astype(int)
+                df["tradeStatus"] = pd.to_numeric(df["tradeStatus"], errors="coerce").fillna(0).astype(int)
             if "code_name" in df.columns:
                 df["code_name"] = df["code_name"].fillna("").astype(str)
 

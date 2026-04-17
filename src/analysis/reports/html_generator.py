@@ -17,6 +17,7 @@ class HTMLReportGenerator:
     def __init__(self, output_dir: str = ""):
         if not output_dir:
             from src.config.paths import REPORTS_DIR
+
             output_dir = str(REPORTS_DIR)
         self.output_dir = output_dir
 
@@ -27,7 +28,7 @@ class HTMLReportGenerator:
         equity_history: List[Dict],
         trades: List[Dict],
         positions: Dict,
-        params: Optional[Dict] = None
+        params: Optional[Dict] = None,
     ) -> str:
         """Generate HTML report"""
         logger.info(f"Generating HTML report for {session_id}")
@@ -41,16 +42,16 @@ class HTMLReportGenerator:
 
         # Calculate stats
         if equity_history:
-            initial = equity_history[0].get('total_equity', 0)
-            final = equity_history[-1].get('total_equity', 0)
+            initial = equity_history[0].get("total_equity", 0)
+            final = equity_history[-1].get("total_equity", 0)
             total_return = (final - initial) / initial if initial > 0 else 0
-            equity_history[0].get('date', '')
-            equity_history[-1].get('date', '')
+            equity_history[0].get("date", "")
+            equity_history[-1].get("date", "")
         else:
             initial = final = total_return = 0
 
         # Build HTML
-        html = f'''<!DOCTYPE html>
+        html = f"""<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -78,21 +79,21 @@ class HTMLReportGenerator:
 <body>
     <div class="container">
         <h1>📊 回测报告: {strategy_name}</h1>
-        <p>会话: {session_id} | 生成时间: {datetime.now().strftime('%Y-%m-%d %H:%M')}</p>
+        <p>会话: {session_id} | 生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M")}</p>
 
         <div class="card">
             <h3>执行摘要</h3>
             <div class="stats-grid">
                 <div class="stat-item">
-                    <div class="stat-value {'positive' if total_return >= 0 else 'negative'}">{total_return:.2%}</div>
+                    <div class="stat-value {"positive" if total_return >= 0 else "negative"}">{total_return:.2%}</div>
                     <div class="stat-label">总收益</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value">{risk.get('sharpe_ratio', 0):.2f}</div>
+                    <div class="stat-value">{risk.get("sharpe_ratio", 0):.2f}</div>
                     <div class="stat-label">夏普比率</div>
                 </div>
                 <div class="stat-item">
-                    <div class="stat-value negative">{risk.get('max_drawdown', 0):.2%}</div>
+                    <div class="stat-value negative">{risk.get("max_drawdown", 0):.2%}</div>
                     <div class="stat-label">最大回撤</div>
                 </div>
                 <div class="stat-item">
@@ -129,8 +130,12 @@ class HTMLReportGenerator:
             <h3>资产归因</h3>
             <table>
                 <tr><th>资产</th><th>盈亏</th></tr>
-                {''.join(f"<tr><td>{s}</td><td class='{'positive' if p>=0 else 'negative'}'>¥{p:+,.0f}</td></tr>"
-                         for s, p in sorted(attribution.by_asset.items(), key=lambda x: x[1], reverse=True)[:10])}
+                {
+            "".join(
+                f"<tr><td>{s}</td><td class='{'positive' if p >= 0 else 'negative'}'>¥{p:+,.0f}</td></tr>"
+                for s, p in sorted(attribution.by_asset.items(), key=lambda x: x[1], reverse=True)[:10]
+            )
+        }
             </table>
         </div>
 
@@ -138,8 +143,12 @@ class HTMLReportGenerator:
             <h3>行业归因</h3>
             <table>
                 <tr><th>行业</th><th>盈亏</th></tr>
-                {''.join(f"<tr><td>{s}</td><td class='{'positive' if p>=0 else 'negative'}'>¥{p:+,.0f}</td></tr>"
-                         for s, p in sorted(attribution.by_sector.items(), key=lambda x: x[1], reverse=True))}
+                {
+            "".join(
+                f"<tr><td>{s}</td><td class='{'positive' if p >= 0 else 'negative'}'>¥{p:+,.0f}</td></tr>"
+                for s, p in sorted(attribution.by_sector.items(), key=lambda x: x[1], reverse=True)
+            )
+        }
             </table>
         </div>
     </div>
@@ -149,10 +158,10 @@ class HTMLReportGenerator:
         new Chart(ctx, {{
             type: 'line',
             data: {{
-                labels: {[e.get('date', '') for e in equity_history]},
+                labels: {[e.get("date", "") for e in equity_history]},
                 datasets: [{{
                     label: '权益',
-                    data: {[e.get('total_equity', 0) for e in equity_history]},
+                    data: {[e.get("total_equity", 0) for e in equity_history]},
                     borderColor: '#58a6ff',
                     fill: false,
                     tension: 0.1
@@ -166,12 +175,12 @@ class HTMLReportGenerator:
         }});
     </script>
 </body>
-</html>'''
+</html>"""
 
         filename = f"report_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.html"
         filepath = os.path.join(self.output_dir, filename)
 
-        with open(filepath, 'w', encoding='utf-8') as f:
+        with open(filepath, "w", encoding="utf-8") as f:
             f.write(html)
 
         logger.info(f"HTML report saved: {filepath}")
@@ -188,11 +197,17 @@ class HTMLReportGenerator:
     ) -> str:
         """Generate PDF report by converting HTML to PDF via weasyprint."""
         html_path = self.generate(
-            session_id, strategy_name, equity_history, trades, positions, params,
+            session_id,
+            strategy_name,
+            equity_history,
+            trades,
+            positions,
+            params,
         )
         pdf_path = html_path.replace(".html", ".pdf")
         try:
             from weasyprint import HTML as WeasyHTML
+
             WeasyHTML(filename=html_path).write_pdf(pdf_path)
             logger.info(f"PDF report saved: {pdf_path}")
         except ImportError:

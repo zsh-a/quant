@@ -41,6 +41,7 @@ def _parse_int_list(value: str | None) -> list[int]:
 # Shared CLI arguments
 # ---------------------------------------------------------------------------
 
+
 def _add_data_args(parser: argparse.ArgumentParser) -> None:
     parser.add_argument("--symbols", required=True, help="Comma-separated symbols (e.g. BTCUSDT,ETHUSDT)")
     parser.add_argument("--start", required=True, help="ISO8601 start time")
@@ -53,6 +54,7 @@ def _add_data_args(parser: argparse.ArgumentParser) -> None:
 # ---------------------------------------------------------------------------
 # Parser
 # ---------------------------------------------------------------------------
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Alpha factor search CLI")
@@ -87,8 +89,12 @@ def build_parser() -> argparse.ArgumentParser:
     search.add_argument("--no-persist", action="store_true")
     search.add_argument("--llm-backend", default="auto", choices=["auto", "heuristic", "openai"])
     search.add_argument("--llm-model", default=None)
-    search.add_argument("--strategy", default="evolution", choices=["evolution", "neural", "full"],
-                        help="Search algorithm: evolution (LLM+enum), neural (Transformer+RL), full (all)")
+    search.add_argument(
+        "--strategy",
+        default="evolution",
+        choices=["evolution", "neural", "full"],
+        help="Search algorithm: evolution (LLM+enum), neural (Transformer+RL), full (all)",
+    )
     search.add_argument("--neural-batch", type=int, default=512)
 
     # -- combine --
@@ -122,6 +128,7 @@ def build_parser() -> argparse.ArgumentParser:
 # ---------------------------------------------------------------------------
 # Command dispatch
 # ---------------------------------------------------------------------------
+
 
 def run_command(args: argparse.Namespace, service: AlphaService) -> Any:
     cmd = args.command
@@ -198,10 +205,13 @@ def run_command(args: argparse.Namespace, service: AlphaService) -> Any:
 
     if cmd == "auto":
         from .auto_runner import load_auto_search_config, run_auto_search_loop
+
         config = load_auto_search_config(args.config)
         return run_auto_search_loop(
-            service=service, config=config,
-            once=args.once, max_cycles=args.max_cycles,
+            service=service,
+            config=config,
+            once=args.once,
+            max_cycles=args.max_cycles,
         )
 
     if cmd == "list-runs":
@@ -222,6 +232,7 @@ def main(argv: list[str] | None = None, service: AlphaService | None = None) -> 
 
     if service is None and args.command == "auto":
         from .auto_runner import build_service_from_auto_search_config, load_auto_search_config
+
         service = build_service_from_auto_search_config(load_auto_search_config(args.config))
 
     if service is None:

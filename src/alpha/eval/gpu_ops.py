@@ -60,8 +60,10 @@ def _ensure_f32_contiguous(t: torch.Tensor) -> torch.Tensor:
 # Rolling mean + std (fused)
 # ---------------------------------------------------------------------------
 
+
 def rolling_mean_std(
-    data: torch.Tensor, window: int,
+    data: torch.Tensor,
+    window: int,
 ) -> tuple[torch.Tensor, torch.Tensor]:
     """Fused rolling mean and std using Welford algorithm.
 
@@ -79,9 +81,15 @@ def rolling_mean_std(
     grid = (T - window + 1, (S + BLOCK_S - 1) // BLOCK_S)
 
     _rolling_mean_std_kernel[grid](
-        data, mean_out, std_out,
-        data.stride(0), data.stride(1),
-        T, S, window, BLOCK_S,
+        data,
+        mean_out,
+        std_out,
+        data.stride(0),
+        data.stride(1),
+        T,
+        S,
+        window,
+        BLOCK_S,
     )
     return mean_out, std_out
 
@@ -90,8 +98,11 @@ def rolling_mean_std(
 # Rolling reduce (sum / max / min)
 # ---------------------------------------------------------------------------
 
+
 def rolling_reduce(
-    data: torch.Tensor, window: int, mode: str,
+    data: torch.Tensor,
+    window: int,
+    mode: str,
 ) -> torch.Tensor:
     """Rolling nansum/nanmax/nanmin over time axis.
 
@@ -111,9 +122,15 @@ def rolling_reduce(
     grid = (T - window + 1, (S + BLOCK_S - 1) // BLOCK_S)
 
     _rolling_reduce_kernel[grid](
-        data, output,
-        data.stride(0), data.stride(1),
-        T, S, window, BLOCK_S, mode_int,
+        data,
+        output,
+        data.stride(0),
+        data.stride(1),
+        T,
+        S,
+        window,
+        BLOCK_S,
+        mode_int,
     )
     return output
 
@@ -122,8 +139,10 @@ def rolling_reduce(
 # Parallel EMA
 # ---------------------------------------------------------------------------
 
+
 def parallel_ema(
-    data: torch.Tensor, window: int,
+    data: torch.Tensor,
+    window: int,
 ) -> torch.Tensor:
     """EMA with alpha = 2 / (window + 1). Handles NaN propagation."""
     data = _ensure_f32_contiguous(data)
@@ -138,10 +157,15 @@ def parallel_ema(
     grid = ((S + BLOCK_S - 1) // BLOCK_S,)
 
     _parallel_ema_scan_kernel[grid](
-        data, output,
-        data.stride(0), data.stride(1),
+        data,
+        output,
+        data.stride(0),
+        data.stride(1),
         alpha,
-        T, S, 0, BLOCK_S,  # BLOCK_T unused but kept for signature compat
+        T,
+        S,
+        0,
+        BLOCK_S,  # BLOCK_T unused but kept for signature compat
     )
     return output
 
@@ -150,8 +174,12 @@ def parallel_ema(
 # Rolling correlation / covariance (fused)
 # ---------------------------------------------------------------------------
 
+
 def rolling_corr_cov(
-    x: torch.Tensor, y: torch.Tensor, window: int, mode: str,
+    x: torch.Tensor,
+    y: torch.Tensor,
+    window: int,
+    mode: str,
 ) -> torch.Tensor:
     """Fused rolling correlation or covariance.
 
@@ -170,9 +198,16 @@ def rolling_corr_cov(
     grid = (T - window + 1, (S + BLOCK_S - 1) // BLOCK_S)
 
     _rolling_corr_cov_kernel[grid](
-        x, y, output,
-        x.stride(0), x.stride(1),
-        T, S, window, BLOCK_S, is_corr,
+        x,
+        y,
+        output,
+        x.stride(0),
+        x.stride(1),
+        T,
+        S,
+        window,
+        BLOCK_S,
+        is_corr,
     )
     return output
 
@@ -180,6 +215,7 @@ def rolling_corr_cov(
 # ---------------------------------------------------------------------------
 # Cross-sectional rank
 # ---------------------------------------------------------------------------
+
 
 def cs_rank(data: torch.Tensor) -> torch.Tensor:
     """Cross-sectional rank per row, normalized to [1/N, 1]. NaN-safe."""
@@ -195,9 +231,13 @@ def cs_rank(data: torch.Tensor) -> torch.Tensor:
     grid = (T,)
 
     _cs_rank_kernel[grid](
-        data, output,
-        data.stride(0), data.stride(1),
-        T, S, BLOCK_S,
+        data,
+        output,
+        data.stride(0),
+        data.stride(1),
+        T,
+        S,
+        BLOCK_S,
     )
     return output
 
@@ -205,6 +245,7 @@ def cs_rank(data: torch.Tensor) -> torch.Tensor:
 # ---------------------------------------------------------------------------
 # Decay linear
 # ---------------------------------------------------------------------------
+
 
 def decay_linear(data: torch.Tensor, window: int) -> torch.Tensor:
     """Linearly weighted rolling average with weights [1, 2, ..., W]."""
@@ -219,9 +260,14 @@ def decay_linear(data: torch.Tensor, window: int) -> torch.Tensor:
     grid = (T - window + 1, (S + BLOCK_S - 1) // BLOCK_S)
 
     _decay_linear_kernel[grid](
-        data, output,
-        data.stride(0), data.stride(1),
-        T, S, window, BLOCK_S,
+        data,
+        output,
+        data.stride(0),
+        data.stride(1),
+        T,
+        S,
+        window,
+        BLOCK_S,
     )
     return output
 
@@ -230,8 +276,10 @@ def decay_linear(data: torch.Tensor, window: int) -> torch.Tensor:
 # Batch rank IC
 # ---------------------------------------------------------------------------
 
+
 def batch_rank_ic(
-    alphas: torch.Tensor, forward_returns: torch.Tensor,
+    alphas: torch.Tensor,
+    forward_returns: torch.Tensor,
 ) -> torch.Tensor:
     """Compute mean rank IC for a batch of factors.
 
@@ -250,10 +298,19 @@ def batch_rank_ic(
     grid = (N, T)
 
     _batch_rank_ic_kernel[grid](
-        alphas, forward_returns, ic_rows, valid_counts,
-        alphas.stride(0), alphas.stride(1), alphas.stride(2),
-        forward_returns.stride(0), forward_returns.stride(1),
-        N, T, S, BLOCK_S,
+        alphas,
+        forward_returns,
+        ic_rows,
+        valid_counts,
+        alphas.stride(0),
+        alphas.stride(1),
+        alphas.stride(2),
+        forward_returns.stride(0),
+        forward_returns.stride(1),
+        N,
+        T,
+        S,
+        BLOCK_S,
     )
 
     # Mean IC: average non-zero rows per factor
@@ -268,6 +325,7 @@ def batch_rank_ic(
 # ---------------------------------------------------------------------------
 # Factor correlation matrix
 # ---------------------------------------------------------------------------
+
 
 def factor_correlation_matrix(factors: torch.Tensor) -> torch.Tensor:
     """Compute full |Pearson correlation| matrix for N factor signals.
@@ -286,7 +344,10 @@ def factor_correlation_matrix(factors: torch.Tensor) -> torch.Tensor:
     grid = (N, N)
 
     _factor_corr_matrix_kernel[grid](
-        factors, corr_out,
-        N, D, BLOCK_D,
+        factors,
+        corr_out,
+        N,
+        D,
+        BLOCK_D,
     )
     return corr_out

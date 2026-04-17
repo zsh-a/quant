@@ -21,6 +21,7 @@ class PersistedRun:
 class AlphaPersistence:
     def __init__(self, root_dir: str = ""):
         from src.config.paths import ALPHA_DIR
+
         self.root_dir = Path(root_dir) if root_dir else ALPHA_DIR
         self.runs_dir = self.root_dir / "runs"
         self.zoo_dir = self.root_dir / "zoo"
@@ -177,9 +178,9 @@ class AlphaPersistence:
             "formula": formula,
             "metrics": node.metrics,
             "timestamp": datetime.now().isoformat(),
-            "name": getattr(node, 'name', 'unknown'),
-            "description": getattr(node, 'description', ''),
-            "metadata": metadata or {}
+            "name": getattr(node, "name", "unknown"),
+            "description": getattr(node, "description", ""),
+            "metadata": metadata or {},
         }
 
         file_path = self.zoo_dir / f"alpha_{formula_id}.json"
@@ -217,7 +218,7 @@ class AlphaPersistence:
                     logger.warning(f"Failed to load {path}: {e}")
 
         # Sort by RankIC by default
-        alphas.sort(key=lambda x: abs(x.get('metrics', {}).get('rank_ic', 0)), reverse=True)
+        alphas.sort(key=lambda x: abs(x.get("metrics", {}).get("rank_ic", 0)), reverse=True)
         return alphas
 
     def export_to_csv(self, output_path: str = "") -> None:
@@ -226,8 +227,10 @@ class AlphaPersistence:
         """
         if not output_path:
             from src.config.paths import DATA_DIR
+
             output_path = str(DATA_DIR / "alpha_zoo_summary.csv")
         import pandas as pd
+
         alphas = self.load_all()
         if not alphas:
             return
@@ -235,12 +238,12 @@ class AlphaPersistence:
         flat_data = []
         for a in alphas:
             row = {
-                "id": a.get('id'),
-                "formula": a.get('formula'),
-                "rank_ic": a.get('metrics', {}).get('rank_ic'),
-                "ic_ir": a.get('metrics', {}).get('ic_ir'),
-                "fitness": a.get('metrics', {}).get('fitness'),
-                "timestamp": a.get('timestamp')
+                "id": a.get("id"),
+                "formula": a.get("formula"),
+                "rank_ic": a.get("metrics", {}).get("rank_ic"),
+                "ic_ir": a.get("metrics", {}).get("ic_ir"),
+                "fitness": a.get("metrics", {}).get("fitness"),
+                "timestamp": a.get("timestamp"),
             }
             flat_data.append(row)
 

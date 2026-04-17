@@ -75,6 +75,7 @@ class HealthCheck:
         try:
             if self._db is None:
                 from src.market_data.db import DB
+
                 self._db = DB()
             self._db.client.query("SELECT 1")
             return {"component": "database", "status": HealthStatus.HEALTHY}
@@ -86,6 +87,7 @@ class HealthCheck:
         try:
             if self._redis is None:
                 import redis
+
                 self._redis = redis.Redis(host="localhost", port=6379, db=0, socket_timeout=2, socket_connect_timeout=2)
             self._redis.ping()
             return {"component": "redis", "status": HealthStatus.HEALTHY}

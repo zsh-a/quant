@@ -30,8 +30,8 @@ const TradeRow = memo<{
         data.onTradeClick?.(trade);
     }, [data, trade]);
 
-    const displayDate = data.showDate 
-        ? trade.timestamp.split(' ')[0] 
+    const displayDate = data.showDate
+        ? trade.timestamp.split(' ')[0]
         : trade.timestamp.split(' ')[1] || trade.timestamp;
 
     return (
@@ -39,8 +39,8 @@ const TradeRow = memo<{
             style={{
                 ...style,
                 display: 'grid',
-                gridTemplateColumns: data.showDate 
-                    ? '100px 1fr 70px 90px 100px 80px' 
+                gridTemplateColumns: data.showDate
+                    ? '100px 1fr 70px 90px 100px 80px'
                     : '80px 1fr 70px 90px 100px 80px',
                 gap: '8px',
                 padding: '0 16px',
@@ -96,8 +96,8 @@ TradeRow.displayName = 'TradeRow';
 const TradeHeader: React.FC<{ showDate: boolean }> = memo(({ showDate }) => (
     <div style={{
         display: 'grid',
-        gridTemplateColumns: showDate 
-            ? '100px 1fr 70px 90px 100px 80px' 
+        gridTemplateColumns: showDate
+            ? '100px 1fr 70px 90px 100px 80px'
             : '80px 1fr 70px 90px 100px 80px',
         gap: '8px',
         padding: '12px 16px',

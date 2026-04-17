@@ -64,6 +64,7 @@ def fast_screen_ic(
 
     # Prepare store — convert to torch for GPU path
     from ..core.vm import TensorStore
+
     store = TensorStore(screen_fields)
     if vm.backend == "torch" and vm.device is not None:
         store = vm._prepare_store(store)
@@ -85,12 +86,7 @@ def fast_screen_ic(
     logger.debug("fast_screen: compiled={} in {:.0f}ms", len(compiled), (perf_counter() - t0) * 1000)
 
     # Check if GPU batch path is available
-    use_gpu = (
-        _torch is not None
-        and vm.backend == "torch"
-        and vm.device is not None
-        and store.uses_torch()
-    )
+    use_gpu = _torch is not None and vm.backend == "torch" and vm.device is not None and store.uses_torch()
 
     if use_gpu:
         # Pre-transfer forward returns to GPU once
@@ -110,7 +106,10 @@ def fast_screen_ic(
         vm_ms = (perf_counter() - chunk_t0) * 1000
         logger.debug(
             "fast_screen: chunk [{}/{}] vm={:.0f}ms n={}",
-            min(start + chunk_size, len(compiled)), len(compiled), vm_ms, len(chunk),
+            min(start + chunk_size, len(compiled)),
+            len(compiled),
+            vm_ms,
+            len(chunk),
         )
 
         if use_gpu and alphas and isinstance(alphas[0], _torch.Tensor):
@@ -174,8 +173,11 @@ def fast_screen_ic(
     elapsed_ms = (perf_counter() - t0) * 1000
     logger.info(
         "fast_screen: input={} compiled={} passed={} top_ic={:.4f} gpu={} {:.0f}ms",
-        len(formulas), len(compiled), len(results),
+        len(formulas),
+        len(compiled),
+        len(results),
         abs(results[0][1]) if results else 0.0,
-        use_gpu, elapsed_ms,
+        use_gpu,
+        elapsed_ms,
     )
     return results

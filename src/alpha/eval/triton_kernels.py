@@ -13,6 +13,7 @@ import triton.language as tl
 # Kernel 1: Fused rolling mean + std (Welford online algorithm)
 # ---------------------------------------------------------------------------
 
+
 @triton.jit
 def _rolling_mean_std_kernel(
     input_ptr,
@@ -79,6 +80,7 @@ def _rolling_mean_std_kernel(
 # Kernel 2: Rolling reduce (sum / max / min)
 # ---------------------------------------------------------------------------
 
+
 @triton.jit
 def _rolling_reduce_kernel(
     input_ptr,
@@ -131,6 +133,7 @@ def _rolling_reduce_kernel(
 # Kernel 3: Parallel EMA via prefix scan
 # ---------------------------------------------------------------------------
 
+
 @triton.jit
 def _parallel_ema_scan_kernel(
     input_ptr,
@@ -163,7 +166,7 @@ def _parallel_ema_scan_kernel(
     for t in range(T):
         cur_x_ptrs = input_ptr + t * stride_t + s_offsets * stride_s
         cur_x = tl.load(cur_x_ptrs, mask=s_mask, other=float("nan"))
-        cur_valid = (cur_x == cur_x)
+        cur_valid = cur_x == cur_x
 
         # EMA update with NaN handling:
         # If current NaN: keep previous
@@ -191,6 +194,7 @@ def _parallel_ema_scan_kernel(
 # ---------------------------------------------------------------------------
 # Kernel 4: Fused rolling correlation / covariance
 # ---------------------------------------------------------------------------
+
 
 @triton.jit
 def _rolling_corr_cov_kernel(
@@ -261,6 +265,7 @@ def _rolling_corr_cov_kernel(
 # Kernel 5: Cross-sectional rank (per-row ranking)
 # ---------------------------------------------------------------------------
 
+
 @triton.jit
 def _cs_rank_kernel(
     input_ptr,
@@ -324,6 +329,7 @@ def _cs_rank_kernel(
 # Kernel 6: Decay linear (linearly weighted rolling sum)
 # ---------------------------------------------------------------------------
 
+
 @triton.jit
 def _decay_linear_kernel(
     input_ptr,
@@ -367,6 +373,7 @@ def _decay_linear_kernel(
 # ---------------------------------------------------------------------------
 # Kernel 7: Batch rank IC (Pearson correlation per row, batched over factors)
 # ---------------------------------------------------------------------------
+
 
 @triton.jit
 def _batch_rank_ic_kernel(
@@ -434,6 +441,7 @@ def _batch_rank_ic_kernel(
 # ---------------------------------------------------------------------------
 # Kernel 8: Pairwise factor correlation matrix
 # ---------------------------------------------------------------------------
+
 
 @triton.jit
 def _factor_corr_matrix_kernel(

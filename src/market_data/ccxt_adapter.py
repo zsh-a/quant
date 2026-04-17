@@ -384,7 +384,4 @@ class CcxtCryptoDataAdapter:
 
 
 def build_default_providers() -> dict[str, CcxtCryptoDataAdapter]:
-    return {
-        provider_name: CcxtCryptoDataAdapter(spec)
-        for provider_name, spec in PROVIDER_SPECS.items()
-    }
+    return {provider_name: CcxtCryptoDataAdapter(spec) for provider_name, spec in PROVIDER_SPECS.items()}

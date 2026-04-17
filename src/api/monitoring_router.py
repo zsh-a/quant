@@ -58,9 +58,7 @@ async def test_alert(
     severity: str = "warning",
 ):
     try:
-        alert_manager.send_alert(
-            title=title, message=message, severity=severity, details={"test": True}
-        )
+        alert_manager.send_alert(title=title, message=message, severity=severity, details={"test": True})
         return {"status": "success", "message": "Test alert sent"}
     except Exception as e:
         logger.error(f"Failed to send test alert: {e}")

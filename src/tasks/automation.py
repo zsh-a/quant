@@ -223,7 +223,9 @@ def _collect_simulation_order_notification(
         stock_name=broker.stock_names.get(order.symbol, "Unknown"),
     )
     price_text = f"{float(order.price):.4f}" if order.price is not None else "市价"
-    reference_price_text = f"{float(reference_price):.4f}" if reference_price is not None and reference_price > 0 else "N/A"
+    reference_price_text = (
+        f"{float(reference_price):.4f}" if reference_price is not None and reference_price > 0 else "N/A"
+    )
     stock_display = f"{order.symbol} {broker.stock_names.get(order.symbol, 'Unknown')}".strip()
     action = "买入" if order.type == "buy" else "卖出"
     return {
@@ -546,17 +548,19 @@ def run_simulation_job_task(
             initial_cash=initial_cash,
             commission=broker_config.backtest.commission,
             slippage=broker_config.backtest.slippage,
-            on_order_submitted=lambda order: pending_order_notifications.append(item)
-            if (
-                item := _collect_simulation_order_notification(
-                    job=job,
-                    session_id=session_id,
-                    run_id=run_id,
-                    broker=broker,
-                    order=order,
+            on_order_submitted=lambda order: (
+                pending_order_notifications.append(item)
+                if (
+                    item := _collect_simulation_order_notification(
+                        job=job,
+                        session_id=session_id,
+                        run_id=run_id,
+                        broker=broker,
+                        order=order,
+                    )
                 )
-            )
-            else None,
+                else None
+            ),
         )
         broker.restore_from_snapshot(snapshot)
 
@@ -657,6 +661,7 @@ def run_simulation_job_task(
         # Flush session logs so the final strategy entries are persisted before
         # we mark the run as completed (avoids the frontend missing tail logs).
         from src.utils.session_logger import get_session_logger as _get_sl
+
         _sl = _get_sl(session_id, create=False)
         if _sl:
             _sl.flush(force=True)

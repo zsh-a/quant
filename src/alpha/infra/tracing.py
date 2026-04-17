@@ -38,9 +38,11 @@ from loguru import logger
 # Data model
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class SpanEvent:
     """A point-in-time observation within a span."""
+
     name: str
     timestamp: float
     attributes: dict[str, Any] = field(default_factory=dict)
@@ -49,6 +51,7 @@ class SpanEvent:
 @dataclass
 class Span:
     """A timed operation in the LLM chain."""
+
     trace_id: str
     span_id: str
     parent_id: str | None
@@ -120,10 +123,7 @@ class Span:
         if self.attributes:
             d["attributes"] = self.attributes
         if self.events:
-            d["events"] = [
-                {"name": e.name, "timestamp": e.timestamp, **e.attributes}
-                for e in self.events
-            ]
+            d["events"] = [{"name": e.name, "timestamp": e.timestamp, **e.attributes} for e in self.events]
         return d
 
 
@@ -131,8 +131,10 @@ class Span:
 # Collector protocol — pluggable backends
 # ---------------------------------------------------------------------------
 
+
 class SpanCollector(Protocol):
     """Interface for span consumers (loguru, OTLP, LangFuse, file, etc.)."""
+
     def on_span_end(self, span: Span) -> None: ...
 
 
@@ -149,11 +151,11 @@ class LoguruCollector:
 
     # Kind → (icon, key attributes to show)
     _KIND_FMT: dict[str, str] = {
-        "llm":    "LLM",
-        "breed":  "BREED",
-        "eval":   "EVAL",
+        "llm": "LLM",
+        "breed": "BREED",
+        "eval": "EVAL",
         "search": "SEARCH",
-        "mcts":   "MCTS",
+        "mcts": "MCTS",
     }
 
     def __init__(self) -> None:
@@ -253,8 +255,10 @@ class LangfuseCollector:
             return
         try:
             from langfuse import Langfuse
+
             self._client = Langfuse(
-                public_key=resolved_pk, secret_key=resolved_sk,
+                public_key=resolved_pk,
+                secret_key=resolved_sk,
                 host=host or os.getenv("LANGFUSE_HOST"),
             )
         except Exception as exc:
@@ -289,8 +293,16 @@ class LangfuseCollector:
         return self._traces[span.trace_id]
 
     def _send(self, span: Span) -> None:
-        _NATIVE = {"model", "prompt_tokens", "completion_tokens", "total_tokens",
-                    "estimated_cost_usd", "temperature", "input", "output"}
+        _NATIVE = {
+            "model",
+            "prompt_tokens",
+            "completion_tokens",
+            "total_tokens",
+            "estimated_cost_usd",
+            "temperature",
+            "input",
+            "output",
+        }
         metadata = {k: v for k, v in span.attributes.items() if k not in _NATIVE}
         level = "ERROR" if span.status == "error" else "DEFAULT"
 
@@ -516,6 +528,7 @@ def _auto_configure_langfuse() -> None:
     # Ensure .env is loaded so Langfuse keys are available
     try:
         from dotenv import load_dotenv
+
         load_dotenv()
     except ImportError:
         pass
@@ -524,7 +537,9 @@ def _auto_configure_langfuse() -> None:
         collector = LangfuseCollector()
         if collector.enabled:
             tracer.add_collector(collector)
-            logger.info("alpha.tracing langfuse collector auto-registered host={}", os.getenv("LANGFUSE_HOST", "default"))
+            logger.info(
+                "alpha.tracing langfuse collector auto-registered host={}", os.getenv("LANGFUSE_HOST", "default")
+            )
 
 
 _auto_configure_langfuse()
@@ -567,6 +582,7 @@ def estimate_cost(model: str, total_tokens: int) -> float | None:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _new_id() -> str:
     return uuid.uuid4().hex[:16]

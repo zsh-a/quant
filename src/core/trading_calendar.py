@@ -35,9 +35,7 @@ class TradingCalendar:
             return _calendar_cache
 
         data = db_client.client.query(
-            "SELECT calendar_date, is_trading_day "
-            "FROM stock_data.trade_dates "
-            "ORDER BY calendar_date"
+            "SELECT calendar_date, is_trading_day FROM stock_data.trade_dates ORDER BY calendar_date"
         )
         df = pd.DataFrame(data.result_rows, columns=data.column_names)
         df["calendar_date"] = pd.to_datetime(df["calendar_date"])

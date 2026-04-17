@@ -91,9 +91,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(ts_zscore(delta(open_interest, 5), 20) - ts_zscore(returns_n(close, 5), 20))",
                     "cs_rank(delta(open_interest_value, 10) - delta(close, 10))",
                 ),
-                anti_patterns=(
-                    "Don't use open_interest raw — always use delta or ts_zscore for stationarity",
-                ),
+                anti_patterns=("Don't use open_interest raw — always use delta or ts_zscore for stationarity",),
                 window_guidance="Medium-term (10-40 bars)",
             ),
             # ---- flow ----
@@ -113,9 +111,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(delta(div(taker_buy_volume, volume + 1e-12), 5))",
                     "cs_rank(ts_corr(div(taker_buy_volume, volume + 1e-12), returns_n(close, 1), 20))",
                 ),
-                anti_patterns=(
-                    "Always add epsilon (1e-12) to divisor to avoid div-by-zero",
-                ),
+                anti_patterns=("Always add epsilon (1e-12) to divisor to avoid div-by-zero",),
                 window_guidance="Short-term (5-20 bars)",
             ),
             FinancialTheme(
@@ -135,9 +131,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(div(volume, adv_n(turnover, 20) + 1e-12))",
                     "cs_rank(ts_zscore(volume, 20) - ts_zscore(abs(returns_n(close, 1)), 20))",
                 ),
-                anti_patterns=(
-                    "Don't use absolute volume — always normalize cross-sectionally or time-series",
-                ),
+                anti_patterns=("Don't use absolute volume — always normalize cross-sectionally or time-series",),
                 window_guidance="Short to medium (5-30 bars)",
             ),
             # ---- microstructure ----
@@ -173,8 +167,11 @@ class FinancialKnowledgeBase:
                     "contrarian reversal becomes likely."
                 ),
                 relevant_fields=(
-                    "long_short_ratio", "taker_long_short_vol_ratio",
-                    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio", "close",
+                    "long_short_ratio",
+                    "taker_long_short_vol_ratio",
+                    "top_trader_long_short_ratio",
+                    "top_trader_long_short_position_ratio",
+                    "close",
                 ),
                 suggested_operators=("ts_zscore", "cs_rank", "neg", "delta", "decay_linear"),
                 example_formulas=(
@@ -198,8 +195,11 @@ class FinancialKnowledgeBase:
                     "whales reducing longs before retail = impending sell-off."
                 ),
                 relevant_fields=(
-                    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
-                    "long_short_ratio", "close", "open_interest",
+                    "top_trader_long_short_ratio",
+                    "top_trader_long_short_position_ratio",
+                    "long_short_ratio",
+                    "close",
+                    "open_interest",
                 ),
                 suggested_operators=("delta", "ts_zscore", "cs_rank", "ts_corr", "decay_linear"),
                 example_formulas=(
@@ -207,9 +207,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(decay_linear(delta(top_trader_long_short_position_ratio, 5), 10))",
                     "cs_rank(ts_corr(delta(top_trader_long_short_ratio, 5), returns_n(close, 5), 20))",
                 ),
-                anti_patterns=(
-                    "Don't use raw ratio levels — use delta for change detection",
-                ),
+                anti_patterns=("Don't use raw ratio levels — use delta for change detection",),
                 window_guidance="Medium-term (10-40 bars)",
             ),
             # ---- volatility ----
@@ -229,9 +227,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(div(atr_n(high, low, close, 5), atr_n(high, low, close, 20) + 1e-12))",
                     "cs_rank(neg(ts_zscore(volatility_n(close, 20), 40)))",
                 ),
-                anti_patterns=(
-                    "Don't use volatility as a directional signal directly — it's symmetric",
-                ),
+                anti_patterns=("Don't use volatility as a directional signal directly — it's symmetric",),
                 window_guidance="Medium to long (10-60 bars)",
             ),
             FinancialTheme(
@@ -270,9 +266,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(returns_n(close, 5) - returns_n(close, 20))",
                     "cs_rank(ts_zscore(returns_n(vwap, 5), 20))",
                 ),
-                anti_patterns=(
-                    "Don't use pure momentum without smoothing — high turnover and whipsaw risk",
-                ),
+                anti_patterns=("Don't use pure momentum without smoothing — high turnover and whipsaw risk",),
                 window_guidance="Short to medium (5-30 bars)",
             ),
             FinancialTheme(
@@ -290,9 +284,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(neg(ts_zscore(div(close, vwap + 1e-12), 20)))",
                     "cs_rank(neg(close - ts_mean(vwap, 10)))",
                 ),
-                anti_patterns=(
-                    "Don't forget to negate — this is a reversal signal, not momentum",
-                ),
+                anti_patterns=("Don't forget to negate — this is a reversal signal, not momentum",),
                 window_guidance="Short-term (5-20 bars)",
             ),
             # ---- mean reversion ----
@@ -311,9 +303,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(neg(ts_zscore(returns_n(close, 5), 40)))",
                     "cs_rank(neg(ts_zscore(returns_n(close, 5), 20)) + ts_zscore(delta(open_interest, 5), 20))",
                 ),
-                anti_patterns=(
-                    "Don't apply in trending markets — add vol-regime filter if possible",
-                ),
+                anti_patterns=("Don't apply in trending markets — add vol-regime filter if possible",),
                 window_guidance="Medium-term (10-40 bars)",
             ),
             # ---- cross-metric ----
@@ -327,8 +317,12 @@ class FinancialKnowledgeBase:
                     "Combine ts_corr of different metric pairs to detect multi-dimensional stress."
                 ),
                 relevant_fields=(
-                    "funding_rate", "premium_close", "open_interest",
-                    "volume", "close", "long_short_ratio",
+                    "funding_rate",
+                    "premium_close",
+                    "open_interest",
+                    "volume",
+                    "close",
+                    "long_short_ratio",
                 ),
                 suggested_operators=("ts_corr", "delta", "ts_zscore", "cs_rank", "div"),
                 example_formulas=(
@@ -336,9 +330,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(ts_zscore(delta(open_interest, 10), 20) - ts_zscore(delta(volume, 10), 20))",
                     "cs_rank(ts_corr(delta(open_interest, 5), delta(long_short_ratio, 5), 20))",
                 ),
-                anti_patterns=(
-                    "Don't use too many metrics in one formula — keep AST depth manageable",
-                ),
+                anti_patterns=("Don't use too many metrics in one formula — keep AST depth manageable",),
                 window_guidance="Medium-term (10-40 bars)",
             ),
             FinancialTheme(
@@ -397,9 +389,7 @@ class FinancialKnowledgeBase:
                     "cs_rank(neg(div(adv_n(turnover, 5), adv_n(turnover, 20) + 1e-12)))",
                     "cs_rank(delta(amihud(close, turnover, 10), 10))",
                 ),
-                anti_patterns=(
-                    "Amihud is inversely related to liquidity — high amihud = illiquid = risky",
-                ),
+                anti_patterns=("Amihud is inversely related to liquidity — high amihud = illiquid = risky",),
                 window_guidance="Medium-term (10-40 bars)",
             ),
         ]
@@ -460,9 +450,12 @@ class FinancialKnowledgeBase:
                 group_id="positioning",
                 name="Positioning & Sentiment",
                 fields=(
-                    "open_interest", "open_interest_value",
-                    "long_short_ratio", "taker_long_short_vol_ratio",
-                    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
+                    "open_interest",
+                    "open_interest_value",
+                    "long_short_ratio",
+                    "taker_long_short_vol_ratio",
+                    "top_trader_long_short_ratio",
+                    "top_trader_long_short_position_ratio",
                 ),
                 financial_meaning=(
                     "Who is positioned how. OI = total outstanding contracts, "

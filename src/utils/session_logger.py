@@ -235,9 +235,7 @@ def list_session_loggers() -> List[str]:
 
     with _logs_lock:
         in_memory_ids = [
-            session_id
-            for session_id, collector in _session_logs.items()
-            if collector.logs or collector.pending_logs
+            session_id for session_id, collector in _session_logs.items() if collector.logs or collector.pending_logs
         ]
 
     result: List[str] = []

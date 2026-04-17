@@ -54,10 +54,9 @@ class LiveBroker(Broker):
     def _load_stock_names(self):
         try:
             from src.market_data.clickhouse import create_clickhouse_client
+
             client = create_clickhouse_client()
-            data = client.query(
-                "SELECT code, name FROM stock_data.stock_daily_meta WHERE name != ''"
-            )
+            data = client.query("SELECT code, name FROM stock_data.stock_daily_meta WHERE name != ''")
             for code, name in data.result_rows:
                 self.stock_names[code] = name
         except Exception as e:
@@ -93,8 +92,9 @@ class LiveBroker(Broker):
             if order.price:
                 params["price"] = order.price
 
-            logger.info("LiveBroker submit: {} {} qty={} price={}",
-                        order.type, order.symbol, order.quantity, order.price)
+            logger.info(
+                "LiveBroker submit: {} {} qty={} price={}", order.type, order.symbol, order.quantity, order.price
+            )
 
             resp = self._http.get(endpoint, params=params)
             resp.raise_for_status()
@@ -172,10 +172,14 @@ class LiveBroker(Broker):
             "commission": float(fill_qty * order.avg_fill_price * 0.0003),  # 估算手续费
         }
 
-        logger.info("成交: {} {} {} qty={} price={:.2f}",
-                     order.type, order.symbol,
-                     self.stock_names.get(order.symbol, ""),
-                     fill_qty, order.avg_fill_price)
+        logger.info(
+            "成交: {} {} {} qty={} price={:.2f}",
+            order.type,
+            order.symbol,
+            self.stock_names.get(order.symbol, ""),
+            fill_qty,
+            order.avg_fill_price,
+        )
 
         if self.on_trade:
             self.on_trade(trade_record)
@@ -258,9 +262,7 @@ class LiveBroker(Broker):
             "total_equity": cash + sum(p["value"] for p in detailed.values()),
             "equity_history": [],
             "trades": trades_list,
-            "pending_orders": [
-                vars(o) for o in self.orders.values() if o.status == "SUBMITTED"
-            ],
+            "pending_orders": [vars(o) for o in self.orders.values() if o.status == "SUBMITTED"],
         }
 
     def step(self, bars: Dict[str, Bar]):

@@ -13,6 +13,7 @@ from src.services.session_service import SessionService
 
 def test_session_service_checkpoint_uses_persisted_data(tmp_path):
     db = SessionDB(str(tmp_path / "sessions.sqlite"))
+
     class FakePersistence:
         def delete_checkpoints(self, session_id):
             return 0

@@ -20,6 +20,7 @@ class StatePersistence:
 
     def __init__(self):
         from src.config.paths import CHECKPOINTS_DIR
+
         self.enabled = True
         self.checkpoint_path = CHECKPOINTS_DIR
         self.checkpoint_interval = 60
@@ -128,10 +129,7 @@ class StatePersistence:
             conn.commit()
             conn.close()
 
-            logger.info(
-                f"Checkpoint saved: session={session_id}, "
-                f"size={len(state_data)} bytes, time={checkpoint_time}"
-            )
+            logger.info(f"Checkpoint saved: session={session_id}, size={len(state_data)} bytes, time={checkpoint_time}")
 
             return True
 
@@ -172,8 +170,7 @@ class StatePersistence:
             state = self.deserialize_state(state_data)
 
             logger.info(
-                f"Checkpoint loaded: session={session_id}, "
-                f"time={checkpoint_time}, size={len(state_data)} bytes"
+                f"Checkpoint loaded: session={session_id}, time={checkpoint_time}, size={len(state_data)} bytes"
             )
 
             return {
@@ -244,9 +241,7 @@ class StatePersistence:
             conn.close()
 
             if deleted > 0:
-                logger.info(
-                    f"Deleted {deleted} old checkpoints for session: {session_id}"
-                )
+                logger.info(f"Deleted {deleted} old checkpoints for session: {session_id}")
 
             return deleted
 

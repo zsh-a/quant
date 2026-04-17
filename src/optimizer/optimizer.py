@@ -14,6 +14,7 @@ from loguru import logger
 
 class OptimizationMethod(Enum):
     """Optimization methods"""
+
     GRID_SEARCH = "grid"
     RANDOM_SEARCH = "random"
     BAYESIAN = "bayesian"
@@ -22,6 +23,7 @@ class OptimizationMethod(Enum):
 
 class OptimizationObjective(Enum):
     """Optimization objectives"""
+
     MAX_SHARPE = "max_sharpe"
     MAX_RETURN = "max_return"
     MIN_DRAWDOWN = "min_drawdown"
@@ -31,6 +33,7 @@ class OptimizationObjective(Enum):
 @dataclass
 class ParamSpec:
     """Parameter specification"""
+
     name: str
     param_type: str  # int, float, categorical
     low: Optional[float] = None
@@ -40,17 +43,17 @@ class ParamSpec:
 
     def generate_values(self) -> List:
         """Generate all values for grid search"""
-        if self.param_type == 'categorical':
+        if self.param_type == "categorical":
             return self.choices or []
 
         if self.low is None or self.high is None:
             return []
 
-        if self.param_type == 'int':
+        if self.param_type == "int":
             step = int(self.step or 1)
             return list(range(int(self.low), int(self.high) + 1, step))
 
-        elif self.param_type == 'float':
+        elif self.param_type == "float":
             step = self.step or 0.01
             values = []
             v = self.low
@@ -63,13 +66,13 @@ class ParamSpec:
 
     def sample_random(self) -> Any:
         """Sample a random value"""
-        if self.param_type == 'categorical':
+        if self.param_type == "categorical":
             return np.random.choice(self.choices)
 
-        if self.param_type == 'int':
+        if self.param_type == "int":
             return np.random.randint(int(self.low), int(self.high) + 1)
 
-        elif self.param_type == 'float':
+        elif self.param_type == "float":
             return np.random.uniform(self.low, self.high)
 
         return None
@@ -78,6 +81,7 @@ class ParamSpec:
 @dataclass
 class OptimizationResult:
     """Single optimization result"""
+
     params: Dict
     sharpe_ratio: float
     total_return: float
@@ -90,6 +94,7 @@ class OptimizationResult:
 @dataclass
 class OptimizationReport:
     """Full optimization report"""
+
     method: str
     objective: str
     best_params: Dict
@@ -112,7 +117,7 @@ class ParameterOptimizer:
         strategy_class: type,
         param_space: Dict[str, ParamSpec],
         objective: OptimizationObjective = OptimizationObjective.MAX_SHARPE,
-        n_workers: int = 4
+        n_workers: int = 4,
     ):
         self.strategy_class = strategy_class
         self.param_space = param_space
@@ -122,11 +127,7 @@ class ParameterOptimizer:
         self.results: List[OptimizationResult] = []
         self.best_result: Optional[OptimizationResult] = None
 
-    def grid_search(
-        self,
-        backtest_fn: Callable[[Dict], Dict],
-        max_combinations: int = 1000
-    ) -> OptimizationReport:
+    def grid_search(self, backtest_fn: Callable[[Dict], Dict], max_combinations: int = 1000) -> OptimizationReport:
         """
         Grid search over parameter space.
 
@@ -166,18 +167,14 @@ class ParameterOptimizer:
                 self.results.append(result)
 
                 if i % 10 == 0:
-                    logger.info(f"Progress: {i+1}/{len(all_combinations)}")
+                    logger.info(f"Progress: {i + 1}/{len(all_combinations)}")
 
             except Exception as e:
                 logger.warning(f"Backtest failed for params {params}: {e}")
 
         return self._create_report("grid", start_time)
 
-    def random_search(
-        self,
-        backtest_fn: Callable[[Dict], Dict],
-        n_iterations: int = 100
-    ) -> OptimizationReport:
+    def random_search(self, backtest_fn: Callable[[Dict], Dict], n_iterations: int = 100) -> OptimizationReport:
         """
         Random search over parameter space.
 
@@ -194,10 +191,7 @@ class ParameterOptimizer:
         self.results = []
         for i in range(n_iterations):
             # Sample random parameters
-            params = {
-                name: spec.sample_random()
-                for name, spec in self.param_space.items()
-            }
+            params = {name: spec.sample_random() for name, spec in self.param_space.items()}
 
             try:
                 backtest_result = backtest_fn(params)
@@ -205,7 +199,7 @@ class ParameterOptimizer:
                 self.results.append(result)
 
                 if i % 10 == 0:
-                    logger.info(f"Progress: {i+1}/{n_iterations}")
+                    logger.info(f"Progress: {i + 1}/{n_iterations}")
 
             except Exception as e:
                 logger.warning(f"Backtest failed for params {params}: {e}")
@@ -213,10 +207,7 @@ class ParameterOptimizer:
         return self._create_report("random", start_time)
 
     def bayesian_optimize(
-        self,
-        backtest_fn: Callable[[Dict], Dict],
-        n_iterations: int = 50,
-        n_initial: int = 10
+        self, backtest_fn: Callable[[Dict], Dict], n_iterations: int = 50, n_initial: int = 10
     ) -> OptimizationReport:
         """
         Bayesian optimization using Gaussian Process.
@@ -244,7 +235,7 @@ class ParameterOptimizer:
         bounds = []
         for name in param_names:
             spec = self.param_space[name]
-            if spec.param_type == 'categorical':
+            if spec.param_type == "categorical":
                 bounds.append((0, len(spec.choices) - 1))
             else:
                 bounds.append((spec.low, spec.high))
@@ -257,10 +248,7 @@ class ParameterOptimizer:
         self.results = []
 
         for i in range(n_initial):
-            params = {
-                name: spec.sample_random()
-                for name, spec in self.param_space.items()
-            }
+            params = {name: spec.sample_random() for name, spec in self.param_space.items()}
 
             try:
                 backtest_result = backtest_fn(params)
@@ -283,11 +271,7 @@ class ParameterOptimizer:
         y = np.array(y_samples)
 
         # Bayesian optimization loop
-        gp = GaussianProcessRegressor(
-            kernel=Matern(nu=2.5),
-            n_restarts_optimizer=5,
-            normalize_y=True
-        )
+        gp = GaussianProcessRegressor(kernel=Matern(nu=2.5), n_restarts_optimizer=5, normalize_y=True)
 
         for i in range(n_initial, n_iterations):
             # Fit GP
@@ -307,7 +291,7 @@ class ParameterOptimizer:
                 X = np.vstack([X, x_next.reshape(1, -1)])
                 y = np.append(y, result.score)
 
-                logger.info(f"Iteration {i+1}/{n_iterations}: score={result.score:.4f}")
+                logger.info(f"Iteration {i + 1}/{n_iterations}: score={result.score:.4f}")
 
             except Exception as e:
                 logger.warning(f"Bayesian iteration failed: {e}")
@@ -319,10 +303,7 @@ class ParameterOptimizer:
         from scipy.stats import norm
 
         # Sample random points
-        X_random = np.random.uniform(
-            bounds[:, 0], bounds[:, 1],
-            size=(n_samples, len(bounds))
-        )
+        X_random = np.random.uniform(bounds[:, 0], bounds[:, 1], size=(n_samples, len(bounds)))
 
         mu, sigma = gp.predict(X_random, return_std=True)
         sigma = np.maximum(sigma, 1e-9)
@@ -340,7 +321,7 @@ class ParameterOptimizer:
             spec = self.param_space[name]
             value = params[name]
 
-            if spec.param_type == 'categorical':
+            if spec.param_type == "categorical":
                 idx = spec.choices.index(value) if value in spec.choices else 0
                 arr.append(idx)
             else:
@@ -355,11 +336,11 @@ class ParameterOptimizer:
             spec = self.param_space[name]
             value = arr[i]
 
-            if spec.param_type == 'categorical':
+            if spec.param_type == "categorical":
                 idx = int(round(value))
                 idx = max(0, min(idx, len(spec.choices) - 1))
                 params[name] = spec.choices[idx]
-            elif spec.param_type == 'int':
+            elif spec.param_type == "int":
                 params[name] = int(round(value))
             else:
                 params[name] = float(value)
@@ -368,10 +349,10 @@ class ParameterOptimizer:
 
     def _create_result(self, params: Dict, backtest_result: Dict) -> OptimizationResult:
         """Create OptimizationResult from backtest output"""
-        sharpe = backtest_result.get('sharpe_ratio', 0)
-        total_return = backtest_result.get('total_return', 0)
-        max_dd = backtest_result.get('max_drawdown', 1)
-        n_trades = backtest_result.get('n_trades', 0)
+        sharpe = backtest_result.get("sharpe_ratio", 0)
+        total_return = backtest_result.get("total_return", 0)
+        max_dd = backtest_result.get("max_drawdown", 1)
+        n_trades = backtest_result.get("n_trades", 0)
 
         # Calculate Calmar ratio
         calmar = total_return / max_dd if max_dd > 0 else 0
@@ -395,7 +376,7 @@ class ParameterOptimizer:
             max_drawdown=max_dd,
             calmar_ratio=calmar,
             n_trades=n_trades,
-            score=score
+            score=score,
         )
 
     def _create_report(self, method: str, start_time: float) -> OptimizationReport:
@@ -411,7 +392,7 @@ class ParameterOptimizer:
                 results=[],
                 param_importance={},
                 elapsed_time=elapsed,
-                n_iterations=0
+                n_iterations=0,
             )
 
         # Find best result
@@ -433,7 +414,7 @@ class ParameterOptimizer:
             results=self.results,
             param_importance=param_importance,
             elapsed_time=elapsed,
-            n_iterations=len(self.results)
+            n_iterations=len(self.results),
         )
 
     def _calculate_importance(self) -> Dict[str, float]:
@@ -445,7 +426,7 @@ class ParameterOptimizer:
         scores = [r.score for r in self.results]
 
         for name, spec in self.param_space.items():
-            if spec.param_type == 'categorical':
+            if spec.param_type == "categorical":
                 continue
 
             values = [r.params.get(name, 0) for r in self.results]
@@ -459,7 +440,7 @@ class ParameterOptimizer:
         # Normalize
         total = sum(importance.values())
         if total > 0:
-            importance = {k: v/total for k, v in importance.items()}
+            importance = {k: v / total for k, v in importance.items()}
 
         return importance
 
@@ -470,14 +451,6 @@ class ParameterOptimizer:
 
         data = []
         for r in self.results:
-            data.append({
-                param1: r.params.get(param1),
-                param2: r.params.get(param2),
-                'score': r.score
-            })
+            data.append({param1: r.params.get(param1), param2: r.params.get(param2), "score": r.score})
 
-        return {
-            'param1': param1,
-            'param2': param2,
-            'data': data
-        }
+        return {"param1": param1, "param2": param2, "data": data}

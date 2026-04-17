@@ -300,17 +300,17 @@ class AlphaPROBEStrategy(BaseStrategy):
                 )
             all_formulas.extend(formulas)
 
-        logger.info(
-            f"[AlphaPROBE] DAG={len(self.dag)}, "
-            f"选择父代={len(parents)}, 生成={len(all_formulas)}"
-        )
+        logger.info(f"[AlphaPROBE] DAG={len(self.dag)}, 选择父代={len(parents)}, 生成={len(all_formulas)}")
         return self.compile_and_dedup(
-            ctx, all_formulas,
+            ctx,
+            all_formulas,
             lineage_fn=lambda f: all_lineages.get(f, Lineage(origin="alpha_probe")),
         )
 
     def on_evaluation_complete(
-        self, ctx: SearchContext, evaluated: list[Individual],
+        self,
+        ctx: SearchContext,
+        evaluated: list[Individual],
     ) -> None:
         for ind in evaluated:
             self.dag.add(ind)
@@ -355,12 +355,8 @@ class AlphaPROBEStrategy(BaseStrategy):
         # 构建祖先路径上下文
         trace_lines: list[str] = []
         for i, anc in enumerate(ancestors):
-            trace_lines.append(
-                f"  第{i}代: {anc.formula}  (IC={anc.rank_ic:.4f}, fitness={anc.fitness:.2f})"
-            )
-        trace_lines.append(
-            f"  当前: {parent.formula}  (IC={parent.rank_ic:.4f}, fitness={parent.fitness:.2f})"
-        )
+            trace_lines.append(f"  第{i}代: {anc.formula}  (IC={anc.rank_ic:.4f}, fitness={anc.fitness:.2f})")
+        trace_lines.append(f"  当前: {parent.formula}  (IC={parent.rank_ic:.4f}, fitness={parent.fitness:.2f})")
         trace_text = "\n".join(trace_lines) if trace_lines else parent.formula
 
         # 已有子代 (避免冗余)
@@ -388,7 +384,8 @@ class AlphaPROBEStrategy(BaseStrategy):
 
         try:
             formulas = self.llm_backend.generate_offspring(
-                spec, count=self.children_per_parent,
+                spec,
+                count=self.children_per_parent,
             )
             return formulas if formulas else []
         except Exception as e:

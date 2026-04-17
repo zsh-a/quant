@@ -22,20 +22,20 @@ class BacktestTask(Task):
     def update_progress(self, session_id: str, progress: float, message: str = ""):
         """Update task progress"""
         self.update_state(
-            state='PROGRESS',
+            state="PROGRESS",
             meta={
-                'session_id': session_id,
-                'progress': progress,
-                'message': message,
-                'timestamp': datetime.now().isoformat()
-            }
+                "session_id": session_id,
+                "progress": progress,
+                "message": message,
+                "timestamp": datetime.now().isoformat(),
+            },
         )
 
 
 @app.task(
     bind=True,
     base=BacktestTask,
-    name='src.tasks.backtest.run_backtest',
+    name="src.tasks.backtest.run_backtest",
     autoretry_for=(ConnectionError, OSError, TimeoutError),
     retry_backoff=True,
     retry_backoff_max=300,
@@ -64,6 +64,7 @@ def run_backtest_task(self, session_id: str, config: dict):
     req_id = config.get("request_id")
     if req_id:
         from src.utils.logging_config import set_request_context
+
         set_request_context(req_id, session_id)
 
     logger.info(f"Starting backtest task for session {session_id}")
@@ -107,12 +108,13 @@ def run_backtest_task(self, session_id: str, config: dict):
     finally:
         if req_id:
             from src.utils.logging_config import clear_request_context
+
             clear_request_context()
 
 
-@app.task(name='src.tasks.backtest.cancel_backtest')
+@app.task(name="src.tasks.backtest.cancel_backtest")
 def cancel_backtest_task(task_id: str):
     """Cancel a running backtest task"""
     app.control.revoke(task_id, terminate=True)
     logger.info(f"Cancelled task: {task_id}")
-    return {'status': 'cancelled', 'task_id': task_id}
+    return {"status": "cancelled", "task_id": task_id}

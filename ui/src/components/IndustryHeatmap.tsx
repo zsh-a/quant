@@ -97,7 +97,7 @@ export const IndustryHeatmap: React.FC = () => {
       grid: {
         height: '85%',
         top: '5%',
-        left: '120px', 
+        left: '120px',
         right: '30px',
         bottom: '10%',
         containLabel: false
@@ -203,8 +203,8 @@ export const IndustryHeatmap: React.FC = () => {
         <div style={{ minHeight: '950px' }}>
           {heatmapData ? (
             <Suspense fallback={<div style={{ height: '950px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>Loading chart...</div>}>
-              <HeatmapChart 
-                option={getOption()} 
+              <HeatmapChart
+                option={getOption()}
                 style={{ height: '950px', width: '100%' }}
                 theme="dark"
               />

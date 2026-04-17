@@ -21,17 +21,19 @@ import numpy as np
 # Data Models
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class BarFeatures:
     """单根 K 线的 Brooks 特征。"""
+
     bar_type: Literal["bull_trend", "bear_trend", "bull_doji", "bear_doji"]
-    body_pct: int             # 实体占比 0-100
+    body_pct: int  # 实体占比 0-100
     close_position: Literal["high", "mid", "low"]
     ema_relation: Literal["above", "at", "below"]
-    ema_distance_pct: float   # 与 EMA20 的距离百分比
+    ema_distance_pct: float  # 与 EMA20 的距离百分比
     is_inside_bar: bool
     is_outside_bar: bool
-    is_reversal_bar: bool     # 长影线反转
+    is_reversal_bar: bool  # 长影线反转
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -40,8 +42,9 @@ class BarFeatures:
 @dataclass
 class MarketContext:
     """市场整体上下文。"""
+
     atr_14: float
-    atr_pct: float            # ATR 相对于价格的百分比
+    atr_pct: float  # ATR 相对于价格的百分比
     is_dead_market: bool
     ema20: float
     recent_high: float
@@ -55,6 +58,7 @@ class MarketContext:
 # ---------------------------------------------------------------------------
 # Core Functions
 # ---------------------------------------------------------------------------
+
 
 def classify_bar(o: float, h: float, l: float, c: float) -> tuple[str, int]:
     """分类 K 线类型 + 实体占比。"""
@@ -158,15 +162,17 @@ def extract_features(bars: list[dict], ema_period: int = 20) -> tuple[list[BarFe
         lower_wick = min(o, c) - l
         is_reversal = (upper_wick > 0.4 * rng_bar or lower_wick > 0.4 * rng_bar) if rng_bar > 0 else False
 
-        features.append(BarFeatures(
-            bar_type=bar_type,
-            body_pct=body_pct,
-            close_position=close_pos,
-            ema_relation=ema_rel,
-            ema_distance_pct=round(dist, 4),
-            is_inside_bar=is_inside,
-            is_outside_bar=is_outside,
-            is_reversal_bar=is_reversal,
-        ))
+        features.append(
+            BarFeatures(
+                bar_type=bar_type,
+                body_pct=body_pct,
+                close_position=close_pos,
+                ema_relation=ema_rel,
+                ema_distance_pct=round(dist, 4),
+                is_inside_bar=is_inside,
+                is_outside_bar=is_outside,
+                is_reversal_bar=is_reversal,
+            )
+        )
 
     return features, ctx

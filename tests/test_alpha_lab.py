@@ -199,7 +199,6 @@ def test_alpha_lab_service_program_cache_uses_lru_eviction():
     assert "CSRank(ts_mean(close, 2) - close)" not in service._program_cache
 
 
-
 class _BatchCountingBackend:
     def __init__(self):
         self.calls: list[int] = []
@@ -301,8 +300,16 @@ def test_evolution_feedback_seed_generation_uses_metrics_in_parent_feedback():
         parent_b="CSRank(ts_std(close, 5))",
         objective="improve robustness and reduce turnover",
         parent_feedback=[
-            {"formula": "CSRank(ts_mean(close, 5) - close)", "metrics": {"sharpe": 1.5, "rank_ic": 0.1}, "rationale": "Elite."},
-            {"formula": "CSRank(ts_std(close, 5))", "metrics": {"sharpe": 0.8, "rank_ic": 0.02}, "rationale": "Runner-up."},
+            {
+                "formula": "CSRank(ts_mean(close, 5) - close)",
+                "metrics": {"sharpe": 1.5, "rank_ic": 0.1},
+                "rationale": "Elite.",
+            },
+            {
+                "formula": "CSRank(ts_std(close, 5))",
+                "metrics": {"sharpe": 0.8, "rank_ic": 0.02},
+                "rationale": "Runner-up.",
+            },
         ],
     )
     formulas = backend.generate_offspring(spec, count=1)
@@ -399,7 +406,6 @@ def test_openai_evolution_prompt_includes_extended_metrics_and_diagnostics():
     assert "|IC|=0.0800" in prompt
     # Check diagnostics
     assert "overfitting" in prompt or "low turnover" in prompt
-
 
 
 def test_cpcv_validator_generates_purged_folds():

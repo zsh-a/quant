@@ -35,9 +35,7 @@ class MessageThrottler:
         self._locks: Dict[str, asyncio.Lock] = defaultdict(asyncio.Lock)
         self._flush_tasks: Dict[str, asyncio.Task] = {}
 
-    async def add_message(
-        self, session_id: str, message: Dict[str, Any], callback
-    ) -> None:
+    async def add_message(self, session_id: str, message: Dict[str, Any], callback) -> None:
         """Add message to throttle queue"""
         async with self._locks[session_id]:
             self._queues[session_id].append(message)
@@ -48,13 +46,8 @@ class MessageThrottler:
                 return
 
             # Schedule delayed flush if not already scheduled
-            if (
-                session_id not in self._flush_tasks
-                or self._flush_tasks[session_id].done()
-            ):
-                self._flush_tasks[session_id] = asyncio.create_task(
-                    self._delayed_flush(session_id, callback)
-                )
+            if session_id not in self._flush_tasks or self._flush_tasks[session_id].done():
+                self._flush_tasks[session_id] = asyncio.create_task(self._delayed_flush(session_id, callback))
 
     async def _delayed_flush(self, session_id: str, callback) -> None:
         """Flush queue after delay"""
@@ -102,12 +95,7 @@ class MessageThrottler:
                 result.append(
                     {
                         "type": "equity_batch",
-                        "data": {
-                            "updates": [
-                                m.get("data", {}).get("equity", m.get("data", {}))
-                                for m in msgs
-                            ]
-                        },
+                        "data": {"updates": [m.get("data", {}).get("equity", m.get("data", {})) for m in msgs]},
                         "count": len(msgs),
                     }
                 )
@@ -116,12 +104,7 @@ class MessageThrottler:
                 result.append(
                     {
                         "type": "trades_batch",
-                        "data": {
-                            "trades": [
-                                m.get("data", {}).get("trade", m.get("data", {}))
-                                for m in msgs
-                            ]
-                        },
+                        "data": {"trades": [m.get("data", {}).get("trade", m.get("data", {})) for m in msgs]},
                         "count": len(msgs),
                     }
                 )
@@ -151,9 +134,7 @@ class ConnectionManager:
         self.active_connections: Dict[str, Set[WebSocket]] = {}
         self.connection_sessions: Dict[WebSocket, str] = {}
         self.heartbeat_interval = 30
-        self.throttler = MessageThrottler(
-            min_interval_ms=100, max_batch_size=50, flush_interval_ms=200
-        )
+        self.throttler = MessageThrottler(min_interval_ms=100, max_batch_size=50, flush_interval_ms=200)
 
     async def connect(self, websocket: WebSocket, session_id: str):
         """Accept and register a new WebSocket connection"""
@@ -214,9 +195,7 @@ class ConnectionManager:
             self.disconnect(connection)
 
         if disconnected:
-            logger.warning(
-                f"Removed {len(disconnected)} failed connections from session {session_id}"
-            )
+            logger.warning(f"Removed {len(disconnected)} failed connections from session {session_id}")
 
     async def broadcast_throttled(self, session_id: str, message: dict):
         """Broadcast with throttling to prevent message flooding"""
@@ -243,9 +222,9 @@ class ConnectionManager:
                     break
 
                 try:
-                    await websocket.send_text(orjson.dumps(
-                        {"type": "ping", "timestamp": datetime.now().isoformat()}
-                    ).decode())
+                    await websocket.send_text(
+                        orjson.dumps({"type": "ping", "timestamp": datetime.now().isoformat()}).decode()
+                    )
                 except Exception:
                     break
 
@@ -267,9 +246,7 @@ class ConnectionManager:
         return {
             "total_connections": self.get_connection_count(),
             "active_sessions": len(self.active_connections),
-            "sessions": {
-                sid: len(conns) for sid, conns in self.active_connections.items()
-            },
+            "sessions": {sid: len(conns) for sid, conns in self.active_connections.items()},
         }
 
 

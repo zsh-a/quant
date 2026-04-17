@@ -87,7 +87,7 @@ def calculate_stop_loss(
         end_idx = min(len(bars) - 1, len(bars) - 1 + end)
         if start_idx > end_idx:
             start_idx, end_idx = end_idx, start_idx
-        sl = bars[start_idx:end_idx + 1]
+        sl = bars[start_idx : end_idx + 1]
         if not sl:
             return entry_price * (0.98 if is_long else 1.02)
         if rtype in ("swing_low", "pattern_low"):
@@ -133,7 +133,7 @@ def calculate_take_profit(
         end_idx = min(len(bars) - 1, len(bars) - 1 + end)
         if start_idx > end_idx:
             start_idx, end_idx = end_idx, start_idx
-        sl = bars[start_idx:end_idx + 1]
+        sl = bars[start_idx : end_idx + 1]
         if not sl:
             return entry_price + risk * 2 if is_long else entry_price - risk * 2
         impulse = max(b.get("high", 0) for b in sl) - min(b.get("low", 0) for b in sl)

@@ -26,19 +26,34 @@ class MarketAdminUpdateRequest(BaseModel):
 
 
 class MarketDbOverviewService:
+    _ALLOWED_TABLES = frozenset(
+        {
+            "stock_data.trade_dates",
+            "stock_data.all_stock",
+            "stock_data.stock_daily",
+            "stock_data.stock_daily_meta",
+            "stock_data.finicial_report",
+            "stock_data.finicial_data",
+            "stock_data.shares_info",
+            "stock_data.industry_info",
+            "stock_data.index_stocks",
+        }
+    )
 
-    _ALLOWED_TABLES = frozenset({
-        "stock_data.trade_dates", "stock_data.all_stock",
-        "stock_data.stock_daily", "stock_data.stock_daily_meta",
-        "stock_data.finicial_report", "stock_data.finicial_data",
-        "stock_data.shares_info", "stock_data.industry_info",
-        "stock_data.index_stocks",
-    })
-
-    _ALLOWED_COLUMNS = frozenset({
-        "code", "date", "day", "calendar_date", "last_update_date",
-        "report_date", "publish_date", "change_date", "enter_date", "index",
-    })
+    _ALLOWED_COLUMNS = frozenset(
+        {
+            "code",
+            "date",
+            "day",
+            "calendar_date",
+            "last_update_date",
+            "report_date",
+            "publish_date",
+            "change_date",
+            "enter_date",
+            "index",
+        }
+    )
 
     def __init__(self):
         self.db = DB()
@@ -129,11 +144,7 @@ class MarketDbOverviewService:
             return run
 
         stale_seconds = int(os.getenv("DATA_UPDATE_STALE_SECONDS", "600"))
-        last_heartbeat = (
-            run.get("last_heartbeat_at")
-            or run.get("started_at")
-            or run.get("created_at")
-        )
+        last_heartbeat = run.get("last_heartbeat_at") or run.get("started_at") or run.get("created_at")
         last_dt = self._parse_timestamp(last_heartbeat)
         if not last_dt:
             return run
@@ -243,6 +254,7 @@ async def get_market_update_capabilities():
 async def get_data_quality_report():
     """数据质量报告：缺失率、异常值、新鲜度。"""
     from src.market_data.data_quality import DataQualityChecker
+
     checker = DataQualityChecker()
     return await anyio.to_thread.run_sync(checker.full_report)
 

@@ -46,9 +46,10 @@ if numba is not None:
 
 class EvalMethod(str, Enum):
     """Factor evaluation / backtesting method."""
-    LONG_SHORT = "long_short"       # 多空对冲 (crypto default)
-    LONG_ONLY = "long_only"         # 纯多头 top-K 等权
-    QUANTILE = "quantile"           # 分层回测 (A股行业标准)
+
+    LONG_SHORT = "long_short"  # 多空对冲 (crypto default)
+    LONG_ONLY = "long_only"  # 纯多头 top-K 等权
+    QUANTILE = "quantile"  # 分层回测 (A股行业标准)
 
 
 @dataclass
@@ -137,9 +138,9 @@ class BacktestResult:
         # Extended metrics
         calmar = total_return / (max_dd + 1e-12)
         win_rate = float(np.mean(net_returns > 0)) if net_returns.size else 0.0
-        skewness = float(
-            np.mean(((net_returns - mean) / (std + 1e-12)) ** 3)
-        ) if net_returns.size and std > 1e-12 else 0.0
+        skewness = (
+            float(np.mean(((net_returns - mean) / (std + 1e-12)) ** 3)) if net_returns.size and std > 1e-12 else 0.0
+        )
 
         return {
             "sharpe": sharpe,
@@ -169,7 +170,10 @@ class SignalTransformer:
         return self._to_target_weights_numpy(alpha, market_ctx)
 
     def _to_long_only_numpy(
-        self, alpha: np.ndarray, market_ctx: MarketContext, top_pct: float = 0.2,
+        self,
+        alpha: np.ndarray,
+        market_ctx: MarketContext,
+        top_pct: float = 0.2,
     ) -> np.ndarray:
         """Long-only equal-weight: buy top *top_pct* stocks by alpha."""
         scores = alpha.astype(float).copy()
@@ -375,7 +379,7 @@ class PortfolioManager:
 
             # Update virtual equity
             bar_ret = float(np.nansum(weights[t] * fwd[t]))
-            equity *= (1.0 + bar_ret)
+            equity *= 1.0 + bar_ret
             if equity > peak_equity:
                 peak_equity = equity
 
@@ -494,4 +498,5 @@ def _as_torch(value: ArrayLike, like: Any, dtype: Any | None = None) -> Any:
 
 def _to_numpy(value: ArrayLike) -> np.ndarray:
     from ..core.vm import to_numpy
+
     return to_numpy(value)

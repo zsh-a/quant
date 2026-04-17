@@ -153,9 +153,9 @@ class Lineage:
     """
 
     origin: str  # "seed" | "bootstrap" | "enumeration" | "llm_genesis" | "llm_evolution" | "mcts_refinement" | "neural_formula"
-    parent_a: str | None = None   # expr_hash of first parent
-    parent_b: str | None = None   # expr_hash of second parent
-    theme: str | None = None      # financial theme id
+    parent_a: str | None = None  # expr_hash of first parent
+    parent_b: str | None = None  # expr_hash of second parent
+    theme: str | None = None  # financial theme id
     screen_ic: float | None = None  # IC from fast screen (enumeration / neural)
     round_idx: int | None = None
     extra: dict[str, Any] = field(default_factory=dict)

@@ -13,6 +13,7 @@ from loguru import logger
 @dataclass
 class AttributionResult:
     """Attribution analysis result"""
+
     total_return: float
     by_asset: Dict[str, float]
     by_sector: Dict[str, float]
@@ -33,17 +34,29 @@ class ReturnAttribution:
     # Simple sector mapping (can be extended)
     SECTOR_MAP = {
         # Technology
-        '300750': 'Technology', '002475': 'Technology', '300059': 'Technology',
+        "300750": "Technology",
+        "002475": "Technology",
+        "300059": "Technology",
         # Consumer
-        '000858': 'Consumer', '600519': 'Consumer', '000568': 'Consumer',
+        "000858": "Consumer",
+        "600519": "Consumer",
+        "000568": "Consumer",
         # Finance
-        '600036': 'Finance', '601318': 'Finance', '600030': 'Finance',
+        "600036": "Finance",
+        "601318": "Finance",
+        "600030": "Finance",
         # Healthcare
-        '300760': 'Healthcare', '600276': 'Healthcare', '000538': 'Healthcare',
+        "300760": "Healthcare",
+        "600276": "Healthcare",
+        "000538": "Healthcare",
         # Industrial
-        '601888': 'Industrial', '000333': 'Industrial', '002594': 'Industrial',
+        "601888": "Industrial",
+        "000333": "Industrial",
+        "002594": "Industrial",
         # Energy
-        '601857': 'Energy', '600028': 'Energy', '601225': 'Energy',
+        "601857": "Energy",
+        "600028": "Energy",
+        "601225": "Energy",
     }
 
     def __init__(self, trades: List[Dict], equity_history: List[Dict]):
@@ -68,8 +81,8 @@ class ReturnAttribution:
 
         # Total return
         if self.equity_history and len(self.equity_history) >= 2:
-            initial = self.equity_history[0].get('total_equity', 1)
-            final = self.equity_history[-1].get('total_equity', 1)
+            initial = self.equity_history[0].get("total_equity", 1)
+            final = self.equity_history[-1].get("total_equity", 1)
             total_return = (final - initial) / initial if initial > 0 else 0
         else:
             total_return = 0
@@ -79,10 +92,10 @@ class ReturnAttribution:
             by_asset=by_asset,
             by_sector=by_sector,
             by_period=by_period,
-            win_rate=trade_stats['win_rate'],
-            avg_win=trade_stats['avg_win'],
-            avg_loss=trade_stats['avg_loss'],
-            profit_factor=trade_stats['profit_factor']
+            win_rate=trade_stats["win_rate"],
+            avg_win=trade_stats["avg_win"],
+            avg_loss=trade_stats["avg_loss"],
+            profit_factor=trade_stats["profit_factor"],
         )
 
     def _attribution_by_asset(self) -> Dict[str, float]:
@@ -93,33 +106,33 @@ class ReturnAttribution:
         positions = {}  # symbol -> [cost_basis, quantity]
 
         for trade in self.trades:
-            symbol = trade.get('symbol', '')
-            side = trade.get('type', trade.get('side', ''))
-            quantity = trade.get('quantity', 0)
-            price = trade.get('price', 0)
+            symbol = trade.get("symbol", "")
+            side = trade.get("type", trade.get("side", ""))
+            quantity = trade.get("quantity", 0)
+            price = trade.get("price", 0)
 
             if symbol not in pnl_by_asset:
                 pnl_by_asset[symbol] = 0
 
             if symbol not in positions:
-                positions[symbol] = {'cost': 0, 'quantity': 0}
+                positions[symbol] = {"cost": 0, "quantity": 0}
 
-            if side.lower() == 'buy':
+            if side.lower() == "buy":
                 # Add to position
                 pos = positions[symbol]
-                total_cost = pos['cost'] * pos['quantity'] + price * quantity
-                total_qty = pos['quantity'] + quantity
+                total_cost = pos["cost"] * pos["quantity"] + price * quantity
+                total_qty = pos["quantity"] + quantity
                 if total_qty > 0:
-                    pos['cost'] = total_cost / total_qty
-                pos['quantity'] = total_qty
+                    pos["cost"] = total_cost / total_qty
+                pos["quantity"] = total_qty
 
-            elif side.lower() == 'sell':
+            elif side.lower() == "sell":
                 # Calculate P&L
                 pos = positions[symbol]
-                if pos['quantity'] > 0:
-                    pnl = (price - pos['cost']) * min(quantity, pos['quantity'])
+                if pos["quantity"] > 0:
+                    pnl = (price - pos["cost"]) * min(quantity, pos["quantity"])
                     pnl_by_asset[symbol] += pnl
-                    pos['quantity'] -= quantity
+                    pos["quantity"] -= quantity
 
         return pnl_by_asset
 
@@ -130,8 +143,8 @@ class ReturnAttribution:
 
         for symbol, pnl in by_asset.items():
             # Extract symbol code (remove exchange prefix)
-            code = symbol.split('.')[-1] if '.' in symbol else symbol
-            sector = self.SECTOR_MAP.get(code, 'Other')
+            code = symbol.split(".")[-1] if "." in symbol else symbol
+            sector = self.SECTOR_MAP.get(code, "Other")
 
             if sector not in by_sector:
                 by_sector[sector] = 0
@@ -149,10 +162,10 @@ class ReturnAttribution:
         # Group equity by month
         monthly_data = {}
         for eq in self.equity_history:
-            date = eq.get('date', eq.get('timestamp', ''))[:7]  # YYYY-MM
+            date = eq.get("date", eq.get("timestamp", ""))[:7]  # YYYY-MM
             if date not in monthly_data:
                 monthly_data[date] = []
-            monthly_data[date].append(eq.get('total_equity', 0))
+            monthly_data[date].append(eq.get("total_equity", 0))
 
         # Calculate monthly returns
         prev_equity = None
@@ -179,14 +192,14 @@ class ReturnAttribution:
         open_positions = {}  # symbol -> buy_price
 
         for trade in self.trades:
-            symbol = trade.get('symbol', '')
-            side = trade.get('type', trade.get('side', ''))
-            price = trade.get('price', 0)
+            symbol = trade.get("symbol", "")
+            side = trade.get("type", trade.get("side", ""))
+            price = trade.get("price", 0)
 
-            if side.lower() == 'buy':
+            if side.lower() == "buy":
                 open_positions[symbol] = price
 
-            elif side.lower() == 'sell' and symbol in open_positions:
+            elif side.lower() == "sell" and symbol in open_positions:
                 buy_price = open_positions[symbol]
                 pnl_pct = (price - buy_price) / buy_price if buy_price > 0 else 0
 
@@ -207,12 +220,7 @@ class ReturnAttribution:
         total_loss = abs(sum(losses)) if losses else 0.001
         profit_factor = total_win / total_loss if total_loss > 0 else 0
 
-        return {
-            'win_rate': win_rate,
-            'avg_win': avg_win,
-            'avg_loss': avg_loss,
-            'profit_factor': profit_factor
-        }
+        return {"win_rate": win_rate, "avg_win": avg_win, "avg_loss": avg_loss, "profit_factor": profit_factor}
 
 
 class RiskAttribution:
@@ -234,13 +242,7 @@ class RiskAttribution:
         returns = self._calculate_returns()
 
         if len(returns) < 5:
-            return {
-                'volatility': 0,
-                'max_drawdown': 0,
-                'var_95': 0,
-                'cvar_95': 0,
-                'sharpe_ratio': 0
-            }
+            return {"volatility": 0, "max_drawdown": 0, "var_95": 0, "cvar_95": 0, "sharpe_ratio": 0}
 
         # Volatility (annualized)
         volatility = np.std(returns) * np.sqrt(252)
@@ -257,19 +259,19 @@ class RiskAttribution:
         sharpe = (mean_ret * 252 - 0.03) / volatility if volatility > 0 else 0
 
         return {
-            'volatility': volatility,
-            'max_drawdown': max_dd,
-            'var_95': var_95,
-            'cvar_95': cvar_95,
-            'sharpe_ratio': sharpe
+            "volatility": volatility,
+            "max_drawdown": max_dd,
+            "var_95": var_95,
+            "cvar_95": cvar_95,
+            "sharpe_ratio": sharpe,
         }
 
     def _calculate_returns(self) -> List[float]:
         """Calculate daily returns"""
         returns = []
         for i in range(1, len(self.equity_history)):
-            prev = self.equity_history[i-1].get('total_equity', 0)
-            curr = self.equity_history[i].get('total_equity', 0)
+            prev = self.equity_history[i - 1].get("total_equity", 0)
+            curr = self.equity_history[i].get("total_equity", 0)
             if prev > 0:
                 returns.append((curr - prev) / prev)
         return returns
@@ -279,11 +281,11 @@ class RiskAttribution:
         if not self.equity_history:
             return 0
 
-        peak = self.equity_history[0].get('total_equity', 1)
+        peak = self.equity_history[0].get("total_equity", 1)
         max_dd = 0
 
         for eq in self.equity_history:
-            equity = eq.get('total_equity', 0)
+            equity = eq.get("total_equity", 0)
             if equity > peak:
                 peak = equity
             dd = (peak - equity) / peak if peak > 0 else 0

@@ -60,7 +60,6 @@ SW1 = {
     requires_symbol=False,
 )
 class RotationStrategy(Strategy):
-
     def __init__(self, db_client, session_id: str = None, **kwargs):
         super().__init__(session_id=session_id)
         self.db_client = db_client
@@ -73,18 +72,14 @@ class RotationStrategy(Strategy):
         rebalance_dates_str = kwargs.get("rebalance_dates", None)
         self.rebalance_dates = None
         if rebalance_dates_str:
-            self.rebalance_dates = [
-                d.strip() for d in rebalance_dates_str.split(",") if d.strip()
-            ]
+            self.rebalance_dates = [d.strip() for d in rebalance_dates_str.split(",") if d.strip()]
 
         self.JSG_group = {"银行I", "有色金属I", "钢铁I", "煤炭I"}
         self.XSZ_group = {"小市值200"}
         self.CYB_group = {"创业板50"}
         self.black_industry_name = {"银行I", "煤炭I", "采掘I", "钢铁I"}
 
-        self._log(
-            f"RotationStrategy initialized: stock_sum={self.stock_sum}, timing={self.timing}"
-        )
+        self._log(f"RotationStrategy initialized: stock_sum={self.stock_sum}, timing={self.timing}")
 
         self.trigger_dates_backtest = set()
         self.trigger_dates_live = set()
@@ -131,9 +126,7 @@ class RotationStrategy(Strategy):
         should_run = False
         is_live = self.engine and self.engine.broker.__class__.__name__ == "LiveBroker"
 
-        trigger_dates = (
-            self.trigger_dates_live if is_live else self.trigger_dates_backtest
-        )
+        trigger_dates = self.trigger_dates_live if is_live else self.trigger_dates_backtest
 
         if self.rebalance_dates:
             if today_str in trigger_dates:
@@ -145,9 +138,7 @@ class RotationStrategy(Strategy):
         if not should_run:
             return
 
-        self._log(
-            f"========== 轮动调仓日 (Timing: {self.timing}, Live: {is_live}) =========="
-        )
+        self._log(f"========== 轮动调仓日 (Timing: {self.timing}, Live: {is_live}) ==========")
 
         try:
             df_ratio = self.get_market_breadth(today_str)
@@ -161,19 +152,14 @@ class RotationStrategy(Strategy):
             I_top = df_ratio.nlargest(1, "ratio")["name"].tolist()
             market_env = self.judge_market_env(today_str)
 
-            if (
-                any(item in self.black_industry_name for item in I_top)
-                and market_env == "存量"
-            ):
+            if any(item in self.black_industry_name for item in I_top) and market_env == "存量":
                 self.adjust([], today_str)
                 return
 
             final_list = []
             if max_group == "JSG" and max_mean > 90:
                 L2 = self.get_L2(today_str)
-                max_ind_code = df_ratio[df_ratio["name"].isin(self.JSG_group)][
-                    "ratio"
-                ].idxmax()
+                max_ind_code = df_ratio[df_ratio["name"].isin(self.JSG_group)]["ratio"].idxmax()
                 L1_stocks = self.db_client.get_swindustry_stocks(max_ind_code, today_str)
                 L1 = self.get_L1(L1_stocks, today_str)
                 final_list = L1[:1] + L2[:9]
@@ -195,18 +181,12 @@ class RotationStrategy(Strategy):
         if h1.empty:
             return pd.DataFrame()
 
-        h1["ma20"] = h1.groupby(level="code")["close"].transform(
-            lambda x: ta.MA(x, timeperiod=20)
-        )
+        h1["ma20"] = h1.groupby(level="code")["close"].transform(lambda x: ta.MA(x, timeperiod=20))
         h1 = h1.groupby(level=0).tail(1).copy()
         h1["bias"] = h1["close"] > h1["ma20"]
 
-        industry_df = self.db_client.get_stock_industry_sw(
-            h1.index.get_level_values("code").to_list(), end_date
-        )
-        h1["industry_code"] = industry_df.reindex(h1.index.get_level_values(0))[
-            "industry_code"
-        ].values
+        industry_df = self.db_client.get_stock_industry_sw(h1.index.get_level_values("code").to_list(), end_date)
+        h1["industry_code"] = industry_df.reindex(h1.index.get_level_values(0))["industry_code"].values
         df_ratio1 = (h1.groupby("industry_code")["bias"].mean() * 100.0).round()
 
         df_ratio = df_ratio1
@@ -219,9 +199,7 @@ class RotationStrategy(Strategy):
             "JSG": df_ratio[df_ratio["name"].isin(self.JSG_group)]["ratio"].mean() or 0,
             "XSZ": df_ratio[df_ratio["name"].isin(self.XSZ_group)]["ratio"].mean() or 0,
             "CYB": df_ratio[df_ratio["name"].isin(self.CYB_group)]["ratio"].mean() or 0,
-            "OTHER": df_ratio[
-                ~df_ratio["name"].isin(self.JSG_group | self.XSZ_group | self.CYB_group)
-            ]["ratio"].mean()
+            "OTHER": df_ratio[~df_ratio["name"].isin(self.JSG_group | self.XSZ_group | self.CYB_group)]["ratio"].mean()
             or 0,
         }
         return {k: (v if not np.isnan(v) else 0) for k, v in means.items()}
@@ -241,15 +219,11 @@ class RotationStrategy(Strategy):
 
     def get_L2(self, date_str):
         S_stocks = self.db_client.get_index_stocks("399101", date_str)
-        fin_db = self.db_client.get_stock_fincial(
-            S_stocks, fields=["roe", "roa", "total_shares"], date=date_str
-        )
+        fin_db = self.db_client.get_stock_fincial(S_stocks, fields=["roe", "roa", "total_shares"], date=date_str)
         if fin_db.empty:
             return []
 
-        df_prc = self.db_client.get_price(
-            fin_db.index.to_list(), date_str, ["close"], 1, price_adj=False
-        )
+        df_prc = self.db_client.get_price(fin_db.index.to_list(), date_str, ["close"], 1, price_adj=False)
         if not df_prc.empty:
             fin_db["close"] = df_prc["close"]
             fin_db["market_cap"] = fin_db["close"] * fin_db["total_shares"]
@@ -260,9 +234,7 @@ class RotationStrategy(Strategy):
     def get_L1(self, stocks, date_str):
         if not stocks:
             return []
-        fin_db = self.db_client.get_stock_fincial(
-            stocks, fields=["roa", "pb_ratio"], date=date_str
-        )
+        fin_db = self.db_client.get_stock_fincial(stocks, fields=["roa", "pb_ratio"], date=date_str)
         mask = (fin_db["pb_ratio"] < 1.0) & (fin_db["roa"] > 0.15)
         return fin_db[mask].sort_values(by="roa", ascending=False).index.to_list()
 

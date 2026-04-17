@@ -31,11 +31,10 @@ _bearer = HTTPBearer(auto_error=False)
 # Token helpers
 # ------------------------------------------------------------------
 
+
 def _create_access_token(sub: str, expires_delta: Optional[timedelta] = None) -> str:
     cfg = get_auth_config()
-    expire = datetime.now(timezone.utc) + (
-        expires_delta or timedelta(minutes=cfg.access_token_expire_minutes)
-    )
+    expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=cfg.access_token_expire_minutes))
     payload = {"sub": sub, "exp": expire}
     return jwt.encode(payload, cfg.secret_key, algorithm=cfg.algorithm)
 
@@ -59,6 +58,7 @@ def _verify_token(token: str) -> str:
 # FastAPI dependency — noop when auth is disabled
 # ------------------------------------------------------------------
 
+
 async def require_auth(
     creds: Optional[HTTPAuthorizationCredentials] = Depends(_bearer),
 ) -> Optional[str]:
@@ -78,6 +78,7 @@ async def require_auth(
 # ------------------------------------------------------------------
 # Endpoints
 # ------------------------------------------------------------------
+
 
 class LoginRequest(BaseModel):
     username: str

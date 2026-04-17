@@ -49,7 +49,7 @@ export function lttb(data: any[], threshold: number, valueKey: string = 'value')
 
         for (; rangeOffs < rangeTo; rangeOffs++) {
             // Calculate triangle area over three buckets
-            area = Math.abs((pointAX - avgX) * ((data[rangeOffs][valueKey] || 0) - pointAY) - 
+            area = Math.abs((pointAX - avgX) * ((data[rangeOffs][valueKey] || 0) - pointAY) -
                             (pointAX - rangeOffs) * (pointAY - avgY)) * 0.5;
             if (area > maxArea) {
                 maxArea = area;

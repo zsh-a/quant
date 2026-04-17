@@ -14,15 +14,17 @@ from loguru import logger
 
 class WeightMethod(Enum):
     """Weight allocation methods"""
-    EQUAL = "equal"                    # 等权重
-    VOLATILITY_INVERSE = "vol_inverse" # 波动率倒数
-    SHARPE_WEIGHTED = "sharpe"         # 夏普比率加权
-    CUSTOM = "custom"                  # 自定义权重
+
+    EQUAL = "equal"  # 等权重
+    VOLATILITY_INVERSE = "vol_inverse"  # 波动率倒数
+    SHARPE_WEIGHTED = "sharpe"  # 夏普比率加权
+    CUSTOM = "custom"  # 自定义权重
 
 
 @dataclass
 class StrategyConfig:
     """Strategy configuration"""
+
     name: str
     strategy_class: type
     params: Dict
@@ -33,6 +35,7 @@ class StrategyConfig:
 @dataclass
 class PortfolioSignal:
     """Combined portfolio signal"""
+
     symbol: str
     direction: str  # 'buy', 'sell', 'hold'
     strength: float  # 0-1
@@ -43,6 +46,7 @@ class PortfolioSignal:
 @dataclass
 class PortfolioState:
     """Portfolio state"""
+
     weights: Dict[str, float] = field(default_factory=dict)
     strategy_returns: Dict[str, List[float]] = field(default_factory=dict)
     strategy_positions: Dict[str, Dict] = field(default_factory=dict)
@@ -64,7 +68,7 @@ class PortfolioManager:
         weight_method: WeightMethod = WeightMethod.EQUAL,
         rebalance_frequency: str = "weekly",  # daily, weekly, monthly
         min_weight: float = 0.05,
-        max_weight: float = 0.40
+        max_weight: float = 0.40,
     ):
         self.strategy_configs = strategies
         self.weight_method = weight_method
@@ -135,10 +139,10 @@ class PortfolioManager:
                 volatilities[name] = 0.15  # Default 15% vol
 
         # Inverse volatility
-        inv_vols = {name: 1/vol for name, vol in volatilities.items()}
+        inv_vols = {name: 1 / vol for name, vol in volatilities.items()}
         total = sum(inv_vols.values())
 
-        self.state.weights = {name: iv/total for name, iv in inv_vols.items()}
+        self.state.weights = {name: iv / total for name, iv in inv_vols.items()}
 
     def _calculate_sharpe_weights(self):
         """Calculate weights proportional to Sharpe ratio"""
@@ -158,7 +162,7 @@ class PortfolioManager:
                 sharpes[name] = 1.0  # Default
 
         total = sum(sharpes.values())
-        self.state.weights = {name: s/total for name, s in sharpes.items()}
+        self.state.weights = {name: s / total for name, s in sharpes.items()}
 
     def _apply_weight_constraints(self):
         """Apply min/max weight constraints"""
@@ -170,7 +174,7 @@ class PortfolioManager:
         # Renormalize
         total = sum(self.state.weights.values())
         if total > 0:
-            self.state.weights = {n: w/total for n, w in self.state.weights.items()}
+            self.state.weights = {n: w / total for n, w in self.state.weights.items()}
 
     def collect_signals(self, bar: Dict) -> Dict[str, Optional[Dict]]:
         """Collect signals from all strategies"""
@@ -178,7 +182,7 @@ class PortfolioManager:
 
         for name, strategy in self.strategies.items():
             try:
-                if hasattr(strategy, 'on_bar'):
+                if hasattr(strategy, "on_bar"):
                     signal = strategy.on_bar(bar)
                     signals[name] = signal
             except Exception as e:
@@ -195,51 +199,49 @@ class PortfolioManager:
             if signal is None:
                 continue
 
-            symbol = signal.get('symbol')
+            symbol = signal.get("symbol")
             if not symbol:
                 continue
 
-            direction = signal.get('direction', 'hold')
-            strength = signal.get('strength', 1.0)
+            direction = signal.get("direction", "hold")
+            strength = signal.get("strength", 1.0)
             weight = self.state.weights.get(strategy_name, 0)
 
             if symbol not in combined:
-                combined[symbol] = {
-                    'buy_score': 0,
-                    'sell_score': 0,
-                    'sources': []
-                }
+                combined[symbol] = {"buy_score": 0, "sell_score": 0, "sources": []}
 
-            if direction == 'buy':
-                combined[symbol]['buy_score'] += strength * weight
-            elif direction == 'sell':
-                combined[symbol]['sell_score'] += strength * weight
+            if direction == "buy":
+                combined[symbol]["buy_score"] += strength * weight
+            elif direction == "sell":
+                combined[symbol]["sell_score"] += strength * weight
 
-            combined[symbol]['sources'].append(strategy_name)
+            combined[symbol]["sources"].append(strategy_name)
 
         # Convert to PortfolioSignals
         portfolio_signals = []
         for symbol, info in combined.items():
-            buy_score = info['buy_score']
-            sell_score = info['sell_score']
+            buy_score = info["buy_score"]
+            sell_score = info["sell_score"]
 
             if buy_score > sell_score and buy_score > 0.3:
-                direction = 'buy'
+                direction = "buy"
                 strength = buy_score
             elif sell_score > buy_score and sell_score > 0.3:
-                direction = 'sell'
+                direction = "sell"
                 strength = sell_score
             else:
-                direction = 'hold'
+                direction = "hold"
                 strength = 0
 
-            portfolio_signals.append(PortfolioSignal(
-                symbol=symbol,
-                direction=direction,
-                strength=strength,
-                source_strategies=info['sources'],
-                timestamp=''
-            ))
+            portfolio_signals.append(
+                PortfolioSignal(
+                    symbol=symbol,
+                    direction=direction,
+                    strength=strength,
+                    source_strategies=info["sources"],
+                    timestamp="",
+                )
+            )
 
         return portfolio_signals
 
@@ -278,17 +280,17 @@ class PortfolioManager:
     def get_portfolio_stats(self) -> Dict:
         """Get portfolio statistics"""
         stats = {
-            'n_strategies': len(self.strategies),
-            'weights': self.state.weights,
-            'weight_method': self.weight_method.value,
-            'rebalance_frequency': self.rebalance_frequency,
-            'last_rebalance': self.state.last_rebalance
+            "n_strategies": len(self.strategies),
+            "weights": self.state.weights,
+            "weight_method": self.weight_method.value,
+            "rebalance_frequency": self.rebalance_frequency,
+            "last_rebalance": self.state.last_rebalance,
         }
 
         # Calculate strategy correlations if enough data
         if all(len(r) >= 20 for r in self.state.strategy_returns.values()):
             returns_df = pd.DataFrame(self.state.strategy_returns)
-            stats['correlation_matrix'] = returns_df.corr().to_dict()
+            stats["correlation_matrix"] = returns_df.corr().to_dict()
 
         return stats
 

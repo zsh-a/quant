@@ -15,12 +15,9 @@ from src.market_data.db import DB
 
 router = APIRouter(prefix="/market", tags=["market"])
 
+
 @router.get("/industry_breadth")
-async def get_industry_breadth(
-    start_date: str,
-    end_date: Optional[str] = None,
-    index_code: str = "000985"
-):
+async def get_industry_breadth(start_date: str, end_date: Optional[str] = None, index_code: str = "000985"):
     """
     Calculate industry market breadth over time.
     Logic follows JSG strategy: % of stocks in industry with close > MA20.
@@ -56,16 +53,14 @@ async def get_industry_breadth(
 
         # 4. Calculate MA20 and Bias
         # Ensure we have a multi-index [code, date] or sort properly
-        price_df = price_df.sort_index(level=['code', 'date'])
+        price_df = price_df.sort_index(level=["code", "date"])
 
         # Calculate MA20 per stock
-        price_df['ma20'] = price_df.groupby(level='code')['close'].transform(
-            lambda x: ta.MA(x, timeperiod=20)
-        )
+        price_df["ma20"] = price_df.groupby(level="code")["close"].transform(lambda x: ta.MA(x, timeperiod=20))
 
         # Filter back to requested range
-        price_df = price_df[price_df.index.get_level_values('date') >= pd.to_datetime(start_date)]
-        price_df['bias'] = price_df['close'] > price_df['ma20']
+        price_df = price_df[price_df.index.get_level_values("date") >= pd.to_datetime(start_date)]
+        price_df["bias"] = price_df["close"] > price_df["ma20"]
 
         # 5. Map stocks to industries
         # Use the end_date for industry classification
@@ -75,13 +70,13 @@ async def get_industry_breadth(
         # Join industry info to price_df
         # We reset index to join on 'code'
         price_df = price_df.reset_index()
-        price_df = price_df.merge(industry_mapping[['industry_name']], left_on='code', right_index=True)
+        price_df = price_df.merge(industry_mapping[["industry_name"]], left_on="code", right_index=True)
 
         # 6. Group by Date and Industry
         # Calculate mean bias (breadth)
-        breadth_df = price_df.groupby(['date', 'industry_name'])['bias'].mean().unstack(level=-1)
+        breadth_df = price_df.groupby(["date", "industry_name"])["bias"].mean().unstack(level=-1)
         breadth_df = (breadth_df * 100).round(1)
-        breadth_df = breadth_df.fillna(0) # Fill gaps
+        breadth_df = breadth_df.fillna(0)  # Fill gaps
 
         # 7. Format for Heatmap
         # ECharts heatmap usually wants [x_index, y_index, value]
@@ -94,22 +89,15 @@ async def get_industry_breadth(
                 val = breadth_df.iloc[i, j]
                 heatmap_data.append([i, j, float(val)])
 
-        return {
-            "dates": dates,
-            "industries": industries,
-            "data": heatmap_data
-        }
+        return {"dates": dates, "industries": industries, "data": heatmap_data}
 
     except Exception as e:
         logger.exception(f"Error calculating industry breadth: {e}")
         raise HTTPException(500, str(e))
 
+
 @router.get("/industry_amount")
-async def get_industry_amount(
-    start_date: str,
-    end_date: Optional[str] = None,
-    index_code: str = "000985"
-):
+async def get_industry_amount(start_date: str, end_date: Optional[str] = None, index_code: str = "000985"):
     """
     Calculate industry trading amount share over time.
     Shows the percentage of total market liquidity captured by each sector.
@@ -136,13 +124,13 @@ async def get_industry_amount(
         industry_mapping = db_client.get_stock_industry_sw(stocks, end_date)
 
         price_df = price_df.reset_index()
-        price_df = price_df.merge(industry_mapping[['industry_name']], left_on='code', right_index=True)
+        price_df = price_df.merge(industry_mapping[["industry_name"]], left_on="code", right_index=True)
 
         # Calculate daily total amount for normalization (Amount Share)
-        daily_total = price_df.groupby('date')['amount'].sum()
+        daily_total = price_df.groupby("date")["amount"].sum()
 
         # Group by Date and Industry
-        industry_amount = price_df.groupby(['date', 'industry_name'])['amount'].sum().unstack(level=-1)
+        industry_amount = price_df.groupby(["date", "industry_name"])["amount"].sum().unstack(level=-1)
 
         # Convert to Share (%)
         industry_share = industry_amount.div(daily_total, axis=0) * 100
@@ -157,11 +145,7 @@ async def get_industry_amount(
                 val = industry_share.iloc[i, j]
                 heatmap_data.append([i, j, float(val)])
 
-        return {
-            "dates": dates,
-            "industries": industries,
-            "data": heatmap_data
-        }
+        return {"dates": dates, "industries": industries, "data": heatmap_data}
 
     except Exception as e:
         logger.exception(f"Error calculating industry amount: {e}")

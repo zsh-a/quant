@@ -20,6 +20,7 @@ from pydantic import BaseModel, Field
 # Decision Models (从 ta_graph 精简迁移)
 # ---------------------------------------------------------------------------
 
+
 class BrooksSignalBar(BaseModel):
     quality_score: int = Field(ge=0, le=10)
     bar_type: Literal["strong_bull", "weak_bull", "doji", "weak_bear", "strong_bear"]
@@ -29,10 +30,15 @@ class BrooksSignalBar(BaseModel):
 
 class BrooksAnalysisResult(BaseModel):
     """VLM Brooks 分析结果。"""
+
     market_cycle: Literal[
-        "strong_bull_trend", "weak_bull_trend",
-        "strong_bear_trend", "weak_bear_trend",
-        "trading_range", "breakout_mode", "climax",
+        "strong_bull_trend",
+        "weak_bull_trend",
+        "strong_bear_trend",
+        "weak_bear_trend",
+        "trading_range",
+        "breakout_mode",
+        "climax",
     ]
     always_in_direction: Literal["long", "short", "neutral"]
     signal_bar: BrooksSignalBar
@@ -46,6 +52,7 @@ class BrooksAnalysisResult(BaseModel):
 
 class TradeDecision(BaseModel):
     """AI 交易决策。"""
+
     operation: Literal["buy", "sell", "hold"]
     symbol: str
     probability: float = 0.0
@@ -60,9 +67,11 @@ class TradeDecision(BaseModel):
 # Pipeline State
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class PipelineState:
     """管线执行状态 — 通过各节点传递。"""
+
     symbol: str = ""
     timeframe: str = "1h"
     bars: list[dict] = field(default_factory=list)
@@ -87,6 +96,7 @@ class PipelineState:
 # ---------------------------------------------------------------------------
 # Pipeline Nodes
 # ---------------------------------------------------------------------------
+
 
 def node_l0_gate(state: PipelineState) -> PipelineState:
     """L0 预处理 + 死市场过滤（零 API 成本）。"""
@@ -137,6 +147,7 @@ L0 特征摘要:
 
     try:
         from openai import OpenAI
+
         client = OpenAI(api_key=api_key, base_url=base_url or None)
         resp = client.chat.completions.create(
             model=model,
@@ -209,6 +220,7 @@ def node_strategy_decision(
 
     try:
         from openai import OpenAI
+
         client = OpenAI(api_key=api_key, base_url=base_url or None)
         resp = client.chat.completions.create(
             model=model,
@@ -260,6 +272,7 @@ def node_risk_check(state: PipelineState) -> PipelineState:
 # Pipeline Runner
 # ---------------------------------------------------------------------------
 
+
 class BrooksLLMPipeline:
     """Brooks LLM 交易管线 — 完整的分析→决策→执行流程。"""
 
@@ -287,12 +300,20 @@ class BrooksLLMPipeline:
 
         # Step 2: Brooks VLM 分析
         state = node_brooks_analyzer(
-            state, self.llm_provider, self.model, self.api_key, self.base_url,
+            state,
+            self.llm_provider,
+            self.model,
+            self.api_key,
+            self.base_url,
         )
 
         # Step 3: AI 策略决策
         state = node_strategy_decision(
-            state, self.llm_provider, self.model, self.api_key, self.base_url,
+            state,
+            self.llm_provider,
+            self.model,
+            self.api_key,
+            self.base_url,
         )
 
         # Step 4: 风险检查
@@ -345,7 +366,9 @@ _STRATEGY_SYSTEM_PROMPT = """你是量化交易策略生成器。基于 Brooks �
 def _format_bars_for_llm(bars: list[dict]) -> str:
     lines = ["idx | open | high | low | close | vol"]
     for i, b in enumerate(bars):
-        lines.append(f"{i-len(bars)+1:+d} | {b['open']:.2f} | {b['high']:.2f} | {b['low']:.2f} | {b['close']:.2f} | {b.get('volume', 0):.0f}")
+        lines.append(
+            f"{i - len(bars) + 1:+d} | {b['open']:.2f} | {b['high']:.2f} | {b['low']:.2f} | {b['close']:.2f} | {b.get('volume', 0):.0f}"
+        )
     return "\n".join(lines)
 
 
@@ -354,7 +377,9 @@ def _format_features_for_llm(features: list) -> str:
         return "无特征数据"
     lines = []
     for f in features[-5:]:
-        lines.append(f"  {f.bar_type} body={f.body_pct}% close={f.close_position} ema={f.ema_relation} inside={f.is_inside_bar} reversal={f.is_reversal_bar}")
+        lines.append(
+            f"  {f.bar_type} body={f.body_pct}% close={f.close_position} ema={f.ema_relation} inside={f.is_inside_bar} reversal={f.is_reversal_bar}"
+        )
     return "\n".join(lines)
 
 

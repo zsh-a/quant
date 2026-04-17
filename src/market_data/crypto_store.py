@@ -210,7 +210,7 @@ class CryptoMinuteBarStore:
         sql = f"""
         SELECT DISTINCT open_time
         FROM crypto_data.minute_bars
-        WHERE {' AND '.join(filters)}
+        WHERE {" AND ".join(filters)}
         ORDER BY open_time
         """
         result = self.client.query(sql)
@@ -334,7 +334,7 @@ class CryptoMinuteBarStore:
             min(open_time) AS earliest_open_time,
             max(open_time) AS latest_open_time
         FROM crypto_data.minute_bars
-        WHERE {' AND '.join(filters)}
+        WHERE {" AND ".join(filters)}
         """
         result = self.client.query(sql)
         row = result.result_rows[0] if result.result_rows else (0, None, None)

@@ -94,7 +94,7 @@ def index_stock_cons(symbol: str = "399639") -> pd.DataFrame:
         temp_df = pd.read_html(StringIO(r.text), header=0, skiprows=1)[3].iloc[:, :3]
         temp_df["品种代码"] = temp_df["品种代码"].astype(str).str.zfill(6)
         return temp_df
-    
+
     print(page_num)
 
     temp_df = pd.DataFrame()

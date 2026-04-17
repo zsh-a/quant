@@ -9,12 +9,12 @@ from src.market_data.processors.baostock import BaoStockProcessor
 from src.market_data.processors.tdx import TDXProcess
 
 INDEX_LIST = [
-    "000300",   # 沪深300
-    "000905",   # 中证500
-    "000852",   # 中证1000
-    "000985",   # 中证全指
-    "399673",   # 创业板50
-    "399101",   # 中证小盘
+    "000300",  # 沪深300
+    "000905",  # 中证500
+    "000852",  # 中证1000
+    "000985",  # 中证全指
+    "399673",  # 创业板50
+    "399101",  # 中证小盘
 ]
 
 DEFAULT_SHARE_START_DATE = "20250101"
@@ -64,40 +64,30 @@ def update_kline_daily(progress_callback: Optional[Callable[[Dict[str, object]],
     return {"message": "daily kline updated"}
 
 
-def update_trade_dates(
-    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
-) -> Dict:
+def update_trade_dates(progress_callback: Optional[Callable[[Dict[str, object]], None]] = None) -> Dict:
     proc = BaoStockProcessor()
     return proc.update_trade_dates()
 
 
-def update_all_stock(
-    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
-) -> Dict:
+def update_all_stock(progress_callback: Optional[Callable[[Dict[str, object]], None]] = None) -> Dict:
     proc = BaoStockProcessor()
     return proc.update_all_stock()
 
 
-def update_index_stocks_weekly(
-    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
-) -> Dict:
+def update_index_stocks_weekly(progress_callback: Optional[Callable[[Dict[str, object]], None]] = None) -> Dict:
     proc = AKDataProcessor()
     for index in INDEX_LIST:
         proc.insert_index_stocks(index)
     return {"updated_indexes": INDEX_LIST}
 
 
-def update_industry_weekly(
-    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
-) -> Dict:
+def update_industry_weekly(progress_callback: Optional[Callable[[Dict[str, object]], None]] = None) -> Dict:
     proc = AKDataProcessor()
     proc.insert_sw_industry()
     return {"message": "industry mapping updated"}
 
 
-def update_financial(
-    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
-) -> Dict:
+def update_financial(progress_callback: Optional[Callable[[Dict[str, object]], None]] = None) -> Dict:
     proc = TDXProcess()
     proc.update_fincial_db()
     return {"message": "financial data updated"}
@@ -112,11 +102,10 @@ def update_share_info(
     return {"start_date": start_date, "message": "share info updated"}
 
 
-def update_etf_kline(
-    progress_callback: Optional[Callable[[Dict[str, object]], None]] = None
-) -> Dict:
+def update_etf_kline(progress_callback: Optional[Callable[[Dict[str, object]], None]] = None) -> Dict:
     proc = AKDataProcessor()
     from src.market_data.static_data import get_etf_codes
+
     all_etfs = get_etf_codes()
     total = len(all_etfs)
     updated = 0
@@ -208,9 +197,7 @@ UPDATE_STEP_BUILDERS: Dict[str, Callable[..., Dict]] = {
     item["key"]: item["builder"] for item in UPDATE_STEP_DEFINITIONS
 }
 
-DEFAULT_UPDATE_STEPS = [
-    item["key"] for item in UPDATE_STEP_DEFINITIONS if item["default_selected"]
-]
+DEFAULT_UPDATE_STEPS = [item["key"] for item in UPDATE_STEP_DEFINITIONS if item["default_selected"]]
 
 
 def get_update_step_capabilities() -> Dict[str, List[Dict[str, object]]]:
@@ -252,9 +239,7 @@ def run_data_update_pipeline(
         step_label = step_label_map.get(step_name, step_name)
         if func is None:
             errors.append({"step": step_name, "error": "unknown step"})
-            results.append(
-                {"step": step_name, "status": "error", "error": "unknown step"}
-            )
+            results.append({"step": step_name, "status": "error", "error": "unknown step"})
             emit_progress(
                 {
                     "event": "step_failed",

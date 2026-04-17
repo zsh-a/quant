@@ -16,6 +16,7 @@ from src.core.risk_manager import RiskManager
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _bar(symbol: str, ts: str, open_: float, high: float, low: float, close: float, volume: float = 1000) -> Bar:
     return Bar(
         symbol=symbol,
@@ -79,6 +80,7 @@ class SellStrategy(Strategy):
 # ---------------------------------------------------------------------------
 # BacktestBroker tests
 # ---------------------------------------------------------------------------
+
 
 class TestBacktestBroker:
     def test_initial_state(self):
@@ -228,6 +230,7 @@ class TestBacktestBroker:
 # TradingEngine tests
 # ---------------------------------------------------------------------------
 
+
 class TestTradingEngine:
     def test_engine_runs_to_completion(self):
         bars_list = [
@@ -277,10 +280,7 @@ class TestTradingEngine:
         assert len(steps) == 2
 
     def test_engine_stop(self):
-        bars_list = [
-            {"SH.600000": _bar("SH.600000", f"2024-01-{d:02d}", 10.0, 11.0, 9.5, 10.5)}
-            for d in range(2, 20)
-        ]
+        bars_list = [{"SH.600000": _bar("SH.600000", f"2024-01-{d:02d}", 10.0, 11.0, 9.5, 10.5)} for d in range(2, 20)]
 
         class StopAfterThree(Strategy):
             def __init__(self):
@@ -364,6 +364,7 @@ class TestTradingEngine:
 # Short selling & stop order tests
 # ---------------------------------------------------------------------------
 
+
 class TestAdvancedOrders:
     def test_short_sell_disabled_by_default(self):
         broker = BacktestBroker(initial_cash=100_000, commission=0.0, slippage=0.0)
@@ -427,13 +428,16 @@ class TestAdvancedOrders:
 # Validators tests
 # ---------------------------------------------------------------------------
 
+
 class TestValidators:
     def test_date_str_valid(self):
         from src.api.validators import _validate_date
+
         assert _validate_date("2024-01-15") == "2024-01-15"
 
     def test_date_str_invalid(self):
         from src.api.validators import _validate_date
+
         with pytest.raises(ValueError):
             _validate_date("01-15-2024")
         with pytest.raises(ValueError):
@@ -443,22 +447,26 @@ class TestValidators:
 
     def test_symbol_valid(self):
         from src.api.validators import _validate_symbol
+
         assert _validate_symbol("sh.600000") == "sh.600000"
         assert _validate_symbol("BTCUSDT") == "BTCUSDT"
 
     def test_symbol_invalid(self):
         from src.api.validators import _validate_symbol
+
         with pytest.raises(ValueError):
             _validate_symbol("'; DROP TABLE --")
 
     def test_mode_valid(self):
         from src.api.validators import _validate_mode
+
         assert _validate_mode("backtest") == "backtest"
         assert _validate_mode("simulation") == "simulation"
         assert _validate_mode("live") == "live"
 
     def test_mode_invalid(self):
         from src.api.validators import _validate_mode
+
         with pytest.raises(ValueError):
             _validate_mode("invalid")
 
@@ -467,13 +475,16 @@ class TestValidators:
 # Auth module tests
 # ---------------------------------------------------------------------------
 
+
 class TestAuth:
     def test_create_and_verify_token(self):
         from src.api.auth import _create_access_token, _verify_token
+
         token = _create_access_token("testuser")
         assert _verify_token(token) == "testuser"
 
     def test_invalid_token_raises(self):
         from src.api.auth import _verify_token
+
         with pytest.raises(Exception):
             _verify_token("invalid.token.here")

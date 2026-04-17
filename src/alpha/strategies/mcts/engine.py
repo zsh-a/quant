@@ -59,10 +59,18 @@ class AlphaNode:
     """
 
     __slots__ = (
-        "formula", "parent", "children", "c_puct",
-        "visits", "eval_scores", "alpha_score",
-        "name", "description", "metrics",
-        "refinement_history", "_child_q_values",
+        "formula",
+        "parent",
+        "children",
+        "c_puct",
+        "visits",
+        "eval_scores",
+        "alpha_score",
+        "name",
+        "description",
+        "metrics",
+        "refinement_history",
+        "_child_q_values",
     )
 
     def __init__(
@@ -167,10 +175,7 @@ class AlphaNode:
         return self.alpha_score
 
     def __repr__(self) -> str:
-        return (
-            f"<AlphaNode {self.formula[:30]}... "
-            f"S={self.alpha_score:.2f} N={self.visits}>"
-        )
+        return f"<AlphaNode {self.formula[:30]}... S={self.alpha_score:.2f} N={self.visits}>"
 
 
 # ---------------------------------------------------------------------------
@@ -263,11 +268,7 @@ def compute_forbidden_subtrees(
 
     n = len(zoo_formulas)
     # Filter by minimum support
-    frequent = [
-        (gene, count)
-        for gene, count in gene_counter.most_common()
-        if count / n >= min_support
-    ]
+    frequent = [(gene, count) for gene, count in gene_counter.most_common() if count / n >= min_support]
 
     # Take top-k
     return [gene for gene, _ in frequent[:top_k]]
@@ -325,10 +326,7 @@ def compute_multi_dim_scores(
     # a degenerate signal (constant ranking).  Clamp to a minimum so that
     # degenerate signals don't get a perfect score.
     _MIN_HEALTHY_TURNOVER = 0.005
-    zoo_turnovers = [
-        m.get("turnover_proxy", m.get("avg_turnover", 0.5))
-        for m in zoo_metrics
-    ]
+    zoo_turnovers = [m.get("turnover_proxy", m.get("avg_turnover", 0.5)) for m in zoo_metrics]
     if turnover < _MIN_HEALTHY_TURNOVER:
         # Degenerate: signal barely changes → cap at half-score
         scores["turnover"] = E_MAX * 0.5
@@ -445,7 +443,8 @@ class MCTSEngine:
         val_ds = dataset.take_indices(list(range(train_end, val_end)))
 
         with tracer.start_span(
-            "mcts_paper_search", kind="search",
+            "mcts_paper_search",
+            kind="search",
             dataset_shape=dataset.shape(),
             zoo_threshold=self.zoo_threshold,
             initial_budget=self.initial_budget,
@@ -482,7 +481,8 @@ class MCTSEngine:
             # --- Main loop (lines 8-39) ---
             while search_count < budget:
                 with tracer.start_span(
-                    "mcts_iteration", kind="mcts",
+                    "mcts_iteration",
+                    kind="mcts",
                     iteration=search_count + 1,
                     budget=budget,
                 ) as iter_span:
@@ -500,7 +500,8 @@ class MCTSEngine:
                     # Multi-dimensional evaluation (lines 20-21)
                     child_metrics = child.metrics
                     child_metrics["max_zoo_corr"] = self._compute_max_zoo_corr(
-                        child.formula, dataset,
+                        child.formula,
+                        dataset,
                     )
                     zoo_metrics = [n.metrics for n in self.alpha_zoo]
                     overfitting_score = self.llm.assess_overfitting_risk(
@@ -508,7 +509,9 @@ class MCTSEngine:
                         child.build_refinement_history(),
                     )
                     child.eval_scores = compute_multi_dim_scores(
-                        child_metrics, zoo_metrics, overfitting_score,
+                        child_metrics,
+                        zoo_metrics,
+                        overfitting_score,
                     )
                     child.alpha_score = aggregate_score(child.eval_scores)
 
@@ -522,9 +525,7 @@ class MCTSEngine:
                     iter_span.set("child_formula", child.formula[:60])
                     iter_span.set("child_score", round(child.alpha_score, 3))
                     iter_span.set("child_rank_ic", round(child_metrics.get("rank_ic", 0), 5))
-                    iter_span.set("eval_scores", {
-                        k: round(v, 2) for k, v in child.eval_scores.items()
-                    })
+                    iter_span.set("eval_scores", {k: round(v, 2) for k, v in child.eval_scores.items()})
 
                     # Log detailed child info for diagnostics
                     logger.info(
@@ -534,8 +535,7 @@ class MCTSEngine:
                         child.formula[:60],
                         child_metrics.get("rank_ic", 0),
                         child_metrics.get("ic_ir", 0),
-                        child_metrics.get("turnover_proxy",
-                                          child_metrics.get("avg_turnover", 0)),
+                        child_metrics.get("turnover_proxy", child_metrics.get("avg_turnover", 0)),
                         child.eval_scores.get("effectiveness", 0),
                         child.eval_scores.get("stability", 0),
                         child.eval_scores.get("turnover", 0),
@@ -560,13 +560,11 @@ class MCTSEngine:
                         )
                     else:
                         logger.debug(
-                            "mcts.zoo_reject formula={} rank_ic={:.4f} "
-                            "ic_ir={:.3f} turnover={:.3f}",
+                            "mcts.zoo_reject formula={} rank_ic={:.4f} ic_ir={:.3f} turnover={:.3f}",
                             child.formula[:40],
                             abs(child_metrics.get("rank_ic", 0)),
                             abs(child_metrics.get("ic_ir", 0)),
-                            child_metrics.get("turnover_proxy",
-                                              child_metrics.get("avg_turnover", 0)),
+                            child_metrics.get("turnover_proxy", child_metrics.get("avg_turnover", 0)),
                         )
 
                     # Dynamic budget (lines 35-38)
@@ -781,7 +779,8 @@ class MCTSEngine:
         exemplars = self._select_exemplars(node, target_dim)
 
         with tracer.start_span(
-            "mcts_expand", kind="breed",
+            "mcts_expand",
+            kind="breed",
             parent_formula=node.formula[:60],
             parent_score=round(node.alpha_score, 3),
             target_dimension=target_dim,
@@ -817,18 +816,21 @@ class MCTSEngine:
                 child.metrics = metrics
 
                 # Build refinement history entry
-                score_change = {
-                    dim: child.eval_scores.get(dim, 0) - node.eval_scores.get(dim, 0)
-                    for dim in EVAL_DIMENSIONS
-                } if node.eval_scores else {}
+                score_change = (
+                    {dim: child.eval_scores.get(dim, 0) - node.eval_scores.get(dim, 0) for dim in EVAL_DIMENSIONS}
+                    if node.eval_scores
+                    else {}
+                )
 
-                child.refinement_history = [{
-                    "parent_formula": node.formula,
-                    "child_formula": new_formula,
-                    "dimension": target_dim,
-                    "suggestion": suggestion[:200] if suggestion else "",
-                    "score_change": score_change,
-                }]
+                child.refinement_history = [
+                    {
+                        "parent_formula": node.formula,
+                        "child_formula": new_formula,
+                        "dimension": target_dim,
+                        "suggestion": suggestion[:200] if suggestion else "",
+                        "score_change": score_change,
+                    }
+                ]
 
                 if suggestion:
                     child.name = suggestion.split("\n")[0][:60]
@@ -885,10 +887,7 @@ class MCTSEngine:
                 {
                     "formula": c.formula[:60],
                     "score": round(c.alpha_score, 2),
-                    "dimension": (
-                        c.refinement_history[-1]["dimension"]
-                        if c.refinement_history else "unknown"
-                    ),
+                    "dimension": (c.refinement_history[-1]["dimension"] if c.refinement_history else "unknown"),
                 }
                 for c in node.parent.children
                 if c is not node
@@ -1061,7 +1060,8 @@ class MCTSEngine:
 
         # Turnover constraint (Section G: daily turnover <= 1.6)
         turnover = node.metrics.get(
-            "turnover_proxy", node.metrics.get("avg_turnover", 0.5),
+            "turnover_proxy",
+            node.metrics.get("avg_turnover", 0.5),
         )
         if turnover > 1.6:
             return False
@@ -1089,6 +1089,7 @@ class MCTSEngine:
     def _add_to_zoo(self, node: AlphaNode, dataset: AlphaDataset) -> None:
         """Add a node to the alpha zoo with diversity check (correlation < 0.8)."""
         from ...core.vm import to_numpy
+
         try:
             program = self.compiler.compile(node.formula, self.schema)
             store = self._prepare_store(dataset)
@@ -1114,7 +1115,9 @@ class MCTSEngine:
             self.alpha_zoo.append(node)
             logger.info(
                 "mcts.zoo_add formula={} score={:.3f} zoo_size={}",
-                node.formula[:50], node.alpha_score, len(self.alpha_zoo),
+                node.formula[:50],
+                node.alpha_score,
+                len(self.alpha_zoo),
             )
         except Exception as e:
             logger.warning("Zoo deduplication check failed: {}, adding anyway", e)
@@ -1127,6 +1130,7 @@ class MCTSEngine:
 
         try:
             from ...core.vm import to_numpy
+
             program = self.compiler.compile(formula, self.schema)
             store = self._prepare_store(dataset)
             factor_values = to_numpy(self.vm.run(program, store))
@@ -1140,7 +1144,8 @@ class MCTSEngine:
                     min_len = min(len(factor_flat), len(existing_flat))
                     if min_len > 100:
                         corr = np.corrcoef(
-                            factor_flat[:min_len], existing_flat[:min_len],
+                            factor_flat[:min_len],
+                            existing_flat[:min_len],
                         )[0, 1]
                         max_corr = max(max_corr, abs(float(corr)) if not np.isnan(corr) else 0.0)
             return max_corr
@@ -1176,6 +1181,7 @@ class MCTSEngine:
             return self.evaluator.eval_metrics(formula, fwd_windows=[1, 5, 10])
         try:
             from ...core.vm import to_numpy
+
             program = self.compiler.compile(formula, self.schema)
             store = self._prepare_store(dataset)
             alpha_np = to_numpy(self.vm.run(program, store))
@@ -1240,20 +1246,20 @@ Control: where(cond,x,y), clip(x,lo,hi), fillna(x,val), max(x,y), min(x,y)"""
 
 _DIMENSION_DESCRIPTIONS = {
     "effectiveness": "Effectiveness measures the alpha's core predictive power (RankIC). "
-        "Improve by incorporating stronger signals, better feature interactions, or "
-        "more informative transformations.",
+    "Improve by incorporating stronger signals, better feature interactions, or "
+    "more informative transformations.",
     "stability": "Stability assesses the consistency of predictive performance over time (IC IR). "
-        "Improve by using smoothing (moving averages), longer windows, or noise-resistant "
-        "transformations like z-score normalization.",
+    "Improve by using smoothing (moving averages), longer windows, or noise-resistant "
+    "transformations like z-score normalization.",
     "turnover": "Turnover evaluates the trading cost. Lower turnover means less frequent "
-        "rebalancing. Improve by using slower-moving indicators, longer lookback windows, "
-        "or applying smoothing operators.",
+    "rebalancing. Improve by using slower-moving indicators, longer lookback windows, "
+    "or applying smoothing operators.",
     "diversity": "Diversity quantifies novelty relative to the existing alpha repository. "
-        "Improve by exploring different feature combinations, using uncommon operators, "
-        "or capturing different market phenomena.",
+    "Improve by exploring different feature combinations, using uncommon operators, "
+    "or capturing different market phenomena.",
     "overfitting": "Overfitting Risk assesses whether the formula is overly complex or "
-        "tailored to training data. Improve by simplifying the expression, using "
-        "well-motivated financial intuition, and avoiding excessive parameter tuning.",
+    "tailored to training data. Improve by simplifying the expression, using "
+    "well-motivated financial intuition, and avoiding excessive parameter tuning.",
 }
 
 
@@ -1336,7 +1342,7 @@ class MCTSLLMAdapter:
             steps = []
             for i, h in enumerate(history[-5:]):
                 steps.append(
-                    f"  Step {i+1}: {h.get('parent_formula', '?')[:40]} -> "
+                    f"  Step {i + 1}: {h.get('parent_formula', '?')[:40]} -> "
                     f"{h.get('child_formula', '?')[:40]} "
                     f"[{h.get('dimension', '?')}]"
                 )
@@ -1346,8 +1352,7 @@ class MCTSLLMAdapter:
         siblings = context.get("siblings", [])
         if siblings:
             sib_lines = [
-                f"  - {s['formula']} (score={s['score']}, dim={s.get('dimension', '?')})"
-                for s in siblings[:3]
+                f"  - {s['formula']} (score={s['score']}, dim={s.get('dimension', '?')})" for s in siblings[:3]
             ]
             siblings_text = "Sibling attempts (avoid similar formulas):\n" + "\n".join(sib_lines)
 
@@ -1355,21 +1360,14 @@ class MCTSLLMAdapter:
         if exemplars:
             ex_lines = []
             for ex in exemplars:
-                ex_lines.append(
-                    f"  Formula: {ex['formula']}\n"
-                    f"  Metrics: {ex.get('metrics', {})}"
-                )
-            exemplar_text = (
-                f"Reference alphas with high {target_dimension} scores:\n"
-                + "\n".join(ex_lines)
-            )
+                ex_lines.append(f"  Formula: {ex['formula']}\n  Metrics: {ex.get('metrics', {})}")
+            exemplar_text = f"Reference alphas with high {target_dimension} scores:\n" + "\n".join(ex_lines)
 
         fsa_text = ""
         if forbidden_subtrees:
             fsa_text = (
                 "IMPORTANT: When designing the formula, try to AVOID including "
-                "the following frequent sub-expressions:\n"
-                + "\n".join(f"  - {s}" for s in forbidden_subtrees)
+                "the following frequent sub-expressions:\n" + "\n".join(f"  - {s}" for s in forbidden_subtrees)
             )
 
         # ---------------------------------------------------------------
@@ -1421,8 +1419,7 @@ Output ONLY the JSON, no markdown fences or extra text."""
         error_text = ""
         if error_feedback:
             error_text = (
-                f"\nPrevious attempt failed with error: {error_feedback}\n"
-                "Fix the error and generate a valid formula."
+                f"\nPrevious attempt failed with error: {error_feedback}\nFix the error and generate a valid formula."
             )
 
         formula_prompt = f"""\
@@ -1469,7 +1466,7 @@ Output ONLY the JSON, no markdown fences or extra text."""
 
         if not formula:
             # Fallback: try to extract any formula-like expression
-            match = re.search(r'[a-z_]+\([^)]*\)', raw_formula)
+            match = re.search(r"[a-z_]+\([^)]*\)", raw_formula)
             if match:
                 formula = match.group(0)
 
@@ -1519,7 +1516,7 @@ Output ONLY the JSON, no markdown fences or extra text."""
             steps = []
             for i, h in enumerate(refinement_history[-5:]):
                 steps.append(
-                    f"Step {i+1}: {h.get('parent_formula', '?')[:50]} -> "
+                    f"Step {i + 1}: {h.get('parent_formula', '?')[:50]} -> "
                     f"{h.get('child_formula', '?')[:50]} "
                     f"[dimension: {h.get('dimension', '?')}]"
                 )
@@ -1571,4 +1568,3 @@ Output ONLY valid JSON:
             if match:
                 return max(0, min(E_MAX, int(match.group(1))))
             return 5.0  # neutral default
-

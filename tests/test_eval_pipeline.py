@@ -22,12 +22,12 @@ from src.alpha.risk.models import (
 #         S0     S1     S2     S3
 CLOSE = np.array(
     [
-        [10.0,  20.0,  30.0,  40.0],  # t0
-        [11.0,  19.0,  33.0,  38.0],  # t1  涨10% 跌5% 涨10% 跌5%
-        [11.0,  19.0,  33.0,  38.0],  # t2  平
-        [12.1,  17.1,  36.3,  34.2],  # t3  涨10% 跌10% 涨10% 跌10%
-        [12.1,  17.1,  36.3,  34.2],  # t4  平
-        [13.31, 15.39, 39.93, 30.78], # t5  涨10% 跌10% 涨10% 跌10%
+        [10.0, 20.0, 30.0, 40.0],  # t0
+        [11.0, 19.0, 33.0, 38.0],  # t1  涨10% 跌5% 涨10% 跌5%
+        [11.0, 19.0, 33.0, 38.0],  # t2  平
+        [12.1, 17.1, 36.3, 34.2],  # t3  涨10% 跌10% 涨10% 跌10%
+        [12.1, 17.1, 36.3, 34.2],  # t4  平
+        [13.31, 15.39, 39.93, 30.78],  # t5  涨10% 跌10% 涨10% 跌10%
     ],
     dtype=np.float32,
 )
@@ -192,7 +192,8 @@ class TestICMetrics:
         """alpha 完全预测未来收益方向 → IC ≈ 1"""
         # alpha 和 forward_return 完美正相关
         alpha = np.array(
-            [[1.0, 2.0, 3.0, 4.0]] * 20, dtype=np.float64,
+            [[1.0, 2.0, 3.0, 4.0]] * 20,
+            dtype=np.float64,
         )
         # 构造 close 使得高 alpha 的股票涨、低 alpha 的跌
         close = np.ones((21, 4), dtype=np.float64) * 100
@@ -247,11 +248,17 @@ class TestEndToEnd:
         close = np.cumprod(1 + rng.standard_normal((T, S)) * 0.02, axis=0).astype(np.float32) * 100
         alpha = rng.standard_normal((T, S)).astype(np.float32)
 
-        fields = {"close": close, "open": close, "high": close * 1.01, "low": close * 0.99, "volume": np.ones_like(close)}
+        fields = {
+            "close": close,
+            "open": close,
+            "high": close * 1.01,
+            "low": close * 0.99,
+            "volume": np.ones_like(close),
+        }
         AlphaDataset(
             interval="1d",
             symbols=[f"S{i}" for i in range(S)],
-            timestamps=[f"2025-01-{d+1:02d}" for d in range(T)],
+            timestamps=[f"2025-01-{d + 1:02d}" for d in range(T)],
             fields=fields,
             liquidity_mask=np.ones((T, S), dtype=bool),
             session_mask=np.ones((T, S), dtype=bool),

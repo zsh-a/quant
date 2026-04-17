@@ -48,6 +48,7 @@ def _ensure_table(conn: sqlite3.Connection):
 # Public API
 # ---------------------------------------------------------------------------
 
+
 def save_portfolio(portfolio_id: str, name: str, config: dict[str, Any]):
     conn = _get_conn()
     _ensure_table(conn)
@@ -92,8 +93,7 @@ def save_backtest_result(portfolio_id: str, result: dict[str, Any]):
     conn = _get_conn()
     _ensure_table(conn)
     conn.execute(
-        "INSERT OR REPLACE INTO portfolio_backtest_results (portfolio_id, result_json) "
-        "VALUES (?, ?)",
+        "INSERT OR REPLACE INTO portfolio_backtest_results (portfolio_id, result_json) VALUES (?, ?)",
         (portfolio_id, json.dumps(result, ensure_ascii=False, default=str)),
     )
     conn.commit()

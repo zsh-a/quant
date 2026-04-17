@@ -174,7 +174,8 @@ class AlphaForgeStrategy(BaseStrategy):
             f"G_loss={self._stats['g_loss']:.4f}"
         )
         return self.compile_and_dedup(
-            ctx, formulas,
+            ctx,
+            formulas,
             lineage_fn=lambda _f: Lineage(origin="alpha_forge"),
             limit=self.top_k,
         )
@@ -212,22 +213,20 @@ class AlphaForgeStrategy(BaseStrategy):
                 self._ic_lib.append(abs(ic))
                 self._stats["valid"] += 1
 
-    def _find_tokens_for(
-        self, formula: str, parsed: list[tuple[str, torch.Tensor]]
-    ) -> torch.Tensor | None:
+    def _find_tokens_for(self, formula: str, parsed: list[tuple[str, torch.Tensor]]) -> torch.Tensor | None:
         for f, tids in parsed:
             if f == formula:
                 return tids
         return None
 
-    def _decode_with_mask(
-        self, all_logits: torch.Tensor
-    ) -> list[tuple[str, torch.Tensor]]:
+    def _decode_with_mask(self, all_logits: torch.Tensor) -> list[tuple[str, torch.Tensor]]:
         """自回归解码 + 动作掩码, 使用 Generator 的位置级 logit 作为先验."""
         B = all_logits.shape[0]
         token_ids = torch.full(
-            (B, self.max_len), self.vocab.bos_id,
-            dtype=torch.long, device=self.device,
+            (B, self.max_len),
+            self.vocab.bos_id,
+            dtype=torch.long,
+            device=self.device,
         )
         stack_depths = torch.zeros(B, dtype=torch.long, device=self.device)
         arity_t = self.vocab.arity_tensor.to(self.device)
@@ -236,7 +235,11 @@ class AlphaForgeStrategy(BaseStrategy):
         for step in range(self.max_len):
             logits = all_logits[:, step, :]
             mask = compute_action_mask_batch(
-                stack_depths, step, self.max_len, self.vocab, self.device,
+                stack_depths,
+                step,
+                self.max_len,
+                self.vocab,
+                self.device,
             )
             logits = logits + mask
             selected = logits.argmax(dim=-1)
@@ -245,7 +248,9 @@ class AlphaForgeStrategy(BaseStrategy):
             sel_arity = arity_t[selected]
             sel_is_op = is_op_t[selected]
             stack_depths = torch.where(
-                sel_is_op, stack_depths - sel_arity + 1, stack_depths + 1,
+                sel_is_op,
+                stack_depths - sel_arity + 1,
+                stack_depths + 1,
             )
 
         results: list[tuple[str, torch.Tensor]] = []
@@ -290,10 +295,16 @@ class AlphaForgeStrategy(BaseStrategy):
             z2 = torch.randn(self.gen_batch, self.z_dim, device=self.device)
 
             soft1 = F.gumbel_softmax(
-                self.generator(z1), tau=self.gumbel_tau, hard=True, dim=-1,
+                self.generator(z1),
+                tau=self.gumbel_tau,
+                hard=True,
+                dim=-1,
             )
             soft2 = F.gumbel_softmax(
-                self.generator(z2), tau=self.gumbel_tau, hard=True, dim=-1,
+                self.generator(z2),
+                tau=self.gumbel_tau,
+                hard=True,
+                dim=-1,
             )
 
             # 适应性损失: 最大化代理模型预测
@@ -301,7 +312,9 @@ class AlphaForgeStrategy(BaseStrategy):
 
             # 多样性损失: 惩罚两组采样的相似度 (Eq. 4 in paper)
             cos_sim = F.cosine_similarity(
-                soft1.flatten(1), soft2.flatten(1), dim=-1,
+                soft1.flatten(1),
+                soft2.flatten(1),
+                dim=-1,
             )
             diversity_loss = cos_sim.mean()
 

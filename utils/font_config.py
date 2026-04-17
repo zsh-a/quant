@@ -18,10 +18,10 @@ def configure_matplotlib_fonts():
     """
     # Suppress font warnings
     warnings.filterwarnings('ignore', category=UserWarning, module='matplotlib')
-    
+
     # Try to find available Chinese fonts
     chinese_fonts = find_chinese_fonts()
-    
+
     if chinese_fonts:
         # Use the first available Chinese font
         matplotlib.rcParams['font.sans-serif'] = [chinese_fonts[0]] + matplotlib.rcParams['font.sans-serif']
@@ -30,10 +30,10 @@ def configure_matplotlib_fonts():
         # Fallback to DejaVu Sans and use English labels
         matplotlib.rcParams['font.sans-serif'] = ['DejaVu Sans']
         print("No Chinese fonts found, using English labels")
-    
+
     # Handle minus sign display
     matplotlib.rcParams['axes.unicode_minus'] = False
-    
+
     # Clear font cache
     fm._rebuild()
 
@@ -41,29 +41,29 @@ def configure_matplotlib_fonts():
 def find_chinese_fonts():
     """
     Find available Chinese fonts on the system
-    
+
     Returns:
         list: List of available Chinese font names
     """
     chinese_fonts = []
-    
+
     # Common Chinese font names to look for
     chinese_font_patterns = [
         'SimHei', 'SimSun', 'Microsoft YaHei', 'WenQuanYi',
         'Noto Sans CJK', 'Source Han Sans', 'Droid Sans Fallback',
         'AR PL UMing', 'AR PL UKai', 'WenQuanYi Micro Hei'
     ]
-    
+
     # Get all available fonts
     available_fonts = [f.name for f in fm.fontManager.ttflist]
-    
+
     # Check for Chinese fonts
     for pattern in chinese_font_patterns:
         for font in available_fonts:
             if pattern.lower() in font.lower():
                 chinese_fonts.append(font)
                 break
-    
+
     return list(set(chinese_fonts))  # Remove duplicates
 
 
@@ -72,7 +72,7 @@ def install_chinese_fonts():
     Install Chinese fonts on the system (requires sudo privileges)
     """
     print("Attempting to install Chinese fonts...")
-    
+
     # Detect the operating system
     if sys.platform.startswith('linux'):
         install_linux_chinese_fonts()
@@ -97,8 +97,8 @@ def install_linux_chinese_fonts():
                 'sudo', 'apt', 'update'
             ], check=True)
             subprocess.run([
-                'sudo', 'apt', 'install', '-y', 
-                'fonts-wqy-microhei', 'fonts-wqy-zenhei', 
+                'sudo', 'apt', 'install', '-y',
+                'fonts-wqy-microhei', 'fonts-wqy-zenhei',
                 'fonts-noto-cjk', 'fonts-arphic-uming'
             ], check=True)
         elif subprocess.run(['which', 'yum'], capture_output=True).returncode == 0:
@@ -116,11 +116,11 @@ def install_linux_chinese_fonts():
         else:
             print("Could not detect package manager. Please install Chinese fonts manually.")
             return False
-            
+
         print("Chinese fonts installed successfully!")
         print("Please restart your Python session for changes to take effect.")
         return True
-        
+
     except subprocess.CalledProcessError as e:
         print(f"Failed to install Chinese fonts: {e}")
         return False
@@ -155,11 +155,11 @@ def test_chinese_display():
     Test if Chinese characters can be displayed properly
     """
     configure_matplotlib_fonts()
-    
+
     # Create a simple test plot
     plt.figure(figsize=(8, 6))
     plt.plot([1, 2, 3, 4], [1, 4, 2, 3])
-    
+
     # Try to use Chinese characters
     try:
         plt.title('测试中文显示 - Test Chinese Display')
@@ -172,16 +172,16 @@ def test_chinese_display():
         plt.xlabel('X Axis')
         plt.ylabel('Y Axis')
         chinese_support = False
-    
+
     plt.grid(True, alpha=0.3)
     plt.savefig('font_test.png', dpi=150, bbox_inches='tight')
     plt.close()
-    
+
     if chinese_support:
         print("Chinese font test completed. Check 'font_test.png' for results.")
     else:
         print("Chinese fonts not available, using English fallback.")
-    
+
     return chinese_support
 
 
@@ -191,30 +191,30 @@ def main():
     """
     print("Matplotlib Chinese Font Configuration Utility")
     print("=" * 50)
-    
+
     # Check current font status
     chinese_fonts = find_chinese_fonts()
     print(f"Available Chinese fonts: {chinese_fonts if chinese_fonts else 'None'}")
-    
+
     if not chinese_fonts:
         print("\nNo Chinese fonts detected.")
         choice = input("Would you like to install Chinese fonts? (y/n): ").lower().strip()
-        
+
         if choice == 'y':
             success = install_chinese_fonts()
             if success:
                 # Re-check after installation
                 chinese_fonts = find_chinese_fonts()
-    
+
     # Configure matplotlib
     configure_matplotlib_fonts()
-    
+
     # Test display
     print("\nTesting font display...")
     test_chinese_display()
-    
+
     print("\nFont configuration completed!")
 
 
 if __name__ == "__main__":
-    main() 
+    main()

@@ -35,18 +35,36 @@ class TensorSchema:
             fields=frozenset(
                 {
                     # Core OHLCV
-                    "open", "high", "low", "close", "volume",
-                    "turnover", "vwap", "bid_ask_spread",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "turnover",
+                    "vwap",
+                    "bid_ask_spread",
                     # Volume details
-                    "trade_count", "taker_buy_volume", "taker_buy_quote_volume",
+                    "trade_count",
+                    "taker_buy_volume",
+                    "taker_buy_quote_volume",
                     # Mark price (fair value)
-                    "mark_open", "mark_high", "mark_low", "mark_close",
+                    "mark_open",
+                    "mark_high",
+                    "mark_low",
+                    "mark_close",
                     # Premium index (futures–spot basis)
-                    "premium_open", "premium_high", "premium_low", "premium_close",
+                    "premium_open",
+                    "premium_high",
+                    "premium_low",
+                    "premium_close",
                     # Market metrics
-                    "funding_rate", "open_interest", "open_interest_value",
-                    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
-                    "long_short_ratio", "taker_long_short_vol_ratio",
+                    "funding_rate",
+                    "open_interest",
+                    "open_interest_value",
+                    "top_trader_long_short_ratio",
+                    "top_trader_long_short_position_ratio",
+                    "long_short_ratio",
+                    "taker_long_short_vol_ratio",
                 }
             ),
             masks=frozenset({"liquidity_mask", "session_mask"}),
@@ -58,12 +76,22 @@ class TensorSchema:
             fields=frozenset(
                 {
                     # Core OHLCV
-                    "open", "high", "low", "close", "volume",
-                    "amount", "turnover", "vwap",
+                    "open",
+                    "high",
+                    "low",
+                    "close",
+                    "volume",
+                    "amount",
+                    "turnover",
+                    "vwap",
                     # A-share specific
-                    "preclose", "turn", "pctChg",
-                    "peTTM", "pbMRQ",
-                    "adjfactor", "isST",
+                    "preclose",
+                    "turn",
+                    "pctChg",
+                    "peTTM",
+                    "pbMRQ",
+                    "adjfactor",
+                    "isST",
                 }
             ),
             masks=frozenset({"liquidity_mask", "session_mask"}),
@@ -135,7 +163,9 @@ class FormulaParser:
             }.get(type(node.ops[0]))
             if not opcode:
                 raise ValueError(f"Unsupported comparison operator: {type(node.ops[0]).__name__}")
-            return ASTNode(kind="call", value=opcode, children=[self._convert(node.left), self._convert(node.comparators[0])])
+            return ASTNode(
+                kind="call", value=opcode, children=[self._convert(node.left), self._convert(node.comparators[0])]
+            )
         if isinstance(node, ast.BoolOp):
             opcode = {
                 ast.And: "and",

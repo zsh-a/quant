@@ -476,10 +476,14 @@ def activate_templates() -> int:
             continue
 
         # 动态创建子类 (不使用 exec，只设置类属性)
-        cls = type(class_name, (TemplateBasedStrategy,), {
-            "template": template,
-            "__doc__": f"Auto-generated from template: {template.label}",
-        })
+        cls = type(
+            class_name,
+            (TemplateBasedStrategy,),
+            {
+                "template": template,
+                "__doc__": f"Auto-generated from template: {template.label}",
+            },
+        )
 
         StrategyRegistry.register(f"tpl_{template.name}")(cls)
         count += 1
@@ -496,9 +500,7 @@ def import_templates(filepath: str) -> int:
     count = 0
     for name, template_data in data.items():
         try:
-            params = [
-                TemplateParameter(**p) for p in template_data.get("parameters", [])
-            ]
+            params = [TemplateParameter(**p) for p in template_data.get("parameters", [])]
             template = StrategyTemplate(
                 name=template_data["name"],
                 label=template_data["label"],

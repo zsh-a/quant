@@ -12,18 +12,20 @@ from src.core.engine import TradingEngine
 
 logging.basicConfig(level=logging.INFO)
 
+
 class MovingAverageStrategy(Strategy):
     def on_bar(self, bars):
         for symbol, bar in bars.items():
             account = self.engine.broker.get_account_info()
             # Simple logic: buy 100 shares if we have no position
-            curr_pos = account['positions'].get(symbol, 0)
+            curr_pos = account["positions"].get(symbol, 0)
             if curr_pos == 0:
                 print(f"[{bar.timestamp}] Buying {symbol} at {bar.close}")
                 self.buy(symbol, 100)
             elif bar.close > bar.open * 1.05 and curr_pos > 0:
                 print(f"[{bar.timestamp}] Selling {symbol} at {bar.close}")
                 self.sell(symbol, 100)
+
 
 def test_backtest():
     # Use 510880.csv from the project qfq data
@@ -41,6 +43,7 @@ def test_backtest():
 
     print("\nBacktest Result:")
     print(broker.get_account_info())
+
 
 if __name__ == "__main__":
     test_backtest()

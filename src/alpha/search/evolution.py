@@ -173,11 +173,10 @@ class FitnessEngine:
         )
 
 
-
-
 # ---------------------------------------------------------------------------
 # Evaluation callback types
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class EvalResult:
@@ -201,5 +200,3 @@ class SearchResult:
     total_evaluations: int
     total_rejected: int
     pipeline: PipelineRecord | None = None
-
-

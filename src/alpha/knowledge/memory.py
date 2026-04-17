@@ -173,10 +173,7 @@ class StrategyMemory:
         productive regions of formula space.
         """
         if not self._records:
-            return (
-                "## Learning from Past Generations\n"
-                "No data yet — explore broadly across all themes and operators."
-            )
+            return "## Learning from Past Generations\nNo data yet — explore broadly across all themes and operators."
 
         lines: list[str] = []
         lines.append(f"## Learning from Past Generations ({len(self._records)} formulas evaluated)\n")
@@ -221,10 +218,7 @@ class StrategyMemory:
         # --- Underexplored ---
         underexplored = self.get_underexplored_features(5)
         if underexplored:
-            lines.append(
-                "\n### Underexplored features (try these for diversity)\n"
-                f"- {', '.join(underexplored)}"
-            )
+            lines.append(f"\n### Underexplored features (try these for diversity)\n- {', '.join(underexplored)}")
 
         return "\n".join(lines)
 
@@ -234,41 +228,25 @@ class StrategyMemory:
 
     def get_theme_ranking(self) -> list[tuple[str, _ThemeStats]]:
         """Return themes sorted by mean fitness."""
-        ranked = [
-            (tid, ts)
-            for tid, ts in self._theme_stats.items()
-            if ts.count > 0
-        ]
+        ranked = [(tid, ts) for tid, ts in self._theme_stats.items() if ts.count > 0]
         ranked.sort(key=lambda x: x[1].mean_fitness, reverse=True)
         return ranked
 
     def get_top_operators(self, k: int = 10) -> list[tuple[str, _RunningStats]]:
         """Return operator patterns sorted by mean fitness."""
-        ranked = [
-            (pattern, stats)
-            for pattern, stats in self._operator_stats.items()
-            if stats.count >= 2
-        ]
+        ranked = [(pattern, stats) for pattern, stats in self._operator_stats.items() if stats.count >= 2]
         ranked.sort(key=lambda x: x[1].mean, reverse=True)
         return ranked[:k]
 
     def get_worst_operators(self, k: int = 3) -> list[tuple[str, _RunningStats]]:
         """Return operator patterns with worst mean fitness."""
-        ranked = [
-            (pattern, stats)
-            for pattern, stats in self._operator_stats.items()
-            if stats.count >= 2
-        ]
+        ranked = [(pattern, stats) for pattern, stats in self._operator_stats.items() if stats.count >= 2]
         ranked.sort(key=lambda x: x[1].mean)
         return ranked[:k]
 
     def get_top_features(self, k: int = 10) -> list[tuple[str, float]]:
         """Return features sorted by mean fitness of formulas containing them."""
-        ranked = [
-            (field, stats.mean)
-            for field, stats in self._feature_stats.items()
-            if stats.count > 0
-        ]
+        ranked = [(field, stats.mean) for field, stats in self._feature_stats.items() if stats.count > 0]
         ranked.sort(key=lambda x: x[1], reverse=True)
         return ranked[:k]
 
@@ -279,10 +257,18 @@ class StrategyMemory:
         count_map = {field: stats.count for field, stats in self._feature_stats.items()}
         # Include fields with zero appearances
         all_relevant_fields = {
-            "funding_rate", "premium_close", "open_interest", "open_interest_value",
-            "long_short_ratio", "taker_long_short_vol_ratio",
-            "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
-            "mark_close", "taker_buy_volume", "bid_ask_spread", "trade_count",
+            "funding_rate",
+            "premium_close",
+            "open_interest",
+            "open_interest_value",
+            "long_short_ratio",
+            "taker_long_short_vol_ratio",
+            "top_trader_long_short_ratio",
+            "top_trader_long_short_position_ratio",
+            "mark_close",
+            "taker_buy_volume",
+            "bid_ask_spread",
+            "trade_count",
         }
         scored = [(f, count_map.get(f, 0)) for f in all_relevant_fields]
         scored.sort(key=lambda x: x[1])
@@ -332,19 +318,17 @@ class StrategyMemory:
             "total_generated": self._total_generated,
             "records": [asdict(r) for r in self._records],
             "theme_stats": {
-                tid: {"count": ts.count, "fitness_sum": ts.fitness_sum,
-                       "best_fitness": ts.best_fitness, "best_formula": ts.best_formula,
-                       "success_count": ts.success_count}
+                tid: {
+                    "count": ts.count,
+                    "fitness_sum": ts.fitness_sum,
+                    "best_fitness": ts.best_fitness,
+                    "best_formula": ts.best_formula,
+                    "success_count": ts.success_count,
+                }
                 for tid, ts in self._theme_stats.items()
             },
-            "operator_stats": {
-                op: {"mean": s.mean, "count": s.count}
-                for op, s in self._operator_stats.items()
-            },
-            "feature_stats": {
-                f: {"mean": s.mean, "count": s.count}
-                for f, s in self._feature_stats.items()
-            },
+            "operator_stats": {op: {"mean": s.mean, "count": s.count} for op, s in self._operator_stats.items()},
+            "feature_stats": {f: {"mean": s.mean, "count": s.count} for f, s in self._feature_stats.items()},
         }
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
 
@@ -436,6 +420,7 @@ class StrategyMemory:
 # ------------------------------------------------------------------
 # Internal data classes
 # ------------------------------------------------------------------
+
 
 class _ThemeStats:
     __slots__ = ("count", "fitness_sum", "best_fitness", "best_formula", "success_count")

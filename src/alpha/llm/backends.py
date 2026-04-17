@@ -85,42 +85,83 @@ _HARD_RULES = """\
 # Maps CamelCase patterns to snake_case.  Order matters (longer prefixes first).
 _CAMEL_TO_SNAKE: list[tuple[str, str]] = [
     # Cross-sectional
-    ("CSRank", "cs_rank"), ("CSZScore", "cs_zscore"), ("CSDemean", "cs_demean"), ("CSScale", "cs_scale"),
+    ("CSRank", "cs_rank"),
+    ("CSZScore", "cs_zscore"),
+    ("CSDemean", "cs_demean"),
+    ("CSScale", "cs_scale"),
     # Time-series (Ts_ prefix)
-    ("Ts_DecayLinear", "decay_linear"), ("Ts_Winsorize", "ts_winsorize"),
-    ("Ts_Zscore", "ts_zscore"), ("Ts_Argmax", "ts_argmax"), ("Ts_Argmin", "ts_argmin"),
-    ("Ts_Returns", "returns_n"), ("Ts_Mean", "ts_mean"), ("Ts_Std", "ts_std"),
-    ("Ts_Max", "ts_max"), ("Ts_Min", "ts_min"), ("Ts_Rank", "ts_rank"),
-    ("Ts_EMA", "ts_ema"), ("Ts_Corr", "ts_corr"), ("Ts_Cov", "ts_cov"),
+    ("Ts_DecayLinear", "decay_linear"),
+    ("Ts_Winsorize", "ts_winsorize"),
+    ("Ts_Zscore", "ts_zscore"),
+    ("Ts_Argmax", "ts_argmax"),
+    ("Ts_Argmin", "ts_argmin"),
+    ("Ts_Returns", "returns_n"),
+    ("Ts_Mean", "ts_mean"),
+    ("Ts_Std", "ts_std"),
+    ("Ts_Max", "ts_max"),
+    ("Ts_Min", "ts_min"),
+    ("Ts_Rank", "ts_rank"),
+    ("Ts_EMA", "ts_ema"),
+    ("Ts_Corr", "ts_corr"),
+    ("Ts_Cov", "ts_cov"),
     # Diff
-    ("Returns_N", "returns_n"), ("Log_Return", "log_return"),
+    ("Returns_N", "returns_n"),
+    ("Log_Return", "log_return"),
     ("Decay_Linear", "decay_linear"),
     # Domain
-    ("OIDelta", "oi_delta"), ("FundingDelta", "funding_delta"),
-    ("SpreadRatio", "spread_ratio"), ("AdvN", "adv_n"),
-    ("Amihud", "amihud"), ("ATR_N", "atr_n"), ("Volatility_N", "volatility_n"),
-    ("HLC3", "hlc3"), ("OHLC4", "ohlc4"), ("TrueRange", "true_range"),
+    ("OIDelta", "oi_delta"),
+    ("FundingDelta", "funding_delta"),
+    ("SpreadRatio", "spread_ratio"),
+    ("AdvN", "adv_n"),
+    ("Amihud", "amihud"),
+    ("ATR_N", "atr_n"),
+    ("Volatility_N", "volatility_n"),
+    ("HLC3", "hlc3"),
+    ("OHLC4", "ohlc4"),
+    ("TrueRange", "true_range"),
     # Math / control
-    ("Div", "div"), ("Abs", "abs"), ("Log", "log"), ("Sign", "sign"),
-    ("Sqrt", "sqrt"), ("Sigmoid", "sigmoid"), ("Power", "power"),
-    ("Where", "where"), ("Clip", "clip"), ("FillNA", "fillna"),
-    ("Max", "max"), ("Min", "min"),
-    ("Correlation", "ts_corr"), ("Covariance", "ts_cov"),
-    ("StdDev", "ts_std"), ("Corr", "ts_corr"),
-    ("Delta", "delta"), ("Delay", "delay"), ("Scale", "cs_scale"),
+    ("Div", "div"),
+    ("Abs", "abs"),
+    ("Log", "log"),
+    ("Sign", "sign"),
+    ("Sqrt", "sqrt"),
+    ("Sigmoid", "sigmoid"),
+    ("Power", "power"),
+    ("Where", "where"),
+    ("Clip", "clip"),
+    ("FillNA", "fillna"),
+    ("Max", "max"),
+    ("Min", "min"),
+    ("Correlation", "ts_corr"),
+    ("Covariance", "ts_cov"),
+    ("StdDev", "ts_std"),
+    ("Corr", "ts_corr"),
+    ("Delta", "delta"),
+    ("Delay", "delay"),
+    ("Scale", "cs_scale"),
     # Field aliases (CamelCase → snake_case)
-    ("Close", "close"), ("High", "high"), ("Low", "low"), ("Open", "open"),
-    ("Volume", "volume"), ("Turnover", "turnover"), ("VWAP", "vwap"),
+    ("Close", "close"),
+    ("High", "high"),
+    ("Low", "low"),
+    ("Open", "open"),
+    ("Volume", "volume"),
+    ("Turnover", "turnover"),
+    ("VWAP", "vwap"),
     ("BidAskSpread", "bid_ask_spread"),
     ("TradeCount", "trade_count"),
     ("TakerBuyQuoteVolume", "taker_buy_quote_volume"),
     ("TakerBuyVolume", "taker_buy_volume"),
-    ("MarkOpen", "mark_open"), ("MarkHigh", "mark_high"),
-    ("MarkLow", "mark_low"), ("MarkClose", "mark_close"),
-    ("PremiumOpen", "premium_open"), ("PremiumHigh", "premium_high"),
-    ("PremiumLow", "premium_low"), ("PremiumClose", "premium_close"),
+    ("MarkOpen", "mark_open"),
+    ("MarkHigh", "mark_high"),
+    ("MarkLow", "mark_low"),
+    ("MarkClose", "mark_close"),
+    ("PremiumOpen", "premium_open"),
+    ("PremiumHigh", "premium_high"),
+    ("PremiumLow", "premium_low"),
+    ("PremiumClose", "premium_close"),
     ("FundingRate", "funding_rate"),
-    ("OIValue", "open_interest_value"), ("OI", "open_interest"),
+    ("OIValue", "open_interest_value"),
+    ("OI", "open_interest"),
     ("OpenInterest", "open_interest"),
     ("LongShortRatio", "long_short_ratio"),
     ("TakerLongShortVolRatio", "taker_long_short_vol_ratio"),
@@ -221,16 +262,22 @@ class HeuristicLLMBackend:
             replacements = list(self._market_profile.mutation_replacements)
         else:
             replacements = [
-                ("ts_mean(", "ts_std("), ("ts_std(", "ts_mean("),
-                ("ts_max(", "ts_rank("), ("ts_rank(", "ts_mean("),
-                ("close", "vwap"), ("close", "mark_close"),
-                ("volume", "turnover"), ("volume", "taker_buy_volume"),
-                ("close", "hlc3(high, low, close)"), ("turnover", "adv_n(turnover, 5)"),
+                ("ts_mean(", "ts_std("),
+                ("ts_std(", "ts_mean("),
+                ("ts_max(", "ts_rank("),
+                ("ts_rank(", "ts_mean("),
+                ("close", "vwap"),
+                ("close", "mark_close"),
+                ("volume", "turnover"),
+                ("volume", "taker_buy_volume"),
+                ("close", "hlc3(high, low, close)"),
+                ("turnover", "adv_n(turnover, 5)"),
                 ("close", "ohlc4(open, high, low, close)"),
                 ("volatility_n(close, 20)", "atr_n(high, low, close, 14)"),
                 ("funding_rate", "ts_zscore(funding_rate, 20)"),
                 ("open_interest", "delta(open_interest, 5)"),
-                ("close", "premium_close"), ("volume", "trade_count"),
+                ("close", "premium_close"),
+                ("volume", "trade_count"),
             ]
         offset = self._stable_index(formula, len(replacements), salt=f"mutate:{variant}")
         for idx in range(len(replacements)):
@@ -257,10 +304,12 @@ class HeuristicLLMBackend:
             f"cs_rank(({formula}) - ts_rank(taker_buy_volume, 10))",
         ]
         if "turnover" in objective.lower():
-            wrappers.extend([
-                f"cs_rank(decay_linear(({formula}), 5) - spread_ratio(bid_ask_spread, close))",
-                f"cs_rank(fillna(({formula}), 0) - amihud(close, turnover, 10))",
-            ])
+            wrappers.extend(
+                [
+                    f"cs_rank(decay_linear(({formula}), 5) - spread_ratio(bid_ask_spread, close))",
+                    f"cs_rank(fillna(({formula}), 0) - amihud(close, turnover, 10))",
+                ]
+            )
         idx = self._stable_index(formula, len(wrappers), salt=f"wrap:{objective}:{variant}")
         return wrappers[idx]
 
@@ -318,15 +367,20 @@ class OpenAILLMBackend:
         self.temperature_evolution = temperature_evolution
         self.max_ast_depth = max_ast_depth
         self.call_stats: dict[str, Any] = {
-            "total_calls": 0, "genesis_calls": 0, "evolution_calls": 0,
-            "total_seconds": 0.0, "total_tokens": 0,
+            "total_calls": 0,
+            "genesis_calls": 0,
+            "evolution_calls": 0,
+            "total_seconds": 0.0,
+            "total_tokens": 0,
         }
         self.fallback_backend = fallback_backend or HeuristicLLMBackend(
-            registry=self.registry, schema=self.schema,
+            registry=self.registry,
+            schema=self.schema,
             market_profile=market_profile,
         )
         self.client = client or OpenAI(
-            base_url=self.base_url, api_key=self.api_key,
+            base_url=self.base_url,
+            api_key=self.api_key,
             timeout=httpx.Timeout(connect=10.0, read=90.0, write=10.0, pool=5.0),
             max_retries=2,
         )
@@ -352,14 +406,12 @@ class OpenAILLMBackend:
         # Over-generate: ask LLM for 2x then take best after validation.
         # This reduces fallback to heuristic and improves diversity.
         request_count = min(count * 2, 24)
-        with tracer.start_span("genesis", kind="breed",
-                               target_count=count, backend=self.backend_name) as span:
+        with tracer.start_span("genesis", kind="breed", target_count=count, backend=self.backend_name) as span:
             self._last_theme_map.clear()
             prompt = self._build_genesis_prompt(request_count)
             raw = self._call_llm(prompt, self.temperature_genesis, "genesis")
             formulas = self._extract_and_validate(raw)
-            finalized = self._finalize(formulas, count,
-                                       lambda n: self.fallback_backend.generate_initial_population(n))
+            finalized = self._finalize(formulas, count, lambda n: self.fallback_backend.generate_initial_population(n))
             span.set("extracted", len(formulas))
             span.set("finalized", len(finalized))
             return finalized
@@ -368,14 +420,12 @@ class OpenAILLMBackend:
         from ..infra.tracing import tracer
 
         request_count = min(count * 2, 16)
-        with tracer.start_span("evolution", kind="breed",
-                               target_count=count, backend=self.backend_name) as span:
+        with tracer.start_span("evolution", kind="breed", target_count=count, backend=self.backend_name) as span:
             self._last_theme_map.clear()
             prompt = self._build_evolution_prompt(spec, request_count)
             raw = self._call_llm(prompt, self.temperature_evolution, "evolution")
             formulas = self._extract_and_validate(raw)
-            finalized = self._finalize(formulas, count,
-                                       lambda n: self.fallback_backend.generate_offspring(spec, n))
+            finalized = self._finalize(formulas, count, lambda n: self.fallback_backend.generate_offspring(spec, n))
             span.set("extracted", len(formulas))
             span.set("finalized", len(finalized))
             return finalized
@@ -502,9 +552,7 @@ Output exactly {count} items:
             )
             issues = self._diagnose(m)
             lines.append(
-                f"[Parent {i}]  `{fb.get('formula', spec.parent_a)}`\n"
-                f"  metrics: {summary}\n"
-                f"  issues:  {issues}"
+                f"[Parent {i}]  `{fb.get('formula', spec.parent_a)}`\n  metrics: {summary}\n  issues:  {issues}"
             )
         return "\n".join(lines) if lines else f"[Parent 1]  `{spec.parent_a}`"
 
@@ -532,13 +580,20 @@ Output exactly {count} items:
         from ..infra.tracing import prompt_hash, tracer
 
         messages = [{"role": "user", "content": user_prompt}]
-        with tracer.start_span(kind, kind="llm", model=self.model_name,
-                               temperature=temperature,
-                               prompt_hash=prompt_hash(user_prompt),
-                               input=messages) as span:
+        with tracer.start_span(
+            kind,
+            kind="llm",
+            model=self.model_name,
+            temperature=temperature,
+            prompt_hash=prompt_hash(user_prompt),
+            input=messages,
+        ) as span:
             resp = self.client.chat.completions.create(
-                model=self.model_name, messages=messages,
-                temperature=temperature, stream=False, timeout=90,
+                model=self.model_name,
+                messages=messages,
+                temperature=temperature,
+                stream=False,
+                timeout=90,
             )
             content = resp.choices[0].message.content or ""
             span.set_response(resp)
@@ -636,15 +691,19 @@ Output exactly {count} items:
             if isinstance(payload, list):
                 for item in payload:
                     if isinstance(item, dict) and "formula" in item:
-                        items.append((
-                            str(item["formula"]),
-                            str(item.get("theme", "")),
-                        ))
+                        items.append(
+                            (
+                                str(item["formula"]),
+                                str(item.get("theme", "")),
+                            )
+                        )
             elif isinstance(payload, dict) and "formula" in payload:
-                items.append((
-                    str(payload["formula"]),
-                    str(payload.get("theme", "")),
-                ))
+                items.append(
+                    (
+                        str(payload["formula"]),
+                        str(payload.get("theme", "")),
+                    )
+                )
         except Exception:
             pass
         if items:
@@ -714,8 +773,11 @@ def build_default_llm_backend(
     resolved_key = api_key or os.getenv("ALPHA_LAB_LLM_API_KEY")
     if requested == "openai" or (requested == "auto" and resolved_key):
         return OpenAILLMBackend(
-            registry=registry, schema=schema,
-            model_name=model_name, base_url=base_url, api_key=api_key,
+            registry=registry,
+            schema=schema,
+            model_name=model_name,
+            base_url=base_url,
+            api_key=api_key,
             strategy_memory=strategy_memory,
             knowledge_base=knowledge_base,
             feature_kitchen=feature_kitchen,

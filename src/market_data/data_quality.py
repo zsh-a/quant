@@ -112,7 +112,7 @@ class DataQualityChecker:
             if latest:
                 if hasattr(latest, "date"):
                     latest = latest
-                age_days = (now.date() - latest.date() if hasattr(latest, "date") else (now - latest).days)
+                age_days = now.date() - latest.date() if hasattr(latest, "date") else (now - latest).days
                 if hasattr(age_days, "days"):
                     age_days = age_days.days
                 checks["stock_daily"] = {

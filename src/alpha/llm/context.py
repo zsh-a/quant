@@ -31,7 +31,9 @@ def build_pipeline_summary(
     # Header
     n_rounds = len(pipeline.rounds)
     lines.append(f"# Alpha Search Summary (job={pipeline.job_id})")
-    lines.append(f"Rounds: {n_rounds} | Evaluations: {pipeline.total_evaluations} | Rejected: {pipeline.total_rejected}")
+    lines.append(
+        f"Rounds: {n_rounds} | Evaluations: {pipeline.total_evaluations} | Rejected: {pipeline.total_rejected}"
+    )
     if pipeline.total_evaluations > 0:
         reject_rate = pipeline.total_rejected / max(pipeline.total_evaluations + pipeline.total_rejected, 1)
         lines.append(f"Rejection rate: {reject_rate:.1%}")
@@ -41,7 +43,9 @@ def build_pipeline_summary(
     lines.append("## Round-by-round")
     for rr in pipeline.rounds:
         strats = ", ".join(rr.strategies_activated) or "none"
-        lines.append(f"R{rr.round_idx}: strategies=[{strats}] archive={rr.archive_size} best={rr.best_fitness:.4f} ({rr.duration_ms:.0f}ms)")
+        lines.append(
+            f"R{rr.round_idx}: strategies=[{strats}] archive={rr.archive_size} best={rr.best_fitness:.4f} ({rr.duration_ms:.0f}ms)"
+        )
         for stage in rr.stages:
             arrow = f"{stage.input_count}→{stage.output_count}"
             lines.append(f"  {stage.kind.value:15s} [{stage.strategy}] {arrow} ({stage.duration_ms:.0f}ms)")
@@ -62,7 +66,9 @@ def build_pipeline_summary(
         lines.append("## Stage Aggregates")
         for kind, st in stage_stats.items():
             passthrough = st["total_out"] / max(st["total_in"], 1) if kind != "generate" else 1.0
-            lines.append(f"  {kind:15s}: in={st['total_in']:.0f} out={st['total_out']:.0f} pass={passthrough:.0%} time={st['total_ms']:.0f}ms")
+            lines.append(
+                f"  {kind:15s}: in={st['total_in']:.0f} out={st['total_out']:.0f} pass={passthrough:.0%} time={st['total_ms']:.0f}ms"
+            )
 
         # Identify bottleneck
         worst_stage = None

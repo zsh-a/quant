@@ -188,6 +188,7 @@ class OperatorRegistry:
             )
         except ValueError as exc:
             from .dsl import ValidationReport
+
             return ValidationReport(
                 ok=False,
                 normalized_formula=formula.strip(),

@@ -19,6 +19,7 @@ from src.strategies.rotation_strategy import RotationStrategy
 logger.remove()
 logger.add(sys.stderr, level="INFO")
 
+
 def test_jsg_migration():
     print("\n--- Testing JSG Strategy Migration ---")
     db_client = DB()
@@ -44,6 +45,7 @@ def test_jsg_migration():
     print("\nJSG Backtest Result:")
     print(broker.get_report())
 
+
 def test_rotation_migration():
     print("\n--- Testing Rotation Strategy Migration ---")
     db_client = DB()
@@ -61,6 +63,7 @@ def test_rotation_migration():
 
     print("\nRotation Backtest Result:")
     print(broker.get_report())
+
 
 if __name__ == "__main__":
     # Test JSG

@@ -78,6 +78,7 @@ class AlphaService:
         self.feature_kitchen = FeatureKitchen(self.schema)
         if strategy_memory_path is None:
             from src.config.paths import STRATEGY_MEMORY_PATH
+
             strategy_memory_path = str(STRATEGY_MEMORY_PATH)
         self.strategy_memory = StrategyMemory(
             persistence_path=strategy_memory_path,
@@ -105,12 +106,17 @@ class AlphaService:
 
         # --- Assemble strategies by mode ---
         strategies: list = self._build_strategies(
-            strategy, resolved_llm, neural_sample_batch, mcts_refinement_frequency,
-            enum_max=enum_max, enum_top_k=enum_top_k,
+            strategy,
+            resolved_llm,
+            neural_sample_batch,
+            mcts_refinement_frequency,
+            enum_max=enum_max,
+            enum_top_k=enum_top_k,
         )
 
         # --- Checkpoint manager ---
         from .search.checkpoint import CheckpointManager
+
         self.checkpoint_manager = CheckpointManager()
 
         # --- Search orchestrator ---
@@ -141,7 +147,8 @@ class AlphaService:
 
         logger.info(
             "AlphaService init market={} vm_backend={} device={} triton={}",
-            market, self.vm.backend,
+            market,
+            self.vm.backend,
             self.vm.device if self.vm.device is not None else "numpy",
             getattr(self.vm, "use_triton", False),
         )
@@ -240,7 +247,9 @@ class AlphaService:
             typed = self.compiler.checker.infer(parsed, self.schema)
             normalized = normalize_formula(parsed)
             ast_hash = hashlib.sha256(normalized.encode("utf-8")).hexdigest()
-            return ValidationReport(ok=True, normalized_formula=normalized, errors=[], ast_hash=ast_hash, ast_tree=typed.to_dict())
+            return ValidationReport(
+                ok=True, normalized_formula=normalized, errors=[], ast_hash=ast_hash, ast_tree=typed.to_dict()
+            )
         except ValueError as exc:
             return ValidationReport(ok=False, normalized_formula=formula.strip(), errors=[str(exc)])
 
@@ -348,8 +357,11 @@ class AlphaService:
         t_eval = perf_counter()
         logger.info(
             "alpha.evaluate_db load={:.1f}s eval={:.1f}s total={:.1f}s backend={} device={}",
-            t_load - t0, t_eval - t_load, t_eval - t0,
-            self.vm.backend, self.vm.device or "numpy",
+            t_load - t0,
+            t_eval - t_load,
+            t_eval - t0,
+            self.vm.backend,
+            self.vm.device or "numpy",
         )
         return result
 
@@ -556,23 +568,29 @@ class AlphaService:
 
         # Top-level trace: all child spans nest under this
         with tracer.start_span(
-            "search", kind="search",
+            "search",
+            kind="search",
             symbols=",".join(symbols),
-            rounds=generations, batch_size=offspring_count,
+            rounds=generations,
+            batch_size=offspring_count,
         ) as search_span:
             # 1. Load dataset
-            with tracer.start_span("load_dataset", kind="internal",
-                                   symbols=len(symbols), interval=interval):
+            with tracer.start_span("load_dataset", kind="internal", symbols=len(symbols), interval=interval):
                 dataset = self.dataset_loader.load(
-                    symbols=symbols, start_time=start_time,
-                    end_time=end_time, interval=interval,
-                    min_quote_volume=min_quote_volume, blocked_utc_hours=blocked_utc_hours,
+                    symbols=symbols,
+                    start_time=start_time,
+                    end_time=end_time,
+                    interval=interval,
+                    min_quote_volume=min_quote_volume,
+                    blocked_utc_hours=blocked_utc_hours,
                     **loader_kwargs,
                 )
 
             # 2. Validation plan
             validation_plan = self._build_validation_plan(
-                dataset, n_splits=n_splits, purge_window=purge_window,
+                dataset,
+                n_splits=n_splits,
+                purge_window=purge_window,
                 embargo_window=embargo_window,
             )
             folds = validation_plan["folds"]
@@ -589,6 +607,7 @@ class AlphaService:
 
             quick_fn = None
             if len(folds) > 1:
+
                 def quick_fn(individuals):
                     r = self.evaluate_population_on_validation_plan(individuals, folds[:1])
                     return EvalResult(
@@ -622,7 +641,8 @@ class AlphaService:
             result = {
                 "dataset": {
                     "interval": dataset.interval,
-                    "symbols": dataset.symbols, "shape": dataset.shape(),
+                    "symbols": dataset.symbols,
+                    "shape": dataset.shape(),
                 },
                 "llm": self._llm_backend_summary(),
                 "timing": timing,
@@ -634,22 +654,31 @@ class AlphaService:
                 },
                 "rounds": search_result.rounds,
                 "lineage": [
-                    {"expr_hash": ind.expr_hash, "formula": ind.formula,
-                     "parent_a": ind.lineage.parent_a,
-                     "parent_b": ind.lineage.parent_b}
+                    {
+                        "expr_hash": ind.expr_hash,
+                        "formula": ind.formula,
+                        "parent_a": ind.lineage.parent_a,
+                        "parent_b": ind.lineage.parent_b,
+                    }
                     for ind in search_result.all_evaluated
                     if ind.lineage.parent_a
                 ],
                 "top_results": [
-                    {"formula": ind.formula, "expr_hash": ind.expr_hash,
-                     "fitness": ind.fitness, "lineage": ind.lineage.to_dict(),
-                     "metrics": ind.metrics}
+                    {
+                        "formula": ind.formula,
+                        "expr_hash": ind.expr_hash,
+                        "fitness": ind.fitness,
+                        "lineage": ind.lineage.to_dict(),
+                        "metrics": ind.metrics,
+                    }
                     for ind in search_result.archive[:top_k]
                 ],
                 "evaluations": {
-                    h: {"formula": d.get("formula"),
+                    h: {
+                        "formula": d.get("formula"),
                         "metrics": d.get("fitness_metrics", {}),
-                        "split_metrics": d.get("split_metrics", {})}
+                        "split_metrics": d.get("split_metrics", {}),
+                    }
                     for h, d in search_result.details_by_hash.items()
                 },
                 "pipeline": search_result.pipeline.to_dict() if search_result.pipeline else None,
@@ -661,7 +690,9 @@ class AlphaService:
                     run = self.persistence.save_run(result, run_name=run_name or "search_db")
                     zoo_paths = self.persistence.save_zoo_entries(result["top_results"], run.run_id)
                 result["persistence"] = {
-                    "run_id": run.run_id, "run_path": run.run_path, "zoo_paths": zoo_paths,
+                    "run_id": run.run_id,
+                    "run_path": run.run_path,
+                    "zoo_paths": zoo_paths,
                 }
 
             timing["overall_seconds"] = perf_counter() - overall_start
@@ -763,6 +794,7 @@ class AlphaService:
 
         # 7. Metrics
         from .eval.metrics import compute_forward_returns, compute_rank_ic
+
         fwd = compute_forward_returns(close_np)
         rank_ic = compute_rank_ic(combined_signal[:-1], fwd[:-1])
 
@@ -871,7 +903,10 @@ class AlphaService:
         )
         eval_method = EvalMethod.LONG_ONLY if position_method == "long_only" else EvalMethod.LONG_SHORT
         target_weights = self.signal_transformer.to_target_weights(
-            combined_signal, market_ctx, method=eval_method, top_pct=top_pct,
+            combined_signal,
+            market_ctx,
+            method=eval_method,
+            top_pct=top_pct,
         )
         weights_np = self._to_numpy(target_weights)
 
@@ -902,7 +937,10 @@ class AlphaService:
         overall_seconds = perf_counter() - overall_start
         logger.info(
             "alpha.generate_event_weights method={} factors={} weight_dates={} overall={:.3f}s",
-            method, len(combo_result["selected_factors"]), len(weight_map), overall_seconds,
+            method,
+            len(combo_result["selected_factors"]),
+            len(weight_map),
+            overall_seconds,
         )
 
         return {
@@ -929,7 +967,9 @@ class AlphaService:
     ) -> dict[str, Any]:
         program = self._compile_cached(formula)
         ind = Individual(
-            formula=formula, program=program, expr_hash=program.expr_hash,
+            formula=formula,
+            program=program,
+            expr_hash=program.expr_hash,
             lineage={"origin": "manual"},
         )
         population = [ind]
@@ -998,11 +1038,8 @@ class AlphaService:
         # Use batched GPU pipeline when possible
         try:
             import torch as _torch
-            if (
-                len(alphas) > 1
-                and isinstance(alphas[0], _torch.Tensor)
-                and alphas[0].is_cuda
-            ):
+
+            if len(alphas) > 1 and isinstance(alphas[0], _torch.Tensor) and alphas[0].is_cuda:
                 T, S = alphas[0].shape
                 gpu_free = _torch.cuda.mem_get_info()[0] if _torch.cuda.is_available() else 0
                 bytes_per_formula = T * S * 4 * 12
@@ -1010,14 +1047,23 @@ class AlphaService:
 
                 if chunk_size >= len(alphas):
                     return self._batch_evaluate_gpu(
-                        population, programs, alphas, dataset, store, timing_breakdown,
+                        population,
+                        programs,
+                        alphas,
+                        dataset,
+                        store,
+                        timing_breakdown,
                     )
                 merged: dict[str, dict] = {"metrics_by_hash": {}, "signatures_by_hash": {}, "details_by_hash": {}}
                 for start in range(0, len(alphas), chunk_size):
                     end = min(start + chunk_size, len(alphas))
                     chunk_result = self._batch_evaluate_gpu(
-                        population[start:end], programs[start:end],
-                        alphas[start:end], dataset, store, timing_breakdown,
+                        population[start:end],
+                        programs[start:end],
+                        alphas[start:end],
+                        dataset,
+                        store,
+                        timing_breakdown,
                     )
                     for key in merged:
                         merged[key].update(chunk_result[key])
@@ -1077,13 +1123,15 @@ class AlphaService:
         if dataset.liquidity_mask is not None:
             liq = torch.as_tensor(
                 np.asarray(dataset.liquidity_mask, dtype=bool),
-                device=scores.device, dtype=torch.bool,
+                device=scores.device,
+                dtype=torch.bool,
             )
             scores = torch.where(liq.unsqueeze(0), scores, torch.full_like(scores, torch.nan))
         if dataset.session_mask is not None:
             sess = torch.as_tensor(
                 np.asarray(dataset.session_mask, dtype=bool),
-                device=scores.device, dtype=torch.bool,
+                device=scores.device,
+                dtype=torch.bool,
             )
             scores = torch.where(sess.unsqueeze(0), scores, torch.zeros_like(scores))
 
@@ -1092,13 +1140,14 @@ class AlphaService:
         safe_scores = torch.where(valid, scores, torch.zeros_like(scores))
         row_means = safe_scores.sum(dim=2, keepdim=True) / valid_counts.clamp(min=1).float()
         centered = scores - row_means
-        empty = (valid_counts == 0)
+        empty = valid_counts == 0
         centered = torch.where(empty, torch.zeros_like(centered), centered)
         abs_c = torch.where(torch.isnan(centered), torch.zeros_like(centered), torch.abs(centered))
         denom = abs_c.sum(dim=2, keepdim=True)
         weights = centered / (denom + 1e-12)
         weights = torch.where(torch.isnan(weights), torch.zeros_like(weights), weights)
         from .risk.models import MarketContext as _MC
+
         max_w = _MC().max_abs_weight
         max_turnover = _MC().max_turnover_per_bar
         weights = torch.clamp(weights, -max_w, max_w)
@@ -1109,6 +1158,7 @@ class AlphaService:
         overlay_start = perf_counter()
         try:
             from .risk.models import _apply_turnover_limit_numba
+
             _has_numba = True
         except ImportError:
             _has_numba = False
@@ -1117,14 +1167,16 @@ class AlphaService:
             w_cpu = weights.cpu().numpy()  # (N, T, S)
             for i in range(N):
                 w_cpu[i] = _apply_turnover_limit_numba(
-                    np.ascontiguousarray(w_cpu[i]), max_turnover,
+                    np.ascontiguousarray(w_cpu[i]),
+                    max_turnover,
                 )
             weights = torch.as_tensor(w_cpu, device=device, dtype=torch.float32)
         else:
             for t in range(1, T):
                 delta = torch.clamp(
                     weights[:, t] - weights[:, t - 1],
-                    -max_turnover, max_turnover,
+                    -max_turnover,
+                    max_turnover,
                 )
                 weights[:, t] = weights[:, t - 1] + delta
         timing_breakdown["rule_overlay_seconds"] += perf_counter() - overlay_start
@@ -1138,7 +1190,8 @@ class AlphaService:
 
         # Position returns: (N, T)
         position_returns = torch.nansum(
-            weights * forward_returns.unsqueeze(0), dim=2,
+            weights * forward_returns.unsqueeze(0),
+            dim=2,
         ).clamp(-0.5, 0.5)
 
         # Turnover: (N, T)
@@ -1205,15 +1258,29 @@ class AlphaService:
 
         # Coverage & activity
         signal_coverage = (~stacked.isnan()).float().mean(dim=(1, 2))  # (N,)
-        active_rows = (weights.abs().sum(dim=2) > 1e-9)  # (N, T)
+        active_rows = weights.abs().sum(dim=2) > 1e-9  # (N, T)
         active_bar_ratio = active_rows.float().mean(dim=1)  # (N,)
         effective_bars = active_rows.float().sum(dim=1)  # (N,)
 
         # Transfer to CPU once (single batch transfer)
-        cpu_data = torch.stack([
-            rank_ic, sharpe, total_return, avg_turnover, max_drawdown,
-            std_ret, final_equity, signal_coverage, active_bar_ratio, effective_bars,
-        ]).cpu().numpy()  # (10, N)
+        cpu_data = (
+            torch.stack(
+                [
+                    rank_ic,
+                    sharpe,
+                    total_return,
+                    avg_turnover,
+                    max_drawdown,
+                    std_ret,
+                    final_equity,
+                    signal_coverage,
+                    active_bar_ratio,
+                    effective_bars,
+                ]
+            )
+            .cpu()
+            .numpy()
+        )  # (10, N)
         timing_breakdown["fitness_seconds"] += perf_counter() - fitness_start
 
         # --- 5. Build per-formula result dicts ---
@@ -1336,7 +1403,8 @@ class AlphaService:
                 else:
                     split_dataset = dataset_ref.take_indices(split_indices[split_name])
                 split_results = self.evaluate_population_from_dataset(
-                    population, split_dataset,
+                    population,
+                    split_dataset,
                 )
                 fold_results[split_name] = split_results
                 del split_dataset
@@ -1411,12 +1479,16 @@ class AlphaService:
                 self._valid_test_gap_penalty(valid_record, test_record)
                 for valid_record, test_record in zip(valid_records, test_records)
             ]
-            negative_test_ratio = float(
-                np.mean([1.0 if float(record.get("sharpe", 0.0)) < 0.0 else 0.0 for record in test_records])
-            ) if test_records else 0.0
-            inactive_valid_ratio = float(
-                np.mean([1.0 if float(record.get("inactive", 0.0)) >= 1.0 else 0.0 for record in valid_records])
-            ) if valid_records else 0.0
+            negative_test_ratio = (
+                float(np.mean([1.0 if float(record.get("sharpe", 0.0)) < 0.0 else 0.0 for record in test_records]))
+                if test_records
+                else 0.0
+            )
+            inactive_valid_ratio = (
+                float(np.mean([1.0 if float(record.get("inactive", 0.0)) >= 1.0 else 0.0 for record in valid_records]))
+                if valid_records
+                else 0.0
+            )
             fitness_metrics = dict(valid)
             fitness_metrics.update(
                 {
@@ -1431,7 +1503,9 @@ class AlphaService:
                     "coverage_penalty": float(valid.get("coverage_penalty", 0.0)),
                     "complexity_penalty": float(valid.get("complexity_penalty", 0.0)),
                     "train_valid_gap_penalty": float(np.mean(gap_penalties)) if gap_penalties else 0.0,
-                    "valid_test_gap_penalty": float(np.mean(valid_test_gap_penalties)) if valid_test_gap_penalties else 0.0,
+                    "valid_test_gap_penalty": float(np.mean(valid_test_gap_penalties))
+                    if valid_test_gap_penalties
+                    else 0.0,
                     "test_sharpe": float(test.get("sharpe", 0.0)),
                     "train_sharpe": float(train.get("sharpe", 0.0)),
                     "valid_sharpe": float(valid.get("sharpe", 0.0)),
@@ -1447,10 +1521,9 @@ class AlphaService:
                 }
             )
             metrics_by_hash[expr_hash] = fitness_metrics
-            signatures_by_hash[expr_hash] = (
-                self._aggregate_signatures(split_signatures_by_hash.get(expr_hash, {}).get("valid", []))
-                or self._aggregate_signatures(split_signatures_by_hash.get(expr_hash, {}).get("train", []))
-            )
+            signatures_by_hash[expr_hash] = self._aggregate_signatures(
+                split_signatures_by_hash.get(expr_hash, {}).get("valid", [])
+            ) or self._aggregate_signatures(split_signatures_by_hash.get(expr_hash, {}).get("train", []))
             details_by_hash.setdefault(expr_hash, {})
             details_by_hash[expr_hash]["split_metrics"] = {
                 "train": train,
@@ -1572,10 +1645,7 @@ class AlphaService:
         time_series_excess = max(counts["time_series_ops"] - 3.0, 0.0) / 3.0
         branching_excess = max(counts["branching_ops"] - 1.0, 0.0) / 2.0
         complexity_penalty = self._clip_unit(
-            0.45 * depth_excess
-            + 0.35 * op_excess
-            + 0.15 * time_series_excess
-            + 0.05 * branching_excess
+            0.45 * depth_excess + 0.35 * op_excess + 0.15 * time_series_excess + 0.05 * branching_excess
         )
         metrics = {
             "ast_depth": float(ast_depth),
@@ -1591,12 +1661,15 @@ class AlphaService:
         return metrics
 
     def _train_valid_gap_penalty(self, train_record: dict[str, float], valid_record: dict[str, float]) -> float:
-        sharpe_gap = self._clip_unit(abs(float(train_record.get("sharpe", 0.0)) - float(valid_record.get("sharpe", 0.0))) / 1.5)
+        sharpe_gap = self._clip_unit(
+            abs(float(train_record.get("sharpe", 0.0)) - float(valid_record.get("sharpe", 0.0))) / 1.5
+        )
         ic_gap = self._clip_unit(
             abs(float(train_record.get("rank_ic_abs", 0.0)) - float(valid_record.get("rank_ic_abs", 0.0))) / 0.05
         )
         activity_gap = self._clip_unit(
-            abs(float(train_record.get("active_bar_ratio", 0.0)) - float(valid_record.get("active_bar_ratio", 0.0))) / 0.25
+            abs(float(train_record.get("active_bar_ratio", 0.0)) - float(valid_record.get("active_bar_ratio", 0.0)))
+            / 0.25
         )
         return 0.50 * sharpe_gap + 0.35 * ic_gap + 0.15 * activity_gap
 
@@ -1608,7 +1681,8 @@ class AlphaService:
             max(float(valid_record.get("rank_ic_abs", 0.0)) - float(test_record.get("rank_ic_abs", 0.0)), 0.0) / 0.05
         )
         activity_decay = self._clip_unit(
-            max(float(valid_record.get("activity_score", 0.0)) - float(test_record.get("activity_score", 0.0)), 0.0) / 0.5
+            max(float(valid_record.get("activity_score", 0.0)) - float(test_record.get("activity_score", 0.0)), 0.0)
+            / 0.5
         )
         return 0.55 * sharpe_decay + 0.30 * ic_decay + 0.15 * activity_decay
 
@@ -1779,7 +1853,9 @@ class AlphaService:
                 )
         close_np = self._to_numpy(store.get_field("close"))
         close_nan = float(np.mean(np.isnan(close_np))) if close_np.size else 1.0
-        liq_true = float(np.mean(np.asarray(dataset.liquidity_mask))) if np.asarray(dataset.liquidity_mask).size else 0.0
+        liq_true = (
+            float(np.mean(np.asarray(dataset.liquidity_mask))) if np.asarray(dataset.liquidity_mask).size else 0.0
+        )
         if (close_nan > 0.5 or liq_true < 0.5) and not self._data_quality_logged:
             self._data_quality_logged = True
             logger.warning(
@@ -1813,7 +1889,9 @@ class AlphaService:
             timing_breakdown["backtest_seconds"] += perf_counter() - backtest_start
 
         fitness_start = perf_counter()
-        metrics = self._build_fitness_metrics(program, alpha, wrapped_weights, store.get_field("close"), result.summary())
+        metrics = self._build_fitness_metrics(
+            program, alpha, wrapped_weights, store.get_field("close"), result.summary()
+        )
         metrics["eval_method"] = eval_method.value
         if timing_breakdown is not None:
             timing_breakdown["fitness_seconds"] += perf_counter() - fitness_start
@@ -1845,10 +1923,13 @@ class AlphaService:
 
         # 分层回测 (always computed — low cost, high diagnostic value)
         from .eval.metrics import compute_quantile_returns
+
         alpha_np = self._to_numpy(alpha)
         close_np = self._to_numpy(store.get_field("close"))
         payload["quantile_analysis"] = compute_quantile_returns(
-            alpha_np, close_np, timestamps=dataset.timestamps,
+            alpha_np,
+            close_np,
+            timestamps=dataset.timestamps,
         )
 
         return payload
@@ -1957,13 +2038,12 @@ class AlphaService:
             "top_results": run.get("top_results", []),
         }
 
-
     def _build_alpha_signature(self, alpha: Any, max_points: int = 200) -> list[float]:
         data = np.nan_to_num(self._to_numpy(alpha), nan=0.0, posinf=0.0, neginf=0.0)
         if data.size == 0:
             return []
         row_mean = np.mean(data, axis=1)  # (T,)
-        row_std = np.std(data, axis=1)    # (T,)
+        row_std = np.std(data, axis=1)  # (T,)
         col_mean = np.mean(data, axis=0)  # (S,)
         # Downsample time-axis vectors to cap memory
         if len(row_mean) > max_points:
@@ -1977,6 +2057,7 @@ class AlphaService:
 
     def _to_numpy(self, value: Any) -> np.ndarray:
         from .core.vm import to_numpy
+
         return to_numpy(value)
 
     def _to_serializable_list(self, value: Any) -> list[Any]:

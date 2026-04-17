@@ -28,14 +28,15 @@ class Regime(str, Enum):
 @dataclass
 class RegimeSnapshot:
     """当前市场状态快照。"""
+
     regime: Regime
-    confidence: float          # 0-1 置信度
-    volatility_zscore: float   # 波动率 z-score (>1.5 高波动)
-    trend_slope: float         # 趋势斜率 (正=上升)
+    confidence: float  # 0-1 置信度
+    volatility_zscore: float  # 波动率 z-score (>1.5 高波动)
+    trend_slope: float  # 趋势斜率 (正=上升)
     current_price: float
-    ma_fast: float             # 短期均线
-    ma_slow: float             # 长期均线
-    annualized_vol: float      # 年化波动率
+    ma_fast: float  # 短期均线
+    ma_slow: float  # 长期均线
+    annualized_vol: float  # 年化波动率
 
 
 class RegimeDetector:
@@ -69,19 +70,23 @@ class RegimeDetector:
         if n < min_required:
             logger.warning("regime_detector: 数据不足 ({} < {}), 默认 sideways", n, min_required)
             return RegimeSnapshot(
-                regime=Regime.SIDEWAYS, confidence=0.0,
-                volatility_zscore=0.0, trend_slope=0.0,
+                regime=Regime.SIDEWAYS,
+                confidence=0.0,
+                volatility_zscore=0.0,
+                trend_slope=0.0,
                 current_price=float(arr[-1]) if n > 0 else 0.0,
-                ma_fast=0.0, ma_slow=0.0, annualized_vol=0.0,
+                ma_fast=0.0,
+                ma_slow=0.0,
+                annualized_vol=0.0,
             )
 
         # 均线
-        ma_fast = float(np.mean(arr[-self.fast_window:]))
-        ma_slow = float(np.mean(arr[-self.slow_window:]))
+        ma_fast = float(np.mean(arr[-self.fast_window :]))
+        ma_slow = float(np.mean(arr[-self.slow_window :]))
         current_price = float(arr[-1])
 
         # 趋势斜率: 短期均线的线性回归斜率 (标准化)
-        recent = arr[-self.fast_window:]
+        recent = arr[-self.fast_window :]
         x = np.arange(self.fast_window, dtype=np.float64)
         x_mean = x.mean()
         y_mean = recent.mean()
@@ -89,16 +94,32 @@ class RegimeDetector:
         norm_slope = slope / y_mean if y_mean != 0 else 0.0  # 相对于均价的斜率
 
         # 波动率
-        log_returns = np.diff(np.log(arr[-self.vol_lookback:]))
-        current_vol = float(np.std(log_returns[-self.vol_window:])) * np.sqrt(252)
-        hist_vol_mean = float(np.mean([
-            np.std(log_returns[i:i + self.vol_window]) * np.sqrt(252)
-            for i in range(0, len(log_returns) - self.vol_window, self.vol_window)
-        ])) if len(log_returns) > self.vol_window else current_vol
-        hist_vol_std = float(np.std([
-            np.std(log_returns[i:i + self.vol_window]) * np.sqrt(252)
-            for i in range(0, len(log_returns) - self.vol_window, self.vol_window)
-        ])) if len(log_returns) > self.vol_window else 1e-6
+        log_returns = np.diff(np.log(arr[-self.vol_lookback :]))
+        current_vol = float(np.std(log_returns[-self.vol_window :])) * np.sqrt(252)
+        hist_vol_mean = (
+            float(
+                np.mean(
+                    [
+                        np.std(log_returns[i : i + self.vol_window]) * np.sqrt(252)
+                        for i in range(0, len(log_returns) - self.vol_window, self.vol_window)
+                    ]
+                )
+            )
+            if len(log_returns) > self.vol_window
+            else current_vol
+        )
+        hist_vol_std = (
+            float(
+                np.std(
+                    [
+                        np.std(log_returns[i : i + self.vol_window]) * np.sqrt(252)
+                        for i in range(0, len(log_returns) - self.vol_window, self.vol_window)
+                    ]
+                )
+            )
+            if len(log_returns) > self.vol_window
+            else 1e-6
+        )
 
         vol_zscore = (current_vol - hist_vol_mean) / (hist_vol_std + 1e-9)
 
@@ -134,13 +155,15 @@ class RegimeDetector:
         min_required = self.slow_window + self.vol_lookback
         results = []
         for i in range(min_required, len(arr), step):
-            snap = self.detect(arr[:i + 1])
-            results.append({
-                "index": i,
-                "regime": snap.regime.value,
-                "confidence": snap.confidence,
-                "vol_zscore": snap.volatility_zscore,
-                "trend_slope": snap.trend_slope,
-                "price": snap.current_price,
-            })
+            snap = self.detect(arr[: i + 1])
+            results.append(
+                {
+                    "index": i,
+                    "regime": snap.regime.value,
+                    "confidence": snap.confidence,
+                    "vol_zscore": snap.volatility_zscore,
+                    "trend_slope": snap.trend_slope,
+                    "price": snap.current_price,
+                }
+            )
         return results

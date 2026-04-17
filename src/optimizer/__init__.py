@@ -10,10 +10,10 @@ from src.optimizer.optimizer import (
 )
 
 __all__ = [
-    'ParameterOptimizer',
-    'ParamSpec',
-    'OptimizationMethod',
-    'OptimizationObjective',
-    'OptimizationResult',
-    'OptimizationReport'
+    "ParameterOptimizer",
+    "ParamSpec",
+    "OptimizationMethod",
+    "OptimizationObjective",
+    "OptimizationResult",
+    "OptimizationReport",
 ]

@@ -131,6 +131,7 @@ class FactorCatalog:
             return
         if not entry.created_at:
             from datetime import datetime, timezone
+
             entry.created_at = datetime.now(timezone.utc).isoformat()
         if entry.evaluated and entry.rank_ic != 0.0:
             entry.ic_history.append(entry.rank_ic)
@@ -141,17 +142,11 @@ class FactorCatalog:
 
     def decaying_factors(self, threshold: float = -0.01) -> list[FactorCatalogEntry]:
         """Return factors whose IC is declining (decay_rate < threshold)."""
-        return [
-            e for e in self._entries
-            if e.evaluated and len(e.ic_history) >= 3 and e.decay_rate < threshold
-        ]
+        return [e for e in self._entries if e.evaluated and len(e.ic_history) >= 3 and e.decay_rate < threshold]
 
     def healthy_factors(self, min_ic: float = 0.02) -> list[FactorCatalogEntry]:
         """Return factors with stable or improving IC above min_ic."""
-        return [
-            e for e in self._entries
-            if e.evaluated and abs(e.rank_ic) >= min_ic and e.decay_rate >= 0
-        ]
+        return [e for e in self._entries if e.evaluated and abs(e.rank_ic) >= min_ic and e.decay_rate >= 0]
 
     # --- query ---
 
@@ -190,11 +185,7 @@ class FactorCatalog:
                 "total_generated": len(entries),
                 "total_evaluated": len(evaluated),
                 "best_fitness": max((e.fitness for e in evaluated), default=0.0),
-                "avg_ic": (
-                    sum(abs(e.rank_ic) for e in evaluated) / len(evaluated)
-                    if evaluated
-                    else 0.0
-                ),
+                "avg_ic": (sum(abs(e.rank_ic) for e in evaluated) / len(evaluated) if evaluated else 0.0),
             }
         return result
 
@@ -204,7 +195,8 @@ class FactorCatalog:
         """Top-K evaluated factors by fitness."""
         return sorted(
             (e for e in self._entries if e.evaluated),
-            key=lambda e: e.fitness, reverse=True,
+            key=lambda e: e.fitness,
+            reverse=True,
         )[:k]
 
     def diverse_top_k(
@@ -223,6 +215,7 @@ class FactorCatalog:
             return candidates[:k]
 
         import numpy as _np
+
         selected: list[FactorCatalogEntry] = []
         selected_signals: list[_np.ndarray] = []
         for entry in candidates:
@@ -273,9 +266,7 @@ class FactorCatalog:
         return [asdict(e) for e in self._entries]
 
     @classmethod
-    def from_json_list(
-        cls, data: list[dict[str, Any]], max_entries: int = 5000
-    ) -> FactorCatalog:
+    def from_json_list(cls, data: list[dict[str, Any]], max_entries: int = 5000) -> FactorCatalog:
         catalog = cls(max_entries=max_entries)
         for d in data:
             try:

@@ -23,6 +23,7 @@ from loguru import logger
 @dataclass
 class FactoryConfig:
     """因子工厂配置。"""
+
     markets: list[str] = field(default_factory=lambda: ["crypto"])
     symbols_per_market: dict[str, list[str]] = field(default_factory=dict)
     generations: int = 5
@@ -39,6 +40,7 @@ class FactoryConfig:
 @dataclass
 class FactoryResult:
     """工厂流水线执行结果。"""
+
     search_results: dict[str, Any]  # market → search result
     zoo_count: int
     combination_result: dict[str, Any] | None
@@ -56,6 +58,7 @@ class FactorFactory:
 
     def _get_service(self, market: str):
         from src.alpha import AlphaService
+
         return AlphaService(market=market, **self._service_kwargs)
 
     def run_pipeline(self, config: FactoryConfig | None = None) -> FactoryResult:
@@ -147,7 +150,10 @@ class FactorFactory:
 
         logger.info(
             "factory.pipeline completed markets={} zoo={} decaying={} total={:.1f}s",
-            config.markets, zoo_count, len(decaying_factors), timing["total"],
+            config.markets,
+            zoo_count,
+            len(decaying_factors),
+            timing["total"],
         )
 
         return FactoryResult(

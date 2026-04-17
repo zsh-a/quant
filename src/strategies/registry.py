@@ -35,9 +35,7 @@ class StrategyRegistry:
         return cls._strategies.get(name)
 
     @classmethod
-    def create_strategy(
-        cls, name: str, db_client, session_id: str = None, **kwargs
-    ) -> Optional[Strategy]:
+    def create_strategy(cls, name: str, db_client, session_id: str = None, **kwargs) -> Optional[Strategy]:
         """Create a strategy instance by name"""
         strategy_cls = cls.get_strategy_class(name)
         if strategy_cls is None:
@@ -79,16 +77,19 @@ class StrategyRegistry:
         # Alpha-dependent strategies — optional (require torch)
         try:
             from src.strategies import multi_factor_strategy
+
             _ = multi_factor_strategy
         except Exception:
             pass
         try:
             from src.strategies import precomputed_alpha_strategy
+
             _ = precomputed_alpha_strategy
         except Exception:
             pass
         try:
             from src.strategies import brooks_strategy
+
             _ = brooks_strategy
         except Exception:
             pass
@@ -99,10 +100,6 @@ StrategyRegistry.register_all()
 
 
 # Convenience function
-def get_strategy(
-    name: str, db_client, session_id: str = None, **kwargs
-) -> Optional[Strategy]:
+def get_strategy(name: str, db_client, session_id: str = None, **kwargs) -> Optional[Strategy]:
     """Get a strategy instance by name"""
-    return StrategyRegistry.create_strategy(
-        name, db_client, session_id=session_id, **kwargs
-    )
+    return StrategyRegistry.create_strategy(name, db_client, session_id=session_id, **kwargs)

@@ -394,7 +394,7 @@ def test_factor_correlation_matrix():
         for j in range(i, N):
             ref = abs(np.corrcoef(factors_np[i], factors_np[j])[0, 1])
             assert abs(result[i, j].item() - ref) < 0.01, (
-                f"Pair ({i},{j}): Triton={result[i,j].item():.6f}, NumPy={ref:.6f}"
+                f"Pair ({i},{j}): Triton={result[i, j].item():.6f}, NumPy={ref:.6f}"
             )
 
     # Diagonal should be ~1.0
@@ -451,7 +451,7 @@ def test_vm_triton_backend_produces_valid_output():
             arr = result.cpu().numpy()
         assert arr.shape == (T, S), f"Formula {formula}: expected ({T},{S}), got {arr.shape}"
         finite_ratio = np.isfinite(arr).mean()
-        assert finite_ratio > 0.5, f"Formula {formula}: too many NaN ({1-finite_ratio:.1%})"
+        assert finite_ratio > 0.5, f"Formula {formula}: too many NaN ({1 - finite_ratio:.1%})"
 
 
 @requires_triton
@@ -497,9 +497,7 @@ def test_vm_triton_batch_matches_serial():
             s = s.cpu().numpy()
         if hasattr(b, "cpu"):
             b = b.cpu().numpy()
-        assert np.allclose(s, b, atol=1e-5, equal_nan=True), (
-            f"Formula {formula}: batch/serial mismatch"
-        )
+        assert np.allclose(s, b, atol=1e-5, equal_nan=True), f"Formula {formula}: batch/serial mismatch"
 
 
 # ---------------------------------------------------------------------------

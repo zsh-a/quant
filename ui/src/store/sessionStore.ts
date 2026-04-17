@@ -39,7 +39,7 @@ export const useSessionStore = create<SessionStore>()(
   persist(
     (set, get) => ({
       ...initialState,
-      
+
       actions: {
         setSessions: (sessions) => {
           const sessionIds = new Set(sessions.map(s => s.id))
@@ -56,7 +56,7 @@ export const useSessionStore = create<SessionStore>()(
             primarySessionId: validPrimary
           })
         },
-        
+
         selectSession: (id) => {
           const { selectedSessionIds } = get()
           if (!selectedSessionIds.includes(id)) {
@@ -64,7 +64,7 @@ export const useSessionStore = create<SessionStore>()(
           }
           set({ primarySessionId: id })
         },
-        
+
         deselectSession: (id) => {
           const { selectedSessionIds, primarySessionId } = get()
           const newSelected = selectedSessionIds.filter(s => s !== id)
@@ -75,7 +75,7 @@ export const useSessionStore = create<SessionStore>()(
               : primarySessionId
           })
         },
-        
+
         toggleSession: (id) => {
           const { selectedSessionIds, actions } = get()
           if (selectedSessionIds.includes(id)) {
@@ -84,20 +84,20 @@ export const useSessionStore = create<SessionStore>()(
             actions.selectSession(id)
           }
         },
-        
+
         updateSession: (id, data) => set((state) => ({
           sessions: state.sessions.map(s =>
             s.id === id ? { ...s, ...data } : s
           )
         })),
-        
+
         addSessionData: (id, data) => set((state) => ({
           sessionDataCache: {
             ...(state.sessionDataCache || {}),
             [id]: data
           }
         })),
-        
+
         removeSession: (id) => set((state) => {
           const sessionDataCache = state.sessionDataCache || {}
           const { [id]: _, ...rest } = sessionDataCache
@@ -110,7 +110,7 @@ export const useSessionStore = create<SessionStore>()(
             sessionDataCache: rest
           }
         }),
-        
+
         clearAll: () => set({
           ...initialState
         })

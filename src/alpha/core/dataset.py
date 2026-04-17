@@ -98,9 +98,12 @@ class AlphaDataset:
 
         included = mask.sum(axis=1).mean()
         logger.info(
-            "universe_mask built: adv_window={} top_n={} skip_top={} "
-            "avg_included={:.1f}/{} symbols",
-            adv_window, top_n, skip_top_n, included, N,
+            "universe_mask built: adv_window={} top_n={} skip_top={} avg_included={:.1f}/{} symbols",
+            adv_window,
+            top_n,
+            skip_top_n,
+            included,
+            N,
         )
         return mask
 
@@ -167,24 +170,47 @@ _FUTURES_TABLE = "crypto_data.futures_5m"
 _BASE_INTERVAL_MINUTES = 5
 
 _SELECT_COLUMNS = [
-    "symbol", "open_time", "close_time",
-    "open", "high", "low", "close",
-    "volume", "quote_volume", "trade_count",
-    "taker_buy_volume", "taker_buy_quote_volume",
-    "mark_open", "mark_high", "mark_low", "mark_close",
-    "premium_open", "premium_high", "premium_low", "premium_close",
-    "open_interest", "open_interest_value",
-    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
-    "long_short_ratio", "taker_long_short_vol_ratio",
+    "symbol",
+    "open_time",
+    "close_time",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "quote_volume",
+    "trade_count",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+    "mark_open",
+    "mark_high",
+    "mark_low",
+    "mark_close",
+    "premium_open",
+    "premium_high",
+    "premium_low",
+    "premium_close",
+    "open_interest",
+    "open_interest_value",
+    "top_trader_long_short_ratio",
+    "top_trader_long_short_position_ratio",
+    "long_short_ratio",
+    "taker_long_short_vol_ratio",
     "funding_rate",
 ]
 
 _RESAMPLE_LAST = {
-    "symbol", "close_time", "close",
-    "mark_close", "premium_close",
-    "open_interest", "open_interest_value",
-    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
-    "long_short_ratio", "taker_long_short_vol_ratio",
+    "symbol",
+    "close_time",
+    "close",
+    "mark_close",
+    "premium_close",
+    "open_interest",
+    "open_interest_value",
+    "top_trader_long_short_ratio",
+    "top_trader_long_short_position_ratio",
+    "long_short_ratio",
+    "taker_long_short_vol_ratio",
     "funding_rate",
 }
 
@@ -201,25 +227,40 @@ for _col in _SELECT_COLUMNS:
         _CH_AGG[_col] = "max"
     elif _col in ("low", "mark_low", "premium_low"):
         _CH_AGG[_col] = "min"
-    elif _col in ("volume", "quote_volume", "trade_count",
-                   "taker_buy_volume", "taker_buy_quote_volume"):
+    elif _col in ("volume", "quote_volume", "trade_count", "taker_buy_volume", "taker_buy_quote_volume"):
         _CH_AGG[_col] = "sum"
     else:
         _CH_AGG[_col] = "argMax"  # last by time
 
 _ZERO_FILL_FIELDS = [
-    "trade_count", "taker_buy_volume", "taker_buy_quote_volume",
-    "mark_open", "mark_high", "mark_low", "mark_close",
-    "premium_open", "premium_high", "premium_low", "premium_close",
-    "open_interest", "open_interest_value",
-    "top_trader_long_short_ratio", "top_trader_long_short_position_ratio",
-    "long_short_ratio", "taker_long_short_vol_ratio",
+    "trade_count",
+    "taker_buy_volume",
+    "taker_buy_quote_volume",
+    "mark_open",
+    "mark_high",
+    "mark_low",
+    "mark_close",
+    "premium_open",
+    "premium_high",
+    "premium_low",
+    "premium_close",
+    "open_interest",
+    "open_interest_value",
+    "top_trader_long_short_ratio",
+    "top_trader_long_short_position_ratio",
+    "long_short_ratio",
+    "taker_long_short_vol_ratio",
     "funding_rate",
 ]
 
 # All numeric columns that need to be pivoted into fields.
 _PIVOT_COLUMNS = [
-    "open", "high", "low", "close", "volume", "quote_volume",
+    "open",
+    "high",
+    "low",
+    "close",
+    "volume",
+    "quote_volume",
     *_ZERO_FILL_FIELDS,
 ]
 
@@ -253,13 +294,16 @@ class CryptoMinuteDatasetLoader:
         query_params = {"symbols": upper_symbols, "start": start_str, "end": end_str}
 
         from time import perf_counter as _pc
+
         _t0 = _pc()
 
         requested_interval = interval
         resample_minutes = self._interval_minutes(requested_interval)
         if resample_minutes is not None and resample_minutes > _BASE_INTERVAL_MINUTES:
             query = self._build_ch_resample_query(
-                start_str, end_str, resample_minutes,
+                start_str,
+                end_str,
+                resample_minutes,
             )
         else:
             cols = ", ".join(_SELECT_COLUMNS)
@@ -298,7 +342,9 @@ class CryptoMinuteDatasetLoader:
 
         logger.info(
             "alpha.dataset.timing query={:.1f}s pivot={:.1f}s rows={}",
-            _t_query - _t0, _t_pivot - _t_query, len(df),
+            _t_query - _t0,
+            _t_pivot - _t_query,
+            len(df),
         )
 
         # Release the large DataFrame and force GC before downstream work.
@@ -325,8 +371,12 @@ class CryptoMinuteDatasetLoader:
         mem_mb = sum(a.nbytes for a in fields.values()) / (1024 * 1024)
         logger.info(
             "alpha.dataset loaded symbols={} timestamps={} interval={} dtype={} fields={} mem={:.0f}MB",
-            len(resolved_symbols), len(timestamps), requested_interval, _DTYPE.__name__,
-            len(fields), mem_mb,
+            len(resolved_symbols),
+            len(timestamps),
+            requested_interval,
+            _DTYPE.__name__,
+            len(fields),
+            mem_mb,
         )
 
         return AlphaDataset(
@@ -385,7 +435,9 @@ class CryptoMinuteDatasetLoader:
 
     @staticmethod
     def _build_ch_resample_query(
-        start_str: str, end_str: str, minutes: int,
+        start_str: str,
+        end_str: str,
+        minutes: int,
     ) -> str:
         """Build a ClickHouse query that resamples 5m data server-side.
 
@@ -455,8 +507,7 @@ class CryptoMinuteDatasetLoader:
                 agg_spec[col] = "max"
             elif col in ("low", "mark_low", "premium_low"):
                 agg_spec[col] = "min"
-            elif col in ("volume", "quote_volume", "trade_count",
-                         "taker_buy_volume", "taker_buy_quote_volume"):
+            elif col in ("volume", "quote_volume", "trade_count", "taker_buy_volume", "taker_buy_quote_volume"):
                 agg_spec[col] = "sum"
             elif col in _RESAMPLE_LAST:
                 agg_spec[col] = "last"
@@ -474,19 +525,40 @@ class CryptoMinuteDatasetLoader:
 _STOCK_TABLE = "stock_data.stock_daily"
 
 _STOCK_SELECT_COLUMNS = [
-    "date", "code",
-    "open", "high", "low", "close", "preclose",
-    "volume", "amount", "turn", "pctChg",
-    "peTTM", "pbMRQ",
-    "tradestatus", "isST", "adjfactor",
+    "date",
+    "code",
+    "open",
+    "high",
+    "low",
+    "close",
+    "preclose",
+    "volume",
+    "amount",
+    "turn",
+    "pctChg",
+    "peTTM",
+    "pbMRQ",
+    "tradestatus",
+    "isST",
+    "adjfactor",
 ]
 
 _STOCK_PRICE_COLS = ["open", "high", "low", "close", "preclose"]
 
 _STOCK_PIVOT_COLUMNS = [
-    "open", "high", "low", "close", "preclose",
-    "volume", "amount", "turn", "pctChg",
-    "peTTM", "pbMRQ", "isST", "adjfactor",
+    "open",
+    "high",
+    "low",
+    "close",
+    "preclose",
+    "volume",
+    "amount",
+    "turn",
+    "pctChg",
+    "peTTM",
+    "pbMRQ",
+    "isST",
+    "adjfactor",
 ]
 
 
@@ -591,7 +663,10 @@ class AShareDailyDatasetLoader:
 
         logger.info(
             "alpha.dataset.a_share loaded symbols={} timestamps={} interval={} dtype={}",
-            len(resolved_symbols), len(timestamps), interval, _DTYPE.__name__,
+            len(resolved_symbols),
+            len(timestamps),
+            interval,
+            _DTYPE.__name__,
         )
 
         return AlphaDataset(
@@ -653,8 +728,7 @@ class AShareDailyDatasetLoader:
         """Resolve index code(s) to constituent stock codes via stock_data.index_stocks."""
         codes = [c.strip() for c in universe.split(",") if c.strip()]
         result = client.query(
-            "SELECT DISTINCT code FROM stock_data.index_stocks "
-            "WHERE index IN {codes:Array(String)}",
+            "SELECT DISTINCT code FROM stock_data.index_stocks WHERE index IN {codes:Array(String)}",
             parameters={"codes": codes},
         )
         if not result.result_rows:

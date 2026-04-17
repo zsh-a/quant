@@ -167,6 +167,7 @@ def test_ccxt_adapter_market_loading_skips_fetch_currencies():
 
     assert market["symbol"] == "BTC/USDT:USDT"
 
+
 def test_crypto_store_missing_ranges_split():
     start = datetime(2024, 1, 1, 0, 0, tzinfo=UTC)
     end = datetime(2024, 1, 1, 0, 5, tzinfo=UTC)

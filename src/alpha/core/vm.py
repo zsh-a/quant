@@ -82,6 +82,7 @@ class SubexprCache:
     def __init__(self, max_entries: int = 4096):
         import threading
         from collections import OrderedDict
+
         self._cache: OrderedDict[tuple[Any, ...], ArrayLike] = OrderedDict()
         self._max = max_entries
         self._lock = threading.Lock()
@@ -159,7 +160,9 @@ class StackVM:
             if ins.opcode == "push_field":
                 cache_key = ("field", ins.value)
                 registers[ins.dst] = self._cache_lookup_or_compute(
-                    cache_key, shared_cache, output_shape,
+                    cache_key,
+                    shared_cache,
+                    output_shape,
                     lambda: store.get_field(ins.value),
                 )
                 register_keys[ins.dst] = cache_key
@@ -167,7 +170,9 @@ class StackVM:
             if ins.opcode == "push_const":
                 cache_key = ("const", float(ins.value), output_shape)
                 registers[ins.dst] = self._cache_lookup_or_compute(
-                    cache_key, shared_cache, output_shape,
+                    cache_key,
+                    shared_cache,
+                    output_shape,
                     lambda: self._broadcast_const(ins.value, output_shape, store),
                 )
                 register_keys[ins.dst] = cache_key
@@ -175,7 +180,9 @@ class StackVM:
             args = [registers[idx] for idx in ins.args]
             cache_key = (ins.opcode, *(register_keys[idx] for idx in ins.args))
             registers[ins.dst] = self._cache_lookup_or_compute(
-                cache_key, shared_cache, output_shape,
+                cache_key,
+                shared_cache,
+                output_shape,
                 lambda: self._execute(ins.opcode, args),
             )
             register_keys[ins.dst] = cache_key
@@ -194,10 +201,7 @@ class StackVM:
     def _prepare_store(self, store: TensorStore) -> TensorStore:
         if self.backend != "torch":
             return store
-        fields = {
-            name: self._as_torch_tensor(value)
-            for name, value in store.fields.items()
-        }
+        fields = {name: self._as_torch_tensor(value) for name, value in store.fields.items()}
         return TensorStore(fields)
 
     def _restore_output(self, value: ArrayLike, original_store: TensorStore) -> ArrayLike:
@@ -555,7 +559,9 @@ class StackVM:
             return self._rolling_torch(args[0], window, reducer="mean")
         if opcode == "amihud":
             window = int(self._scalar(args[2]))
-            illiquidity = torch.abs(self._execute_torch("log_return", [args[0], args[2]])) / (torch.abs(args[1]) + 1e-12)
+            illiquidity = torch.abs(self._execute_torch("log_return", [args[0], args[2]])) / (
+                torch.abs(args[1]) + 1e-12
+            )
             if self.use_triton:
                 mean, _ = _triton_rolling_mean_std(illiquidity, window)
                 return mean
@@ -641,14 +647,16 @@ class StackVM:
             return result
         windows = np.lib.stride_tricks.sliding_window_view(data, window_shape=window, axis=0)
         reduced = reducer(windows, axis=-1)
-        result[window - 1:] = reduced
+        result[window - 1 :] = reduced
         return result
 
     def _pool1d_sum(self, x_2d: Any, window: int) -> Any:
         """Rolling sum via avg_pool1d. Input (T, S), output (T-W+1, S)."""
         # avg_pool1d expects (N, C, L); we use (S, 1, T)
         pooled = torch.nn.functional.avg_pool1d(
-            x_2d.T.unsqueeze(1), window, stride=1,
+            x_2d.T.unsqueeze(1),
+            window,
+            stride=1,
         )
         return pooled.squeeze(1).T * window  # avg * W = sum
 
@@ -670,7 +678,7 @@ class StackVM:
             else:
                 reduced = r_sum / r_cnt.clamp(min=1).to(data.dtype)
                 reduced = torch.where(r_cnt > 0, reduced, torch.full_like(reduced, torch.nan))
-            result[window - 1:] = reduced
+            result[window - 1 :] = reduced
             return result
 
         if reducer == "std":
@@ -681,7 +689,7 @@ class StackVM:
             mean = r_sum / n
             var = (r_sum2 / n - mean * mean).clamp(min=0)
             reduced = torch.where(r_cnt > 0, torch.sqrt(var), torch.full_like(var, torch.nan))
-            result[window - 1:] = reduced
+            result[window - 1 :] = reduced
             return result
 
         if reducer in ("max", "min"):
@@ -695,7 +703,7 @@ class StackVM:
             reduced = pooled.squeeze(1).T
             all_nan_cnt = self._pool1d_sum((~valid).float(), window)
             reduced = torch.where(all_nan_cnt >= window, torch.full_like(reduced, torch.nan), reduced)
-            result[window - 1:] = reduced
+            result[window - 1 :] = reduced
             return result
 
         raise ValueError(f"Unsupported rolling reducer: {reducer}")
@@ -728,7 +736,7 @@ class StackVM:
         else:
             raise ValueError(f"Unsupported rolling pair reducer: {reducer}")
         reduced[count == 0] = np.nan
-        result[window - 1:] = reduced
+        result[window - 1 :] = reduced
         return result
 
     def _rolling_pair_torch(self, left: ArrayLike, right: ArrayLike, window: int, reducer: str) -> ArrayLike:
@@ -759,7 +767,7 @@ class StackVM:
             raise ValueError(f"Unsupported rolling pair reducer: {reducer}")
 
         reduced = torch.where(cnt > 0, reduced, torch.full_like(reduced, torch.nan))
-        result[window - 1:] = reduced
+        result[window - 1 :] = reduced
         return result
 
     # --- decay linear ---
@@ -776,7 +784,7 @@ class StackVM:
         denom = np.where(valid, weights, 0.0).sum(axis=-1)
         reduced = weighted.sum(axis=-1) / np.maximum(denom, 1e-12)
         reduced[denom <= 0] = np.nan
-        result[window - 1:] = reduced
+        result[window - 1 :] = reduced
         return result
 
     def _decay_linear_torch(self, arr: ArrayLike, window: int) -> ArrayLike:
@@ -797,7 +805,7 @@ class StackVM:
         weight_denom = torch.nn.functional.conv1d(v, kernel).squeeze(1).T
         reduced = weighted_sum / weight_denom.clamp(min=1e-12)
         reduced = torch.where(weight_denom > 0, reduced, torch.full_like(reduced, torch.nan))
-        result[window - 1:] = reduced
+        result[window - 1 :] = reduced
         return result
 
     # --- ts_ema (NEW) ---
@@ -864,7 +872,7 @@ class StackVM:
         counts = valid.sum(axis=-1)
         scaled = indices.astype(float) / max(window - 1, 1)
         scaled[counts == 0] = np.nan
-        result[window - 1:] = scaled
+        result[window - 1 :] = scaled
         return result
 
     def _ts_argextreme_torch(self, arr: ArrayLike, window: int, mode: str) -> ArrayLike:
@@ -887,7 +895,7 @@ class StackVM:
         better = np.where(valid[..., :-1], last > windows[..., :-1], False).sum(axis=-1)
         ranked = better / np.maximum(counts, 1)
         ranked[counts == 0] = np.nan
-        result[window - 1:] = ranked
+        result[window - 1 :] = ranked
         return result
 
     def _ts_rank_torch(self, arr: ArrayLike, window: int) -> ArrayLike:

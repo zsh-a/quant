@@ -26,9 +26,11 @@ _MIGRATIONS: list[Migration] = []
 
 def migration(version: str, description: str):
     """Decorator to register a schema migration."""
+
     def decorator(fn: Callable):
         _MIGRATIONS.append((version, description, fn))
         return fn
+
     return decorator
 
 
@@ -58,8 +60,7 @@ def _applied_versions(client) -> set[str]:
 
 def _mark_applied(client, version: str, description: str):
     client.command(
-        "INSERT INTO system_meta.schema_migrations (version, description) VALUES "
-        "({version:String}, {desc:String})",
+        "INSERT INTO system_meta.schema_migrations (version, description) VALUES ({version:String}, {desc:String})",
         parameters={"version": version, "desc": description},
     )
 
@@ -67,6 +68,7 @@ def _mark_applied(client, version: str, description: str):
 # ---------------------------------------------------------------------------
 # Registered migrations
 # ---------------------------------------------------------------------------
+
 
 @migration("001", "Create stock_data database and core tables")
 def _m001(client):
@@ -153,6 +155,7 @@ def _m003(client):
 # ---------------------------------------------------------------------------
 # Runner
 # ---------------------------------------------------------------------------
+
 
 def run_migrations() -> list[str]:
     """Execute pending migrations. Returns list of newly applied versions."""

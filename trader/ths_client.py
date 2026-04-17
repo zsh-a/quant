@@ -21,7 +21,7 @@ def try_buy(code):
     return json.loads(resp.text)
 
 def buy(code):
-    
+
 
 if __name__ == "__main__":
 

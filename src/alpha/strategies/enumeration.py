@@ -54,17 +54,19 @@ class EnumerationStrategy(BaseStrategy):
 
         # Use shared evaluator if available, else fall back to fast_screen_ic
         if ctx.evaluator is not None:
-            passed = [
-                (f, ic) for f, ic in ctx.evaluator.eval_ic_batch(formulas)
-                if abs(ic) >= self.min_abs_ic
-            ]
+            passed = [(f, ic) for f, ic in ctx.evaluator.eval_ic_batch(formulas) if abs(ic) >= self.min_abs_ic]
             passed.sort(key=lambda x: abs(x[1]), reverse=True)
         else:
             from ..core.vm import StackVM
             from ..eval.fast_screen import fast_screen_ic
+
             vm = ctx.vm or StackVM()
             passed = fast_screen_ic(
-                formulas, ctx.dataset, ctx.compiler, vm, ctx.schema,
+                formulas,
+                ctx.dataset,
+                ctx.compiler,
+                vm,
+                ctx.schema,
                 min_abs_ic=self.min_abs_ic,
             )
 
@@ -83,12 +85,16 @@ class EnumerationStrategy(BaseStrategy):
 
         logger.info(
             "enumeration.generate enumerated={} ic_passed={} candidates={}",
-            len(formulas), len(passed), len(candidates),
+            len(formulas),
+            len(passed),
+            len(candidates),
         )
         return candidates
 
     def on_evaluation_complete(
-        self, ctx: SearchContext, evaluated: list[Individual],
+        self,
+        ctx: SearchContext,
+        evaluated: list[Individual],
     ) -> None:
         pass  # Enumeration does no learning
 

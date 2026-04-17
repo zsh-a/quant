@@ -1,7 +1,49 @@
+exclude: |
+  (?x)^(
+    logs/.*|
+    data/.*|
+    db/.*|
+    node_modules/.*|
+    \.venv/.*|
+    ui/dist/.*|
+    utils/TGW-SDK.*|
+    .*\.csv|
+    .*\.log|
+    .*\.sql|
+    .*\.xml|
+    .*\.min\.(js|css)|
+    config/static_data/.*|
+    uv\.lock
+  )$
+
 repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+        exclude: ^ui/tsconfig.*\.json$  # tsconfig allows JSON5 comments
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: [--maxkb=1000]
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.8.6
+    rev: v0.15.11
     hooks:
       - id: ruff
         args: [--fix]
+        files: ^(src|tests)/.*\.py$
       - id: ruff-format
+        files: ^(src|tests)/.*\.py$
+
+  - repo: local
+    hooks:
+      - id: tsc
+        name: ui tsc --noEmit
+        entry: bash -c 'cd ui && bunx tsc --noEmit'
+        language: system
+        pass_filenames: false
+        files: ^ui/.*\.(ts|tsx)$

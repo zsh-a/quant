@@ -16,6 +16,7 @@ logger = get_logger(__name__)
 
 class OrderType(Enum):
     """Order type enumeration"""
+
     MARKET = "market"
     LIMIT = "limit"
     STOP = "stop"
@@ -24,12 +25,14 @@ class OrderType(Enum):
 
 class OrderSide(Enum):
     """Order side enumeration"""
+
     BUY = "buy"
     SELL = "sell"
 
 
 class OrderStatus(Enum):
     """Order status enumeration"""
+
     PENDING = "pending"
     SUBMITTED = "submitted"
     PARTIAL_FILLED = "partial_filled"
@@ -42,6 +45,7 @@ class OrderStatus(Enum):
 @dataclass
 class Order:
     """Order data structure"""
+
     symbol: str
     side: OrderSide
     quantity: float
@@ -66,6 +70,7 @@ class Order:
 @dataclass
 class Position:
     """Position data structure"""
+
     symbol: str
     quantity: float
     avg_cost: float
@@ -76,19 +81,20 @@ class Position:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'symbol': self.symbol,
-            'quantity': self.quantity,
-            'avg_cost': self.avg_cost,
-            'current_price': self.current_price,
-            'market_value': self.market_value,
-            'unrealized_pnl': self.unrealized_pnl,
-            'unrealized_pnl_pct': self.unrealized_pnl_pct
+            "symbol": self.symbol,
+            "quantity": self.quantity,
+            "avg_cost": self.avg_cost,
+            "current_price": self.current_price,
+            "market_value": self.market_value,
+            "unrealized_pnl": self.unrealized_pnl,
+            "unrealized_pnl_pct": self.unrealized_pnl_pct,
         }
 
 
 @dataclass
 class AccountInfo:
     """Account information data structure"""
+
     cash: float
     total_equity: float
     positions: Dict[str, Position]
@@ -97,11 +103,11 @@ class AccountInfo:
 
     def to_dict(self) -> Dict[str, Any]:
         return {
-            'cash': self.cash,
-            'total_equity': self.total_equity,
-            'positions': {k: v.to_dict() for k, v in self.positions.items()},
-            'buying_power': self.buying_power,
-            'margin_used': self.margin_used
+            "cash": self.cash,
+            "total_equity": self.total_equity,
+            "positions": {k: v.to_dict() for k, v in self.positions.items()},
+            "buying_power": self.buying_power,
+            "margin_used": self.margin_used,
         }
 
 
@@ -259,7 +265,7 @@ class MockBroker(BrokerInterface):
                     current_price=exec_price,
                     market_value=order.quantity * exec_price,
                     unrealized_pnl=0.0,
-                    unrealized_pnl_pct=0.0
+                    unrealized_pnl_pct=0.0,
                 )
 
         elif order.side == OrderSide.SELL:
@@ -328,7 +334,7 @@ class MockBroker(BrokerInterface):
             cash=self.cash,
             total_equity=total_equity,
             positions=self.positions.copy(),
-            buying_power=self.cash  # Simplified: no margin
+            buying_power=self.cash,  # Simplified: no margin
         )
 
     def get_positions(self) -> Dict[str, Position]:

@@ -123,6 +123,7 @@ class PrecomputedAlphaStrategy(Strategy):
 
         # 二分查找最近的历史日期
         import bisect
+
         idx = bisect.bisect_right(self._weight_dates, date_str)
         if idx == 0:
             return None  # 还没有可用的权重
@@ -194,7 +195,7 @@ class PrecomputedAlphaStrategy(Strategy):
         # 按权重降序排列，选 top_n
         sorted_symbols = sorted(weights.items(), key=lambda x: x[1], reverse=True)
         # 只选正权重
-        selected = [(s, w) for s, w in sorted_symbols if w > 0][:self.top_n]
+        selected = [(s, w) for s, w in sorted_symbols if w > 0][: self.top_n]
 
         if not selected:
             return {}
@@ -231,7 +232,7 @@ class PrecomputedAlphaStrategy(Strategy):
             return {}
 
         # 按权重排序取 top_n
-        sorted_symbols = sorted(positive.items(), key=lambda x: x[1], reverse=True)[:self.top_n]
+        sorted_symbols = sorted(positive.items(), key=lambda x: x[1], reverse=True)[: self.top_n]
 
         # 权重归一化
         total_weight = sum(w for _, w in sorted_symbols)

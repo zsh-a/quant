@@ -205,9 +205,7 @@ class BacktestCache:
         hash_key = hashlib.md5(key_data.encode()).hexdigest()[:16]
         return f"backtest:{strategy}:{symbol}:{hash_key}"
 
-    def cache_session_result(
-        self, session_id: str, result: Dict[str, Any], ttl: int = 7200
-    ) -> bool:
+    def cache_session_result(self, session_id: str, result: Dict[str, Any], ttl: int = 7200) -> bool:
         """Cache session result"""
         key = self._make_session_key(session_id)
         return self.cache.set(key, result, ttl)
@@ -217,9 +215,7 @@ class BacktestCache:
         key = self._make_session_key(session_id)
         return self.cache.get(key)
 
-    def cache_equity_history(
-        self, session_id: str, equity_history: List[Dict[str, Any]], ttl: int = 7200
-    ) -> bool:
+    def cache_equity_history(self, session_id: str, equity_history: List[Dict[str, Any]], ttl: int = 7200) -> bool:
         """Cache equity history"""
         key = self._make_equity_key(session_id)
         return self.cache.set(key, equity_history, ttl)
@@ -229,9 +225,7 @@ class BacktestCache:
         key = self._make_equity_key(session_id)
         return self.cache.get(key)
 
-    def cache_trades(
-        self, session_id: str, trades: List[Dict[str, Any]], ttl: int = 7200
-    ) -> bool:
+    def cache_trades(self, session_id: str, trades: List[Dict[str, Any]], ttl: int = 7200) -> bool:
         """Cache trades"""
         key = self._make_trades_key(session_id)
         return self.cache.set(key, trades, ttl)
@@ -252,9 +246,7 @@ class BacktestCache:
         ttl: int = 86400,
     ) -> bool:
         """Cache backtest result by configuration (for deduplication)"""
-        key = self._make_backtest_result_key(
-            strategy, symbol, start_date, end_date, params
-        )
+        key = self._make_backtest_result_key(strategy, symbol, start_date, end_date, params)
         return self.cache.set(key, result, ttl)
 
     def get_backtest_result(
@@ -266,9 +258,7 @@ class BacktestCache:
         params: Dict[str, Any],
     ) -> Optional[Dict[str, Any]]:
         """Get cached backtest result by configuration"""
-        key = self._make_backtest_result_key(
-            strategy, symbol, start_date, end_date, params
-        )
+        key = self._make_backtest_result_key(strategy, symbol, start_date, end_date, params)
         return self.cache.get(key)
 
     def invalidate_session(self, session_id: str) -> int:

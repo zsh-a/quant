@@ -10,4 +10,3 @@ celery -A src.tasks.celery_app worker \
     --max-tasks-per-child=100 \
     --time-limit=3600 \
     --soft-time-limit=3000
-

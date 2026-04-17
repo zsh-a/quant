@@ -61,6 +61,7 @@ def _rank_cross_section(factor: pd.DataFrame) -> pd.DataFrame:
 
 # --------------- Strategy ---------------
 
+
 @StrategyRegistry.register(
     name="multi_factor",
     label="Multi-Factor Alpha",
@@ -103,9 +104,9 @@ class MultiFactorStrategy(Strategy):
             f"factors={len(self.factors)}"
         )
         for i, f in enumerate(self.factors):
-            ic = f['metrics'].get('rank_ic', 0)
+            ic = f["metrics"].get("rank_ic", 0)
             direction = "正向" if ic > 0 else "反向"
-            self._log(f"  Factor {i+1}: IC={ic:+.4f} ({direction})  {f['formula'][:60]}")
+            self._log(f"  Factor {i + 1}: IC={ic:+.4f} ({direction})  {f['formula'][:60]}")
 
     # ---- Parameters ----
 
@@ -151,6 +152,7 @@ class MultiFactorStrategy(Strategy):
         """Load and filter factors from the alpha zoo."""
         if not zoo_dir:
             from src.config.paths import ALPHA_ZOO_DIR
+
             zoo_dir = str(ALPHA_ZOO_DIR.parent)
         zoo = AlphaZooPersistence(root_dir=zoo_dir)
         all_factors = zoo.load_all()
@@ -193,7 +195,8 @@ class MultiFactorStrategy(Strategy):
         """
         # 1. Fetch price history (lookback days for all stocks)
         price_df = self.db_client.get_price(
-            stocks, date_str,
+            stocks,
+            date_str,
             fields=["open", "high", "low", "close", "volume", "amount"],
             count=self.lookback,
         )
@@ -235,7 +238,7 @@ class MultiFactorStrategy(Strategy):
                     composite = composite.add(ranked * w, fill_value=0)
 
             except Exception as e:
-                self._log(f"Factor {i+1} evaluation failed: {e}", level="WARNING")
+                self._log(f"Factor {i + 1} evaluation failed: {e}", level="WARNING")
                 continue
 
         if composite is None:
@@ -278,7 +281,7 @@ class MultiFactorStrategy(Strategy):
             target_stocks = scores.head(self.top_n).index.tolist()
             self._log(f"Top {self.top_n} stocks selected")
             for i, s in enumerate(target_stocks[:5]):
-                self._log(f"  {i+1}. {s}  score={scores[s]:.4f}")
+                self._log(f"  {i + 1}. {s}  score={scores[s]:.4f}")
             if len(target_stocks) > 5:
                 self._log(f"  ... and {len(target_stocks) - 5} more")
 

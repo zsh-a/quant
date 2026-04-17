@@ -97,9 +97,9 @@ const SessionList: React.FC<SessionListProps> = ({
                         {filteredSessions.map(s => (
                             <tr key={s.id} style={{ backgroundColor: selectedSessionIds.includes(s.id) ? 'rgba(34, 211, 238, 0.08)' : 'transparent' }}>
                                 <td>
-                                    <input 
-                                        type="checkbox" 
-                                        checked={selectedSessionIds.includes(s.id)} 
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedSessionIds.includes(s.id)}
                                         onChange={() => onToggleSelection(s.id)}
                                         style={{ cursor: 'pointer', width: '16px', height: '16px', accentColor: 'var(--primary)' }}
                                     />

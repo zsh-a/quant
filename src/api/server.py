@@ -81,6 +81,7 @@ from src.utils.logging_config import get_logger, logging_middleware, setup_loggi
 # Alpha Lab — optional, requires torch
 try:
     from src.api.alpha_lab_router import router as alpha_lab_router
+
     _ALPHA_AVAILABLE = True
 except Exception:
     _ALPHA_AVAILABLE = False
@@ -116,9 +117,9 @@ app.add_middleware(
 app.middleware("http")(logging_middleware)
 
 # Include routers
-app.include_router(auth_router)          # /auth — always public
+app.include_router(auth_router)  # /auth — always public
 app.include_router(tasks_router, dependencies=[Depends(require_auth)])
-app.include_router(monitoring_router)    # health/metrics — keep public
+app.include_router(monitoring_router)  # health/metrics — keep public
 app.include_router(portfolio_router, dependencies=[Depends(require_auth)])
 app.include_router(optimizer_router, dependencies=[Depends(require_auth)])
 app.include_router(analysis_router, dependencies=[Depends(require_auth)])
@@ -147,12 +148,14 @@ class SessionRequest(BaseModel):
     params: Dict[str, Any] = Field(default_factory=dict)
     enable_risk_management: bool = True
 
+
 # Register strategies once at startup
 StrategyRegistry.register_all()
 
 # Activate template-based strategies
 try:
     from src.strategies.templates import activate_templates
+
     n = activate_templates()
     if n:
         logger.info(f"Activated {n} template strategies")
@@ -292,6 +295,7 @@ async def run_session_async(req: SessionRequest, request: Request = None):
 
     # Build config for Celery task (include request_id for tracing)
     from src.utils.logging_config import request_id_ctx
+
     config = {
         "symbol": req.symbol,
         "strategy": req.strategy,
@@ -336,18 +340,12 @@ async def delete_session(session_id: str):
 @app.get("/session/{session_id}/risk", dependencies=[Depends(require_auth)])
 async def get_session_risk(session_id: str):
     """Risk metrics and alerts for a session. Returns 404 if session not found."""
-    runtime, persisted = await anyio.to_thread.run_sync(
-        session_service.get_runtime_or_persisted, session_id
-    )
+    runtime, persisted = await anyio.to_thread.run_sync(session_service.get_runtime_or_persisted, session_id)
     if not runtime and not persisted:
         raise HTTPException(status_code=404, detail="Session not found")
     # Risk manager state is not persisted; return safe default so RiskPanel doesn't 404
     return {
-        "enabled": bool(
-            runtime
-            and getattr(runtime, "engine", None)
-            and getattr(runtime.engine, "risk_manager", None)
-        ),
+        "enabled": bool(runtime and getattr(runtime, "engine", None) and getattr(runtime.engine, "risk_manager", None)),
         "metrics": {},
         "limits": {},
         "alerts": [],
@@ -413,15 +411,11 @@ async def get_session_metrics(session_id: str):
     Uses unified metrics calculation for consistency with frontend.
     """
     # Get equity history and trades
-    equity_history = await anyio.to_thread.run_sync(
-        session_db.get_equity_history, session_id
-    )
+    equity_history = await anyio.to_thread.run_sync(session_db.get_equity_history, session_id)
     trades = await anyio.to_thread.run_sync(session_db.get_trades, session_id)
 
     if not equity_history:
-        raise HTTPException(
-            status_code=404, detail="No equity history found for session"
-        )
+        raise HTTPException(status_code=404, detail="No equity history found for session")
 
     # Calculate metrics using unified service
     metrics = calc_perf_metrics(equity_history, trades)
@@ -494,9 +488,7 @@ logger.info("WebSocket event listeners registered")
 @app.post("/session/{session_id}/checkpoint", dependencies=[Depends(require_auth)])
 async def create_checkpoint(session_id: str):
     """Create a checkpoint for a session"""
-    state, metadata = await anyio.to_thread.run_sync(
-        session_service.build_checkpoint_state, session_id
-    )
+    state, metadata = await anyio.to_thread.run_sync(session_service.build_checkpoint_state, session_id)
     success = persistence.save_checkpoint(session_id, state, metadata)
 
     if success:
@@ -525,9 +517,7 @@ async def restore_session(session_id: str):
     # Restore session
     session = await anyio.to_thread.run_sync(session_service.restore_session, state)
 
-    logger.info(
-        f"Session restored: {session_id} from checkpoint {checkpoint['checkpoint_time']}"
-    )
+    logger.info(f"Session restored: {session_id} from checkpoint {checkpoint['checkpoint_time']}")
 
     return {
         "message": "Session restored",

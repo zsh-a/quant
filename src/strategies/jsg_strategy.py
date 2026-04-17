@@ -16,7 +16,6 @@ NUM_STOCKS = 6
     requires_symbol=False,
 )
 class JSGStrategy(Strategy):
-
     def __init__(self, db_client, session_id: str = None, **kwargs):
         super().__init__(session_id=session_id)
         self.db_client = db_client
@@ -95,14 +94,14 @@ class JSGStrategy(Strategy):
 
     def _is_limit_up(self, symbol: str, bar: Bar) -> bool:
         """Check if a stock is at limit-up price."""
-        preclose = bar.extra.get('preclose', 0)
+        preclose = bar.extra.get("preclose", 0)
         if preclose <= 0:
             return False
 
         limit_pct = 0.10
-        if bar.extra.get('isst') == 1:
+        if bar.extra.get("isst") == 1:
             limit_pct = 0.05
-        elif symbol.startswith('sh.68') or symbol.startswith('sz.30'):
+        elif symbol.startswith("sh.68") or symbol.startswith("sz.30"):
             limit_pct = 0.20
 
         up_limit = round(preclose * (1 + limit_pct) + 0.0001, 2)
@@ -250,15 +249,11 @@ class JSGStrategy(Strategy):
         if len(df) == 0:
             return []
 
-        df["ma20"] = df.groupby(level="code")["close"].transform(
-            lambda x: ta.MA(x, timeperiod=20)
-        )
+        df["ma20"] = df.groupby(level="code")["close"].transform(lambda x: ta.MA(x, timeperiod=20))
         df.dropna(inplace=True)
         df["bias"] = df["close"] > df["ma20"]
 
-        if not df.empty and "date" in (
-            df.index.names if hasattr(df.index, "names") else []
-        ):
+        if not df.empty and "date" in (df.index.names if hasattr(df.index, "names") else []):
             df.reset_index(level="date", drop=True, inplace=True)
 
         industry_df = self.db_client.get_stock_industry_sw(df.index.to_list(), end_date)
@@ -276,9 +271,7 @@ class JSGStrategy(Strategy):
 
     def filter_basic(self, stocks, date_str):
         df = self.db_client.get_price(stocks, date_str, ["isST"], 1)
-        if not df.empty and "date" in (
-            df.index.names if hasattr(df.index, "names") else []
-        ):
+        if not df.empty and "date" in (df.index.names if hasattr(df.index, "names") else []):
             df.reset_index(level="date", drop=True, inplace=True)
         # Assuming tradestatus is also in the fields if needed,
         # but the original logic only asked for isST
@@ -300,24 +293,16 @@ class JSGStrategy(Strategy):
         )
         fin_db = fin_db[fin_db["adjusted_profit_diff"] > 0]
 
-        df = self.db_client.get_price(
-            fin_db.index.to_list(), date_str, ["close"], 1, price_adj=False
-        )
-        if not df.empty and "date" in (
-            df.index.names if hasattr(df.index, "names") else []
-        ):
+        df = self.db_client.get_price(fin_db.index.to_list(), date_str, ["close"], 1, price_adj=False)
+        if not df.empty and "date" in (df.index.names if hasattr(df.index, "names") else []):
             df.reset_index(level="date", drop=True, inplace=True)
 
         fin_db["close"] = df["close"]
-        share_info = self.db_client.get_stock_shares_info(
-            fin_db.index.to_list(), str(fin_date)
-        )
+        share_info = self.db_client.get_stock_shares_info(fin_db.index.to_list(), str(fin_date))
         fin_db["total_shares"] = share_info["total_shares"]
         fin_db["market_cap"] = fin_db["close"] * fin_db["total_shares"]
 
-        fin_dbContent = fin_db.sort_values(by="market_cap", ascending=True).iloc[
-            : self.pool_size
-        ]
+        fin_dbContent = fin_db.sort_values(by="market_cap", ascending=True).iloc[: self.pool_size]
         return fin_dbContent.index.to_list()
 
     def adjust(self, target_stocks, date_str):

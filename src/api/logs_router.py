@@ -25,10 +25,7 @@ router = APIRouter(prefix="/logs", tags=["logs"])
 async def list_sessions_with_logs():
     """List all sessions that have logs"""
     sessions = list_session_loggers()
-    return {
-        "sessions": sessions,
-        "count": len(sessions)
-    }
+    return {"sessions": sessions, "count": len(sessions)}
 
 
 @router.get("/{session_id}")
@@ -38,7 +35,7 @@ async def get_session_logs(
     source: Optional[str] = None,
     since: Optional[str] = None,
     limit: int = 500,
-    format: str = "text"  # text or json
+    format: str = "text",  # text or json
 ):
     """
     Get logs for a session.
@@ -61,11 +58,7 @@ async def get_session_logs(
         )
         if not logs:
             return {"logs": [], "count": 0}
-        return {
-            "session_id": session_id,
-            "logs": logs,
-            "count": len(logs)
-        }
+        return {"session_id": session_id, "logs": logs, "count": len(logs)}
     else:
         # Return plain text for log viewer
         text = get_all_logs(session_id, level=level, source=source, since=since, limit=limit)
@@ -88,5 +81,5 @@ async def stream_logs_info(session_id: str):
     return {
         "session_id": session_id,
         "ws_url": f"/ws/session/{session_id}/logs",
-        "message": "Connect to WebSocket for live log streaming"
+        "message": "Connect to WebSocket for live log streaming",
     }

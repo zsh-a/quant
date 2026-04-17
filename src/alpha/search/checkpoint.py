@@ -62,9 +62,7 @@ class SearchCheckpoint:
             )
 
         # Factor catalog
-        (checkpoint_dir / "factor_catalog.json").write_text(
-            json.dumps(self.factor_catalog_json, ensure_ascii=False)
-        )
+        (checkpoint_dir / "factor_catalog.json").write_text(json.dumps(self.factor_catalog_json, ensure_ascii=False))
 
         # Manifest
         (checkpoint_dir / "manifest.json").write_text(
@@ -88,9 +86,7 @@ class SearchCheckpoint:
     def load(cls, checkpoint_dir: Path) -> SearchCheckpoint:
         """Read checkpoint from disk."""
         manifest = json.loads((checkpoint_dir / "manifest.json").read_text())
-        catalog_json = json.loads(
-            (checkpoint_dir / "factor_catalog.json").read_text()
-        )
+        catalog_json = json.loads((checkpoint_dir / "factor_catalog.json").read_text())
 
         snapshots: dict[str, StrategySnapshot] = {}
         for name in manifest.get("strategy_names", []):
@@ -142,6 +138,7 @@ class CheckpointManager:
     ) -> None:
         if not checkpoint_dir:
             from src.config.paths import ALPHA_LAB_CHECKPOINTS_DIR
+
             checkpoint_dir = str(ALPHA_LAB_CHECKPOINTS_DIR)
         self._dir = Path(checkpoint_dir)
         self._every_n = checkpoint_every_n_rounds

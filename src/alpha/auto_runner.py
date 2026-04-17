@@ -27,6 +27,7 @@ from .service import AlphaService
 # Configuration
 # ---------------------------------------------------------------------------
 
+
 class WindowConfig(BaseModel):
     lookback_minutes: int = 24 * 60
     lag_minutes: int = 5
@@ -117,6 +118,7 @@ def build_service_from_auto_search_config(config: AutoSearchConfig) -> AlphaServ
 # Main loop
 # ---------------------------------------------------------------------------
 
+
 def run_auto_search_loop(
     service: AlphaService,
     config: AutoSearchConfig,
@@ -129,6 +131,7 @@ def run_auto_search_loop(
     _sp = config.runtime.state_path
     if not _sp:
         from src.config.paths import AUTO_SEARCH_STATE_PATH
+
         _sp = str(AUTO_SEARCH_STATE_PATH)
     state_path = Path(_sp)
     state = _load_state(state_path)
@@ -144,7 +147,10 @@ def run_auto_search_loop(
 
     logger.info(
         "alpha.auto_search start symbols={} interval={} once={} max_cycles={}",
-        ",".join(config.search.symbols), config.search.interval, once, resolved_max,
+        ",".join(config.search.symbols),
+        config.search.interval,
+        once,
+        resolved_max,
     )
 
     while True:
@@ -168,8 +174,10 @@ def run_auto_search_loop(
             # Wrap entire cycle in a single trace so seed generation
             # and search share the same trace_id in Langfuse.
             from .tracing import tracer
+
             with tracer.start_span(
-                "auto_search_cycle", kind="search",
+                "auto_search_cycle",
+                kind="search",
                 cycle=attempted,
                 window_start=window["start"],
                 window_end=window["end"],
@@ -177,7 +185,10 @@ def run_auto_search_loop(
                 seeds = _resolve_seeds(config, service, state)
                 logger.info(
                     "alpha.auto_search cycle={} start={} end={} seeds={}",
-                    attempted, window["start"], window["end"], len(seeds),
+                    attempted,
+                    window["start"],
+                    window["end"],
+                    len(seeds),
                 )
 
                 result = service.search_formulas_on_db(
@@ -230,16 +241,18 @@ def run_auto_search_loop(
 
             # Update state
             successful += 1
-            state.update({
-                "successful_cycles": successful,
-                "consecutive_failures": 0,
-                "last_error": None,
-                "last_window": window,
-                "last_success_at": datetime.now(UTC).isoformat(),
-                "last_run_id": result.get("persistence", {}).get("run_id"),
-                "carryover_entries": _build_carryover(result, config.search.carryover_top_k),
-                "updated_at": datetime.now(UTC).isoformat(),
-            })
+            state.update(
+                {
+                    "successful_cycles": successful,
+                    "consecutive_failures": 0,
+                    "last_error": None,
+                    "last_window": window,
+                    "last_success_at": datetime.now(UTC).isoformat(),
+                    "last_run_id": result.get("persistence", {}).get("run_id"),
+                    "carryover_entries": _build_carryover(result, config.search.carryover_top_k),
+                    "updated_at": datetime.now(UTC).isoformat(),
+                }
+            )
             if combo_result:
                 state["last_combination"] = {
                     "metrics": combo_result.get("metrics"),
@@ -259,7 +272,9 @@ def run_auto_search_loop(
             }
             logger.info(
                 "alpha.auto_search cycle_done cycle={} run_id={} top={}",
-                attempted, last_result["run_id"], last_result["top_count"],
+                attempted,
+                last_result["run_id"],
+                last_result["top_count"],
             )
 
             if once:
@@ -302,6 +317,7 @@ def run_auto_search_loop(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _load_state(path: Path) -> dict[str, Any]:
     if not path.exists():
@@ -356,7 +372,7 @@ def _resolve_seeds(
 
     # Zoo top-k as seeds
     zoo = service.list_zoo(limit=max(config.search.seed_zoo_limit, config.search.feedback_seed_count, 0))
-    for entry in zoo[:max(config.search.seed_zoo_limit, 0)]:
+    for entry in zoo[: max(config.search.seed_zoo_limit, 0)]:
         f = entry.get("formula")
         if f and f not in seen:
             seeds.append(f)
@@ -366,7 +382,9 @@ def _resolve_seeds(
     # LLM feedback seeds
     if config.search.feedback_seed_count > 0:
         source = feedback_entries or zoo
-        for f in _generate_feedback_seeds(service, source, config.search.feedback_seed_count, config.search.feedback_objective):
+        for f in _generate_feedback_seeds(
+            service, source, config.search.feedback_seed_count, config.search.feedback_objective
+        ):
             if f not in seen:
                 seeds.append(f)
                 seen.add(f)
@@ -391,9 +409,13 @@ def _generate_feedback_seeds(
         return []
     parent_a = ranked[0]
     parent_b = ranked[1] if len(ranked) > 1 else None
-    feedback = [{"formula": parent_a["formula"], "metrics": parent_a.get("metrics", {}), "rationale": "Carryover elite."}]
+    feedback = [
+        {"formula": parent_a["formula"], "metrics": parent_a.get("metrics", {}), "rationale": "Carryover elite."}
+    ]
     if parent_b:
-        feedback.append({"formula": parent_b["formula"], "metrics": parent_b.get("metrics", {}), "rationale": "Secondary elite."})
+        feedback.append(
+            {"formula": parent_b["formula"], "metrics": parent_b.get("metrics", {}), "rationale": "Secondary elite."}
+        )
     formulas = service.llm_backend.generate_offspring(
         BreedingSpec(
             parent_a=parent_a["formula"],
@@ -410,8 +432,12 @@ def _build_carryover(result: dict[str, Any], top_k: int) -> list[dict[str, Any]]
     if top_k <= 0:
         return []
     return [
-        {"formula": r.get("formula"), "expr_hash": r.get("expr_hash"),
-         "fitness": r.get("fitness"), "metrics": dict(r.get("metrics") or {})}
+        {
+            "formula": r.get("formula"),
+            "expr_hash": r.get("expr_hash"),
+            "fitness": r.get("fitness"),
+            "metrics": dict(r.get("metrics") or {}),
+        }
         for r in (result.get("top_results") or [])[:top_k]
     ]
 

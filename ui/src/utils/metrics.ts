@@ -27,25 +27,25 @@ export interface PerformanceMetrics {
     // Return metrics
     totalReturn: number;
     annualizedReturn: number;
-    
-    // Risk metrics  
+
+    // Risk metrics
     maxDrawdown: number;
     maxDrawdownDurationDays: number;
     volatility: number;
     downsideDeviation: number;
-    
+
     // Risk-adjusted metrics
     sharpeRatio: number;
     sortinoRatio: number;
     calmarRatio: number;
-    
+
     // Trade statistics (based on daily P&L)
     totalTrades: number;
     winRate: number;
     profitFactor: number;
     avgWin: number;
     avgLoss: number;
-    
+
     // Period info
     tradingDays: number;
     startDate: string | null;
@@ -61,7 +61,7 @@ const TRADING_DAYS_PER_YEAR = 252;
  * This matches the Python implementation for consistency.
  */
 export const calculateMetrics = (
-    equityHistory: EquityPoint[], 
+    equityHistory: EquityPoint[],
     trades: Trade[]
 ): PerformanceMetrics => {
     const emptyMetrics: PerformanceMetrics = {
@@ -107,7 +107,7 @@ export const calculateMetrics = (
     let tradingDays: number;
     let startDate: string | null = timestamps[0];
     let endDate: string | null = timestamps[timestamps.length - 1];
-    
+
     try {
         const start = new Date(timestamps[0].split(' ')[0]);
         const end = new Date(timestamps[timestamps.length - 1].split(' ')[0]);
@@ -117,8 +117,8 @@ export const calculateMetrics = (
     }
 
     // Annualized return
-    const annualizedReturn = tradingDays > 0 
-        ? Math.pow(1 + totalReturn, 365 / tradingDays) - 1 
+    const annualizedReturn = tradingDays > 0
+        ? Math.pow(1 + totalReturn, 365 / tradingDays) - 1
         : 0;
 
     // ========== Daily Returns ==========
@@ -190,8 +190,8 @@ export const calculateMetrics = (
     const dailyRf = RISK_FREE_RATE / TRADING_DAYS_PER_YEAR;
 
     // Sharpe Ratio
-    const sharpeRatio = stdDev > 0 
-        ? (meanReturn - dailyRf) / stdDev * Math.sqrt(TRADING_DAYS_PER_YEAR) 
+    const sharpeRatio = stdDev > 0
+        ? (meanReturn - dailyRf) / stdDev * Math.sqrt(TRADING_DAYS_PER_YEAR)
         : 0;
 
     // Sortino Ratio
@@ -226,11 +226,11 @@ export const calculateMetrics = (
         profitFactor = 999.99;
     }
 
-    const avgWin = positivePnls.length > 0 
-        ? positivePnls.reduce((sum, p) => sum + p, 0) / positivePnls.length 
+    const avgWin = positivePnls.length > 0
+        ? positivePnls.reduce((sum, p) => sum + p, 0) / positivePnls.length
         : 0;
-    const avgLoss = negativePnls.length > 0 
-        ? negativePnls.reduce((sum, p) => sum + p, 0) / negativePnls.length 
+    const avgLoss = negativePnls.length > 0
+        ? negativePnls.reduce((sum, p) => sum + p, 0) / negativePnls.length
         : 0;
 
     // Clamp infinite values

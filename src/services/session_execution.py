@@ -54,9 +54,7 @@ class SessionExecutionResult:
 class SessionExecutionHooks:
     on_session_started: Optional[Callable[[SessionExecutionConfig], None]] = None
     on_engine_created: Optional[Callable[[TradingEngine, Any], None]] = None
-    on_status_change: Optional[
-        Callable[[str, float, Optional[str]], None]
-    ] = None
+    on_status_change: Optional[Callable[[str, float, Optional[str]], None]] = None
     on_progress: Optional[Callable[[float, str], None]] = None
     on_equity_point: Optional[Callable[[Dict[str, Any]], None]] = None
     on_trade: Optional[Callable[[Dict[str, Any]], None]] = None
@@ -192,12 +190,8 @@ def execute_session(
             initial_cash=config.initial_cash
             if config.initial_cash is not None
             else broker_config.backtest.initial_cash,
-            commission=config.commission
-            if config.commission is not None
-            else broker_config.backtest.commission,
-            slippage=config.slippage
-            if config.slippage is not None
-            else broker_config.backtest.slippage,
+            commission=config.commission if config.commission is not None else broker_config.backtest.commission,
+            slippage=config.slippage if config.slippage is not None else broker_config.backtest.slippage,
             session_id=config.session_id,
         )
 
@@ -275,11 +269,7 @@ def execute_session(
         if session_db is not None:
             stored_equity = session_db.get_equity_history(config.session_id)
             stored_trades = session_db.get_trades(config.session_id)
-            final_equity = (
-                stored_equity[-1]["total_equity"]
-                if stored_equity
-                else final_info.get("total_equity", 0.0)
-            )
+            final_equity = stored_equity[-1]["total_equity"] if stored_equity else final_info.get("total_equity", 0.0)
             total_trades = len(stored_trades)
         else:
             final_equity = float(final_info.get("total_equity", 0.0))

@@ -19,12 +19,8 @@ from src.config.paths import LOG_FILE_PATH as _LOG_FILE_PATH
 from src.config.settings import get_logging_config
 
 # Context variables for request correlation
-request_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
-    "request_id", default=None
-)
-session_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
-    "session_id", default=None
-)
+request_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("request_id", default=None)
+session_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar("session_id", default=None)
 
 # Fallback configuration
 LOG_LEVEL = "INFO"
@@ -44,10 +40,7 @@ CONSOLE_FORMAT = (
 )
 
 # File format (with full timestamp)
-FILE_FORMAT = (
-    "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | "
-    "{extra[name]}:{function}:{line} - {message}"
-)
+FILE_FORMAT = "{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {extra[name]}:{function}:{line} - {message}"
 
 
 class InterceptHandler(logging.Handler):
@@ -154,12 +147,8 @@ def json_serializer(record: Dict[str, Any]) -> str:
 
     if record["exception"]:
         log_entry["exception"] = {
-            "type": record["exception"].type.__name__
-            if record["exception"].type
-            else None,
-            "value": str(record["exception"].value)
-            if record["exception"].value
-            else None,
+            "type": record["exception"].type.__name__ if record["exception"].type else None,
+            "value": str(record["exception"].value) if record["exception"].value else None,
             "traceback": record["exception"].traceback is not None,
         }
 
@@ -311,9 +300,7 @@ def log_performance(operation: str, duration: float, **kwargs) -> None:
     )
 
 
-def log_trade(
-    action: str, symbol: str, quantity: float, price: float, **kwargs
-) -> None:
+def log_trade(action: str, symbol: str, quantity: float, price: float, **kwargs) -> None:
     """Log trade execution in a structured format."""
     logger.info(
         f"TRADE: {action} {quantity} {symbol} @ {price}",
@@ -325,9 +312,7 @@ def log_trade(
     )
 
 
-def log_backtest_progress(
-    session_id: str, progress: float, current_date: str, trades: int = 0, **kwargs
-) -> None:
+def log_backtest_progress(session_id: str, progress: float, current_date: str, trades: int = 0, **kwargs) -> None:
     """Log backtest progress for monitoring."""
     logger.info(
         f"BACKTEST: {progress:.1f}% - {current_date}",
@@ -354,9 +339,7 @@ _QUIET_PATHS = frozenset({"/sessions", "/monitoring/health"})
 _QUIET_PREFIXES = ("/alpha-lab/search-jobs/",)
 
 
-def log_api_request(
-    method: str, path: str, status_code: int, duration_ms: float, **kwargs
-) -> None:
+def log_api_request(method: str, path: str, status_code: int, duration_ms: float, **kwargs) -> None:
     """Log API request for monitoring.
 
     High-frequency polling endpoints (search-job status, sessions, health)

@@ -44,6 +44,7 @@ class BrooksStrategy(Strategy):
         self._pipeline = None
         if self.use_llm:
             from src.strategies.brooks_llm_pipeline import BrooksLLMPipeline
+
             self._pipeline = BrooksLLMPipeline(
                 model=self.llm_model,
                 api_key=self.llm_api_key,
@@ -62,43 +63,65 @@ class BrooksStrategy(Strategy):
     def get_parameters(cls) -> Dict[str, Dict[str, Any]]:
         return {
             "atr_multiplier": {
-                "type": "float", "default": 1.5, "min": 0.5, "max": 5.0,
+                "type": "float",
+                "default": 1.5,
+                "min": 0.5,
+                "max": 5.0,
                 "description": "ATR 止损倍数",
             },
             "min_body_pct": {
-                "type": "int", "default": 50, "min": 20, "max": 80,
+                "type": "int",
+                "default": 50,
+                "min": 20,
+                "max": 80,
                 "description": "最小趋势 bar 实体占比 (%)",
             },
             "min_rr": {
-                "type": "float", "default": 2.0, "min": 1.0, "max": 5.0,
+                "type": "float",
+                "default": 2.0,
+                "min": 1.0,
+                "max": 5.0,
                 "description": "最小风险回报比",
             },
             "risk_percent": {
-                "type": "float", "default": 1.0, "min": 0.1, "max": 5.0,
+                "type": "float",
+                "default": 1.0,
+                "min": 0.1,
+                "max": 5.0,
                 "description": "每笔交易风险占比 (%)",
             },
             "lookback": {
-                "type": "int", "default": 20, "min": 10, "max": 60,
+                "type": "int",
+                "default": 20,
+                "min": 10,
+                "max": 60,
                 "description": "EMA / 摆动点回看期",
             },
             "cooldown_bars": {
-                "type": "int", "default": 3, "min": 1, "max": 10,
+                "type": "int",
+                "default": 3,
+                "min": 1,
+                "max": 10,
                 "description": "交易间隔最少 bar 数",
             },
             "use_llm": {
-                "type": "bool", "default": False,
+                "type": "bool",
+                "default": False,
                 "description": "启用 LLM AI 分析 (需要 API Key)",
             },
             "llm_model": {
-                "type": "str", "default": "gpt-4o-mini",
+                "type": "str",
+                "default": "gpt-4o-mini",
                 "description": "LLM 模型名称",
             },
             "llm_api_key": {
-                "type": "str", "default": "",
+                "type": "str",
+                "default": "",
                 "description": "LLM API Key",
             },
             "llm_base_url": {
-                "type": "str", "default": "",
+                "type": "str",
+                "default": "",
                 "description": "LLM API Base URL (可选)",
             },
         }
@@ -110,8 +133,10 @@ class BrooksStrategy(Strategy):
 
         for symbol, bar in bars.items():
             bar_dict = {
-                "open": bar.open, "high": bar.high,
-                "low": bar.low, "close": bar.close,
+                "open": bar.open,
+                "high": bar.high,
+                "low": bar.low,
+                "close": bar.close,
                 "volume": bar.volume,
             }
             self._bars_history.append(bar_dict)
@@ -153,17 +178,19 @@ class BrooksStrategy(Strategy):
             atr = ctx.atr_14
 
             # Brooks 做多信号: 牛趋势 bar + 收盘在高位 + 价格在 EMA 上方
-            if (latest.bar_type == "bull_trend"
-                    and latest.body_pct >= self.min_body_pct
-                    and latest.close_position == "high"
-                    and latest.ema_relation in ("above", "at")
-                    and not latest.is_inside_bar):
-
+            if (
+                latest.bar_type == "bull_trend"
+                and latest.body_pct >= self.min_body_pct
+                and latest.close_position == "high"
+                and latest.ema_relation in ("above", "at")
+                and not latest.is_inside_bar
+            ):
                 entry = bar.close
                 sl = entry - atr * self.atr_mult
                 tp = entry + abs(entry - sl) * self.min_rr
 
                 from src.core.price_calculator import enforce_min_rr, enforce_min_stop_distance
+
                 sl = enforce_min_stop_distance(entry, sl, atr, self.atr_mult)
                 tp = enforce_min_rr(entry, sl, tp, self.min_rr)
 
@@ -174,17 +201,19 @@ class BrooksStrategy(Strategy):
                     self._enter_position(symbol, "long", entry, sl)
 
             # Brooks 做空信号: 熊趋势 bar + 收盘在低位 + 价格在 EMA 下方
-            elif (latest.bar_type == "bear_trend"
-                    and latest.body_pct >= self.min_body_pct
-                    and latest.close_position == "low"
-                    and latest.ema_relation in ("below", "at")
-                    and not latest.is_inside_bar):
-
+            elif (
+                latest.bar_type == "bear_trend"
+                and latest.body_pct >= self.min_body_pct
+                and latest.close_position == "low"
+                and latest.ema_relation in ("below", "at")
+                and not latest.is_inside_bar
+            ):
                 entry = bar.close
                 sl = entry + atr * self.atr_mult
                 tp = entry - abs(sl - entry) * self.min_rr
 
                 from src.core.price_calculator import enforce_min_rr, enforce_min_stop_distance
+
                 sl = enforce_min_stop_distance(entry, sl, atr, self.atr_mult)
                 tp = enforce_min_rr(entry, sl, tp, self.min_rr)
 

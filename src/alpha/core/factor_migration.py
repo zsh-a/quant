@@ -24,19 +24,19 @@ from .market import get_market_profile
 
 _CROSS_MARKET_EQUIVALENTS: dict[str, dict[str, str]] = {
     # crypto 字段 → A-share 等价字段
-    "funding_rate": {"a_share": "pctChg"},       # 资金费率 → 日涨幅 (近似 sentiment)
-    "open_interest": {"a_share": "volume"},       # 持仓量 → 成交量
-    "trade_count": {"a_share": "turn"},           # 成交笔数 → 换手率
-    "taker_buy_volume": {"a_share": "volume"},    # 主买量 → 总量
-    "long_short_ratio": {"a_share": "turn"},      # 多空比 → 换手率
-    "bid_ask_spread": {"a_share": "amount"},      # 买卖价差 → 成交额
+    "funding_rate": {"a_share": "pctChg"},  # 资金费率 → 日涨幅 (近似 sentiment)
+    "open_interest": {"a_share": "volume"},  # 持仓量 → 成交量
+    "trade_count": {"a_share": "turn"},  # 成交笔数 → 换手率
+    "taker_buy_volume": {"a_share": "volume"},  # 主买量 → 总量
+    "long_short_ratio": {"a_share": "turn"},  # 多空比 → 换手率
+    "bid_ask_spread": {"a_share": "amount"},  # 买卖价差 → 成交额
     # A-share 字段 → crypto 等价字段
-    "peTTM": {"crypto": "volume"},                # 市盈率 → 成交量 (无直接等价)
-    "pbMRQ": {"crypto": "volume"},                # 市净率 → 成交量
-    "turn": {"crypto": "trade_count"},            # 换手率 → 成交笔数
-    "pctChg": {"crypto": "close"},                # 涨幅 → 收盘价 (需用 ts_return)
-    "isST": {},                                   # ST 标记 — crypto 无等价
-    "adjfactor": {},                              # 复权因子 — crypto 无需
+    "peTTM": {"crypto": "volume"},  # 市盈率 → 成交量 (无直接等价)
+    "pbMRQ": {"crypto": "volume"},  # 市净率 → 成交量
+    "turn": {"crypto": "trade_count"},  # 换手率 → 成交笔数
+    "pctChg": {"crypto": "close"},  # 涨幅 → 收盘价 (需用 ts_return)
+    "isST": {},  # ST 标记 — crypto 无等价
+    "adjfactor": {},  # 复权因子 — crypto 无需
 }
 
 # 两个市场共有的基础字段
@@ -46,6 +46,7 @@ _UNIVERSAL_FIELDS = {"open", "high", "low", "close", "volume", "amount", "vwap"}
 @dataclass
 class MigrationResult:
     """因子迁移结果。"""
+
     original_formula: str
     migrated_formula: str | None
     source_market: str
@@ -61,14 +62,37 @@ def _extract_fields_from_formula(formula: str) -> set[str]:
         ast = Parser().parse(formula)
     except Exception:
         # 降级: 正则提取
-        tokens = set(re.findall(r'\b([a-z_][a-z0-9_]*)\b', formula.lower()))
+        tokens = set(re.findall(r"\b([a-z_][a-z0-9_]*)\b", formula.lower()))
         # 排除运算符名
         operators = {
-            "ts_mean", "ts_std", "ts_max", "ts_min", "ts_sum", "ts_rank",
-            "ts_delta", "ts_delay", "ts_corr", "ts_cov", "ts_return",
-            "cs_rank", "cs_zscore", "cs_demean", "decay_linear",
-            "log", "abs", "sign", "rank", "sqrt", "power",
-            "add", "sub", "mul", "div", "max", "min", "if_else",
+            "ts_mean",
+            "ts_std",
+            "ts_max",
+            "ts_min",
+            "ts_sum",
+            "ts_rank",
+            "ts_delta",
+            "ts_delay",
+            "ts_corr",
+            "ts_cov",
+            "ts_return",
+            "cs_rank",
+            "cs_zscore",
+            "cs_demean",
+            "decay_linear",
+            "log",
+            "abs",
+            "sign",
+            "rank",
+            "sqrt",
+            "power",
+            "add",
+            "sub",
+            "mul",
+            "div",
+            "max",
+            "min",
+            "if_else",
         }
         return tokens - operators
 
@@ -76,7 +100,7 @@ def _extract_fields_from_formula(formula: str) -> set[str]:
         if node.kind == "field":
             return {node.value}
         result = set()
-        for child in (node.children or []):
+        for child in node.children or []:
             result |= _walk(child)
         return result
 
@@ -142,7 +166,7 @@ def migrate_formula(
         migrated = formula
         for src_field, tgt_field in field_mappings.items():
             if src_field != tgt_field:
-                migrated = re.sub(rf'\b{re.escape(src_field)}\b', tgt_field, migrated)
+                migrated = re.sub(rf"\b{re.escape(src_field)}\b", tgt_field, migrated)
 
     result = MigrationResult(
         original_formula=formula,
@@ -155,7 +179,10 @@ def migrate_formula(
     )
     logger.info(
         "factor_migration: {} → {} viable={} mappings={} unmappable={}",
-        source_market, target_market, is_viable,
-        len(field_mappings), unmappable,
+        source_market,
+        target_market,
+        is_viable,
+        len(field_mappings),
+        unmappable,
     )
     return result

@@ -42,6 +42,7 @@ class TDXProcess:
                 "or `uv sync --group dev`."
             )
         from src.config.paths import TDX_FIN_DATA_DIR, TDX_SYNC_STATE_PATH
+
         self.state_file = str(TDX_SYNC_STATE_PATH)
         self.client = create_clickhouse_client()
         self.fin_path = str(TDX_FIN_DATA_DIR)
@@ -137,12 +138,8 @@ class TDXProcess:
         }
 
         new_df = pd.DataFrame(index=df.index)
-        new_df["report_date"] = pd.to_datetime(
-            df["report_date"].astype(str), format="%Y%m%d", errors="coerce"
-        ).dt.date
-        new_df["publish_date"] = pd.to_datetime(
-            df["财报公告日期"].apply(convert_to_date), errors="coerce"
-        ).dt.date
+        new_df["report_date"] = pd.to_datetime(df["report_date"].astype(str), format="%Y%m%d", errors="coerce").dt.date
+        new_df["publish_date"] = pd.to_datetime(df["财报公告日期"].apply(convert_to_date), errors="coerce").dt.date
 
         for tdx_col, internal_col in mapping.items():
             if tdx_col in df.columns:

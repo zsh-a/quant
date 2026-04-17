@@ -14,6 +14,7 @@ logger = get_logger(__name__)
 
 class EventType:
     """Event type constants"""
+
     SESSION_STARTED = "session_started"
     SESSION_PROGRESS = "session_progress"
     SESSION_COMPLETED = "session_completed"
@@ -59,10 +60,10 @@ class SessionEventBus:
             return
 
         event_data = {
-            'type': event_type,
-            'session_id': session_id,
-            'timestamp': datetime.now().isoformat(),
-            'data': data
+            "type": event_type,
+            "session_id": session_id,
+            "timestamp": datetime.now().isoformat(),
+            "data": data,
         }
 
         logger.debug(f"Emitting event: {event_type} for session {session_id}")
@@ -89,33 +90,24 @@ event_bus = SessionEventBus()
 # Helper functions for common events
 async def emit_session_started(session_id: str, strategy: str, symbol: str):
     """Emit session started event"""
-    await event_bus.emit(EventType.SESSION_STARTED, session_id, {
-        'strategy': strategy,
-        'symbol': symbol
-    })
+    await event_bus.emit(EventType.SESSION_STARTED, session_id, {"strategy": strategy, "symbol": symbol})
 
 
 async def emit_session_progress(session_id: str, progress: float, status: str):
     """Emit session progress event"""
-    await event_bus.emit(EventType.SESSION_PROGRESS, session_id, {
-        'progress': progress,
-        'status': status
-    })
+    await event_bus.emit(EventType.SESSION_PROGRESS, session_id, {"progress": progress, "status": status})
 
 
 async def emit_session_completed(session_id: str, final_equity: float, total_trades: int):
     """Emit session completed event"""
-    await event_bus.emit(EventType.SESSION_COMPLETED, session_id, {
-        'final_equity': final_equity,
-        'total_trades': total_trades
-    })
+    await event_bus.emit(
+        EventType.SESSION_COMPLETED, session_id, {"final_equity": final_equity, "total_trades": total_trades}
+    )
 
 
 async def emit_session_failed(session_id: str, error: str):
     """Emit session failed event"""
-    await event_bus.emit(EventType.SESSION_FAILED, session_id, {
-        'error': error
-    })
+    await event_bus.emit(EventType.SESSION_FAILED, session_id, {"error": error})
 
 
 async def emit_session_stopped(session_id: str):
@@ -125,23 +117,17 @@ async def emit_session_stopped(session_id: str):
 
 async def emit_trade_executed(session_id: str, trade: dict):
     """Emit trade executed event"""
-    await event_bus.emit(EventType.TRADE_EXECUTED, session_id, {
-        'trade': trade
-    })
+    await event_bus.emit(EventType.TRADE_EXECUTED, session_id, {"trade": trade})
 
 
 async def emit_equity_update(session_id: str, equity_point: dict):
     """Emit equity update event"""
-    await event_bus.emit(EventType.EQUITY_UPDATE, session_id, {
-        'equity': equity_point
-    })
+    await event_bus.emit(EventType.EQUITY_UPDATE, session_id, {"equity": equity_point})
 
 
 async def emit_error(session_id: str, error: str):
     """Emit error event"""
-    await event_bus.emit(EventType.ERROR_OCCURRED, session_id, {
-        'error': error
-    })
+    await event_bus.emit(EventType.ERROR_OCCURRED, session_id, {"error": error})
 
 
 async def emit_data_update_started(session_id: str, payload: dict):

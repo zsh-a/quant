@@ -20,10 +20,7 @@ _STATIC_DIR = _PROJECT_ROOT / "config" / "static_data"
 def _resolve(filename: str) -> Path:
     path = _STATIC_DIR / filename
     if not path.exists():
-        raise FileNotFoundError(
-            f"Static data file not found: {path}. "
-            f"Expected under config/static_data/"
-        )
+        raise FileNotFoundError(f"Static data file not found: {path}. Expected under config/static_data/")
     return path
 
 

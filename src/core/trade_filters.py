@@ -24,6 +24,7 @@ from loguru import logger
 # Trade Filter — 防过度交易
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class TradeFilterConfig:
     cooldown_minutes: int = 15
@@ -149,6 +150,7 @@ class TradeFilter:
 # Equity Protector — 权益保护
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class EquityProtectorConfig:
     max_daily_loss_pct: float = 2.0
@@ -184,7 +186,8 @@ class EquityProtector:
                 self.trading_enabled = False
                 logger.critical(
                     "日亏损熔断: {:.2f}% >= {:.1f}% — 交易已禁止",
-                    loss_pct, self.cfg.max_daily_loss_pct,
+                    loss_pct,
+                    self.cfg.max_daily_loss_pct,
                 )
 
         # 连损冷却
@@ -193,7 +196,8 @@ class EquityProtector:
             self.cooldown_until = datetime.now() + timedelta(hours=self.cfg.cooldown_hours)
             logger.warning(
                 "连损冷却: {} 次连续亏损 → 暂停 {}h",
-                self.consecutive_losses, self.cfg.cooldown_hours,
+                self.consecutive_losses,
+                self.cfg.cooldown_hours,
             )
 
     def can_trade(self) -> bool:

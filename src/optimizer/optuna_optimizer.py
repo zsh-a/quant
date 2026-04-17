@@ -40,12 +40,14 @@ def optuna_optimize(
     """
     try:
         import optuna
+
         optuna.logging.set_verbosity(optuna.logging.WARNING)
     except ImportError:
         logger.error("optuna not installed. Install with: pip install optuna")
         raise ImportError("pip install optuna")
 
     import time
+
     start_time = time.time()
     all_results: list[OptimizationResult] = []
 
@@ -74,11 +76,13 @@ def optuna_optimize(
         try:
             result = backtest_fn(params)
             score = result.get(objective_key, 0.0)
-            all_results.append(OptimizationResult(
-                params=params,
-                metrics=result,
-                objective_value=float(score),
-            ))
+            all_results.append(
+                OptimizationResult(
+                    params=params,
+                    metrics=result,
+                    objective_value=float(score),
+                )
+            )
             return float(score)
         except Exception as exc:
             logger.warning("Trial {} failed: {}", trial.number, exc)
@@ -102,7 +106,10 @@ def optuna_optimize(
 
     logger.info(
         "optuna.optimize completed: {} trials, best {}={:.4f}, {:.1f}s",
-        len(study.trials), objective_key, best.value, elapsed,
+        len(study.trials),
+        objective_key,
+        best.value,
+        elapsed,
     )
 
     # Sort results
@@ -125,6 +132,7 @@ def _get_importance(study, param_space: Dict[str, ParamSpec]) -> Dict[str, float
     """Extract parameter importance from Optuna study."""
     try:
         import optuna
+
         importance = optuna.importance.get_param_importances(study)
         return {k: round(v, 4) for k, v in importance.items()}
     except Exception:

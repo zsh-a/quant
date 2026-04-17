@@ -14,6 +14,7 @@ def compute_rank_ic(alpha: np.ndarray, forward_returns: np.ndarray) -> float:
     Returns the average per-row correlation across time steps.
     """
     from ..core.vm import to_numpy
+
     alpha_np = to_numpy(alpha).astype(float)
     returns_np = to_numpy(forward_returns).astype(float)
     mask = ~np.isnan(alpha_np) & ~np.isnan(returns_np)
@@ -49,7 +50,8 @@ def compute_forward_returns(close: np.ndarray, periods: int = 1) -> np.ndarray:
     if periods < close.shape[0]:
         fwd[:-periods] = np.clip(
             close[periods:] / (close[:-periods] + 1e-12) - 1.0,
-            -0.5, 0.5,
+            -0.5,
+            0.5,
         )
     return fwd
 
@@ -65,6 +67,7 @@ def compute_ic_metrics(
     ic_decay, and turnover_proxy.
     """
     from ..core.vm import to_numpy
+
     alpha = to_numpy(alpha).astype(float)
     close = to_numpy(close).astype(float)
     fwd_windows = fwd_windows or [1, 5, 10]
@@ -127,7 +130,7 @@ def compute_ic_metrics(
     else:
         turnover_proxy = 1.0
 
-    fitness = (rank_ic ** 2) / (ic_std + 1e-9)
+    fitness = (rank_ic**2) / (ic_std + 1e-9)
 
     metrics = {
         "rank_ic": rank_ic,
@@ -245,13 +248,15 @@ def compute_quantile_returns(
         std_r = float(np.std(rets))
         peak = np.maximum.accumulate(equity)
         dd = np.where(peak > 1e-12, 1.0 - equity / peak, 0.0)
-        quantile_stats.append({
-            "group": g + 1,
-            "total_return": float(equity[-1] - 1.0) if equity.size else 0.0,
-            "annual_return": mean_r * 252,
-            "annual_sharpe": mean_r / (std_r + 1e-12) * np.sqrt(252),
-            "max_drawdown": float(np.max(dd)) if dd.size else 0.0,
-        })
+        quantile_stats.append(
+            {
+                "group": g + 1,
+                "total_return": float(equity[-1] - 1.0) if equity.size else 0.0,
+                "annual_return": mean_r * 252,
+                "annual_sharpe": mean_r / (std_r + 1e-12) * np.sqrt(252),
+                "max_drawdown": float(np.max(dd)) if dd.size else 0.0,
+            }
+        )
 
     # Long-short: top group - bottom group
     top_rets = np.array(group_returns[-1])
@@ -263,13 +268,14 @@ def compute_quantile_returns(
     group_total_returns = [s["total_return"] for s in quantile_stats]
     if len(group_total_returns) >= 3:
         from scipy.stats import spearmanr
+
         mono_corr, _ = spearmanr(range(n_quantiles), group_total_returns)
         monotonicity = float(mono_corr) if np.isfinite(mono_corr) else 0.0
     else:
         monotonicity = 0.0
 
     # Timestamps for the x-axis (one per return period, excluding last `periods` rows)
-    ts = timestamps[:T - periods] if timestamps else None
+    ts = timestamps[: T - periods] if timestamps else None
 
     return {
         "n_quantiles": n_quantiles,

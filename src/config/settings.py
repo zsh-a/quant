@@ -166,9 +166,7 @@ class CryptoMarketConfig(BaseModel):
 
     default_provider: str = "bitget"
     default_interval: str = "1m"
-    default_symbols: List[str] = Field(
-        default_factory=lambda: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
-    )
+    default_symbols: List[str] = Field(default_factory=lambda: ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"])
     default_lookback_hours: int = 24
     full_history_start: str = "2020-01-01T00:00:00+00:00"
     state_file: str = str(paths.CRYPTO_SYNC_STATE_PATH)

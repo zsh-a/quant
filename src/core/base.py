@@ -18,6 +18,7 @@ class Bar:
     amount: float
     extra: Dict[str, Any] = field(default_factory=dict)
 
+
 class DataStream(ABC):
     @abstractmethod
     def next_bar(self) -> Optional[Dict[str, Bar]]:
@@ -29,20 +30,29 @@ class DataStream(ABC):
         """Reset the stream focus to the beginning (for backtesting)."""
         pass
 
+
 class Order:
-    def __init__(self, symbol: str, type: str, quantity: float, price: Optional[float] = None,
-                 execution_type: str = "NEXT_OPEN", stop_price: Optional[float] = None):
+    def __init__(
+        self,
+        symbol: str,
+        type: str,
+        quantity: float,
+        price: Optional[float] = None,
+        execution_type: str = "NEXT_OPEN",
+        stop_price: Optional[float] = None,
+    ):
         self.symbol = symbol
         self.type = type  # 'buy', 'sell', 'sell_short', 'buy_to_cover'
         self.quantity = quantity
         self.price = price  # None for market order; limit price for limit orders
         self.stop_price = stop_price  # Trigger price for stop orders
-        self.execution_type = execution_type # 'NEXT_OPEN', 'IMMEDIATE_OPEN', 'IMMEDIATE_CLOSE'
+        self.execution_type = execution_type  # 'NEXT_OPEN', 'IMMEDIATE_OPEN', 'IMMEDIATE_CLOSE'
         self.status = "PENDING"  # PENDING -> SUBMITTED -> TRIGGERED -> FILLED / REJECTED
         self.filled_quantity = 0.0
         self.avg_fill_price = 0.0
         self.id = None
         self.created_at = datetime.now()
+
 
 class Broker(ABC):
     @abstractmethod
@@ -69,6 +79,7 @@ class Broker(ABC):
         """Process immediate orders (optional implementation for backtest)."""
         pass
 
+
 class Strategy(ABC):
     """Base strategy class with built-in session logging support."""
 
@@ -82,6 +93,7 @@ class Strategy(ABC):
         if session_id:
             try:
                 from src.utils.session_logger import get_session_logger
+
                 self._session_log = get_session_logger(session_id)
             except ImportError:
                 pass
@@ -95,8 +107,7 @@ class Strategy(ABC):
             ts = next(iter(bars.values())).timestamp
             self._current_date = str(ts.date())
 
-    def _log(self, message: str, level: str = "INFO", source: str = "strategy",
-             include_date: bool = True, **kwargs):
+    def _log(self, message: str, level: str = "INFO", source: str = "strategy", include_date: bool = True, **kwargs):
         """Log to both loguru and session logger.
 
         Args:
@@ -139,19 +150,25 @@ class Strategy(ABC):
         return {}
 
     def buy(self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"):
-        return self.engine.submit_order(Order(symbol, 'buy', quantity, price, execution_type))
+        return self.engine.submit_order(Order(symbol, "buy", quantity, price, execution_type))
 
     def sell(self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"):
-        return self.engine.submit_order(Order(symbol, 'sell', quantity, price, execution_type))
+        return self.engine.submit_order(Order(symbol, "sell", quantity, price, execution_type))
 
-    def sell_short(self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"):
+    def sell_short(
+        self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"
+    ):
         """Open a short position (requires broker allow_short=True)."""
-        return self.engine.submit_order(Order(symbol, 'sell_short', quantity, price, execution_type))
+        return self.engine.submit_order(Order(symbol, "sell_short", quantity, price, execution_type))
 
-    def buy_to_cover(self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"):
+    def buy_to_cover(
+        self, symbol: str, quantity: float, price: Optional[float] = None, execution_type: str = "NEXT_OPEN"
+    ):
         """Close a short position."""
-        return self.engine.submit_order(Order(symbol, 'buy_to_cover', quantity, price, execution_type))
+        return self.engine.submit_order(Order(symbol, "buy_to_cover", quantity, price, execution_type))
 
     def stop_order(self, symbol: str, type: str, quantity: float, stop_price: float, execution_type: str = "NEXT_OPEN"):
         """Submit a stop order that triggers when market price crosses stop_price."""
-        return self.engine.submit_order(Order(symbol, type, quantity, execution_type=execution_type, stop_price=stop_price))
+        return self.engine.submit_order(
+            Order(symbol, type, quantity, execution_type=execution_type, stop_price=stop_price)
+        )

@@ -12,6 +12,7 @@ from .base import Bar, DataStream
 
 logger = get_logger(__name__)
 
+
 class CSVDataStream(DataStream):
     def __init__(self, csv_files: Dict[str, str], start_date: Optional[str] = None, end_date: Optional[str] = None):
         """
@@ -22,15 +23,15 @@ class CSVDataStream(DataStream):
             # Check if file has header or not. Based on inspection, it doesn't.
             df = pd.read_csv(path, header=None)
             if len(df.columns) >= 6:
-                df.columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'amount'][:len(df.columns)]
+                df.columns = ["timestamp", "open", "high", "low", "close", "volume", "amount"][: len(df.columns)]
 
-            df['timestamp'] = pd.to_datetime(df['timestamp'])
+            df["timestamp"] = pd.to_datetime(df["timestamp"])
 
-            df = df.sort_values('timestamp')
+            df = df.sort_values("timestamp")
             if start_date:
-                df = df[df['timestamp'] >= pd.to_datetime(start_date)]
+                df = df[df["timestamp"] >= pd.to_datetime(start_date)]
             if end_date:
-                df = df[df['timestamp'] <= pd.to_datetime(end_date)]
+                df = df[df["timestamp"] <= pd.to_datetime(end_date)]
 
             self.data[symbol] = df.reset_index(drop=True)
 
@@ -49,13 +50,13 @@ class CSVDataStream(DataStream):
                 row = df.iloc[self.idx]
                 bars[symbol] = Bar(
                     symbol=symbol,
-                    timestamp=row['timestamp'],
-                    open=row['open'],
-                    high=row['high'],
-                    low=row['low'],
-                    close=row['close'],
-                    volume=row.get('volume', 0.0),
-                    amount=row.get('amount', 0.0)
+                    timestamp=row["timestamp"],
+                    open=row["open"],
+                    high=row["high"],
+                    low=row["low"],
+                    close=row["close"],
+                    volume=row.get("volume", 0.0),
+                    amount=row.get("amount", 0.0),
                 )
 
         self.idx += 1
@@ -64,9 +65,16 @@ class CSVDataStream(DataStream):
     def reset(self):
         self.idx = 0
 
+
 class DBDataStream(DataStream):
-    def __init__(self, db_client, symbols: List[str], start_date: str, end_date: Optional[str] = None,
-                 chunk_size_months: int = None):
+    def __init__(
+        self,
+        db_client,
+        symbols: List[str],
+        start_date: str,
+        end_date: Optional[str] = None,
+        chunk_size_months: int = None,
+    ):
         self.db_client = db_client
         self.symbols = symbols
         self.start_date = pd.to_datetime(start_date)
@@ -88,29 +96,31 @@ class DBDataStream(DataStream):
         self.process = psutil.Process(os.getpid())
         self.initial_memory_mb = self.process.memory_info().rss / 1024 / 1024
 
-        logger.info(f"Initializing DBDataStream: {len(symbols)} symbols, "
-                   f"chunk_size={chunk_size_months} months, "
-                   f"initial_memory={self.initial_memory_mb:.2f}MB")
+        logger.info(
+            f"Initializing DBDataStream: {len(symbols)} symbols, "
+            f"chunk_size={chunk_size_months} months, "
+            f"initial_memory={self.initial_memory_mb:.2f}MB"
+        )
 
         # Load master timeline (using the first symbol as reference or a market index)
         # This is lightweight compared to loading all columns for all stocks
-        ref_symbol = symbols[0] if symbols else 'sh.000001'
+        ref_symbol = symbols[0] if symbols else "sh.000001"
         try:
             # We fetch just dates if possible, but get_kline fetches all.
             # Optimization: In a real scenario, we'd add a get_trading_days method to DB.
             # For now, we assume fetching one symbol's full history is acceptable overhead
             # compared to fetching ALL symbols' full history.
             ref_df = self.db_client.get_kline(ref_symbol, start_date, end_date)
-            if 'date' in ref_df.columns:
-                self.timestamps = pd.to_datetime(ref_df['date']).sort_values().unique().tolist()
-            elif 'datetime' in ref_df.columns:
-                self.timestamps = pd.to_datetime(ref_df['datetime']).sort_values().unique().tolist()
+            if "date" in ref_df.columns:
+                self.timestamps = pd.to_datetime(ref_df["date"]).sort_values().unique().tolist()
+            elif "datetime" in ref_df.columns:
+                self.timestamps = pd.to_datetime(ref_df["datetime"]).sort_values().unique().tolist()
             else:
                 self.timestamps = pd.to_datetime(ref_df.index).sort_values().unique().tolist()
         except Exception as e:
             logger.warning(f"Failed to load timeline from {ref_symbol}: {e}, using fallback")
             # Fallback if reference symbol fails
-            self.timestamps = pd.date_range(start=self.start_date, end=self.end_date, freq='B').tolist()
+            self.timestamps = pd.date_range(start=self.start_date, end=self.end_date, freq="B").tolist()
 
         self.total_bars = len(self.timestamps)
         self.global_idx = 0
@@ -121,7 +131,9 @@ class DBDataStream(DataStream):
         self.current_chunk_end_idx = 0
         self.chunks_loaded = 0
 
-        logger.info(f"Timeline loaded: {self.total_bars} trading days from {self.start_date.date()} to {self.end_date.date()}")
+        logger.info(
+            f"Timeline loaded: {self.total_bars} trading days from {self.start_date.date()} to {self.end_date.date()}"
+        )
 
         self._load_next_chunk()
 
@@ -166,20 +178,20 @@ class DBDataStream(DataStream):
                 continue
 
             df.columns = [c.lower() for c in df.columns]
-            if 'datetime' in df.columns:
-                df['timestamp'] = pd.to_datetime(df['datetime'])
-            elif 'date' in df.columns:
-                df['timestamp'] = pd.to_datetime(df['date'])
+            if "datetime" in df.columns:
+                df["timestamp"] = pd.to_datetime(df["datetime"])
+            elif "date" in df.columns:
+                df["timestamp"] = pd.to_datetime(df["date"])
             else:
-                df['timestamp'] = pd.to_datetime(df.index)
+                df["timestamp"] = pd.to_datetime(df.index)
 
-            if 'adjfactor' in df.columns:
-                for col in ['open', 'high', 'low', 'close']:
+            if "adjfactor" in df.columns:
+                for col in ["open", "high", "low", "close"]:
                     if col in df.columns:
-                        df[col] = df[col] * df['adjfactor']
+                        df[col] = df[col] * df["adjfactor"]
 
             # Index by timestamp for faster lookup in next_bar
-            self.current_chunk_data[symbol] = df.set_index('timestamp').sort_index()
+            self.current_chunk_data[symbol] = df.set_index("timestamp").sort_index()
             symbols_loaded += 1
 
         # Memory tracking after loading
@@ -187,9 +199,11 @@ class DBDataStream(DataStream):
         mem_delta = mem_after - mem_before
         self.chunks_loaded += 1
 
-        logger.info(f"Chunk {self.chunks_loaded} loaded: {start_str} to {end_str}, "
-                   f"{symbols_loaded}/{len(self.symbols)} symbols, "
-                   f"memory: {mem_after:.2f}MB (+{mem_delta:.2f}MB)")
+        logger.info(
+            f"Chunk {self.chunks_loaded} loaded: {start_str} to {end_str}, "
+            f"{symbols_loaded}/{len(self.symbols)} symbols, "
+            f"memory: {mem_after:.2f}MB (+{mem_delta:.2f}MB)"
+        )
 
     def next_bar(self) -> Optional[Dict[str, Bar]]:
         if self.global_idx >= self.total_bars:
@@ -198,7 +212,7 @@ class DBDataStream(DataStream):
         # Check if we need to load next chunk
         if self.global_idx >= self.current_chunk_end_idx:
             self._load_next_chunk()
-            if self.global_idx >= self.total_bars: # Double check
+            if self.global_idx >= self.total_bars:  # Double check
                 return None
 
         current_ts = self.timestamps[self.global_idx]
@@ -215,13 +229,15 @@ class DBDataStream(DataStream):
                 bars[symbol] = Bar(
                     symbol=symbol,
                     timestamp=current_ts,
-                    open=row['open'],
-                    high=row['high'],
-                    low=row['low'],
-                    close=row['close'],
-                    volume=row.get('volume', 0.0),
-                    amount=row.get('amount', 0.0),
-                    extra={k: v for k, v in row.items() if k not in ['open', 'high', 'low', 'close', 'volume', 'amount']}
+                    open=row["open"],
+                    high=row["high"],
+                    low=row["low"],
+                    close=row["close"],
+                    volume=row.get("volume", 0.0),
+                    amount=row.get("amount", 0.0),
+                    extra={
+                        k: v for k, v in row.items() if k not in ["open", "high", "low", "close", "volume", "amount"]
+                    },
                 )
 
         self.global_idx += 1
@@ -234,6 +250,7 @@ class DBDataStream(DataStream):
         self.idx = 0
         self._load_next_chunk()
 
+
 class CryptoDBDataStream(DataStream):
     """Chunked crypto data stream from ClickHouse ``crypto_data.futures_5m``."""
 
@@ -242,8 +259,13 @@ class CryptoDBDataStream(DataStream):
 
     _AGG = {
         "close_time": "max",
-        "open": "argMin", "high": "max", "low": "min", "close": "argMax",
-        "volume": "sum", "quote_volume": "sum", "trade_count": "sum",
+        "open": "argMin",
+        "high": "max",
+        "low": "min",
+        "close": "argMax",
+        "volume": "sum",
+        "quote_volume": "sum",
+        "trade_count": "sum",
     }
 
     def __init__(
@@ -368,8 +390,7 @@ class CryptoDBDataStream(DataStream):
 
         self.chunks_loaded += 1
         logger.info(
-            f"Crypto chunk {self.chunks_loaded}: {len(chunk_ts)} bars, "
-            f"{len(self.current_chunk)} symbols loaded"
+            f"Crypto chunk {self.chunks_loaded}: {len(chunk_ts)} bars, {len(self.current_chunk)} symbols loaded"
         )
 
     def next_bar(self) -> Optional[Dict[str, Bar]]:
@@ -414,8 +435,13 @@ class RealtimeDataStream(DataStream):
     Supports multiple data sources with automatic fallback.
     """
 
-    def __init__(self, symbols: List[str], interval_seconds: int = 60,
-                 data_source: str = 'akshare', enable_trading_hours_check: bool = True):
+    def __init__(
+        self,
+        symbols: List[str],
+        interval_seconds: int = 60,
+        data_source: str = "akshare",
+        enable_trading_hours_check: bool = True,
+    ):
         """
         Initialize realtime data stream.
 
@@ -438,31 +464,35 @@ class RealtimeDataStream(DataStream):
         # Initialize data source
         self._init_data_source()
 
-        logger.info(f"RealtimeDataStream initialized: {len(symbols)} symbols, "
-                   f"interval={interval_seconds}s, source={data_source}")
+        logger.info(
+            f"RealtimeDataStream initialized: {len(symbols)} symbols, "
+            f"interval={interval_seconds}s, source={data_source}"
+        )
 
     def _init_data_source(self):
         """Initialize the data source client"""
-        if self.data_source == 'akshare':
+        if self.data_source == "akshare":
             try:
                 import akshare as ak
+
                 self.ak = ak
                 logger.info("AkShare data source initialized")
             except ImportError:
                 logger.error("AkShare not installed, falling back to mock data")
-                self.data_source = 'mock'
-        elif self.data_source == 'tushare':
+                self.data_source = "mock"
+        elif self.data_source == "tushare":
             try:
                 import tushare as ts
+
                 self.ts = ts
                 logger.info("Tushare data source initialized")
             except ImportError:
                 logger.error("Tushare not installed, falling back to akshare")
-                self.data_source = 'akshare'
+                self.data_source = "akshare"
                 self._init_data_source()
         else:
             logger.warning(f"Unknown data source: {self.data_source}, using mock")
-            self.data_source = 'mock'
+            self.data_source = "mock"
 
     def _is_trading_hours(self) -> bool:
         """
@@ -528,8 +558,9 @@ class RealtimeDataStream(DataStream):
                     next_open = (now + pd.Timedelta(days=1)).replace(hour=9, minute=30, second=0, microsecond=0)
 
             wait_seconds = (next_open - now).total_seconds()
-            logger.info(f"Market opens at {next_open.strftime('%Y-%m-%d %H:%M:%S')}, "
-                       f"waiting {wait_seconds/60:.1f} minutes")
+            logger.info(
+                f"Market opens at {next_open.strftime('%Y-%m-%d %H:%M:%S')}, waiting {wait_seconds / 60:.1f} minutes"
+            )
 
             # Sleep in chunks to allow for interruption
             sleep_chunk = min(60, wait_seconds)  # Sleep max 1 minute at a time
@@ -546,21 +577,21 @@ class RealtimeDataStream(DataStream):
 
             for symbol in self.symbols:
                 # Remove prefix if present (sh.510880 -> 510880)
-                code = symbol.split('.')[-1]
+                code = symbol.split(".")[-1]
 
-                row = df[df['代码'] == code]
+                row = df[df["代码"] == code]
                 if not row.empty:
                     data = row.iloc[0]
                     bars[symbol] = Bar(
                         symbol=symbol,
                         timestamp=current_ts,
-                        open=float(data['开盘价']),
-                        high=float(data['最高价']),
-                        low=float(data['最低价']),
-                        close=float(data['最新价']),
-                        volume=float(data['成交量']),
-                        amount=float(data['成交额']),
-                        extra={"name": data['名称']}
+                        open=float(data["开盘价"]),
+                        high=float(data["最高价"]),
+                        low=float(data["最低价"]),
+                        close=float(data["最新价"]),
+                        volume=float(data["成交量"]),
+                        amount=float(data["成交额"]),
+                        extra={"name": data["名称"]},
                     )
                 else:
                     logger.warning(f"Symbol {symbol} not found in market data")
@@ -574,6 +605,7 @@ class RealtimeDataStream(DataStream):
     def _fetch_mock_data(self) -> Dict[str, Bar]:
         """Generate mock data for testing"""
         import random
+
         bars = {}
         current_ts = datetime.now()
 
@@ -589,7 +621,7 @@ class RealtimeDataStream(DataStream):
                 close=base_price + random.uniform(-5, 5),
                 volume=random.randint(1000000, 10000000),
                 amount=random.randint(100000000, 1000000000),
-                extra={"name": f"Mock {symbol}"}
+                extra={"name": f"Mock {symbol}"},
             )
 
         return bars
@@ -611,9 +643,9 @@ class RealtimeDataStream(DataStream):
         # Fetch data with retry logic
         for attempt in range(self.max_retries):
             try:
-                if self.data_source == 'akshare':
+                if self.data_source == "akshare":
                     bars = self._fetch_akshare_data()
-                elif self.data_source == 'mock':
+                elif self.data_source == "mock":
                     bars = self._fetch_mock_data()
                 else:
                     logger.error(f"Unsupported data source: {self.data_source}")
@@ -645,4 +677,3 @@ class RealtimeDataStream(DataStream):
         self.last_fetch_time = time.time()
         self.consecutive_errors = 0
         logger.info("RealtimeDataStream reset")
-
