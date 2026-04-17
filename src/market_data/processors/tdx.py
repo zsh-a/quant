@@ -4,10 +4,15 @@ from datetime import datetime
 
 import pandas as pd
 from loguru import logger
-from mootdx.affair import Affair
-from mootdx.financial.base import BaseFinancial
 
 from src.market_data.clickhouse import create_clickhouse_client
+
+try:
+    from mootdx.affair import Affair
+    from mootdx.financial.base import BaseFinancial
+except ImportError:  # mootdx lives in the dev dependency group
+    Affair = None  # type: ignore[assignment]
+    BaseFinancial = None  # type: ignore[assignment]
 
 # Known working TDX financial data servers
 TDX_SERVERS = [
@@ -30,6 +35,12 @@ class TDXProcess:
     table_name = "stock_data.finicial_report"
 
     def __init__(self):
+        if Affair is None or BaseFinancial is None:
+            raise RuntimeError(
+                "TDX data source requires the 'mootdx' package from the dev "
+                "dependency group. Install via `uv sync` (dev group is default) "
+                "or `uv sync --group dev`."
+            )
         from src.config.paths import TDX_SYNC_STATE_PATH, TDX_FIN_DATA_DIR
         self.state_file = str(TDX_SYNC_STATE_PATH)
         self.client = create_clickhouse_client()
