@@ -3,11 +3,11 @@ Redis-based caching layer for backtest data.
 Provides caching for session results, equity history, and trades.
 """
 
-import orjson
 import hashlib
-from typing import Any, Dict, List, Optional
-from datetime import datetime, timedelta
 from functools import wraps
+from typing import Any, Dict, List, Optional
+
+import orjson
 
 try:
     import redis

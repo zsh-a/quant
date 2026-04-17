@@ -6,19 +6,21 @@ Computes a composite score from multiple factors, ranks the universe,
 and periodically rebalances into the top-N stocks.
 """
 
-import pandas as pd
+from typing import Any, Dict, List, Optional
+
 import numpy as np
-from typing import Dict, List, Optional, Any
-from src.core.base import Strategy, Bar
-from src.core.trading_calendar import TradingCalendar
-from src.strategies.registry import StrategyRegistry
-from src.alpha.infra.persistence import AlphaPersistence as AlphaZooPersistence
-from src.alpha.core.operators import OperatorRegistry as _OperatorRegistry
-from src.alpha.core.compiler import FormulaCompiler as _FormulaCompiler
-from src.alpha.core.dsl import TensorSchema as _TensorSchema
-from src.alpha.core.vm import StackVM as _StackVM, TensorStore as _TensorStore
+import pandas as pd
 from loguru import logger
 
+from src.alpha.core.compiler import FormulaCompiler as _FormulaCompiler
+from src.alpha.core.dsl import TensorSchema as _TensorSchema
+from src.alpha.core.operators import OperatorRegistry as _OperatorRegistry
+from src.alpha.core.vm import StackVM as _StackVM
+from src.alpha.core.vm import TensorStore as _TensorStore
+from src.alpha.infra.persistence import AlphaPersistence as AlphaZooPersistence
+from src.core.base import Bar, Strategy
+from src.core.trading_calendar import TradingCalendar
+from src.strategies.registry import StrategyRegistry
 
 # --------------- Factor computation helpers ---------------
 

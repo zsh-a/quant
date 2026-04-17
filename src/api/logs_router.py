@@ -2,15 +2,20 @@
 Logs API Router - API endpoints for session debug logs.
 """
 
-from fastapi import APIRouter
-from fastapi.responses import PlainTextResponse
 from typing import Optional
 
+from fastapi import APIRouter
+from fastapi.responses import PlainTextResponse
+
+from src.utils.session_logger import (
+    clear_session_logs as purge_session_logs,
+)
 from src.utils.session_logger import (
     get_all_logs,
-    get_session_logs as fetch_session_logs,
-    clear_session_logs as purge_session_logs,
     list_session_loggers,
+)
+from src.utils.session_logger import (
+    get_session_logs as fetch_session_logs,
 )
 
 router = APIRouter(prefix="/logs", tags=["logs"])
@@ -37,7 +42,7 @@ async def get_session_logs(
 ):
     """
     Get logs for a session.
-    
+
     Args:
         session_id: Session ID
         level: Filter by log level (DEBUG, INFO, WARNING, ERROR)

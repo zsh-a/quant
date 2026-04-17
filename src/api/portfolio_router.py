@@ -2,20 +2,17 @@
 Portfolio API Router - API endpoints for portfolio management.
 """
 
+from typing import Dict, List
+
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Dict, List, Optional
 from loguru import logger
+from pydantic import BaseModel
 
-from src.portfolio.portfolio_manager import (
-    PortfolioManager,
-    StrategyConfig,
-    WeightMethod
-)
-from src.portfolio.backtest import PortfolioBacktester, PortfolioBacktestResult
+from src.api.validators import DateStr, NonNegativeFloat
 from src.portfolio import persistence as portfolio_db
+from src.portfolio.backtest import PortfolioBacktester, PortfolioBacktestResult
+from src.portfolio.portfolio_manager import PortfolioManager, StrategyConfig, WeightMethod
 from src.strategies.registry import StrategyRegistry
-
 
 router = APIRouter(prefix="/portfolio", tags=["portfolio"])
 
@@ -38,9 +35,6 @@ class UpdateWeightsRequest(BaseModel):
     weights: Dict[str, float]
 
 
-from src.api.validators import DateStr, NonNegativeFloat
-
-
 class PortfolioBacktestRequest(BaseModel):
     """Request to run portfolio backtest"""
     start_date: DateStr
@@ -61,7 +55,7 @@ async def create_portfolio(req: CreatePortfolioRequest):
             "custom": WeightMethod.CUSTOM
         }
         weight_method = method_map.get(req.weight_method, WeightMethod.EQUAL)
-        
+
         # Create strategy configs
         strategy_configs = []
         for s in req.strategies:
@@ -69,7 +63,7 @@ async def create_portfolio(req: CreatePortfolioRequest):
             strategy_class = StrategyRegistry.get_strategy_class(s.get('strategy', 'jsg'))
             if strategy_class is None:
                 raise HTTPException(400, f"Unknown strategy: {s.get('strategy')}")
-            
+
             config = StrategyConfig(
                 name=s.get('name', s.get('strategy')),
                 strategy_class=strategy_class,
@@ -78,14 +72,14 @@ async def create_portfolio(req: CreatePortfolioRequest):
                 enabled=True
             )
             strategy_configs.append(config)
-        
+
         # Create portfolio manager
         portfolio = PortfolioManager(
             strategies=strategy_configs,
             weight_method=weight_method,
             rebalance_frequency=req.rebalance_frequency
         )
-        
+
         portfolio_id = f"pf_{req.name}_{len(PORTFOLIOS)}"
         PORTFOLIOS[portfolio_id] = portfolio
 
@@ -98,7 +92,7 @@ async def create_portfolio(req: CreatePortfolioRequest):
         portfolio_db.save_portfolio(portfolio_id, req.name, raw_config)
 
         logger.info(f"Created portfolio: {portfolio_id}")
-        
+
         return {
             "portfolio_id": portfolio_id,
             "name": req.name,
@@ -106,7 +100,7 @@ async def create_portfolio(req: CreatePortfolioRequest):
             "weights": portfolio.get_weights(),
             "weight_method": req.weight_method
         }
-    
+
     except Exception as e:
         logger.error(f"Create portfolio error: {e}")
         raise HTTPException(500, str(e))
@@ -118,7 +112,7 @@ async def get_portfolio(portfolio_id: str):
     portfolio = PORTFOLIOS.get(portfolio_id)
     if not portfolio:
         raise HTTPException(404, "Portfolio not found")
-    
+
     return {
         "portfolio_id": portfolio_id,
         "stats": portfolio.get_portfolio_stats()
@@ -144,9 +138,9 @@ async def update_weights(portfolio_id: str, req: UpdateWeightsRequest):
     portfolio = PORTFOLIOS.get(portfolio_id)
     if not portfolio:
         raise HTTPException(404, "Portfolio not found")
-    
+
     portfolio.set_weights(req.weights)
-    
+
     return {
         "portfolio_id": portfolio_id,
         "weights": portfolio.get_weights()
@@ -159,19 +153,19 @@ async def run_portfolio_backtest(portfolio_id: str, req: PortfolioBacktestReques
     portfolio = PORTFOLIOS.get(portfolio_id)
     if not portfolio:
         raise HTTPException(404, "Portfolio not found")
-    
+
     try:
         backtester = PortfolioBacktester(
             portfolio_manager=portfolio,
             initial_capital=req.initial_capital
         )
-        
+
         result = backtester.run(
             start_date=req.start_date,
             end_date=req.end_date,
             symbols=req.symbols
         )
-        
+
         # Store result (memory + DB)
         BACKTEST_RESULTS[portfolio_id] = result
         portfolio_db.save_backtest_result(portfolio_id, {
@@ -195,7 +189,7 @@ async def run_portfolio_backtest(portfolio_id: str, req: PortfolioBacktestReques
             "strategy_results": result.strategy_results,
             "n_trades": len(result.trades)
         }
-    
+
     except Exception as e:
         logger.error(f"Portfolio backtest error: {e}")
         raise HTTPException(500, str(e))
@@ -207,7 +201,7 @@ async def get_backtest_result(portfolio_id: str):
     result = BACKTEST_RESULTS.get(portfolio_id)
     if not result:
         raise HTTPException(404, "Backtest result not found")
-    
+
     return {
         "portfolio_id": result.portfolio_id,
         "total_return": result.total_return,

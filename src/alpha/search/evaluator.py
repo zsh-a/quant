@@ -9,13 +9,12 @@ from __future__ import annotations
 from typing import Any
 
 import numpy as np
-from loguru import logger
 
-from ..core.compiler import FormulaCompiler, BytecodeProgram
+from ..core.compiler import BytecodeProgram, FormulaCompiler
 from ..core.dataset import AlphaDataset
 from ..core.dsl import TensorSchema
 from ..core.vm import StackVM, TensorStore, to_numpy
-from ..eval.metrics import compute_forward_returns, compute_rank_ic, compute_ic_metrics
+from ..eval.metrics import compute_forward_returns, compute_ic_metrics, compute_rank_ic
 
 try:
     import torch as _torch

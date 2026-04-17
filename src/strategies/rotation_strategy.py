@@ -1,7 +1,8 @@
-import pandas as pd
 import numpy as np
+import pandas as pd
 import talib as ta
-from src.core.base import Strategy, Bar
+
+from src.core.base import Bar, Strategy
 from src.core.trading_calendar import TradingCalendar
 from src.strategies.registry import StrategyRegistry
 

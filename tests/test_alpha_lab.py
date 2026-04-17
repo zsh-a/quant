@@ -6,15 +6,13 @@ import numpy as np
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from src.alpha import AlphaService, FormulaCompiler, StackVM, TensorStore
-from src.alpha.search.evolution import BreedingSpec, FitnessEngine
-from src.alpha.llm.backends import HeuristicLLMBackend
-from src.alpha.search.orchestrator import SearchOrchestrator
-from src.alpha.strategies import LLMEvolutionStrategy
-from src.alpha.llm.backends import OpenAILLMBackend
-from src.alpha.infra.persistence import AlphaPersistence
-from src.alpha.risk.models import CostModel, ExecutionSimulator, MarketContext, RuleOverlay
 from src.alpha.eval.validation import CPCVValidator
-from src.market_data.ccxt_adapter import CcxtCryptoDataAdapter, PROVIDER_SPECS
+from src.alpha.infra.persistence import AlphaPersistence
+from src.alpha.llm.backends import HeuristicLLMBackend, OpenAILLMBackend
+from src.alpha.risk.models import CostModel, ExecutionSimulator, MarketContext, RuleOverlay
+from src.alpha.search.evolution import BreedingSpec, FitnessEngine
+from src.alpha.strategies import LLMEvolutionStrategy
+from src.market_data.ccxt_adapter import PROVIDER_SPECS, CcxtCryptoDataAdapter
 
 
 def test_formula_compile_and_vm_run():
@@ -221,7 +219,7 @@ class _BatchCountingBackend:
 
 def test_evolution_breed_batches_llm_calls():
     backend = _BatchCountingBackend()
-    strategy = LLMEvolutionStrategy(llm_backend=backend, batch_size=7)
+    LLMEvolutionStrategy(llm_backend=backend, batch_size=7)
     # Strategy generates offspring via LLM backend
     formulas = backend.generate_offspring(
         BreedingSpec(parent_a="CSRank(ts_mean(close, 5) - close)", parent_b=None, objective="test"),

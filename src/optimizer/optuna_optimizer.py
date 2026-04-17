@@ -10,7 +10,7 @@ Optuna 贝叶斯参数优化 — TPE 采样 + 中位数剪枝。
 
 from __future__ import annotations
 
-from typing import Any, Callable, Dict, List, Optional
+from typing import Any, Callable, Dict, Optional
 
 from loguru import logger
 

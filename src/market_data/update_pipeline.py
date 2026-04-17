@@ -3,8 +3,6 @@ import time
 from datetime import datetime
 from typing import Callable, Dict, List, Optional
 
-import pandas as pd
-
 from src.market_data.db import DB
 from src.market_data.processors.akshare import AKDataProcessor
 from src.market_data.processors.baostock import BaoStockProcessor

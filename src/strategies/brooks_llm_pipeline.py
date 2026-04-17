@@ -11,11 +11,10 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 from loguru import logger
 from pydantic import BaseModel, Field
-
 
 # ---------------------------------------------------------------------------
 # Decision Models (从 ta_graph 精简迁移)
@@ -238,13 +237,12 @@ def node_risk_check(state: PipelineState) -> PipelineState:
     if not d or d.operation == "hold":
         return state
 
-    from src.core.price_calculator import enforce_min_stop_distance, enforce_min_rr
     from src.analysis.bar_features import calculate_atr
+    from src.core.price_calculator import enforce_min_rr, enforce_min_stop_distance
 
     atr = calculate_atr(state.bars)
 
     if d.entry_price > 0 and d.stop_loss > 0:
-        is_long = d.operation == "buy"
         d.stop_loss = enforce_min_stop_distance(d.entry_price, d.stop_loss, atr)
         if d.take_profit > 0:
             d.take_profit = enforce_min_rr(d.entry_price, d.stop_loss, d.take_profit)

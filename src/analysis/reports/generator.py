@@ -2,9 +2,10 @@
 Report Generator - Generate backtest reports in Markdown format.
 """
 
-from typing import Dict, List, Optional
-from datetime import datetime
 import os
+from datetime import datetime
+from typing import Dict, List, Optional
+
 from loguru import logger
 
 from src.analysis.attribution import ReturnAttribution, RiskAttribution
@@ -13,16 +14,16 @@ from src.analysis.attribution import ReturnAttribution, RiskAttribution
 class ReportGenerator:
     """
     Backtest report generator.
-    
+
     Generates professional reports in Markdown format.
     """
-    
+
     def __init__(self, output_dir: str = ""):
         if not output_dir:
             from src.config.paths import REPORTS_DIR
             output_dir = str(REPORTS_DIR)
         self.output_dir = output_dir
-    
+
     def generate(
         self,
         session_id: str,
@@ -35,19 +36,19 @@ class ReportGenerator:
     ) -> str:
         """
         Generate Markdown report.
-        
+
         Returns:
             Path to generated report
         """
         logger.info(f"Generating report for session {session_id}")
-        
+
         # Run attribution analysis
         return_attr = ReturnAttribution(trades, equity_history)
         attribution = return_attr.analyze()
-        
+
         risk_attr = RiskAttribution(equity_history, positions)
         risk_metrics = risk_attr.analyze()
-        
+
         # Build report content
         report = self._build_report(
             session_id=session_id,
@@ -59,17 +60,17 @@ class ReportGenerator:
             params=params or {},
             metadata=metadata or {}
         )
-        
+
         # Save report
         filename = f"report_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.md"
         filepath = os.path.join(self.output_dir, filename)
-        
+
         with open(filepath, 'w', encoding='utf-8') as f:
             f.write(report)
-        
+
         logger.info(f"Report saved: {filepath}")
         return filepath
-    
+
     def _build_report(
         self,
         session_id: str,
@@ -82,7 +83,7 @@ class ReportGenerator:
         metadata: Dict
     ) -> str:
         """Build report content"""
-        
+
         # Calculate summary stats
         if equity_history:
             initial = equity_history[0].get('total_equity', 0)
@@ -94,9 +95,9 @@ class ReportGenerator:
             initial = final = 0
             total_return = 0
             start_date = end_date = ''
-        
+
         lines = []
-        
+
         # Header
         lines.append(f"# 回测报告: {strategy_name}")
         lines.append("")
@@ -105,7 +106,7 @@ class ReportGenerator:
         lines.append("")
         lines.append("---")
         lines.append("")
-        
+
         # Executive Summary
         lines.append("## 📊 执行摘要")
         lines.append("")
@@ -119,7 +120,7 @@ class ReportGenerator:
         lines.append(f"| 最大回撤 | {risk_metrics.get('max_drawdown', 0):.2%} |")
         lines.append(f"| 交易次数 | {len(trades)} |")
         lines.append("")
-        
+
         # Strategy Parameters
         if params:
             lines.append("## ⚙️ 策略参数")
@@ -129,7 +130,7 @@ class ReportGenerator:
             for k, v in params.items():
                 lines.append(f"| {k} | {v} |")
             lines.append("")
-        
+
         # Performance Metrics
         lines.append("## 📈 绩效指标")
         lines.append("")
@@ -140,7 +141,7 @@ class ReportGenerator:
         lines.append(f"- **胜率**: {attribution.win_rate:.1%}")
         lines.append(f"- **盈亏比**: {attribution.profit_factor:.2f}")
         lines.append("")
-        
+
         lines.append("### 风险指标")
         lines.append("")
         lines.append(f"- **年化波动率**: {risk_metrics.get('volatility', 0):.2%}")
@@ -148,7 +149,7 @@ class ReportGenerator:
         lines.append(f"- **VaR(95%)**: {risk_metrics.get('var_95', 0):.2%}")
         lines.append(f"- **CVaR(95%)**: {risk_metrics.get('cvar_95', 0):.2%}")
         lines.append("")
-        
+
         # Trade Analysis
         lines.append("## 📋 交易分析")
         lines.append("")
@@ -156,7 +157,7 @@ class ReportGenerator:
         lines.append(f"- **平均盈利**: {attribution.avg_win:.2%}")
         lines.append(f"- **平均亏损**: {attribution.avg_loss:.2%}")
         lines.append("")
-        
+
         # Attribution by Asset
         if attribution.by_asset:
             lines.append("### 资产归因")
@@ -168,7 +169,7 @@ class ReportGenerator:
                 pnl_str = f"¥{pnl:+,.0f}" if pnl != 0 else "¥0"
                 lines.append(f"| {symbol} | {pnl_str} |")
             lines.append("")
-        
+
         # Attribution by Sector
         if attribution.by_sector:
             lines.append("### 行业归因")
@@ -180,7 +181,7 @@ class ReportGenerator:
                 pnl_str = f"¥{pnl:+,.0f}" if pnl != 0 else "¥0"
                 lines.append(f"| {sector} | {pnl_str} |")
             lines.append("")
-        
+
         # Monthly Returns
         if attribution.by_period:
             lines.append("### 月度收益")
@@ -191,7 +192,7 @@ class ReportGenerator:
                 color = "🟢" if ret >= 0 else "🔴"
                 lines.append(f"| {month} | {color} {ret:+.2%} |")
             lines.append("")
-        
+
         # Recent Trades
         if trades:
             lines.append("## 📝 最近交易")
@@ -206,14 +207,14 @@ class ReportGenerator:
                 price = trade.get('price', 0)
                 lines.append(f"| {ts} | {symbol} | {side} | {qty} | ¥{price:.2f} |")
             lines.append("")
-        
+
         # Footer
         lines.append("---")
         lines.append("")
         lines.append("*本报告由Quant Trading Platform自动生成*")
-        
+
         return "\n".join(lines)
-    
+
     def _annualize_return(self, total_return: float, n_days: int) -> float:
         """Annualize return"""
         if n_days <= 0:
@@ -226,19 +227,19 @@ class ReportGenerator:
 
 class ReportExporter:
     """Export reports to different formats"""
-    
+
     @staticmethod
     def to_dict(report_path: str) -> Dict:
         """Parse Markdown report to dict"""
         with open(report_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
         # Simple parsing - extract key metrics
         result = {
             'content': content,
             'path': report_path
         }
-        
+
         # Extract summary metrics from table
         lines = content.split('\n')
         for line in lines:
@@ -248,5 +249,5 @@ class ReportExporter:
                 result['final_capital'] = line.split('|')[-2].strip()
             elif '总收益率' in line:
                 result['total_return'] = line.split('|')[-2].strip()
-        
+
         return result

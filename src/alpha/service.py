@@ -11,25 +11,33 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from .risk.combination import FactorCombiner
 from .core.compiler import BytecodeProgram, FormulaCompiler
 from .core.dataset import AlphaDataset, AShareDailyDatasetLoader, CryptoMinuteDatasetLoader
 from .core.dsl import TensorSchema
 from .core.market import MarketType, get_market_profile
-from .search.evolution import EvalResult, Individual
-from .knowledge.features import FeatureKitchen
-from .knowledge.themes import FinancialKnowledgeBase
 from .core.operators import OperatorRegistry
-from .infra.persistence import AlphaPersistence
-from .risk.models import CostModel, ExecutionSimulator, MarketContext, PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer
-from .search.orchestrator import SearchOrchestrator
-from .knowledge.memory import StrategyMemory
-from .eval.validation import CPCVValidator, ValidationFold
 from .core.vm import StackVM, TensorStore
+from .eval.validation import CPCVValidator, ValidationFold
+from .infra.persistence import AlphaPersistence
+from .knowledge.features import FeatureKitchen
+from .knowledge.memory import StrategyMemory
+from .knowledge.themes import FinancialKnowledgeBase
+from .risk.combination import FactorCombiner
+from .risk.models import (
+    CostModel,
+    ExecutionSimulator,
+    MarketContext,
+    PortfolioManager,
+    RiskConfig,
+    RuleOverlay,
+    SignalTransformer,
+)
+from .search.evolution import EvalResult, Individual
+from .search.orchestrator import SearchOrchestrator
 
 try:
     import torch as _torch
-    from .eval.gpu_metrics import compute_ic_metrics_gpu as _gpu_ic_metrics
+
 except Exception:  # pragma: no cover
     _torch = None
 
@@ -159,7 +167,7 @@ class AlphaService:
 
     def get_strategy_modes_info(self) -> list[dict[str, Any]]:
         """Return strategy modes for frontend StrategyModeInfo selector."""
-        from .strategies.registry import get_all_modes, get_strategy_meta
+        from .strategies.registry import get_all_modes
 
         return [
             {
@@ -187,7 +195,7 @@ class AlphaService:
         ``strategy`` is a mode name (e.g. ``"evolution"``, ``"neural"``).
         Falls back to evolution if unknown.
         """
-        from .strategies.registry import build_strategies, get_mode, StrategyInfra
+        from .strategies.registry import StrategyInfra, build_strategies, get_mode
 
         mode = get_mode(strategy or "evolution") or get_mode("evolution")
         names = set(mode.strategies)
@@ -222,8 +230,9 @@ class AlphaService:
 
     def _validate_with_aliases(self, formula: str):
         """Validate using the market-aware compiler (with correct field aliases)."""
-        from .core.dsl import FormulaParser, ValidationReport, normalize_formula
         import hashlib
+
+        from .core.dsl import FormulaParser, ValidationReport, normalize_formula
 
         parser = FormulaParser(self.registry)
         try:

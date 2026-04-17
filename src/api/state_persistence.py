@@ -3,12 +3,13 @@ Session state persistence and recovery module.
 Handles serialization, checkpoint saving, and state restoration.
 """
 
-import orjson
-import sqlite3
 import gzip
-from pathlib import Path
-from typing import Dict, Any, Optional
+import sqlite3
 from datetime import datetime
+from typing import Any, Dict, Optional
+
+import orjson
+
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -49,7 +50,7 @@ class StatePersistence:
         """)
 
         cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_session_time 
+            CREATE INDEX IF NOT EXISTS idx_session_time
             ON checkpoints(session_id, checkpoint_time DESC)
         """)
 
@@ -274,7 +275,7 @@ class StatePersistence:
             cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT 
+                SELECT
                     COUNT(DISTINCT session_id) as session_count,
                     COUNT(*) as checkpoint_count,
                     SUM(LENGTH(state_data)) as total_size

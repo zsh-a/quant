@@ -32,8 +32,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import UTC, datetime, timedelta
 from typing import Any, Callable
 
-import pandas as pd
 import httpx
+import pandas as pd
 from loguru import logger
 
 from src.market_data.clickhouse import create_clickhouse_client

@@ -3,14 +3,12 @@ Strategy Template System - Templates for creating new strategies quickly.
 Provides base templates, template registry, and strategy generation.
 """
 
-from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Type
+import json
 from dataclasses import dataclass, field
 from enum import Enum
-import json
-from pathlib import Path
+from typing import Any, Dict, List, Optional, Type
 
-from src.core.base import Strategy, Bar
+from src.core.base import Strategy
 from src.strategies.registry import StrategyRegistry
 from src.utils.logging_config import get_logger
 

@@ -1,6 +1,5 @@
 import akshare as ak
 import pandas as pd
-
 from loguru import logger
 
 from src.market_data.clickhouse import create_clickhouse_client

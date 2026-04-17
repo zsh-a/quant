@@ -2,9 +2,10 @@
 HTML Report Generator - Generate HTML reports with interactive charts.
 """
 
-from typing import Dict, List, Optional
-from datetime import datetime
 import os
+from datetime import datetime
+from typing import Dict, List, Optional
+
 from loguru import logger
 
 from src.analysis.attribution import ReturnAttribution, RiskAttribution
@@ -43,11 +44,10 @@ class HTMLReportGenerator:
             initial = equity_history[0].get('total_equity', 0)
             final = equity_history[-1].get('total_equity', 0)
             total_return = (final - initial) / initial if initial > 0 else 0
-            start_date = equity_history[0].get('date', '')
-            end_date = equity_history[-1].get('date', '')
+            equity_history[0].get('date', '')
+            equity_history[-1].get('date', '')
         else:
             initial = final = total_return = 0
-            start_date = end_date = ''
 
         # Build HTML
         html = f'''<!DOCTYPE html>
@@ -58,7 +58,7 @@ class HTMLReportGenerator:
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <style>
         * {{ box-sizing: border-box; }}
-        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; 
+        body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
                background: #0d1117; color: #c9d1d9; margin: 0; padding: 20px; }}
         .container {{ max-width: 1200px; margin: 0 auto; }}
         h1 {{ color: #58a6ff; border-bottom: 1px solid #30363d; padding-bottom: 16px; }}
@@ -129,7 +129,7 @@ class HTMLReportGenerator:
             <h3>资产归因</h3>
             <table>
                 <tr><th>资产</th><th>盈亏</th></tr>
-                {''.join(f"<tr><td>{s}</td><td class='{'positive' if p>=0 else 'negative'}'>¥{p:+,.0f}</td></tr>" 
+                {''.join(f"<tr><td>{s}</td><td class='{'positive' if p>=0 else 'negative'}'>¥{p:+,.0f}</td></tr>"
                          for s, p in sorted(attribution.by_asset.items(), key=lambda x: x[1], reverse=True)[:10])}
             </table>
         </div>
@@ -138,7 +138,7 @@ class HTMLReportGenerator:
             <h3>行业归因</h3>
             <table>
                 <tr><th>行业</th><th>盈亏</th></tr>
-                {''.join(f"<tr><td>{s}</td><td class='{'positive' if p>=0 else 'negative'}'>¥{p:+,.0f}</td></tr>" 
+                {''.join(f"<tr><td>{s}</td><td class='{'positive' if p>=0 else 'negative'}'>¥{p:+,.0f}</td></tr>"
                          for s, p in sorted(attribution.by_sector.items(), key=lambda x: x[1], reverse=True))}
             </table>
         </div>

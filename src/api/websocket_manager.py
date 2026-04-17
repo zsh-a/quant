@@ -4,12 +4,14 @@ Handles connection lifecycle, broadcasting, heartbeat, and message throttling.
 """
 
 import asyncio
-import orjson
 import time
-from typing import Dict, Set, List, Any, Optional
-from datetime import datetime
 from collections import defaultdict
-from fastapi import WebSocket, WebSocketDisconnect
+from datetime import datetime
+from typing import Any, Dict, List, Optional, Set
+
+import orjson
+from fastapi import WebSocket
+
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)

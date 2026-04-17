@@ -23,7 +23,6 @@ from .cli import _parse_iso
 from .risk.models import RiskConfig
 from .service import AlphaService
 
-
 # ---------------------------------------------------------------------------
 # Configuration
 # ---------------------------------------------------------------------------

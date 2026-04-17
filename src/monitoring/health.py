@@ -2,11 +2,12 @@
 Health check system for monitoring application status.
 """
 
-from typing import Dict, Any
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import TimeoutError as FuturesTimeout
 from datetime import datetime
-from concurrent.futures import ThreadPoolExecutor, TimeoutError as FuturesTimeout
+from typing import Any, Dict
+
 import psutil
-from loguru import logger
 
 _executor = ThreadPoolExecutor(max_workers=3, thread_name_prefix="health")
 

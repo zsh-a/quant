@@ -8,10 +8,8 @@ for unused features.
 
 from __future__ import annotations
 
-import ast
-import math
 from collections import defaultdict
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:

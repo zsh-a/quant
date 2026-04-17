@@ -12,9 +12,8 @@ from __future__ import annotations
 import ast
 import json
 import math
-import re
 from collections import defaultdict, deque
-from dataclasses import asdict, dataclass, field
+from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 

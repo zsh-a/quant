@@ -18,7 +18,7 @@ from src.tasks.celery_app import app
 
 class BacktestTask(Task):
     """Base task with progress tracking"""
-    
+
     def update_progress(self, session_id: str, progress: float, message: str = ""):
         """Update task progress"""
         self.update_state(
@@ -45,7 +45,7 @@ class BacktestTask(Task):
 def run_backtest_task(self, session_id: str, config: dict):
     """
     Run a backtest task asynchronously.
-    
+
     Args:
         session_id: Session identifier
         config: Backtest configuration
@@ -56,7 +56,7 @@ def run_backtest_task(self, session_id: str, config: dict):
             - params: Strategy parameters
             - initial_cash: Initial capital
             - commission: Commission rate
-    
+
     Returns:
         dict: Backtest results
     """

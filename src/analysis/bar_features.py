@@ -16,8 +16,6 @@ from dataclasses import asdict, dataclass
 from typing import Any, Literal
 
 import numpy as np
-from loguru import logger
-
 
 # ---------------------------------------------------------------------------
 # Data Models

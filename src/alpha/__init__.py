@@ -13,62 +13,120 @@ Subpackages:
 
 # --- Core ---
 from .core import (
-    ASTNode, AlphaDataset, AShareDailyDatasetLoader, BytecodeProgram,
-    CryptoMinuteDatasetLoader, DatasetLoader, FormulaCompiler, FormulaParser,
-    Instruction, MarketProfile, MarketType, OperatorRegistry, OperatorSpec,
-    StackVM, TensorSchema, TensorStore, TypeChecker, ValidationReport,
-    get_market_profile, list_market_types,
+    AlphaDataset,
+    AShareDailyDatasetLoader,
+    ASTNode,
+    BytecodeProgram,
+    CryptoMinuteDatasetLoader,
+    DatasetLoader,
+    FormulaCompiler,
+    FormulaParser,
+    Instruction,
+    MarketProfile,
+    MarketType,
+    OperatorRegistry,
+    OperatorSpec,
+    StackVM,
+    TensorSchema,
+    TensorStore,
+    TypeChecker,
+    ValidationReport,
+    get_market_profile,
+    list_market_types,
 )
 
 # --- Eval ---
 from .eval import (
     TRITON_AVAILABLE as triton_available,
-    CPCVValidator, ValidationFold,
-    compute_forward_returns, compute_ic_metrics, compute_rank_ic,
-    compute_ic_metrics_gpu, compute_rank_ic_batch_gpu, compute_rank_ic_gpu,
+)
+from .eval import (
+    CPCVValidator,
+    ValidationFold,
+    compute_forward_returns,
+    compute_ic_metrics,
+    compute_ic_metrics_gpu,
+    compute_rank_ic,
+    compute_rank_ic_batch_gpu,
+    compute_rank_ic_gpu,
     fast_screen_ic,
 )
 
-# --- Search ---
-from .search import (
-    ArchiveEntry, BreedingSpec, CheckpointManager, EvalResult,
-    FactorCatalog, FactorCatalogEntry, FitnessEngine, FitnessPolicy,
-    FormulaEnumerator, Individual, Lineage, PipelineRecord, RoundRecord,
-    SearchCheckpoint, SearchContext, SearchOrchestrator, SearchResult,
-    SearchStrategy, StageKind, StageRecord, StatefulStrategy, StrategySnapshot,
-    build_individual,
+# --- Infra ---
+from .infra import (
+    AlphaPersistence,
+    InMemoryCollector,
+    LangfuseCollector,
+    PersistedRun,
+    Span,
+    SpanCollector,
+    tracer,
+)
+
+# --- Knowledge ---
+from .knowledge import (
+    DerivedFeature,
+    FeatureGroup,
+    FeatureKitchen,
+    FinancialKnowledgeBase,
+    FinancialTheme,
+    StrategyMemory,
 )
 
 # --- LLM ---
 from .llm import HeuristicLLMBackend, OpenAILLMBackend
 
-# --- Strategies ---
-from .strategies import (
-    EnumerationStrategy, LLMEvolutionStrategy,
-    MCTSRefinementStrategy, NeuralFormulaStrategy,
-)
-from .strategies.mcts import AlphaNode, MCTSEngine, MCTSLLMAdapter
-
-# --- Knowledge ---
-from .knowledge import (
-    DerivedFeature, FeatureGroup, FeatureKitchen,
-    FinancialKnowledgeBase, FinancialTheme, StrategyMemory,
-)
-
 # --- Risk ---
 from .risk import (
-    BacktestResult, CostModel, ExecutionSimulator, FactorCombiner, FactorSignal,
-    MarketContext, PortfolioManager, RiskConfig, RuleOverlay, SignalTransformer,
+    BacktestResult,
+    CostModel,
+    ExecutionSimulator,
+    FactorCombiner,
+    FactorSignal,
+    MarketContext,
+    PortfolioManager,
+    RiskConfig,
+    RuleOverlay,
+    SignalTransformer,
 )
 
-# --- Infra ---
-from .infra import (
-    AlphaPersistence, InMemoryCollector, LangfuseCollector,
-    PersistedRun, Span, SpanCollector, tracer,
+# --- Search ---
+from .search import (
+    ArchiveEntry,
+    BreedingSpec,
+    CheckpointManager,
+    EvalResult,
+    FactorCatalog,
+    FactorCatalogEntry,
+    FitnessEngine,
+    FitnessPolicy,
+    FormulaEnumerator,
+    Individual,
+    Lineage,
+    PipelineRecord,
+    RoundRecord,
+    SearchCheckpoint,
+    SearchContext,
+    SearchOrchestrator,
+    SearchResult,
+    SearchStrategy,
+    StageKind,
+    StageRecord,
+    StatefulStrategy,
+    StrategySnapshot,
+    build_individual,
 )
 
 # --- Service ---
 from .service import AlphaService
+
+# --- Strategies ---
+from .strategies import (
+    EnumerationStrategy,
+    LLMEvolutionStrategy,
+    MCTSRefinementStrategy,
+    NeuralFormulaStrategy,
+)
+from .strategies.mcts import AlphaNode, MCTSEngine, MCTSLLMAdapter
 
 __all__ = [
     # Core

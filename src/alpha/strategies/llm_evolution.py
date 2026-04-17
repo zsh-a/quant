@@ -10,11 +10,9 @@ from __future__ import annotations
 import random
 from typing import Any, ClassVar
 
-from loguru import logger
-
+from ..search.context import SearchContext
 from ..search.evolution import BreedingSpec, Individual
 from ..search.pipeline import Lineage
-from ..search.context import SearchContext
 from .base import BaseStrategy, StrategyMeta
 
 
@@ -142,7 +140,7 @@ class LLMEvolutionStrategy(BaseStrategy):
 
 
 # --- Registry ---
-from .registry import register_strategy, StrategyInfra  # noqa: E402
+from .registry import StrategyInfra, register_strategy  # noqa: E402
 
 
 @register_strategy(LLMEvolutionStrategy.meta)

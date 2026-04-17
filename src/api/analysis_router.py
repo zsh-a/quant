@@ -2,14 +2,13 @@
 Analysis and Reports API Router - API endpoints for attribution analysis and report generation.
 """
 
+
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import FileResponse
-from typing import Optional
 from loguru import logger
 
 from src.analysis.attribution import ReturnAttribution, RiskAttribution
 from src.analysis.reports.generator import ReportGenerator
-
 
 router = APIRouter(prefix="/analysis", tags=["analysis"])
 
@@ -26,19 +25,19 @@ async def get_attribution(session_id: str):
     """Get return attribution analysis"""
     if not session_db:
         raise HTTPException(500, "Session database not available")
-    
+
     try:
         # Get session data
         equity_history = session_db.get_equity_history(session_id)
         trades = session_db.get_trades(session_id)
-        
+
         if not equity_history:
             raise HTTPException(404, "Session not found or no data")
-        
+
         # Run attribution
         attr = ReturnAttribution(trades, equity_history)
         result = attr.analyze()
-        
+
         return {
             'session_id': session_id,
             'total_return': result.total_return,
@@ -50,7 +49,7 @@ async def get_attribution(session_id: str):
             'avg_loss': result.avg_loss,
             'profit_factor': result.profit_factor
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -63,19 +62,19 @@ async def get_risk_analysis(session_id: str):
     """Get risk attribution analysis"""
     if not session_db:
         raise HTTPException(500, "Session database not available")
-    
+
     try:
         equity_history = session_db.get_equity_history(session_id)
         session = session_db.get_session(session_id)
-        
+
         if not equity_history:
             raise HTTPException(404, "Session not found or no data")
-        
+
         positions = session.get('positions', {}) if session else {}
-        
+
         risk_attr = RiskAttribution(equity_history, positions)
         result = risk_attr.analyze()
-        
+
         return {
             'session_id': session_id,
             'volatility': result['volatility'],
@@ -84,7 +83,7 @@ async def get_risk_analysis(session_id: str):
             'cvar_95': result['cvar_95'],
             'sharpe_ratio': result['sharpe_ratio']
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -100,17 +99,17 @@ async def generate_report(
     """Generate backtest report"""
     if not session_db:
         raise HTTPException(500, "Session database not available")
-    
+
     try:
         # Get session data
         session = session_db.get_session(session_id)
         if not session:
             raise HTTPException(404, "Session not found")
-        
+
         equity_history = session_db.get_equity_history(session_id)
         trades = session_db.get_trades(session_id)
         positions = session.get('positions', {})
-        
+
         # Generate report
         generator = ReportGenerator()
         report_path = generator.generate(
@@ -126,7 +125,7 @@ async def generate_report(
                 'status': session.get('status')
             }
         )
-        
+
         if format == "markdown":
             return FileResponse(
                 report_path,
@@ -138,7 +137,7 @@ async def generate_report(
             with open(report_path, 'r', encoding='utf-8') as f:
                 content = f.read()
             return {'content': content, 'path': report_path}
-    
+
     except HTTPException:
         raise
     except Exception as e:
@@ -187,15 +186,15 @@ async def get_session_summary(session_id: str):
     """Get quick session summary"""
     if not session_db:
         raise HTTPException(500, "Session database not available")
-    
+
     try:
         session = session_db.get_session(session_id)
         if not session:
             raise HTTPException(404, "Session not found")
-        
+
         equity_history = session_db.get_equity_history(session_id)
         trades = session_db.get_trades(session_id)
-        
+
         if not equity_history:
             return {
                 'session_id': session_id,
@@ -203,11 +202,11 @@ async def get_session_summary(session_id: str):
                 'total_return': 0,
                 'n_trades': 0
             }
-        
+
         initial = equity_history[0].get('total_equity', 1)
         final = equity_history[-1].get('total_equity', 1)
         total_return = (final - initial) / initial if initial > 0 else 0
-        
+
         return {
             'session_id': session_id,
             'strategy': session.get('strategy'),
@@ -219,7 +218,7 @@ async def get_session_summary(session_id: str):
             'total_return': total_return,
             'n_trades': len(trades)
         }
-    
+
     except HTTPException:
         raise
     except Exception as e:

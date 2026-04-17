@@ -86,7 +86,17 @@ exclude = [".venv", "ui", "db", "data", "node_modules"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I"]
-ignore = ["E501"]  # line length handled by formatter
+ignore = [
+    "E501",  # line length handled by formatter
+    "E741",  # OHLC (o/h/l/c) and identity-matrix `I` are idiomatic in this codebase
+]
+
+[tool.ruff.lint.per-file-ignores]
+# Package facades intentionally re-export names; treat as implicit __all__.
+"__init__.py" = ["F401"]
+# server.py / tasks_router.py do sys.path manipulation before src.* imports.
+"src/api/server.py" = ["E402"]
+"src/api/tasks_router.py" = ["E402"]
 
 [tool.ruff.format]
 quote-style = "double"

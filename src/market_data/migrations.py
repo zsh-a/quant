@@ -10,7 +10,6 @@ ClickHouse schema 版本化迁移系统。
 
 from __future__ import annotations
 
-from datetime import datetime
 from typing import Callable
 
 from loguru import logger

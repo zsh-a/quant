@@ -210,7 +210,7 @@ class MCTSRefinementStrategy(BaseStrategy):
 
 
 # --- Registry ---
-from .registry import register_strategy, StrategyInfra  # noqa: E402
+from .registry import StrategyInfra, register_strategy  # noqa: E402
 
 
 @register_strategy(MCTSRefinementStrategy.meta)

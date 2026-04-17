@@ -30,10 +30,9 @@ import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Callable, Protocol
+from typing import Any, Protocol
 
 from loguru import logger
-
 
 # ---------------------------------------------------------------------------
 # Data model
@@ -354,7 +353,7 @@ class InMemoryCollector:
         # Evict oldest traces if too many
         if len(self._traces) > self._MAX_TRACES:
             oldest = next(iter(self._traces))
-            evicted = self._traces.pop(oldest)
+            self._traces.pop(oldest)
             self.spans = [s for s in self.spans if s.trace_id != oldest]
 
     def clear(self) -> None:

@@ -2,15 +2,14 @@
 Templates Router - API endpoints for strategy templates.
 """
 
+from typing import Any, Dict, List, Optional
+
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
 
 from src.strategies.templates import (
-    TemplateRegistry,
     TemplateCategory,
-    StrategyTemplate,
-    TemplateParameter,
+    TemplateRegistry,
 )
 
 router = APIRouter(prefix="/templates", tags=["templates"])

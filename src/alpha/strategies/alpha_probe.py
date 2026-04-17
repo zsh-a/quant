@@ -21,7 +21,6 @@ Paper: "AlphaPROBE: Alpha Mining via Principled Retrieval and On-graph
 from __future__ import annotations
 
 import math
-import random
 from dataclasses import dataclass, field
 from typing import Any, ClassVar
 
@@ -32,7 +31,6 @@ from ..search.context import SearchContext
 from ..search.evolution import BreedingSpec, Individual
 from ..search.pipeline import Lineage
 from .base import BaseStrategy, StrategyMeta
-
 
 # ---------------------------------------------------------------------------
 # Factor DAG

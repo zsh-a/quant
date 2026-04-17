@@ -1,16 +1,16 @@
 """Monitoring package initialization"""
 
 from src.monitoring.metrics import (
-    api_requests_total,
+    active_sessions,
     api_request_duration,
+    api_requests_total,
     backtest_duration,
     backtest_total,
-    active_sessions,
     system_cpu_usage,
     system_memory_usage,
     track_api_request,
     track_backtest,
-    update_system_metrics
+    update_system_metrics,
 )
 
 __all__ = [

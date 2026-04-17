@@ -8,15 +8,12 @@ unique formulas survive.
 
 from __future__ import annotations
 
-import itertools
 import random
-from typing import Any
 
 from loguru import logger
 
 from ..core.compiler import FormulaCompiler
 from ..core.dsl import TensorSchema
-
 
 # ---------------------------------------------------------------------------
 # Building blocks

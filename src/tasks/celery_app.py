@@ -3,11 +3,12 @@ Celery application configuration for distributed task processing.
 Handles concurrent backtesting and other async tasks.
 """
 
+import os
+
+from celery import Celery
 from celery.schedules import crontab
 from celery.signals import setup_logging as celery_setup_logging
-from celery import Celery
 from kombu import Exchange, Queue
-import os
 
 from src.config.paths import ensure_data_dirs
 from src.utils.logging_config import setup_logging
@@ -22,30 +23,30 @@ app.conf.update(
     # Broker settings
     broker_url=os.getenv('CELERY_BROKER_URL', 'redis://localhost:6379/0'),
     result_backend=os.getenv('CELERY_RESULT_BACKEND', 'redis://localhost:6379/1'),
-    
+
     # Task settings
     task_serializer='msgpack',
     result_serializer='msgpack',
     accept_content=['msgpack', 'json'],
     timezone='Asia/Shanghai',
     enable_utc=True,
-    
+
     # Worker settings
     worker_concurrency=4,
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=100,  # Prevent memory leaks
     worker_hijack_root_logger=False,
-    
+
     # Task execution
     task_time_limit=3600,  # 1 hour hard limit
     task_soft_time_limit=3000,  # 50 minutes soft limit
     task_acks_late=True,
     task_reject_on_worker_lost=True,
-    
+
     # Result backend
     result_expires=86400,  # 24 hours
     result_compression='gzip',
-    
+
     # Routing
     task_routes={
         'src.tasks.backtest.*': {'queue': 'backtest'},
@@ -54,7 +55,7 @@ app.conf.update(
         'src.tasks.automation.*': {'queue': 'automation'},
         'src.tasks.crypto_tasks.*': {'queue': 'automation'},
     },
-    
+
     # Queues
     task_queues=(
         Queue('default', Exchange('default'), routing_key='default'),
@@ -62,7 +63,7 @@ app.conf.update(
         Queue('analysis', Exchange('analysis'), routing_key='analysis'),
         Queue('automation', Exchange('automation'), routing_key='automation'),
     ),
-    
+
     beat_schedule={
         'scheduled-data-update-and-simulation': {
             'task': 'src.tasks.automation.run_automation_cycle',

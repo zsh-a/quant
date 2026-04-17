@@ -1,11 +1,14 @@
-import pandas as pd
-import time
-import psutil
 import os
-from typing import Dict, Optional, List
-from .base import DataStream, Bar
+import time
 from datetime import datetime
+from typing import Dict, List, Optional
+
+import pandas as pd
+import psutil
+
 from src.utils.logging_config import get_logger
+
+from .base import Bar, DataStream
 
 logger = get_logger(__name__)
 
@@ -20,17 +23,17 @@ class CSVDataStream(DataStream):
             df = pd.read_csv(path, header=None)
             if len(df.columns) >= 6:
                 df.columns = ['timestamp', 'open', 'high', 'low', 'close', 'volume', 'amount'][:len(df.columns)]
-            
+
             df['timestamp'] = pd.to_datetime(df['timestamp'])
-            
+
             df = df.sort_values('timestamp')
             if start_date:
                 df = df[df['timestamp'] >= pd.to_datetime(start_date)]
             if end_date:
                 df = df[df['timestamp'] <= pd.to_datetime(end_date)]
-            
+
             self.data[symbol] = df.reset_index(drop=True)
-            
+
         self.idx = 0
         # Determine the union of all timestamps (or just use the first symbol if they are aligned)
         # Simplified for now: assume they are aligned by index
@@ -39,7 +42,7 @@ class CSVDataStream(DataStream):
     def next_bar(self) -> Optional[Dict[str, Bar]]:
         if self.idx >= self.max_idx:
             return None
-        
+
         bars = {}
         for symbol, df in self.data.items():
             if self.idx < len(df):
@@ -54,7 +57,7 @@ class CSVDataStream(DataStream):
                     volume=row.get('volume', 0.0),
                     amount=row.get('amount', 0.0)
                 )
-        
+
         self.idx += 1
         return bars
 
@@ -62,13 +65,13 @@ class CSVDataStream(DataStream):
         self.idx = 0
 
 class DBDataStream(DataStream):
-    def __init__(self, db_client, symbols: List[str], start_date: str, end_date: Optional[str] = None, 
+    def __init__(self, db_client, symbols: List[str], start_date: str, end_date: Optional[str] = None,
                  chunk_size_months: int = None):
         self.db_client = db_client
         self.symbols = symbols
         self.start_date = pd.to_datetime(start_date)
         self.end_date = pd.to_datetime(end_date) if end_date else pd.Timestamp.now()
-        
+
         # Dynamic chunk size based on symbol count
         # More symbols = smaller chunks to avoid memory overflow
         if chunk_size_months is None:
@@ -78,24 +81,24 @@ class DBDataStream(DataStream):
                 chunk_size_months = 3  # 3 months for medium portfolios
             else:
                 chunk_size_months = 12  # 1 year for small portfolios
-        
+
         self.chunk_size_months = chunk_size_months
-        
+
         # Memory monitoring
         self.process = psutil.Process(os.getpid())
         self.initial_memory_mb = self.process.memory_info().rss / 1024 / 1024
-        
+
         logger.info(f"Initializing DBDataStream: {len(symbols)} symbols, "
                    f"chunk_size={chunk_size_months} months, "
                    f"initial_memory={self.initial_memory_mb:.2f}MB")
-        
+
         # Load master timeline (using the first symbol as reference or a market index)
         # This is lightweight compared to loading all columns for all stocks
         ref_symbol = symbols[0] if symbols else 'sh.000001'
         try:
-            # We fetch just dates if possible, but get_kline fetches all. 
+            # We fetch just dates if possible, but get_kline fetches all.
             # Optimization: In a real scenario, we'd add a get_trading_days method to DB.
-            # For now, we assume fetching one symbol's full history is acceptable overhead 
+            # For now, we assume fetching one symbol's full history is acceptable overhead
             # compared to fetching ALL symbols' full history.
             ref_df = self.db_client.get_kline(ref_symbol, start_date, end_date)
             if 'date' in ref_df.columns:
@@ -111,15 +114,15 @@ class DBDataStream(DataStream):
 
         self.total_bars = len(self.timestamps)
         self.global_idx = 0
-        
+
         # Chunking
         self.current_chunk_data: Dict[str, pd.DataFrame] = {}
         self.current_chunk_start_idx = 0
         self.current_chunk_end_idx = 0
         self.chunks_loaded = 0
-        
+
         logger.info(f"Timeline loaded: {self.total_bars} trading days from {self.start_date.date()} to {self.end_date.date()}")
-        
+
         self._load_next_chunk()
 
     def _load_next_chunk(self):
@@ -131,29 +134,29 @@ class DBDataStream(DataStream):
         chunk_start_ts = self.timestamps[self.global_idx]
         # Determine chunk end date using months instead of years
         chunk_end_date_limit = chunk_start_ts + pd.DateOffset(months=self.chunk_size_months)
-        
+
         # Find the index in self.timestamps that corresponds to this limit
         # We want to load enough data to cover [chunk_start_ts, chunk_end_date_limit)
-        
+
         # Filter timestamps for this chunk
         chunk_timestamps = [t for t in self.timestamps if t >= chunk_start_ts and t < chunk_end_date_limit]
-        
+
         if not chunk_timestamps:
             # Should not happen unless global_idx is at end
             return
 
         chunk_end_ts = chunk_timestamps[-1]
-        
+
         # Update chunk indices relative to global timestamps
         self.current_chunk_start_idx = self.global_idx
         self.current_chunk_end_idx = self.global_idx + len(chunk_timestamps)
-        
+
         start_str = chunk_start_ts.strftime("%Y-%m-%d")
         end_str = chunk_end_ts.strftime("%Y-%m-%d")
-        
+
         # Memory tracking before loading
         mem_before = self.process.memory_info().rss / 1024 / 1024
-        
+
         # Load data for all symbols in this range
         self.current_chunk_data = {}
         symbols_loaded = 0
@@ -161,7 +164,7 @@ class DBDataStream(DataStream):
             df = self.db_client.get_kline(symbol, start_str, end_str)
             if df.empty:
                 continue
-                
+
             df.columns = [c.lower() for c in df.columns]
             if 'datetime' in df.columns:
                 df['timestamp'] = pd.to_datetime(df['datetime'])
@@ -169,21 +172,21 @@ class DBDataStream(DataStream):
                 df['timestamp'] = pd.to_datetime(df['date'])
             else:
                 df['timestamp'] = pd.to_datetime(df.index)
-            
+
             if 'adjfactor' in df.columns:
                 for col in ['open', 'high', 'low', 'close']:
                     if col in df.columns:
                         df[col] = df[col] * df['adjfactor']
-            
+
             # Index by timestamp for faster lookup in next_bar
             self.current_chunk_data[symbol] = df.set_index('timestamp').sort_index()
             symbols_loaded += 1
-        
+
         # Memory tracking after loading
         mem_after = self.process.memory_info().rss / 1024 / 1024
         mem_delta = mem_after - mem_before
         self.chunks_loaded += 1
-        
+
         logger.info(f"Chunk {self.chunks_loaded} loaded: {start_str} to {end_str}, "
                    f"{symbols_loaded}/{len(self.symbols)} symbols, "
                    f"memory: {mem_after:.2f}MB (+{mem_delta:.2f}MB)")
@@ -191,7 +194,7 @@ class DBDataStream(DataStream):
     def next_bar(self) -> Optional[Dict[str, Bar]]:
         if self.global_idx >= self.total_bars:
             return None
-            
+
         # Check if we need to load next chunk
         if self.global_idx >= self.current_chunk_end_idx:
             self._load_next_chunk()
@@ -200,7 +203,7 @@ class DBDataStream(DataStream):
 
         current_ts = self.timestamps[self.global_idx]
         bars = {}
-        
+
         for symbol, df in self.current_chunk_data.items():
             if current_ts in df.index:
                 row = df.loc[current_ts]
@@ -208,7 +211,7 @@ class DBDataStream(DataStream):
                 # handle duplicate timestamps if necessary, assume Series
                 if isinstance(row, pd.DataFrame):
                     row = row.iloc[0]
-                    
+
                 bars[symbol] = Bar(
                     symbol=symbol,
                     timestamp=current_ts,
@@ -220,10 +223,10 @@ class DBDataStream(DataStream):
                     amount=row.get('amount', 0.0),
                     extra={k: v for k, v in row.items() if k not in ['open', 'high', 'low', 'close', 'volume', 'amount']}
                 )
-        
+
         self.global_idx += 1
         # expose idx for progress tracking (mimicking old interface)
-        self.idx = self.global_idx 
+        self.idx = self.global_idx
         return bars
 
     def reset(self):
@@ -252,6 +255,7 @@ class CryptoDBDataStream(DataStream):
         chunk_days: int = 90,
     ):
         from clickhouse_driver import Client as CHClient
+
         from src.config.settings import get_settings
 
         settings = get_settings()
@@ -409,12 +413,12 @@ class RealtimeDataStream(DataStream):
     Event-driven realtime data stream for live trading.
     Supports multiple data sources with automatic fallback.
     """
-    
-    def __init__(self, symbols: List[str], interval_seconds: int = 60, 
+
+    def __init__(self, symbols: List[str], interval_seconds: int = 60,
                  data_source: str = 'akshare', enable_trading_hours_check: bool = True):
         """
         Initialize realtime data stream.
-        
+
         Args:
             symbols: List of symbols to track
             interval_seconds: Update interval in seconds (default: 60 for 1-minute bars)
@@ -425,18 +429,18 @@ class RealtimeDataStream(DataStream):
         self.interval_seconds = interval_seconds
         self.data_source = data_source
         self.enable_trading_hours_check = enable_trading_hours_check
-        
+
         self.last_fetch_time = time.time()
         self.consecutive_errors = 0
         self.max_retries = 3
         self.retry_delay = 5  # seconds
-        
+
         # Initialize data source
         self._init_data_source()
-        
+
         logger.info(f"RealtimeDataStream initialized: {len(symbols)} symbols, "
                    f"interval={interval_seconds}s, source={data_source}")
-    
+
     def _init_data_source(self):
         """Initialize the data source client"""
         if self.data_source == 'akshare':
@@ -459,7 +463,7 @@ class RealtimeDataStream(DataStream):
         else:
             logger.warning(f"Unknown data source: {self.data_source}, using mock")
             self.data_source = 'mock'
-    
+
     def _is_trading_hours(self) -> bool:
         """
         Check if current time is within trading hours.
@@ -467,38 +471,38 @@ class RealtimeDataStream(DataStream):
         """
         if not self.enable_trading_hours_check:
             return True
-        
+
         now = datetime.now()
-        
+
         # Check if weekend
         if now.weekday() >= 5:  # Saturday = 5, Sunday = 6
             return False
-        
+
         # Check trading hours
         current_time = now.time()
         morning_start = datetime.strptime("09:30", "%H:%M").time()
         morning_end = datetime.strptime("11:30", "%H:%M").time()
         afternoon_start = datetime.strptime("13:00", "%H:%M").time()
         afternoon_end = datetime.strptime("15:00", "%H:%M").time()
-        
+
         is_morning = morning_start <= current_time <= morning_end
         is_afternoon = afternoon_start <= current_time <= afternoon_end
-        
+
         return is_morning or is_afternoon
-    
+
     def _wait_for_next_interval(self):
         """Wait until next data fetch interval"""
         time_to_wait = self.interval_seconds - (time.time() - self.last_fetch_time)
         if time_to_wait > 0:
             logger.debug(f"Waiting {time_to_wait:.1f}s for next interval")
             time.sleep(time_to_wait)
-    
+
     def _wait_for_trading_hours(self):
         """Wait until market opens if outside trading hours"""
         while not self._is_trading_hours():
             now = datetime.now()
             logger.info(f"Outside trading hours ({now.strftime('%Y-%m-%d %H:%M:%S')}), waiting...")
-            
+
             # Calculate time until next market open
             if now.weekday() >= 5:
                 # Weekend, wait until Monday 09:30
@@ -512,7 +516,7 @@ class RealtimeDataStream(DataStream):
                 current_time = now.time()
                 morning_start = datetime.strptime("09:30", "%H:%M").time()
                 afternoon_start = datetime.strptime("13:00", "%H:%M").time()
-                
+
                 if current_time < morning_start:
                     # Before morning session
                     next_open = now.replace(hour=9, minute=30, second=0, microsecond=0)
@@ -522,28 +526,28 @@ class RealtimeDataStream(DataStream):
                 else:
                     # After market close, wait until next day
                     next_open = (now + pd.Timedelta(days=1)).replace(hour=9, minute=30, second=0, microsecond=0)
-            
+
             wait_seconds = (next_open - now).total_seconds()
             logger.info(f"Market opens at {next_open.strftime('%Y-%m-%d %H:%M:%S')}, "
                        f"waiting {wait_seconds/60:.1f} minutes")
-            
+
             # Sleep in chunks to allow for interruption
             sleep_chunk = min(60, wait_seconds)  # Sleep max 1 minute at a time
             time.sleep(sleep_chunk)
-    
+
     def _fetch_akshare_data(self) -> Dict[str, Bar]:
         """Fetch data from AkShare"""
         bars = {}
         current_ts = datetime.now()
-        
+
         try:
             # Fetch ETF spot data
             df = self.ak.fund_etf_spot_em()
-            
+
             for symbol in self.symbols:
                 # Remove prefix if present (sh.510880 -> 510880)
                 code = symbol.split('.')[-1]
-                
+
                 row = df[df['代码'] == code]
                 if not row.empty:
                     data = row.iloc[0]
@@ -560,19 +564,19 @@ class RealtimeDataStream(DataStream):
                     )
                 else:
                     logger.warning(f"Symbol {symbol} not found in market data")
-        
+
         except Exception as e:
             logger.error(f"AkShare fetch error: {e}")
             raise
-        
+
         return bars
-    
+
     def _fetch_mock_data(self) -> Dict[str, Bar]:
         """Generate mock data for testing"""
         import random
         bars = {}
         current_ts = datetime.now()
-        
+
         for symbol in self.symbols:
             # Generate random OHLC data
             base_price = 100.0
@@ -587,9 +591,9 @@ class RealtimeDataStream(DataStream):
                 amount=random.randint(100000000, 1000000000),
                 extra={"name": f"Mock {symbol}"}
             )
-        
+
         return bars
-    
+
     def next_bar(self) -> Optional[Dict[str, Bar]]:
         """
         Get next bar of realtime data.
@@ -597,13 +601,13 @@ class RealtimeDataStream(DataStream):
         """
         # Wait for next interval
         self._wait_for_next_interval()
-        
+
         # Wait for trading hours if enabled
         if self.enable_trading_hours_check:
             self._wait_for_trading_hours()
-        
+
         self.last_fetch_time = time.time()
-        
+
         # Fetch data with retry logic
         for attempt in range(self.max_retries):
             try:
@@ -614,28 +618,28 @@ class RealtimeDataStream(DataStream):
                 else:
                     logger.error(f"Unsupported data source: {self.data_source}")
                     return {}
-                
+
                 # Reset error counter on success
                 if self.consecutive_errors > 0:
                     logger.info(f"Data fetch recovered after {self.consecutive_errors} errors")
                     self.consecutive_errors = 0
-                
+
                 logger.debug(f"Fetched {len(bars)} symbols at {datetime.now().strftime('%H:%M:%S')}")
                 return bars
-            
+
             except Exception as e:
                 self.consecutive_errors += 1
                 logger.error(f"Data fetch failed (attempt {attempt + 1}/{self.max_retries}): {e}")
-                
+
                 if attempt < self.max_retries - 1:
                     logger.info(f"Retrying in {self.retry_delay}s...")
                     time.sleep(self.retry_delay)
                 else:
-                    logger.error(f"Max retries reached, returning empty data")
+                    logger.error("Max retries reached, returning empty data")
                     return {}
-        
+
         return {}
-    
+
     def reset(self):
         """Reset the stream (no-op for realtime stream)"""
         self.last_fetch_time = time.time()

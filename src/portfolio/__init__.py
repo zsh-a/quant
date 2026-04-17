@@ -5,7 +5,7 @@ from src.portfolio.portfolio_manager import (
     PortfolioSignal,
     PortfolioState,
     StrategyConfig,
-    WeightMethod
+    WeightMethod,
 )
 
 __all__ = [

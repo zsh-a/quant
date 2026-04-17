@@ -9,7 +9,6 @@ from __future__ import annotations
 import triton
 import triton.language as tl
 
-
 # ---------------------------------------------------------------------------
 # Kernel 1: Fused rolling mean + std (Welford online algorithm)
 # ---------------------------------------------------------------------------

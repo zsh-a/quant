@@ -1,11 +1,9 @@
 import re
 
 import pandas as pd
-
 from loguru import logger
 
 from src.market_data.clickhouse import create_clickhouse_client
-
 
 # ---------------------------------------------------------------------------
 # Column / table allowlists — prevent injection via dynamic identifiers

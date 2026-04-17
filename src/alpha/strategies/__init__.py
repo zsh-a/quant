@@ -14,27 +14,27 @@ Strategy registry:
     build_strategies({"mcts", "neural"}, StrategyInfra(...)) to construct them.
 """
 
+from .alpha_forge import AlphaForgeStrategy
+from .alpha_probe import AlphaPROBEStrategy
 from .base import BaseStrategy, StrategyMeta
-from .registry import (
-    SearchMode,
-    register_strategy,
-    register_mode,
-    build_strategies,
-    available_strategies,
-    get_all_meta,
-    get_all_modes,
-    get_mode,
-    get_strategy_meta,
-    StrategyInfra,
-)
 
 # Import strategy modules to trigger @register_strategy decorators
 from .enumeration import EnumerationStrategy
 from .llm_evolution import LLMEvolutionStrategy
 from .mcts_refinement import MCTSRefinementStrategy
 from .neural_formula import NeuralFormulaStrategy
-from .alpha_forge import AlphaForgeStrategy
-from .alpha_probe import AlphaPROBEStrategy
+from .registry import (
+    SearchMode,
+    StrategyInfra,
+    available_strategies,
+    build_strategies,
+    get_all_meta,
+    get_all_modes,
+    get_mode,
+    get_strategy_meta,
+    register_mode,
+    register_strategy,
+)
 
 __all__ = [
     # Base class and metadata

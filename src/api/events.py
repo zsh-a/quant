@@ -3,8 +3,10 @@ Event system for session state changes.
 Triggers WebSocket broadcasts when session state updates.
 """
 
-from typing import Callable, Dict, List
+import asyncio
 from datetime import datetime
+from typing import Callable, Dict, List
+
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -33,38 +35,38 @@ class EventType:
 
 class SessionEventBus:
     """Event bus for session state changes"""
-    
+
     def __init__(self):
         # event_type -> list of callback functions
         self.listeners: Dict[str, List[Callable]] = {}
-        
+
     def subscribe(self, event_type: str, callback: Callable):
         """Subscribe to an event type"""
         if event_type not in self.listeners:
             self.listeners[event_type] = []
-        
+
         self.listeners[event_type].append(callback)
         logger.debug(f"Subscribed to event: {event_type}")
-    
+
     def unsubscribe(self, event_type: str, callback: Callable):
         """Unsubscribe from an event type"""
         if event_type in self.listeners:
             self.listeners[event_type].remove(callback)
-    
+
     async def emit(self, event_type: str, session_id: str, data: dict):
         """Emit an event to all subscribers"""
         if event_type not in self.listeners:
             return
-        
+
         event_data = {
             'type': event_type,
             'session_id': session_id,
             'timestamp': datetime.now().isoformat(),
             'data': data
         }
-        
+
         logger.debug(f"Emitting event: {event_type} for session {session_id}")
-        
+
         for callback in self.listeners[event_type]:
             try:
                 # Support both sync and async callbacks
@@ -74,14 +76,13 @@ class SessionEventBus:
                     callback(event_data)
             except Exception as e:
                 logger.error(f"Error in event callback: {e}", exc_info=True)
-    
+
     def clear(self):
         """Clear all listeners"""
         self.listeners.clear()
 
 
 # Global event bus instance
-import asyncio
 event_bus = SessionEventBus()
 
 

@@ -17,12 +17,24 @@ from loguru import logger as _logger
 try:
     from ..eval.gpu_ops import (
         TRITON_AVAILABLE as _TRITON_OK,
-        rolling_mean_std as _triton_rolling_mean_std,
-        rolling_reduce as _triton_rolling_reduce,
-        parallel_ema as _triton_parallel_ema,
-        rolling_corr_cov as _triton_rolling_corr_cov,
+    )
+    from ..eval.gpu_ops import (
         cs_rank as _triton_cs_rank,
+    )
+    from ..eval.gpu_ops import (
         decay_linear as _triton_decay_linear,
+    )
+    from ..eval.gpu_ops import (
+        parallel_ema as _triton_parallel_ema,
+    )
+    from ..eval.gpu_ops import (
+        rolling_corr_cov as _triton_rolling_corr_cov,
+    )
+    from ..eval.gpu_ops import (
+        rolling_mean_std as _triton_rolling_mean_std,
+    )
+    from ..eval.gpu_ops import (
+        rolling_reduce as _triton_rolling_reduce,
     )
 except Exception as _exc:  # pragma: no cover
     _logger.warning("Triton GPU 加速不可用 ({}), 将使用 CPU 计算。性能可能显著下降。", _exc)

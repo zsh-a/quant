@@ -1,9 +1,10 @@
 from abc import ABC, abstractmethod
-from typing import Any, List, Dict, Optional
 from dataclasses import dataclass, field
 from datetime import datetime
-import pandas as pd
+from typing import Any, Dict, Optional
+
 from loguru import logger as loguru_logger
+
 
 @dataclass
 class Bar:
@@ -70,13 +71,13 @@ class Broker(ABC):
 
 class Strategy(ABC):
     """Base strategy class with built-in session logging support."""
-    
+
     def __init__(self, session_id: Optional[str] = None):
         self.engine = None
         self.session_id = session_id
         self._session_log = None
         self._current_date: Optional[str] = None  # Auto-tracked current backtest date
-        
+
         # Lazy load session logger to avoid circular imports
         if session_id:
             try:
@@ -87,17 +88,17 @@ class Strategy(ABC):
 
     def set_engine(self, engine):
         self.engine = engine
-    
+
     def _update_current_date(self, bars: Dict[str, Bar]):
         """Update current date from bars (called automatically by engine or strategy)."""
         if bars:
             ts = next(iter(bars.values())).timestamp
             self._current_date = str(ts.date())
-    
-    def _log(self, message: str, level: str = "INFO", source: str = "strategy", 
+
+    def _log(self, message: str, level: str = "INFO", source: str = "strategy",
              include_date: bool = True, **kwargs):
         """Log to both loguru and session logger.
-        
+
         Args:
             message: Log message
             level: Log level (DEBUG, INFO, WARNING, ERROR)
@@ -109,7 +110,7 @@ class Strategy(ABC):
         if include_date and self._current_date and not message.startswith(f"[{self._current_date}]"):
             message = f"[{self._current_date}] {message}"
             kwargs.setdefault("date", self._current_date)
-        
+
         getattr(loguru_logger, level.lower())(message)
         if self._session_log:
             self._session_log.add(level, source, message, kwargs)

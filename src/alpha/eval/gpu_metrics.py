@@ -6,10 +6,6 @@ Falls back to CPU evaluation when Triton/CUDA is not available.
 
 from __future__ import annotations
 
-from typing import Any
-
-import numpy as np
-
 try:
     import torch
 except Exception:  # pragma: no cover

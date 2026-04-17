@@ -23,7 +23,6 @@ import math
 import random
 import re
 from collections import Counter
-from dataclasses import dataclass, field
 from typing import Any, Optional
 
 import numpy as np
@@ -32,9 +31,8 @@ from loguru import logger
 from ...core.compiler import FormulaCompiler
 from ...core.dataset import AlphaDataset
 from ...core.dsl import TensorSchema
-from ...eval.metrics import compute_forward_returns, compute_ic_metrics, compute_rank_ic
 from ...core.vm import StackVM, TensorStore
-
+from ...eval.metrics import compute_ic_metrics
 
 # ---------------------------------------------------------------------------
 # Evaluation dimensions (Section 3: Multi-Dimensional Alpha Evaluation)

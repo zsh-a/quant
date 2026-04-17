@@ -1,9 +1,8 @@
 import pandas as pd
-import numpy as np
 import talib as ta
-from src.core.base import Strategy, Bar
+
+from src.core.base import Bar, Strategy
 from src.core.trading_calendar import TradingCalendar
-import utils.utils as util
 from src.strategies.registry import StrategyRegistry
 
 PRICE_CHANGE_LIMIT = 0.098
@@ -33,7 +32,7 @@ class JSGStrategy(Strategy):
 
         self.black_industry_name = {"银行", "煤炭", "有色金属", "钢铁"}
         self.pass_month = []
-        
+
         # Track stocks that hit limit-up yesterday
         self.prev_limit_up_stocks = set()
 
@@ -99,13 +98,13 @@ class JSGStrategy(Strategy):
         preclose = bar.extra.get('preclose', 0)
         if preclose <= 0:
             return False
-            
+
         limit_pct = 0.10
         if bar.extra.get('isst') == 1:
             limit_pct = 0.05
         elif symbol.startswith('sh.68') or symbol.startswith('sz.30'):
             limit_pct = 0.20
-            
+
         up_limit = round(preclose * (1 + limit_pct) + 0.0001, 2)
         return bar.close >= up_limit
 
@@ -340,7 +339,7 @@ class JSGStrategy(Strategy):
                     action="sell_all",
                 )
                 if qty > 0:
-                    order_id = self.sell(stock, qty)
+                    self.sell(stock, qty)
                     submitted_orders.append(f"卖出 {stock} x{qty}")
                     self._trailing_highs.pop(stock, None)
 
@@ -372,10 +371,10 @@ class JSGStrategy(Strategy):
                     delta=delta,
                 )
                 if delta > 0:
-                    order_id = self.buy(code, delta)
+                    self.buy(code, delta)
                     submitted_orders.append(f"买入 {code} x{delta} @{price:.2f}")
                 elif delta < 0:
-                    order_id = self.sell(code, abs(delta))
+                    self.sell(code, abs(delta))
                     submitted_orders.append(f"卖出 {code} x{abs(delta)} @{price:.2f}")
 
         if submitted_orders:

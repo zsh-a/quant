@@ -23,17 +23,15 @@ from typing import Any, ClassVar
 import numpy as np
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
 from loguru import logger
 from torch.distributions import Categorical
 
-from ..search.evolution import Individual
-from ..core.operators import OperatorRegistry, OperatorSpec
 from ..core.dsl import TensorSchema
+from ..core.operators import OperatorRegistry
+from ..search.context import SearchContext, StrategySnapshot
+from ..search.evolution import Individual
 from ..search.pipeline import Lineage
-from ..search.context import SearchContext, StrategySnapshot, build_individual
 from .base import BaseStrategy, StrategyMeta
-
 
 # ---------------------------------------------------------------------------
 # Vocabulary
@@ -645,8 +643,8 @@ class NeuralFormulaStrategy(BaseStrategy):
         """Build forward-returns cache from dataset for internal IC evaluation."""
         if self._fwd_returns is not None:
             return
-        from ..eval.metrics import compute_forward_returns
         from ..core.vm import TensorStore
+        from ..eval.metrics import compute_forward_returns
         ds = ctx.dataset
         close = np.asarray(ds.fields["close"], dtype=np.float32)
         self._fwd_returns = compute_forward_returns(close, periods=5)
@@ -658,8 +656,8 @@ class NeuralFormulaStrategy(BaseStrategy):
 
     def _train_step(self, ctx: SearchContext) -> dict[str, float]:
         """One REINFORCE training step. Returns {formula: ic} for valid formulas."""
-        from ..eval.metrics import compute_rank_ic
         from ..core.vm import StackVM
+        from ..eval.metrics import compute_rank_ic
 
         self._model.train()
         bs = self._sample_batch
@@ -786,7 +784,7 @@ class NeuralFormulaStrategy(BaseStrategy):
 
 
 # --- Registry ---
-from .registry import register_strategy, StrategyInfra  # noqa: E402
+from .registry import StrategyInfra, register_strategy  # noqa: E402
 
 
 @register_strategy(NeuralFormulaStrategy.meta)

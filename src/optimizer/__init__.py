@@ -1,12 +1,12 @@
 """Optimizer package initialization"""
 
 from src.optimizer.optimizer import (
-    ParameterOptimizer,
-    ParamSpec,
     OptimizationMethod,
     OptimizationObjective,
+    OptimizationReport,
     OptimizationResult,
-    OptimizationReport
+    ParameterOptimizer,
+    ParamSpec,
 )
 
 __all__ = [

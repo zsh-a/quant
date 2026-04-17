@@ -11,14 +11,12 @@
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
-from typing import Any
+from dataclasses import dataclass
 
 from loguru import logger
 
 from .dsl import Parser
-from .market import MarketType, get_market_profile
-
+from .market import get_market_profile
 
 # ---------------------------------------------------------------------------
 # 通用字段映射表 — 跨市场的语义等价字段

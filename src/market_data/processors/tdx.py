@@ -41,7 +41,7 @@ class TDXProcess:
                 "dependency group. Install via `uv sync` (dev group is default) "
                 "or `uv sync --group dev`."
             )
-        from src.config.paths import TDX_SYNC_STATE_PATH, TDX_FIN_DATA_DIR
+        from src.config.paths import TDX_FIN_DATA_DIR, TDX_SYNC_STATE_PATH
         self.state_file = str(TDX_SYNC_STATE_PATH)
         self.client = create_clickhouse_client()
         self.fin_path = str(TDX_FIN_DATA_DIR)
@@ -75,7 +75,7 @@ class TDXProcess:
             except Exception as exc:
                 logger.warning(f"Failed to connect to {server_ip}:{server_port}: {exc}")
                 continue
-        
+
         # Last resort: try default mootdx behavior
         try:
             logger.info("Trying default mootdx connection...")

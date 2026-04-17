@@ -3,8 +3,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any, Dict, Optional
 
-from src.market_data.update_pipeline import get_reference_latest_date
 from session_db import SessionDB
+from src.market_data.update_pipeline import get_reference_latest_date
 
 
 class AutomationService:

@@ -11,14 +11,6 @@ from typing import Dict, Optional
 
 from loguru import logger
 
-from src.market_data.update_pipeline import (
-    DEFAULT_SHARE_START_DATE,
-    DEFAULT_UPDATE_STEPS,
-    UPDATE_STEP_DEFINITIONS,
-    get_reference_latest_date,
-    run_data_update_pipeline,
-)
-from src.market_data.db import DB
 from session_db import SessionDB
 from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
 from src.automation.service import AutomationService
@@ -30,6 +22,14 @@ from src.config.settings import (
 from src.core.backtest_broker import BacktestBroker
 from src.core.data_stream import DBDataStream
 from src.core.engine import TradingEngine
+from src.market_data.db import DB
+from src.market_data.update_pipeline import (
+    DEFAULT_SHARE_START_DATE,
+    DEFAULT_UPDATE_STEPS,
+    UPDATE_STEP_DEFINITIONS,
+    get_reference_latest_date,
+    run_data_update_pipeline,
+)
 from src.notifications.telegram import (
     TelegramNotifier,
     build_simulation_order_message,

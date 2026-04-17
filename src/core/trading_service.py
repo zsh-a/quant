@@ -3,16 +3,16 @@ Trading Service - Decoupled trading engine service layer.
 Provides a clean interface for running backtests and managing trading sessions.
 """
 
-from typing import Dict, Any, Optional, Callable, List
+import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from enum import Enum
-import uuid
+from typing import Any, Callable, Dict, List, Optional
 
+from src.analysis.backtest_metrics import PerformanceMetrics, calculate_metrics
+from src.core.base import Bar, Broker, DataStream, Strategy
 from src.core.engine import TradingEngine
-from src.core.base import Strategy, Broker, DataStream, Bar
 from src.core.risk_manager import RiskManager
-from src.analysis.backtest_metrics import calculate_metrics, PerformanceMetrics
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)
@@ -308,12 +308,12 @@ def run_backtest(
         # Some strategies require db_client as first argument
         import inspect
         sig = inspect.signature(strategy_class.__init__)
-        
+
         if 'db_client' in sig.parameters:
             from src.market_data.db import DB
             db_client = DB()
             return strategy_class(db_client, **params)
-        
+
         return strategy_class(**params)
 
     def broker_factory(mode, capital):

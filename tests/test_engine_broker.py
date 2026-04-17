@@ -7,11 +7,10 @@ from typing import Dict, Optional
 
 import pytest
 
-from src.core.base import Bar, Broker, DataStream, Order, Strategy
 from src.core.backtest_broker import BacktestBroker
+from src.core.base import Bar, DataStream, Order, Strategy
 from src.core.engine import TradingEngine
 from src.core.risk_manager import RiskManager
-
 
 # ---------------------------------------------------------------------------
 # Helpers

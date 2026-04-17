@@ -31,7 +31,6 @@ from ..search.pipeline import Lineage
 from .base import BaseStrategy, StrategyMeta
 from .neural_formula import FormulaVocab, compute_action_mask_batch, rpn_to_dsl
 
-
 # ---------------------------------------------------------------------------
 # Networks
 # ---------------------------------------------------------------------------

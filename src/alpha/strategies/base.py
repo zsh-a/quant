@@ -17,11 +17,8 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Any, ClassVar
 
-from loguru import logger
-
 from ..search.context import SearchContext, build_individual
 from ..search.evolution import Individual
-from ..search.pipeline import Lineage
 
 
 @dataclass(frozen=True)

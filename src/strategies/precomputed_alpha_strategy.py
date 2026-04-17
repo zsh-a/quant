@@ -10,9 +10,7 @@
   3. 本策略在 on_bar 中查找当前日期的目标权重，执行调仓
 """
 
-from typing import Any, Dict, List, Optional
-
-from loguru import logger
+from typing import Dict, Optional
 
 from src.core.base import Bar, Strategy
 from src.strategies.registry import StrategyRegistry
@@ -149,7 +147,7 @@ class PrecomputedAlphaStrategy(Strategy):
         if not target_portfolio and not current_positions:
             return
 
-        self._log(f"========== 多因子调仓 ==========")
+        self._log("========== 多因子调仓 ==========")
         self._log(f"总权益: {total_equity:,.0f}, 当前持仓: {len(current_positions)}, 目标持仓: {len(target_portfolio)}")
 
         submitted = []

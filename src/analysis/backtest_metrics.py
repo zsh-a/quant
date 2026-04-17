@@ -4,10 +4,10 @@ This module provides consistent metrics calculation for both backend and API res
 The frontend TypeScript implementation should mirror these calculations.
 """
 
-from dataclasses import dataclass
-from typing import List, Optional, Dict, Any
-from datetime import datetime
 import math
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 
 @dataclass
@@ -176,7 +176,7 @@ def calculate_metrics(
 
     # ========== Risk-Adjusted Metrics ==========
     daily_rf = risk_free_rate / TRADING_DAYS_PER_YEAR
-    excess_returns = [r - daily_rf for r in daily_returns]
+    [r - daily_rf for r in daily_returns]
 
     # Sharpe Ratio
     if std_dev > 0:

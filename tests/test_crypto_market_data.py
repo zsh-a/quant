@@ -5,7 +5,7 @@ from pathlib import Path
 
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
-from src.market_data.ccxt_adapter import CcxtCryptoDataAdapter, PROVIDER_SPECS
+from src.market_data.ccxt_adapter import PROVIDER_SPECS, CcxtCryptoDataAdapter
 from src.market_data.crypto_cli import build_parser, run_command
 from src.market_data.crypto_pipeline import CryptoMinuteSyncService
 from src.market_data.crypto_store import CryptoMinuteBarStore, UnifiedMinuteBar

@@ -5,15 +5,17 @@ output stay consistent across processes.
 """
 
 import contextvars
-import orjson
 import logging
 import sys
 from functools import wraps
 from pathlib import Path
 from typing import Any, Callable, Dict, Optional
 
+import orjson
 from loguru import logger
 
+from src.config.paths import JSON_LOG_PATH as _JSON_LOG_PATH
+from src.config.paths import LOG_FILE_PATH as _LOG_FILE_PATH
 from src.config.settings import get_logging_config
 
 # Context variables for request correlation
@@ -28,8 +30,6 @@ session_id_ctx: contextvars.ContextVar[Optional[str]] = contextvars.ContextVar(
 LOG_LEVEL = "INFO"
 LOG_ROTATION = "100 MB"
 LOG_RETENTION = "30 days"
-from src.config.paths import LOG_FILE_PATH as _LOG_FILE_PATH, JSON_LOG_PATH as _JSON_LOG_PATH
-
 LOG_PATH = str(_LOG_FILE_PATH)
 JSON_LOG_PATH = str(_JSON_LOG_PATH)
 

@@ -8,6 +8,10 @@ support for alpha_mining formula compatibility.  New operators added:
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from .dsl import TensorSchema
 
 
 @dataclass(frozen=True)
@@ -164,8 +168,9 @@ class OperatorRegistry:
         return aliases
 
     def validate_formula(self, formula: str, schema: "TensorSchema | None" = None):
-        from .dsl import FormulaParser, TensorSchema, TypeChecker, ValidationReport, normalize_formula
         import hashlib
+
+        from .dsl import FormulaParser, TensorSchema, TypeChecker, ValidationReport, normalize_formula
 
         parser = FormulaParser(self)
         checker = TypeChecker(self)

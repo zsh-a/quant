@@ -2,9 +2,10 @@
 Excel Report Generator - Generate Excel reports with xlsxwriter.
 """
 
-from typing import Dict, List, Optional
-from datetime import datetime
 import os
+from datetime import datetime
+from typing import Dict, List, Optional
+
 from loguru import logger
 
 try:
@@ -52,9 +53,9 @@ class ExcelReportGenerator:
         # Create workbook
         filename = f"report_{session_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
         filepath = os.path.join(self.output_dir, filename)
-        
+
         workbook = xlsxwriter.Workbook(filepath)
-        
+
         # Formats
         header_fmt = workbook.add_format({'bold': True, 'bg_color': '#4472C4', 'font_color': 'white'})
         money_fmt = workbook.add_format({'num_format': '¥#,##0.00'})
@@ -103,12 +104,12 @@ class ExcelReportGenerator:
             ("会话ID", session_id),
             ("生成时间", datetime.now().strftime('%Y-%m-%d %H:%M:%S')),
         ]
-        
+
         if equity_history:
             initial = equity_history[0].get('total_equity', 0)
             final = equity_history[-1].get('total_equity', 0)
             total_return = (final - initial) / initial if initial > 0 else 0
-            
+
             info.extend([
                 ("回测期间", f"{equity_history[0].get('date', '')} 至 {equity_history[-1].get('date', '')}"),
                 ("初始资金", initial),
@@ -157,7 +158,7 @@ class ExcelReportGenerator:
         for row, eq in enumerate(equity_history, 1):
             sheet.write(row, 0, eq.get('date', ''))
             sheet.write(row, 1, eq.get('total_equity', 0), money_fmt)
-            
+
             if row > 1:
                 prev = equity_history[row-2].get('total_equity', 0)
                 curr = eq.get('total_equity', 0)
@@ -207,7 +208,7 @@ class ExcelReportGenerator:
         # By Asset
         sheet.write(0, 0, "资产归因", header_fmt)
         sheet.write(0, 1, "盈亏", header_fmt)
-        
+
         row = 1
         for symbol, pnl in sorted(attribution.by_asset.items(), key=lambda x: x[1], reverse=True):
             sheet.write(row, 0, symbol)
@@ -218,7 +219,7 @@ class ExcelReportGenerator:
         # By Sector
         sheet.write(0, 3, "行业归因", header_fmt)
         sheet.write(0, 4, "盈亏", header_fmt)
-        
+
         row = 1
         for sector, pnl in sorted(attribution.by_sector.items(), key=lambda x: x[1], reverse=True):
             sheet.write(row, 3, sector)
@@ -231,7 +232,7 @@ class ExcelReportGenerator:
             start_row = max(len(attribution.by_asset), len(attribution.by_sector)) + 3
             sheet.write(start_row, 0, "月度收益", header_fmt)
             sheet.write(start_row, 1, "收益率", header_fmt)
-            
+
             row = start_row + 1
             for month, ret in sorted(attribution.by_period.items()):
                 sheet.write(row, 0, month)

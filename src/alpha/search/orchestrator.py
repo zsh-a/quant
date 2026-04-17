@@ -11,25 +11,33 @@ Manages multiple search strategies in a unified loop with:
 
 from __future__ import annotations
 
-import random
 from collections import deque
 from time import perf_counter
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 import numpy as np
 from loguru import logger
 
 from ..core.compiler import FormulaCompiler
 from ..core.dsl import TensorSchema
+from ..core.operators import OperatorRegistry
+
+if TYPE_CHECKING:
+    from ..core.dataset import AlphaDataset
+from .context import (
+    FactorCatalog,
+    FactorCatalogEntry,
+    SearchContext,
+    SearchStrategy,
+    build_individual,
+)
 from .evolution import (
+    BreedingSpec,
     EvalResult,
     FitnessEngine,
     Individual,
-    BreedingSpec,
     SearchResult,
 )
-from ..llm import HeuristicLLMBackend
-from ..core.operators import OperatorRegistry
 from .pipeline import (
     ArchiveEntry,
     Lineage,
@@ -38,14 +46,6 @@ from .pipeline import (
     StageKind,
     StageRecord,
 )
-from .context import (
-    FactorCatalog,
-    FactorCatalogEntry,
-    SearchContext,
-    SearchStrategy,
-    build_individual,
-)
-
 
 # ---------------------------------------------------------------------------
 # Archive helpers
@@ -153,6 +153,7 @@ class SearchOrchestrator:
     ) -> SearchResult:
         """Execute the search loop with all registered strategies."""
         from pathlib import Path
+
         from ..infra.tracing import tracer
 
         overall_start = perf_counter()
@@ -173,6 +174,7 @@ class SearchOrchestrator:
         # Build shared evaluator for strategies
         evaluator = None
         if dataset is not None:
+            from ..core.vm import StackVM
             from .evaluator import FormulaEvaluator
             _eval_vm = vm or StackVM()
             evaluator = FormulaEvaluator(self.compiler, _eval_vm, self.schema, dataset)
@@ -228,7 +230,7 @@ class SearchOrchestrator:
         # --- main loop (with pipeline overlap) ---
         # Pre-generated candidates from the previous round's LLM call.
         # While evaluation runs, the next round's LLM call is already in flight.
-        from concurrent.futures import ThreadPoolExecutor, Future
+        from concurrent.futures import Future, ThreadPoolExecutor
         prefetch_future: Future | None = None
         prefetch_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="llm_prefetch")
 
@@ -646,6 +648,7 @@ class SearchOrchestrator:
                 population.append(ind)
                 seen.add(ind.expr_hash)
 
+        from ..llm import HeuristicLLMBackend
         heuristic = HeuristicLLMBackend(registry=self.registry, schema=self.schema)
         if not seeds:
             seeds = heuristic.generate_initial_population(target)

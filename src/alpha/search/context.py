@@ -16,9 +16,6 @@ from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Protocol, runtime_checkable
 
-from loguru import logger
-
-
 # ---------------------------------------------------------------------------
 # Stateful strategy protocol
 # ---------------------------------------------------------------------------

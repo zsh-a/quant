@@ -18,7 +18,7 @@ from ..core.dsl import TensorSchema
 from .metrics import compute_forward_returns
 
 if TYPE_CHECKING:
-    from ..core.vm import StackVM, TensorStore
+    from ..core.vm import StackVM
 
 _CHUNK_SIZE = 128  # formulas per GPU batch
 
@@ -116,7 +116,7 @@ def fast_screen_ic(
         if use_gpu and alphas and isinstance(alphas[0], _torch.Tensor):
             # --- GPU batched rank IC ---
             stacked = _torch.stack(alphas)  # (N, T, S)
-            N = stacked.shape[0]
+            stacked.shape[0]
 
             # Coverage check on GPU
             coverage = (~stacked.isnan()).float().mean(dim=(1, 2))  # (N,)
@@ -155,8 +155,8 @@ def fast_screen_ic(
             del stacked, alphas
         else:
             # --- CPU fallback (per-formula) ---
-            from .metrics import compute_rank_ic
             from ..core.vm import to_numpy
+            from .metrics import compute_rank_ic
 
             for formula, alpha_raw in zip(chunk_formulas, alphas):
                 alpha = to_numpy(alpha_raw)

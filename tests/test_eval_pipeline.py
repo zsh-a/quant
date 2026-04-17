@@ -5,7 +5,6 @@
 """
 
 import numpy as np
-import pytest
 
 from src.alpha.core.dataset import AlphaDataset
 from src.alpha.eval.metrics import compute_forward_returns, compute_ic_metrics, compute_quantile_returns
@@ -249,7 +248,7 @@ class TestEndToEnd:
         alpha = rng.standard_normal((T, S)).astype(np.float32)
 
         fields = {"close": close, "open": close, "high": close * 1.01, "low": close * 0.99, "volume": np.ones_like(close)}
-        dataset = AlphaDataset(
+        AlphaDataset(
             interval="1d",
             symbols=[f"S{i}" for i in range(S)],
             timestamps=[f"2025-01-{d+1:02d}" for d in range(T)],

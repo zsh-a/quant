@@ -3,7 +3,8 @@ Strategy registry for automatic strategy discovery and registration.
 Eliminates hardcoded strategy mapping in server.py.
 """
 
-from typing import Dict, Type, Optional, Any
+from typing import Any, Dict, Optional, Type
+
 from src.core.base import Strategy
 
 
@@ -70,8 +71,7 @@ class StrategyRegistry:
     @classmethod
     def register_all(cls):
         """Import all strategy modules to trigger registration"""
-        from src.strategies import jsg_strategy
-        from src.strategies import rotation_strategy
+        from src.strategies import jsg_strategy, rotation_strategy
 
         # Import forces decorator execution
         _ = jsg_strategy, rotation_strategy

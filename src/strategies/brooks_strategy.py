@@ -17,8 +17,6 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
-from loguru import logger
-
 from src.core.base import Bar, Strategy
 from src.strategies.registry import StrategyRegistry
 
@@ -106,7 +104,7 @@ class BrooksStrategy(Strategy):
         }
 
     def on_bar(self, bars: Dict[str, Bar]):
-        from src.analysis.bar_features import extract_features, calculate_atr
+        from src.analysis.bar_features import extract_features
 
         self._bars_since_trade += 1
 
@@ -151,7 +149,7 @@ class BrooksStrategy(Strategy):
 
             # --- 信号判断 ---
             latest = features[-1]
-            prev = features[-2] if len(features) >= 2 else latest
+            features[-2] if len(features) >= 2 else latest
             atr = ctx.atr_14
 
             # Brooks 做多信号: 牛趋势 bar + 收盘在高位 + 价格在 EMA 上方
@@ -165,7 +163,7 @@ class BrooksStrategy(Strategy):
                 sl = entry - atr * self.atr_mult
                 tp = entry + abs(entry - sl) * self.min_rr
 
-                from src.core.price_calculator import enforce_min_stop_distance, enforce_min_rr
+                from src.core.price_calculator import enforce_min_rr, enforce_min_stop_distance
                 sl = enforce_min_stop_distance(entry, sl, atr, self.atr_mult)
                 tp = enforce_min_rr(entry, sl, tp, self.min_rr)
 
@@ -186,7 +184,7 @@ class BrooksStrategy(Strategy):
                 sl = entry + atr * self.atr_mult
                 tp = entry - abs(sl - entry) * self.min_rr
 
-                from src.core.price_calculator import enforce_min_stop_distance, enforce_min_rr
+                from src.core.price_calculator import enforce_min_rr, enforce_min_stop_distance
                 sl = enforce_min_stop_distance(entry, sl, atr, self.atr_mult)
                 tp = enforce_min_rr(entry, sl, tp, self.min_rr)
 

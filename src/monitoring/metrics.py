@@ -3,11 +3,12 @@ Prometheus metrics for system monitoring.
 Tracks API performance, backtest execution, and system health.
 """
 
-from prometheus_client import Counter, Histogram, Gauge, Info
-from functools import wraps
 import time
+from functools import wraps
 from typing import Callable
+
 from loguru import logger
+from prometheus_client import Counter, Gauge, Histogram, Info
 
 # API Metrics
 api_requests_total = Counter(
@@ -138,11 +139,11 @@ def track_api_request(method: str, endpoint: str):
         async def wrapper(*args, **kwargs):
             start_time = time.time()
             status = 'success'
-            
+
             try:
                 result = await func(*args, **kwargs)
                 return result
-            except Exception as e:
+            except Exception:
                 status = 'error'
                 raise
             finally:
@@ -156,7 +157,7 @@ def track_api_request(method: str, endpoint: str):
                     method=method,
                     endpoint=endpoint
                 ).observe(duration)
-        
+
         return wrapper
     return decorator
 
@@ -168,16 +169,16 @@ def track_backtest(strategy: str, mode: str):
         def wrapper(*args, **kwargs):
             start_time = time.time()
             status = 'success'
-            
+
             try:
                 result = func(*args, **kwargs)
-                
+
                 # Track trade count if available
                 if isinstance(result, dict) and 'total_trades' in result:
                     backtest_trades.labels(strategy=strategy).observe(
                         result['total_trades']
                     )
-                
+
                 return result
             except Exception as e:
                 status = 'failed'
@@ -193,7 +194,7 @@ def track_backtest(strategy: str, mode: str):
                     strategy=strategy,
                     status=status
                 ).inc()
-        
+
         return wrapper
     return decorator
 
@@ -202,19 +203,19 @@ def update_system_metrics():
     """Update system resource metrics"""
     try:
         import psutil
-        
+
         # CPU usage
         cpu_percent = psutil.cpu_percent(interval=1)
         system_cpu_usage.set(cpu_percent)
-        
+
         # Memory usage
         memory = psutil.virtual_memory()
         system_memory_usage.set(memory.used)
-        
+
         # Disk usage
         disk = psutil.disk_usage('/')
         system_disk_usage.set(disk.percent)
-        
+
     except ImportError:
         logger.warning("psutil not installed, system metrics unavailable")
     except Exception as e:

@@ -9,22 +9,20 @@ snake_case DSL so the LLM output compiles with minimal normalisation.
 from __future__ import annotations
 
 import ast
+import hashlib
 import json
 import os
 import re
 from typing import Any
 
 import httpx
-from loguru import logger
 from openai import OpenAI
-
-import hashlib
 
 from ..core.compiler import FormulaCompiler
 from ..core.dsl import TensorSchema
 from ..core.market import MarketProfile
-from ..search.evolution import BreedingSpec
 from ..core.operators import OperatorRegistry
+from ..search.evolution import BreedingSpec
 
 # ---------------------------------------------------------------------------
 # Shared DSL reference (injected into every prompt)

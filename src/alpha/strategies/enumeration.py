@@ -8,13 +8,13 @@ as pre-screened Individual objects for the orchestrator to evaluate.
 
 from __future__ import annotations
 
-from typing import Any, ClassVar
+from typing import ClassVar
 
 from loguru import logger
 
+from ..search.context import SearchContext
 from ..search.evolution import Individual
 from ..search.pipeline import Lineage
-from ..search.context import SearchContext
 from .base import BaseStrategy, StrategyMeta
 
 
@@ -60,8 +60,8 @@ class EnumerationStrategy(BaseStrategy):
             ]
             passed.sort(key=lambda x: abs(x[1]), reverse=True)
         else:
-            from ..eval.fast_screen import fast_screen_ic
             from ..core.vm import StackVM
+            from ..eval.fast_screen import fast_screen_ic
             vm = ctx.vm or StackVM()
             passed = fast_screen_ic(
                 formulas, ctx.dataset, ctx.compiler, vm, ctx.schema,
@@ -94,7 +94,7 @@ class EnumerationStrategy(BaseStrategy):
 
 
 # --- Registry ---
-from .registry import register_strategy, StrategyInfra  # noqa: E402
+from .registry import StrategyInfra, register_strategy  # noqa: E402
 
 
 @register_strategy(EnumerationStrategy.meta)

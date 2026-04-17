@@ -3,10 +3,10 @@ Alert system with Feishu webhook integration.
 Monitors system metrics and sends notifications when thresholds are exceeded.
 """
 
+from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 import httpx
-import time
-from typing import Dict, Any, List, Optional
-from datetime import datetime, timedelta
 from loguru import logger
 
 
@@ -181,11 +181,13 @@ class AlertManager:
                 if ">" in condition_str:
                     metric, threshold = condition_str.split(">")
                     threshold = float(threshold.strip())
-                    condition = lambda x: x > threshold
+                    def condition(x):
+                        return x > threshold
                 elif "<" in condition_str:
                     metric, threshold = condition_str.split("<")
                     threshold = float(threshold.strip())
-                    condition = lambda x: x < threshold
+                    def condition(x):
+                        return x < threshold
                 else:
                     logger.warning(f"Invalid condition format: {condition_str}")
                     continue

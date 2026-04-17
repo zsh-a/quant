@@ -20,6 +20,7 @@ except ImportError:
 
 try:
     import triton  # noqa: F401
+
     from src.alpha.eval.gpu_ops import (
         TRITON_AVAILABLE,
         batch_rank_ic,

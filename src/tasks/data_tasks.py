@@ -7,6 +7,7 @@ from loguru import logger
 from src.market_data.processors.tdx import TDXProcess
 from src.tasks.celery_app import app
 
+
 @app.task(
     name='src.tasks.data_tasks.sync_financial_data',
     autoretry_for=(ConnectionError, OSError, TimeoutError),

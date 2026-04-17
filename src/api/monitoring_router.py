@@ -5,11 +5,12 @@ Monitoring API router for health checks and metrics.
 import anyio
 from fastapi import APIRouter
 from fastapi.responses import PlainTextResponse
-from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from loguru import logger
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+
+from src.monitoring.alerts import alert_manager
 from src.monitoring.health import health_checker
 from src.monitoring.metrics import update_system_metrics
-from src.monitoring.alerts import alert_manager
-from loguru import logger
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 

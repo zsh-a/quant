@@ -3,9 +3,10 @@ Risk management system for trading platform.
 Handles position limits, stop-loss, take-profit, and risk metrics.
 """
 
-from typing import Dict, Any, Optional, List
 from dataclasses import dataclass
 from datetime import datetime
+from typing import Any, Dict, List, Optional
+
 from src.utils.logging_config import get_logger
 
 logger = get_logger(__name__)

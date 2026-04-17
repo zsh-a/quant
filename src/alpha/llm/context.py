@@ -8,9 +8,9 @@ suggestions. Does NOT call any LLM — only builds text.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 
-from ..search.pipeline import ArchiveEntry, PipelineRecord, StageKind
+from ..search.pipeline import ArchiveEntry, PipelineRecord
 
 if TYPE_CHECKING:
     from ..knowledge.memory import StrategyMemory

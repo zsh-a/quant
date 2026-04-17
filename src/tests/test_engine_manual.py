@@ -1,14 +1,14 @@
-import sys
-import os
 import logging
+import os
+import sys
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
-from src.core.base import Strategy, Bar
-from src.core.engine import TradingEngine
 from src.core.backtest_broker import BacktestBroker
+from src.core.base import Strategy
 from src.core.data_stream import CSVDataStream
+from src.core.engine import TradingEngine
 
 logging.basicConfig(level=logging.INFO)
 
@@ -35,10 +35,10 @@ def test_backtest():
     stream = CSVDataStream({"510880": data_path}, start_date="2023-01-01")
     broker = BacktestBroker()
     strategy = MovingAverageStrategy()
-    
+
     engine = TradingEngine(strategy, broker, stream)
     engine.run()
-    
+
     print("\nBacktest Result:")
     print(broker.get_account_info())
 

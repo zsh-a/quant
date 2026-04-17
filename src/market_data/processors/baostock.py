@@ -135,7 +135,7 @@ class BaoStockProcessor:
                 dt = datetime.date.fromisoformat(str(value))
             except (ValueError, TypeError):
                 return None
-        
+
         if dt and dt.year < 1990:
             return None
         return dt

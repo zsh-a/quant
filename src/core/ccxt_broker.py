@@ -11,7 +11,6 @@ CCXT 实盘 Broker — 基于 CCXT 的多交易所实盘交易接口。
 
 from __future__ import annotations
 
-from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
 from loguru import logger

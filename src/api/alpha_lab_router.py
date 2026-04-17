@@ -15,10 +15,10 @@ from pydantic import BaseModel, Field
 
 from src.alpha import AlphaService
 from src.alpha.core.market import list_market_types
-from src.alpha.search.pipeline import RoundRecord, StageRecord
 from src.alpha.infra.tracing import InMemoryCollector, tracer
-from src.config.settings import get_alpha_lab_config, get_bitget_config, get_crypto_market_config
+from src.alpha.search.pipeline import RoundRecord, StageRecord
 from src.config.paths import SEARCH_JOBS_STATE_PATH
+from src.config.settings import get_alpha_lab_config, get_bitget_config, get_crypto_market_config
 
 router = APIRouter(prefix="/alpha-lab", tags=["alpha-lab"])
 
@@ -224,8 +224,8 @@ def _normalize_blocked_hours(values: list[int] | None) -> list[int] | None:
 
 
 def _workspace_defaults() -> dict[str, object]:
-    from src.market_data.binance_vision import EXPANDED_SYMBOLS
     from src.alpha.core.market import get_market_profile
+    from src.market_data.binance_vision import EXPANDED_SYMBOLS
 
     crypto_market = get_crypto_market_config()
     crypto_profile = get_market_profile("crypto")
@@ -549,7 +549,7 @@ def _run_event_backtest(
 ) -> None:
     """在后台线程中执行 event engine 回测。"""
     from session_db import SessionDB
-    from src.services import SessionExecutionConfig, SessionExecutionHooks, execute_session
+    from src.services import SessionExecutionConfig, execute_session
 
     session_db = SessionDB()
 
@@ -624,6 +624,7 @@ async def run_event_backtest(request: EventBacktestRequest, background_tasks: Ba
     3. 返回 session_id，通过现有 session API 查询结果
     """
     import uuid
+
     from session_db import SessionDB
 
     session_id = str(uuid.uuid4())
@@ -732,7 +733,9 @@ async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
         ))
 
     # Build pipeline record from serialized data
-    from src.alpha.search.pipeline import PipelineRecord, RoundRecord as RR, StageRecord as SR, StageKind
+    from src.alpha.search.pipeline import PipelineRecord, StageKind
+    from src.alpha.search.pipeline import RoundRecord as RR
+    from src.alpha.search.pipeline import StageRecord as SR
     pr = PipelineRecord(
         job_id=pipeline_data.get("job_id", job_id),
         total_evaluations=pipeline_data.get("total_evaluations", 0),
@@ -837,6 +840,7 @@ async def get_tracing_traces():
 async def get_neural_history():
     """Get neural strategy training history if available."""
     import json
+
     from src.config.paths import ALPHA_LAB_NEURAL_DIR
     p = ALPHA_LAB_NEURAL_DIR / "training_history.json"
     if not p.exists():
@@ -996,7 +1000,7 @@ async def get_factor_catalog(
         if not pipeline:
             continue
         # Rebuild catalog from pipeline rounds
-        from src.alpha.search.context import FactorCatalog, FactorCatalogEntry
+        from src.alpha.search.context import FactorCatalog
         catalog = FactorCatalog()
         # Try to load from checkpoint if available
         ckpt = _get_service().checkpoint_manager.latest_checkpoint(job_id)

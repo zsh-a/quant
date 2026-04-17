@@ -1,13 +1,12 @@
 from __future__ import annotations
 
+import time
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Dict, Optional
-import time
 
 from loguru import logger
 
 from session_db import SessionDB
-from src.utils.session_logger import get_session_logger
 from src.config.settings import get_broker_config, get_data_stream_config
 from src.core.backtest_broker import BacktestBroker
 from src.core.data_stream import CryptoDBDataStream, DBDataStream, RealtimeDataStream
@@ -16,6 +15,7 @@ from src.core.live_broker import LiveBroker
 from src.core.risk_manager import RiskManager
 from src.market_data.db import DB
 from src.strategies.registry import StrategyRegistry
+from src.utils.session_logger import get_session_logger
 
 
 @dataclass

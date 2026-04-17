@@ -10,9 +10,9 @@ import anyio
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from session_db import SessionDB
 from src.market_data.db import DB
 from src.market_data.update_pipeline import REFERENCE_SYMBOL, get_update_step_capabilities
-from session_db import SessionDB
 from src.tasks.automation import run_data_update_pipeline_task
 
 router = APIRouter(prefix="/market-admin", tags=["market-admin"])

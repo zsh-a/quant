@@ -13,7 +13,6 @@ except ImportError:  # pragma: no cover - exercised only when dependency is miss
 
 from src.market_data.crypto_store import UnifiedMinuteBar
 
-
 DEFAULT_CRYPTO_SYMBOLS = ["BTCUSDT", "ETHUSDT", "SOLUSDT", "BNBUSDT", "XRPUSDT"]
 
 

@@ -1,7 +1,7 @@
 from fastapi import (
+    BackgroundTasks,
     Depends,
     FastAPI,
-    BackgroundTasks,
     HTTPException,
     Query,
     Request,
@@ -13,67 +13,70 @@ try:
     from websockets.exceptions import ConnectionClosed as WsConnectionClosed
 except ImportError:
     WsConnectionClosed = None
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import ORJSONResponse
-from pydantic import BaseModel, Field
-from typing import List, Dict, Any, Optional
-import orjson
+import asyncio
 import os
 import sys
 import uuid
-import asyncio
-import anyio
+from typing import Any, Dict, Optional
 
+import anyio
+import orjson
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import ORJSONResponse
+from pydantic import BaseModel, Field
 
 # Ensure src is in path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "../..")))
 
 from src.config.paths import ensure_data_dirs
+
 ensure_data_dirs()
 
-from src.strategies.registry import StrategyRegistry
-from src.utils.cache import get_cache, get_backtest_cache
-from src.config.settings import (
-    get_data_stream_config,
-    get_broker_config,
-    get_api_config,
-    get_settings,
-)
-from src.utils.logging_config import setup_logging, get_logger, logging_middleware
-from src.api.websocket_manager import manager as ws_manager, handle_websocket_message
+from session_db import SessionDB
+from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
+from src.api.analysis_router import router as analysis_router
+from src.api.auth import require_auth
+from src.api.auth import router as auth_router
+from src.api.automation_router import router as automation_router
+from src.api.crypto_market_router import router as crypto_market_router
 from src.api.events import (
-    event_bus,
     EventType,
-    emit_session_started,
     emit_equity_update,
-    emit_session_progress,
-    emit_trade_executed,
+    emit_error,
     emit_session_completed,
     emit_session_failed,
+    emit_session_progress,
+    emit_session_started,
     emit_session_stopped,
-    emit_error,
+    emit_trade_executed,
+    event_bus,
 )
+from src.api.logs_router import router as logs_router
+from src.api.market_admin_router import router as market_admin_router
+from src.api.market_router import router as market_router
+from src.api.monitoring_router import router as monitoring_router
+from src.api.optimizer_router import router as optimizer_router
+from src.api.portfolio_router import router as portfolio_router
 from src.api.state_persistence import persistence
-from src.analysis.backtest_metrics import calculate_metrics as calc_perf_metrics
+from src.api.tasks_router import router as tasks_router
+from src.api.websocket_manager import handle_websocket_message
+from src.api.websocket_manager import manager as ws_manager
+from src.config.settings import (
+    get_api_config,
+    get_broker_config,
+    get_data_stream_config,
+    get_settings,
+)
 from src.market_data.db import DB
-from session_db import SessionDB
 from src.services import (
     SessionExecutionConfig,
     SessionExecutionHooks,
     SessionService,
     execute_session,
 )
-from src.api.auth import router as auth_router, require_auth
-from src.api.tasks_router import router as tasks_router
-from src.api.monitoring_router import router as monitoring_router
-from src.api.portfolio_router import router as portfolio_router
-from src.api.optimizer_router import router as optimizer_router
-from src.api.analysis_router import router as analysis_router
-from src.api.logs_router import router as logs_router
-from src.api.market_router import router as market_router
-from src.api.automation_router import router as automation_router
-from src.api.market_admin_router import router as market_admin_router
-from src.api.crypto_market_router import router as crypto_market_router
+from src.strategies.registry import StrategyRegistry
+from src.utils.cache import get_backtest_cache, get_cache
+from src.utils.logging_config import get_logger, logging_middleware, setup_logging
 
 # Alpha Lab — optional, requires torch
 try:
@@ -92,8 +95,8 @@ data_stream_config = get_data_stream_config()
 broker_config = get_broker_config()
 
 from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
 
@@ -130,7 +133,7 @@ app.include_router(crypto_market_router, dependencies=[Depends(require_auth)])
 logger.info(f"API Server starting with config: port={api_config.port}")
 
 
-from src.api.validators import DateStr, SymbolStr, ModeStr, MarketStr, IntervalStr
+from src.api.validators import DateStr, IntervalStr, MarketStr, ModeStr, SymbolStr
 
 
 class SessionRequest(BaseModel):

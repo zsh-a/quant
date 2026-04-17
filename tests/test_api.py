@@ -2,8 +2,9 @@
 API endpoint integration tests using FastAPI TestClient.
 """
 
+from unittest.mock import patch
+
 import pytest
-from unittest.mock import patch, MagicMock
 from fastapi.testclient import TestClient
 
 
@@ -13,7 +14,7 @@ def client():
     # Mock heavy imports before loading server
     with patch("src.api.server.session_db") as mock_db, \
          patch("src.api.server.session_service") as mock_svc, \
-         patch("src.api.server.persistence") as mock_persist:
+         patch("src.api.server.persistence"):
         mock_db.get_all_sessions.return_value = []
         mock_svc.count_running_sessions.return_value = 0
         from src.api.server import app
@@ -113,12 +114,12 @@ class TestDBColumnValidation:
     """Test SQL injection prevention via column/table allowlists."""
 
     def test_valid_columns(self):
-        from src.market_data.db import _validate_columns, _VALID_STOCK_COLUMNS
+        from src.market_data.db import _VALID_STOCK_COLUMNS, _validate_columns
         result = _validate_columns(["close", "open", "volume"], _VALID_STOCK_COLUMNS)
         assert result == ["close", "open", "volume"]
 
     def test_invalid_columns_rejected(self):
-        from src.market_data.db import _validate_columns, _VALID_STOCK_COLUMNS
+        from src.market_data.db import _VALID_STOCK_COLUMNS, _validate_columns
         with pytest.raises(ValueError, match="不允许的列名"):
             _validate_columns(["close", "DROP TABLE"], _VALID_STOCK_COLUMNS)
 

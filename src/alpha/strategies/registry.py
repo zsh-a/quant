@@ -6,11 +6,10 @@ decorator.  ``SearchMode`` defines which strategies compose each selectable mode
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Callable
 
 from .base import StrategyMeta
-
 
 # ---------------------------------------------------------------------------
 # Search modes — each mode explicitly lists its strategies

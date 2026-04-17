@@ -16,7 +16,7 @@ from typing import Any
 import numpy as np
 from loguru import logger
 
-from ..core.compiler import BytecodeProgram, FormulaCompiler
+from ..core.compiler import FormulaCompiler
 from ..core.dataset import AlphaDataset
 from ..core.dsl import TensorSchema
 from ..core.operators import OperatorRegistry
@@ -24,7 +24,10 @@ from ..core.vm import StackVM, TensorStore
 
 try:
     import torch
-    from ..eval.gpu_ops import TRITON_AVAILABLE as _TRITON_OK, cs_rank as _triton_cs_rank, factor_correlation_matrix as _triton_factor_corr
+
+    from ..eval.gpu_ops import TRITON_AVAILABLE as _TRITON_OK
+    from ..eval.gpu_ops import cs_rank as _triton_cs_rank
+    from ..eval.gpu_ops import factor_correlation_matrix as _triton_factor_corr
 except Exception:  # pragma: no cover
     torch = None
     _TRITON_OK = False

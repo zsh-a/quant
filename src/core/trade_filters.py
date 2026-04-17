@@ -13,13 +13,12 @@ Usage:
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from typing import Any, Optional
 
 import numpy as np
 from loguru import logger
-
 
 # ---------------------------------------------------------------------------
 # Trade Filter — 防过度交易

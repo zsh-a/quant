@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from enum import Enum
 from typing import Any
 
 import numpy as np
@@ -41,9 +42,6 @@ if numba is not None:
                     delta = lower
                 out[row, col] = prev + delta
         return out
-
-
-from enum import Enum
 
 
 class EvalMethod(str, Enum):
@@ -188,7 +186,7 @@ class SignalTransformer:
             n_valid = valid.sum()
             if n_valid < 2:
                 continue
-            k = max(int(n_valid * top_pct), 1)
+            max(int(n_valid * top_pct), 1)
             # Top-k by alpha (descending)
             threshold = np.nanpercentile(row[valid], 100 * (1 - top_pct))
             selected = valid & (row >= threshold)
