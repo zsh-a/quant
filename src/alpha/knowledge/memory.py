@@ -54,6 +54,8 @@ class StrategyMemory:
         self._theme_stats: dict[str, _ThemeStats] = defaultdict(_ThemeStats)
         self._operator_stats: dict[str, _RunningStats] = defaultdict(_RunningStats)
         self._feature_stats: dict[str, _RunningStats] = defaultdict(_RunningStats)
+        # Per-strategy reward stats (e.g. "llm_evolution", "mcts_refinement")
+        self._strategy_stats: dict[str, _RunningStats] = defaultdict(_RunningStats)
         self._persistence_path = persistence_path
         self._all_theme_ids: list[str] = all_theme_ids or []
         self._total_generated: int = 0
@@ -70,6 +72,7 @@ class StrategyMemory:
         is_novel: bool,
         round_idx: int = 0,
         all_fields: frozenset[str] | None = None,
+        strategy: str | None = None,
     ) -> None:
         """Record one evaluation result. Called after every full evaluation."""
         fitness = float(metrics.get("fitness", 0.0))
@@ -111,6 +114,57 @@ class StrategyMemory:
         # Update feature stats
         for feat in features:
             self._feature_stats[feat].update(fitness)
+
+        # Update per-strategy reward stats (enables adaptive scheduling)
+        if strategy:
+            self._strategy_stats[strategy].update(fitness)
+
+    # ------------------------------------------------------------------
+    # Per-strategy stats (for AdaptiveScheduler)
+    # ------------------------------------------------------------------
+
+    def get_strategy_stats(self) -> dict[str, dict[str, Any]]:
+        return {
+            name: {"mean_fitness": s.mean, "count": s.count} for name, s in self._strategy_stats.items() if s.count > 0
+        }
+
+    def suggest_strategy_mix(
+        self,
+        strategy_names: list[str],
+        *,
+        goal: str = "maximize_fitness",
+        exploration: float = 1.0,
+    ) -> dict[str, float]:
+        """Return normalised UCB1 weights over the given strategy names.
+
+        ``goal`` is reserved for future "diverse" / "reduce_turnover" modes;
+        for now it's always "maximize_fitness" (the default reward signal).
+        Unseen strategies get infinite UCB so at least one trial is
+        guaranteed before any exploitation kicks in.
+        """
+        if not strategy_names:
+            return {}
+        total = max(self._total_generated, 1)
+        raw_scores: dict[str, float] = {}
+        for name in strategy_names:
+            stats = self._strategy_stats.get(name)
+            if stats is None or stats.count == 0:
+                raw_scores[name] = math.inf
+                continue
+            mean = stats.mean
+            bonus = exploration * math.sqrt(math.log(total) / stats.count)
+            raw_scores[name] = mean + bonus
+
+        # Convert infinite scores to flat-uniform + keep exploiters proportional.
+        inf_names = [n for n, v in raw_scores.items() if math.isinf(v)]
+        if inf_names:
+            return {n: (1.0 / len(inf_names) if n in inf_names else 0.0) for n in strategy_names}
+
+        # Softmax over finite scores with sane temperature to avoid collapse.
+        mx = max(raw_scores.values())
+        exps = {n: math.exp((v - mx) / max(exploration, 1e-3)) for n, v in raw_scores.items()}
+        denom = sum(exps.values()) or 1.0
+        return {n: exps[n] / denom for n in strategy_names}
 
     # ------------------------------------------------------------------
     # UCB1 Bandit — theme selection
@@ -329,6 +383,7 @@ class StrategyMemory:
             },
             "operator_stats": {op: {"mean": s.mean, "count": s.count} for op, s in self._operator_stats.items()},
             "feature_stats": {f: {"mean": s.mean, "count": s.count} for f, s in self._feature_stats.items()},
+            "strategy_stats": {n: {"mean": s.mean, "count": s.count} for n, s in self._strategy_stats.items()},
         }
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
 
@@ -372,6 +427,12 @@ class StrategyMemory:
             s.mean = s_dict.get("mean", 0.0)
             s.count = s_dict.get("count", 0)
             self._feature_stats[f] = s
+
+        for name, s_dict in data.get("strategy_stats", {}).items():
+            s = _RunningStats()
+            s.mean = s_dict.get("mean", 0.0)
+            s.count = s_dict.get("count", 0)
+            self._strategy_stats[name] = s
 
     # ------------------------------------------------------------------
     # Helpers

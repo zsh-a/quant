@@ -20,7 +20,16 @@ from loguru import logger
 from pydantic import BaseModel, Field
 
 from .cli import _parse_iso
+from .infra.errors import (
+    DataError,
+    FatalError,
+    classify_exception,
+)
 from .risk.models import RiskConfig
+from .search.persistent_context import (
+    load_persistent_state,
+    save_persistent_state,
+)
 from .service import AlphaService
 
 # ---------------------------------------------------------------------------
@@ -35,6 +44,13 @@ class WindowConfig(BaseModel):
     anchor_time: str | None = None
     start_time: str | None = None
     end_time: str | None = None
+
+
+class BudgetConfig(BaseModel):
+    max_llm_tokens: int = 0
+    max_full_eval: int = 0
+    max_wall_time_sec: float = 0.0
+    max_cost_usd: float = 0.0
 
 
 class SearchConfig(BaseModel):
@@ -59,6 +75,7 @@ class SearchConfig(BaseModel):
     carryover_top_k: int = 3
     llm_backend: str = "auto"
     llm_model: str | None = None
+    budget: BudgetConfig = Field(default_factory=BudgetConfig)
 
 
 class RuntimeConfig(BaseModel):
@@ -135,6 +152,12 @@ def run_auto_search_loop(
         _sp = str(AUTO_SEARCH_STATE_PATH)
     state_path = Path(_sp)
     state = _load_state(state_path)
+
+    # Persistent cross-cycle memory: de-duplicates previously-seen formulas
+    # and carries top archive summaries forward.
+    market_tag = getattr(service, "market", None) or "default"
+    persistent_state = load_persistent_state(market_tag)
+
     resolved_max = max_cycles if max_cycles is not None else config.runtime.max_cycles
     effective_now = now_fn or (lambda: datetime.now(UTC))
 
@@ -209,6 +232,8 @@ def run_auto_search_loop(
                     purge_window=config.search.purge_window,
                     embargo_window=config.search.embargo_window,
                     blocked_utc_hours=config.search.blocked_utc_hours,
+                    prior_seen_hashes=persistent_state.seen_set(),
+                    budget=_build_budget_tracker(config.search.budget),
                 )
 
                 # Optional: combine factors
@@ -259,6 +284,34 @@ def run_auto_search_loop(
                     "factor_count": combo_result.get("combination", {}).get("factor_count"),
                 }
             _save_state(state_path, state)
+
+            # Update persistent cross-cycle state with this cycle's discoveries.
+            try:
+                top = result.get("top_results") or []
+                new_hashes = {h for h in (ind.get("expr_hash") for ind in top) if h}
+                for ev_hash in (result.get("evaluations") or {}).keys():
+                    if ev_hash:
+                        new_hashes.add(ev_hash)
+                persistent_state.merge_cycle_result(
+                    new_hashes=new_hashes,
+                    new_archive=[
+                        {
+                            "formula": ind.get("formula"),
+                            "expr_hash": ind.get("expr_hash"),
+                            "fitness": ind.get("fitness"),
+                            "metrics": ind.get("metrics", {}),
+                            "strategy": (ind.get("lineage") or {}).get("origin", ""),
+                            "round_idx": (ind.get("lineage") or {}).get("round_idx", 0) or 0,
+                        }
+                        for ind in top
+                    ],
+                    window=window,
+                    run_id=state.get("last_run_id") or "",
+                )
+                save_persistent_state(persistent_state)
+            except Exception as pc_exc:
+                logger.debug("persistent_state update failed: {}", pc_exc)
+
             _apply_retention(config, service)
 
             top = result.get("top_results") or []
@@ -292,11 +345,42 @@ def run_auto_search_loop(
             state["failed_cycles"] = failed
             state["consecutive_failures"] = int(state.get("consecutive_failures", 0)) + 1
             state["last_error"] = str(exc)
+            state["last_error_class"] = classify_exception(exc).__name__
             state["updated_at"] = datetime.now(UTC).isoformat()
             _save_state(state_path, state)
-            logger.exception("alpha.auto_search cycle_failed: {}", exc)
+
+            error_class = classify_exception(exc)
+            logger.exception(
+                "alpha.auto_search cycle_failed class={} exc={}",
+                error_class.__name__,
+                exc,
+            )
+
+            # Persist a replayable payload to DLQ so humans can re-drive.
+            try:
+                from src.tasks.alpha_dlq import write_dlq_entry
+
+                write_dlq_entry(
+                    source="auto_search_cycle",
+                    error=f"{error_class.__name__}: {exc}",
+                    payload={
+                        "cycle": attempted,
+                        "config_snapshot": config.model_dump(),
+                        "last_window": state.get("last_window"),
+                    },
+                )
+            except Exception as dlq_exc:
+                logger.debug("auto_search DLQ write failed: {}", dlq_exc)
+
+            if error_class is FatalError:
+                stopped_reason = "fatal_error"
+                raise
             if once or not config.runtime.continue_on_error:
                 raise
+            # Data errors: skip the window with a short sleep; transient: exponential backoff.
+            if error_class is DataError:
+                sleep_fn(max(config.runtime.poll_interval_seconds, 1))
+                continue
             backoff = min(
                 config.runtime.failure_backoff_seconds * (2 ** max(state["consecutive_failures"] - 1, 0)),
                 config.runtime.max_failure_backoff_seconds,
@@ -317,6 +401,22 @@ def run_auto_search_loop(
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _build_budget_tracker(cfg: "BudgetConfig"):
+    """Return a live BudgetTracker iff any cap is set, else None."""
+    if not any(
+        getattr(cfg, k, 0) > 0 for k in ("max_llm_tokens", "max_full_eval", "max_wall_time_sec", "max_cost_usd")
+    ):
+        return None
+    from .search.context import BudgetTracker
+
+    return BudgetTracker(
+        max_llm_tokens=cfg.max_llm_tokens,
+        max_full_eval=cfg.max_full_eval,
+        max_wall_time_sec=cfg.max_wall_time_sec,
+        max_cost_usd=cfg.max_cost_usd,
+    )
 
 
 def _load_state(path: Path) -> dict[str, Any]:

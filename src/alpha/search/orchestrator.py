@@ -150,6 +150,9 @@ class SearchOrchestrator:
         on_stage_complete: Callable[[StageRecord], None] | None = None,
         on_round_complete: Callable[[RoundRecord], None] | None = None,
         resume_from: str | None = None,
+        should_abort: Callable[[], bool] | None = None,
+        prior_seen_hashes: set[str] | None = None,
+        budget: Any | None = None,
     ) -> SearchResult:
         """Execute the search loop with all registered strategies."""
         from pathlib import Path
@@ -163,14 +166,21 @@ class SearchOrchestrator:
         start_round = 0
         restored_catalog: FactorCatalog | None = None
         if resume_from and self._checkpoint_manager:
+            from .checkpoint import SearchCheckpoint
+
             ckpt_path = Path(resume_from)
-            if ckpt_path.exists():
+            if ckpt_path.exists() and SearchCheckpoint.verify_integrity(ckpt_path):
                 restored_catalog, saved_state = self._checkpoint_manager.restore_strategies(
                     ckpt_path,
                     self.strategies,
                 )
                 start_round = saved_state.get("round_idx", -1) + 1
                 logger.info("search.resume from round={}", start_round)
+            elif ckpt_path.exists():
+                logger.warning(
+                    "search.resume skipped — checkpoint integrity check failed path={}",
+                    ckpt_path,
+                )
 
         # Build shared evaluator for strategies
         evaluator = None
@@ -206,10 +216,20 @@ class SearchOrchestrator:
             total_rejected=0,
             batch_size=batch_size,
             factor_catalog=restored_catalog or FactorCatalog(),
+            budget=budget,
         )
 
         if start_round > 0:
             ctx.round_idx = start_round
+
+        # Preload cross-cycle memory: prevents re-evaluating previously-seen
+        # formulas in the next cycle even when the strategy re-generates them.
+        if prior_seen_hashes:
+            ctx.seen_hashes.update(h for h in prior_seen_hashes if h)
+            logger.info(
+                "search.prior_seen loaded count={}",
+                len(prior_seen_hashes),
+            )
 
         round_summaries: list[dict[str, Any]] = []
 
@@ -243,7 +263,20 @@ class SearchOrchestrator:
         _warm_start_active = False
         _WARM_MAX_ROUNDS = 3
 
+        aborted = False
+        budget_exhausted = False
         for round_idx in range(rounds):
+            if should_abort and should_abort():
+                logger.info("search.abort_requested round={} — exiting early", round_idx)
+                aborted = True
+                break
+            if ctx.budget is not None and ctx.budget.exhausted():
+                logger.warning(
+                    "search.budget_exhausted reasons={} — degrading gracefully",
+                    ctx.budget.exhausted_reasons,
+                )
+                budget_exhausted = True
+                break
             round_start = perf_counter()
             ctx.round_idx = round_idx
 
@@ -543,6 +576,9 @@ class SearchOrchestrator:
 
         pipeline.total_evaluations = ctx.total_evaluations
         pipeline.total_rejected = ctx.total_rejected
+        pipeline.aborted = aborted or budget_exhausted
+        pipeline.budget_exhausted = budget_exhausted
+        pipeline.budget_snapshot = ctx.budget.snapshot() if ctx.budget is not None else None
 
         # --- result ---
         archive_list = sorted(ctx.archive.values(), key=lambda x: x.fitness, reverse=True)
@@ -619,6 +655,8 @@ class SearchOrchestrator:
                 )
 
         ctx.total_evaluations += len(individuals)
+        if ctx.budget is not None:
+            ctx.budget.record_eval(len(individuals))
 
         # Diagnostic: log fitness distribution for rejected batches
         if individuals:

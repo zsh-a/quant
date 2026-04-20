@@ -52,6 +52,7 @@ export const AlphaLabWorkspace: React.FC<AlphaLabWorkspaceProps> = ({ onViewSess
   const symList = useCallback(() => symbols.split(',').map(s => s.trim()).filter(Boolean), [symbols])
 
   const handleMarketChange = useCallback((m: string) => {
+    if (m === market) return
     setMarket(m)
     const preset = marketPresets[m] ?? {}
     const newIntervals = preset.intervals ?? []
@@ -67,7 +68,15 @@ export const AlphaLabWorkspace: React.FC<AlphaLabWorkspaceProps> = ({ onViewSess
       setUniverse(null); setExcludeST(false)
       setStartTime(lookback)
     }
-  }, [marketPresets, ws])
+    // Transparency: the cascade reset affects every sibling tab. Tell the user
+    // explicitly so chrome state changes don't feel ghostly.
+    void import('sonner').then(({ toast }) => {
+      toast.info(`Market → ${MARKET_LABELS[m] ?? m}`, {
+        description: '已重置 symbols / universe / exclude_ST / interval，其他标签页的数据范围参数已同步。',
+        duration: 4000,
+      })
+    }).catch(() => { /* sonner not available — silent fallback */ })
+  }, [market, marketPresets, ws])
 
   const loadWorkspace = useCallback(async () => {
     try {

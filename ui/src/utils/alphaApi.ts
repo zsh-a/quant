@@ -59,13 +59,18 @@ export const alphaApi = {
 
   // Search
   submitSearch: (params: Record<string, unknown>) =>
-    post<{ job_id: string; status: string }>('/alpha-lab/search-db', params),
+    post<{ job_id: string; status: string; request_id?: string }>('/alpha-lab/search-db', params),
 
   getSearchJob: (jobId: string) =>
     request<AlphaLabSearchJob>(`/alpha-lab/search-jobs/${jobId}`),
 
   listSearchJobs: () =>
     request<{ jobs: AlphaLabSearchJob[] }>('/alpha-lab/search-jobs'),
+
+  cancelSearchJob: (jobId: string) =>
+    post<{ job_id: string; status: string; already_settled?: boolean }>(
+      `/alpha-lab/search-jobs/${jobId}/cancel`, {},
+    ),
 
   getSearchPipeline: (jobId: string) =>
     request<{ pipeline: AlphaPipelineRecord | null }>(`/alpha-lab/search-jobs/${jobId}/pipeline`),
@@ -79,6 +84,23 @@ export const alphaApi = {
   listZoo: (limit = 50) => request<{ entries: AlphaLabZooEntry[] }>(`/alpha-lab/zoo?limit=${limit}`),
   saveToZoo: (params: Record<string, unknown>) => post<AlphaLabZooEntry>('/alpha-lab/zoo', params),
 
+  promoteZooToSimulation: (factorId: string, params: Record<string, unknown>) =>
+    post<{ job_id: string; source_zoo_factor_id: string; job: Record<string, unknown> }>(
+      `/alpha-lab/zoo/${encodeURIComponent(factorId)}/promote-to-simulation`, params,
+    ),
+
+  // Lineage
+  getLineage: (kind: string, nodeId: string, maxDepth = 4) =>
+    request<{
+      root: { kind: string; id: string }
+      nodes: { kind: string; id: string }[]
+      edges: {
+        parent_kind: string; parent_id: string;
+        child_kind: string; child_id: string;
+        relation: string; meta: Record<string, unknown>
+      }[]
+    }>(`/alpha-lab/lineage/${encodeURIComponent(kind)}/${encodeURIComponent(nodeId)}?max_depth=${maxDepth}`),
+
   // Runs
   listRuns: (limit = 20) => request<{ runs: unknown[] }>(`/alpha-lab/runs?limit=${limit}`),
   getRun: (runId: string) => request<AlphaLabRunDetail>(`/alpha-lab/runs/${runId}`),
@@ -91,6 +113,14 @@ export const alphaApi = {
   getTracingSummary: () => request<Record<string, unknown>>('/alpha-lab/tracing/summary'),
   getTracingSpans: (limit = 50) =>
     request<{ spans: unknown[]; total: number }>(`/alpha-lab/tracing/spans?limit=${limit}`),
+  getTracingByRequest: (requestId: string) =>
+    request<{ request_id: string; spans: Record<string, unknown>[]; total: number; enabled: boolean }>(
+      `/alpha-lab/tracing/request/${encodeURIComponent(requestId)}`,
+    ),
+  listTracingRequests: (limit = 50) =>
+    request<{ requests: string[]; total: number; enabled: boolean }>(
+      `/alpha-lab/tracing/requests?limit=${limit}`,
+    ),
 
   // Neural
   getNeuralHistory: () => request<AlphaLabTrainingHistory>('/alpha-lab/neural/history'),

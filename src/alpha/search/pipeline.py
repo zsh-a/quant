@@ -129,6 +129,9 @@ class PipelineRecord:
     rounds: list[RoundRecord] = field(default_factory=list)
     total_evaluations: int = 0
     total_rejected: int = 0
+    aborted: bool = False
+    budget_exhausted: bool = False
+    budget_snapshot: dict[str, Any] | None = None
 
     def to_dict(self) -> dict[str, Any]:
         return {
@@ -136,6 +139,9 @@ class PipelineRecord:
             "rounds": [r.to_dict() for r in self.rounds],
             "total_evaluations": self.total_evaluations,
             "total_rejected": self.total_rejected,
+            "aborted": self.aborted,
+            "budget_exhausted": self.budget_exhausted,
+            "budget_snapshot": self.budget_snapshot,
         }
 
 

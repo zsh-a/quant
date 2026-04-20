@@ -75,6 +75,7 @@ class BaseStrategy(ABC):
                     is_novel=True,
                     round_idx=ctx.round_idx,
                     all_fields=ctx.schema.fields,
+                    strategy=self.name,
                 )
 
     def get_stats(self) -> dict[str, Any]:

@@ -5,7 +5,7 @@
  * useSearchJobs (in workspace) and survives page refresh via backend recovery.
  */
 import React, { useCallback, useMemo, useState } from 'react'
-import { ChevronRight, Info, Loader2, Settings2, X, Zap } from 'lucide-react'
+import { ChevronRight, Info, Loader2, RotateCcw, Settings2, StopCircle, X, Zap } from 'lucide-react'
 import type { AlphaLabSearchJob, AlphaLabWorkspace as WorkspacePayload, StrategyModeInfo } from '../../types'
 import type { SearchJobsState } from '../../hooks/useSearchJobs'
 import { SectionCard } from '../layout/SectionCard'
@@ -15,6 +15,7 @@ import { Badge } from '../ui/badge'
 import { SearchProgress } from './SearchProgress'
 import { LLMAnalysis } from './LLMAnalysis'
 import { DataScopeSection } from './DataScopeSection'
+import { JobsDashboard } from './JobsDashboard'
 import { toISO } from './shared'
 
 /* ── Strategy descriptions (fallback when backend unavailable) ────── */
@@ -63,6 +64,55 @@ const ALL_SEARCH_PARAMS: ParamDef[] = [
   { key: 'enumMax',    label: 'Enum Total',       hint: 'Round 0 程序化枚举的公式总数', min: 50, max: 5000, step: 100 },
   { key: 'enumTopK',   label: 'Enum Top-K',       hint: '枚举后经 fast-IC 筛选保留的数量', min: 5, max: 200 },
   { key: 'neuralBatch', label: 'Neural Batch',    hint: '每步 Transformer 采样的 RPN 序列数', min: 64, max: 8192 },
+]
+
+/* ── Search presets ────────────────────────────────────────────────── */
+
+export interface SearchPreset {
+  key: string
+  label: string
+  hint: string
+  strategy: string
+  params: Record<string, number>
+  budget?: { max_wall_time_sec?: number; max_full_eval?: number; max_llm_tokens?: number }
+}
+
+export const SEARCH_PRESETS: SearchPreset[] = [
+  {
+    key: 'quick', label: '快速扫描',
+    hint: '~2 分钟出结果，小种群 + 1-2 轮；适合试水或因子草稿验证',
+    strategy: 'evolution',
+    params: { popSize: 4, offspring: 2, gens: 2, topK: 3, nSplits: 3, enumMax: 200, enumTopK: 10, neuralBatch: 2048 },
+    budget: { max_wall_time_sec: 180, max_full_eval: 80 },
+  },
+  {
+    key: 'balanced', label: '平衡探索 (推荐)',
+    hint: '~10 分钟，中等种群 + 3 轮进化；大多数研究场景的默认选择',
+    strategy: 'evolution',
+    params: { popSize: 8, offspring: 4, gens: 3, topK: 5, nSplits: 5, enumMax: 500, enumTopK: 30, neuralBatch: 4096 },
+    budget: { max_wall_time_sec: 900, max_full_eval: 400 },
+  },
+  {
+    key: 'deep', label: '深度探索',
+    hint: '~30 分钟以上，大种群 + 8 轮 + 更严 CPCV；用于最终选因子',
+    strategy: 'evolution',
+    params: { popSize: 16, offspring: 8, gens: 8, topK: 10, nSplits: 7, enumMax: 2000, enumTopK: 60, neuralBatch: 4096 },
+    budget: { max_wall_time_sec: 2400, max_full_eval: 1500 },
+  },
+  {
+    key: 'mcts', label: 'MCTS 精炼',
+    hint: '枚举+LLM+MCTS 三段式，适合有明确前辈因子想精修时使用',
+    strategy: 'mcts',
+    params: { popSize: 8, offspring: 4, gens: 4, topK: 5, nSplits: 5, enumMax: 500, enumTopK: 30, neuralBatch: 4096 },
+    budget: { max_wall_time_sec: 1200 },
+  },
+  {
+    key: 'neural', label: 'Neural 大批量',
+    hint: 'Transformer + REINFORCE 纯神经网络搜索，适合数据量大的市场',
+    strategy: 'neural',
+    params: { popSize: 4, offspring: 4, gens: 6, topK: 8, nSplits: 5, enumMax: 0, enumTopK: 0, neuralBatch: 8192 },
+    budget: { max_wall_time_sec: 1800 },
+  },
 ]
 
 /* ── Labeled input with tooltip ────────────────────────────────────── */
@@ -117,6 +167,11 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   const [searchSeeds, setSearchSeeds] = useState('')
   const [strategy, setStrategy] = useState<string>('evolution')
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [presetKey, setPresetKey] = useState<string>('balanced')
+  const activePreset = useMemo(
+    () => SEARCH_PRESETS.find(p => p.key === presetKey) ?? SEARCH_PRESETS[1],
+    [presetKey],
+  )
 
   // Strategy modes loaded from backend (or fallback)
   const modes: StrategyModeInfo[] = ws?.strategy_modes_info?.length
@@ -135,6 +190,14 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   })
   const setParam = useCallback((key: string, value: number) => {
     setParams(prev => ({ ...prev, [key]: value }))
+  }, [])
+
+  const applyPreset = useCallback((key: string) => {
+    setPresetKey(key)
+    const preset = SEARCH_PRESETS.find(p => p.key === key)
+    if (!preset) return
+    setStrategy(preset.strategy)
+    setParams(prev => ({ ...prev, ...preset.params }))
   }, [])
 
   // Estimated search volume based on active strategies
@@ -156,15 +219,44 @@ export const SearchTab: React.FC<SearchTabProps> = ({
         population_size: params.popSize, offspring_count: params.offspring, generations: params.gens,
         top_k: params.topK, n_splits: params.nSplits, persist: true, strategy,
         neural_batch: params.neuralBatch, enum_max: params.enumMax, enum_top_k: params.enumTopK,
+        ...(activePreset.budget?.max_wall_time_sec ? { max_wall_time_sec: activePreset.budget.max_wall_time_sec } : {}),
+        ...(activePreset.budget?.max_full_eval ? { max_full_eval: activePreset.budget.max_full_eval } : {}),
+        ...(activePreset.budget?.max_llm_tokens ? { max_llm_tokens: activePreset.budget.max_llm_tokens } : {}),
         ...(universe ? { universe } : {}),
         ...(excludeST ? { exclude_st: true } : {}),
       })
     } catch (e) { setErr(e instanceof Error ? e.message : 'Search submit failed') }
-  }, [formula, interval, startTime, endTime, searchSeeds, params, symList, strategy, market, universe, excludeST, setErr, searchJobs])
+  }, [formula, interval, startTime, endTime, searchSeeds, params, symList, strategy, market, universe, excludeST, setErr, searchJobs, activePreset])
 
   return (
     <div className="space-y-6">
       <SectionCard title="Alpha Search" description="Configure and run automated factor discovery.">
+
+        {/* ── Preset selector ── */}
+        <div className="space-y-2">
+          <label className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+            Preset
+          </label>
+          <div className="flex flex-wrap gap-2">
+            {SEARCH_PRESETS.map(p => (
+              <button
+                key={p.key}
+                type="button"
+                onClick={() => applyPreset(p.key)}
+                className={
+                  'rounded-lg border px-3 py-1.5 text-xs transition ' +
+                  (p.key === presetKey
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border/50 bg-secondary/30 text-muted-foreground hover:text-foreground')
+                }
+                title={p.hint}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+          <div className="text-[11px] text-muted-foreground">{activePreset.hint}</div>
+        </div>
 
         {/* ── Strategy selector + description ── */}
         <div className="space-y-3">
@@ -273,6 +365,9 @@ export const SearchTab: React.FC<SearchTabProps> = ({
         </div>
       </SectionCard>
 
+      {/* ── Jobs dashboard (compact summary) ── */}
+      <JobsDashboard searchJobs={searchJobs} />
+
       {/* ── Job list ── */}
       {searchJobs.jobs.length > 0 && (
         <div className="space-y-4">
@@ -281,7 +376,14 @@ export const SearchTab: React.FC<SearchTabProps> = ({
               key={job.job_id}
               job={job}
               onLoadFormula={onLoadFormula}
-              onDismiss={() => searchJobs.dismiss(job.job_id)}
+              onApplySeeds={(seeds) => setSearchSeeds(prev => {
+                const existing = prev.split('\n').map(s => s.trim()).filter(Boolean)
+                const merged = Array.from(new Set([...existing, ...seeds]))
+                return merged.join('\n')
+              })}
+              onCancel={() => searchJobs.cancel(job.job_id)}
+              onHide={() => searchJobs.hide(job.job_id)}
+              onRetry={() => searchJobs.retry(job.job_id)}
             />
           ))}
         </div>
@@ -290,35 +392,109 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   )
 }
 
-/* ── Job card: wraps SearchProgress + dismiss button ────────────────── */
+/* ── Job card: wraps SearchProgress + cancel/retry/hide controls ─── */
 
-function JobCard({ job, onLoadFormula, onDismiss }: {
+function JobCard({ job, onLoadFormula, onApplySeeds, onCancel, onHide, onRetry }: {
   job: AlphaLabSearchJob
   onLoadFormula: (f: string) => void
-  onDismiss: () => void
+  onApplySeeds: (seeds: string[]) => void
+  onCancel: () => Promise<void>
+  onHide: () => void
+  onRetry: () => Promise<string | null>
 }) {
   const isActive = job.status === 'pending' || job.status === 'running'
+  const isCancelling = job.status === 'cancelling'
   const isCompleted = job.status === 'completed'
+  const isFailed = job.status === 'failed'
+  const isCancelled = job.status === 'cancelled'
   const [showAnalysis, setShowAnalysis] = useState(false)
+  const [confirmingCancel, setConfirmingCancel] = useState(false)
+  const [retrying, setRetrying] = useState(false)
+
+  const handleCancel = async () => {
+    setConfirmingCancel(false)
+    await onCancel()
+  }
+
+  const handleRetry = async () => {
+    setRetrying(true)
+    try { await onRetry() } finally { setRetrying(false) }
+  }
 
   return (
     <div className="relative">
-      {/* Dismiss button */}
-      {!isActive && (
-        <button
-          onClick={onDismiss}
-          className="absolute right-3 top-3 z-10 rounded-lg p-1 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
-          title="Dismiss"
-        >
-          <X className="size-3.5" />
-        </button>
-      )}
+      {/* Right-rail controls */}
+      <div className="absolute right-3 top-3 z-10 flex items-center gap-1">
+        {isActive && !confirmingCancel && (
+          <button
+            onClick={() => setConfirmingCancel(true)}
+            className="rounded-lg px-2 py-1 text-[11px] text-red-400 hover:text-red-300 hover:bg-red-500/10 transition flex items-center gap-1"
+            title="Cancel this running search"
+          >
+            <StopCircle className="size-3.5" />
+            Cancel
+          </button>
+        )}
+        {isActive && confirmingCancel && (
+          <div className="flex items-center gap-1 rounded-lg bg-red-500/10 border border-red-500/30 px-2 py-1 text-[11px]">
+            <span className="text-red-300">Stop this search?</span>
+            <button
+              onClick={() => void handleCancel()}
+              className="rounded px-1.5 py-0.5 text-red-200 hover:bg-red-500/20 transition font-medium"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => setConfirmingCancel(false)}
+              className="rounded px-1.5 py-0.5 text-muted-foreground hover:bg-secondary/60 transition"
+            >
+              No
+            </button>
+          </div>
+        )}
+        {isCancelling && (
+          <span className="text-[11px] text-amber-400 flex items-center gap-1">
+            <Loader2 className="size-3 animate-spin" />
+            cancelling…
+          </span>
+        )}
+        {isFailed && (
+          <button
+            onClick={() => void handleRetry()}
+            disabled={retrying}
+            className="rounded-lg px-2 py-1 text-[11px] text-blue-300 hover:text-blue-200 hover:bg-blue-500/10 transition flex items-center gap-1 disabled:opacity-50"
+            title="Re-submit using the original parameters"
+          >
+            <RotateCcw className={`size-3.5 ${retrying ? 'animate-spin' : ''}`} />
+            Retry
+          </button>
+        )}
+        {!isActive && (
+          <button
+            onClick={onHide}
+            className="rounded-lg p-1 text-muted-foreground hover:text-foreground hover:bg-secondary/60 transition"
+            title="Hide from the list (does not cancel)"
+          >
+            <X className="size-3.5" />
+          </button>
+        )}
+      </div>
 
       {/* Job header badge */}
       <div className="mb-1 flex items-center gap-2 text-[10px] text-muted-foreground">
-        {isActive && <Loader2 className="size-3 animate-spin text-blue-400" />}
+        {(isActive || isCancelling) && <Loader2 className="size-3 animate-spin text-blue-400" />}
         <span className="font-mono">{job.job_id}</span>
         {job.strategy && <Badge variant="info" className="text-[9px] px-1.5 py-0">{job.strategy}</Badge>}
+        {job.request_id && (
+          <a
+            href={`#/tracing/${job.request_id}`}
+            className="font-mono text-[9px] text-muted-foreground/60 hover:text-foreground transition"
+            title="Open trace for this request"
+          >
+            trace:{job.request_id.slice(0, 8)}
+          </a>
+        )}
+        {isCancelled && <span className="text-amber-400">cancelled</span>}
         {job.created_at && <span>{new Date(job.created_at).toLocaleTimeString()}</span>}
       </div>
 
@@ -333,7 +509,7 @@ function JobCard({ job, onLoadFormula, onDismiss }: {
               </Button>
             </div>
           )}
-          {showAnalysis && <LLMAnalysis jobId={job.job_id} onApplySeeds={() => {}} />}
+          {showAnalysis && <LLMAnalysis jobId={job.job_id} onApplySeeds={onApplySeeds} />}
         </>
       )}
     </div>

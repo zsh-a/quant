@@ -83,8 +83,38 @@ class SearchCheckpoint:
         return checkpoint_dir
 
     @classmethod
+    def verify_integrity(cls, checkpoint_dir: Path) -> bool:
+        """Best-effort check that the checkpoint directory is loadable.
+
+        Catches the common rot modes: missing manifest, truncated JSON,
+        missing strategy weight files referenced by the manifest. Returns
+        False on any detected issue so callers can fall back.
+        """
+        try:
+            manifest_path = checkpoint_dir / "manifest.json"
+            if not manifest_path.exists():
+                return False
+            manifest = json.loads(manifest_path.read_text())
+            catalog_path = checkpoint_dir / "factor_catalog.json"
+            if not catalog_path.exists():
+                return False
+            json.loads(catalog_path.read_text())  # force parse
+            for name in manifest.get("strategy_names", []):
+                safe = name.replace("/", "_")
+                meta_path = checkpoint_dir / f"strategy_{safe}.meta.json"
+                if not meta_path.exists():
+                    return False
+                meta = json.loads(meta_path.read_text())
+                data_path = checkpoint_dir / f"strategy_{safe}.{meta['format']}"
+                if not data_path.exists():
+                    return False
+        except Exception:
+            return False
+        return True
+
+    @classmethod
     def load(cls, checkpoint_dir: Path) -> SearchCheckpoint:
-        """Read checkpoint from disk."""
+        """Read checkpoint from disk. Raises on corruption — use verify_integrity first."""
         manifest = json.loads((checkpoint_dir / "manifest.json").read_text())
         catalog_json = json.loads((checkpoint_dir / "factor_catalog.json").read_text())
 

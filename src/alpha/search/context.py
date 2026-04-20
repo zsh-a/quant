@@ -7,11 +7,13 @@ Provides:
   - ``StatefulStrategy`` — optional protocol for strategies with saveable state
   - ``StrategySnapshot`` — serialized state from one strategy
   - ``FactorCatalog`` — queryable registry of all factors across strategies
+  - ``BudgetTracker`` — bounded tokens/evaluations/wall-time per cycle
   - ``build_individual`` — compile a formula into an Individual
 """
 
 from __future__ import annotations
 
+import time
 from collections import defaultdict, deque
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Protocol, runtime_checkable
@@ -322,6 +324,91 @@ class SearchStrategy(Protocol):
 
 
 @dataclass
+class BudgetTracker:
+    """Budget ledger shared across strategies in one search cycle.
+
+    Strategies call ``reserve_*`` before expensive operations and
+    ``record_*`` as they consume. Orchestrator checks ``exhausted``
+    at each stage boundary and degrades gracefully when tripped.
+
+    Unlimited when a cap is set to ``0`` (the default).
+    """
+
+    max_llm_tokens: int = 0
+    max_full_eval: int = 0
+    max_wall_time_sec: float = 0.0
+    max_cost_usd: float = 0.0
+
+    # Running consumption
+    used_llm_tokens: int = 0
+    used_full_eval: int = 0
+    used_cost_usd: float = 0.0
+    start_time: float = field(default_factory=time.time)
+
+    # Labels for the *first* budget that was tripped
+    exhausted_reasons: list[str] = field(default_factory=list)
+
+    def elapsed_sec(self) -> float:
+        return time.time() - self.start_time
+
+    def remaining_wall_sec(self) -> float:
+        if self.max_wall_time_sec <= 0:
+            return float("inf")
+        return max(0.0, self.max_wall_time_sec - self.elapsed_sec())
+
+    def remaining_full_eval(self) -> int:
+        if self.max_full_eval <= 0:
+            return 10**9
+        return max(0, self.max_full_eval - self.used_full_eval)
+
+    def remaining_tokens(self) -> int:
+        if self.max_llm_tokens <= 0:
+            return 10**9
+        return max(0, self.max_llm_tokens - self.used_llm_tokens)
+
+    def remaining_cost(self) -> float:
+        if self.max_cost_usd <= 0:
+            return float("inf")
+        return max(0.0, self.max_cost_usd - self.used_cost_usd)
+
+    def record_llm(self, tokens: int = 0, cost_usd: float = 0.0) -> None:
+        self.used_llm_tokens += max(0, int(tokens))
+        self.used_cost_usd += max(0.0, float(cost_usd))
+
+    def record_eval(self, n: int) -> None:
+        self.used_full_eval += max(0, int(n))
+
+    def exhausted(self) -> bool:
+        reasons: list[str] = []
+        if self.max_wall_time_sec > 0 and self.elapsed_sec() >= self.max_wall_time_sec:
+            reasons.append("wall_time")
+        if self.max_full_eval > 0 and self.used_full_eval >= self.max_full_eval:
+            reasons.append("full_eval")
+        if self.max_llm_tokens > 0 and self.used_llm_tokens >= self.max_llm_tokens:
+            reasons.append("llm_tokens")
+        if self.max_cost_usd > 0 and self.used_cost_usd >= self.max_cost_usd:
+            reasons.append("cost_usd")
+        if reasons and not self.exhausted_reasons:
+            self.exhausted_reasons = reasons
+        return bool(reasons)
+
+    def snapshot(self) -> dict[str, Any]:
+        return {
+            "max_llm_tokens": self.max_llm_tokens,
+            "max_full_eval": self.max_full_eval,
+            "max_wall_time_sec": self.max_wall_time_sec,
+            "max_cost_usd": self.max_cost_usd,
+            "used_llm_tokens": self.used_llm_tokens,
+            "used_full_eval": self.used_full_eval,
+            "used_cost_usd": round(self.used_cost_usd, 6),
+            "elapsed_sec": round(self.elapsed_sec(), 2),
+            "remaining_wall_sec": (round(self.remaining_wall_sec(), 2) if self.max_wall_time_sec > 0 else None),
+            "exhausted": self.exhausted(),
+            "exhausted_reasons": list(self.exhausted_reasons),
+        }
+
+
+@dataclass
 class SearchContext:
     """Shared state accessible to all strategies via a single object.
 
@@ -367,6 +454,9 @@ class SearchContext:
 
     # --- factor catalog (unified factor tracking) ---
     factor_catalog: FactorCatalog | None = None
+
+    # --- budget ledger (cost / tokens / wall-time) ---
+    budget: BudgetTracker | None = None
 
 
 # ---------------------------------------------------------------------------

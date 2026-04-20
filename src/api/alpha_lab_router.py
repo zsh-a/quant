@@ -15,7 +15,12 @@ from pydantic import BaseModel, Field
 
 from src.alpha import AlphaService
 from src.alpha.core.market import list_market_types
-from src.alpha.infra.tracing import InMemoryCollector, tracer
+from src.alpha.infra.tracing import (
+    InMemoryCollector,
+    jsonl_collector,
+    request_scope,
+    tracer,
+)
 from src.alpha.search.pipeline import RoundRecord, StageRecord
 from src.config.paths import SEARCH_JOBS_STATE_PATH
 from src.config.settings import get_alpha_lab_config, get_bitget_config, get_crypto_market_config
@@ -41,6 +46,15 @@ tracer.add_collector(_memory_collector)
 
 _SEARCH_JOBS: dict[str, dict[str, Any]] = {}
 _SEARCH_EVENTS: dict[str, asyncio.Queue[dict[str, Any]]] = {}
+
+# Cancellation signal per job_id; set from /cancel endpoint, polled by search
+import threading as _threading  # noqa: E402
+
+_SEARCH_CANCEL: dict[str, _threading.Event] = {}
+
+
+class SearchCancelled(Exception):
+    """Raised when an in-flight search detects a cancel request."""
 
 
 def _persist_search_jobs() -> None:
@@ -92,6 +106,7 @@ def _run_search_job(
     job_id: str,
     params: dict[str, Any],
     loop: asyncio.AbstractEventLoop | None = None,
+    request_id: str | None = None,
 ) -> None:
     """Execute search in background thread — updates _SEARCH_JOBS in-place."""
     queue = _SEARCH_EVENTS.get(job_id)
@@ -106,37 +121,80 @@ def _run_search_job(
     def _on_round(round_rec: RoundRecord) -> None:
         _push({"type": "round", "data": round_rec.to_dict()})
 
-    try:
-        _SEARCH_JOBS[job_id]["status"] = "running"
-        market = params.pop("market", "crypto")
-        strategy = params.pop("strategy", "")
-        neural_batch = params.pop("neural_batch", 4096)
-        enum_max = params.pop("enum_max", 500)
-        enum_top_k = params.pop("enum_top_k", 30)
-        logger.info("alpha.search creating service strategy={!r} market={!r}", strategy, market)
-        svc = AlphaService(
-            market=market,
-            strategy=strategy,
-            neural_sample_batch=neural_batch,
-            enum_max=enum_max,
-            enum_top_k=enum_top_k,
-        )
-        logger.info("alpha.search strategies={}", [s.name for s in svc.search_engine.strategies])
-        result = svc.search_formulas_on_db(
-            **params,
-            job_id=job_id,
-            on_stage_complete=_on_stage,
-            on_round_complete=_on_round,
-        )
-        _SEARCH_JOBS[job_id].update(status="completed", result=result)
-        _push({"type": "complete", "data": {"status": "completed"}})
-        _persist_search_jobs()
-        logger.info("alpha.search job={} completed", job_id)
-    except Exception as exc:
-        _SEARCH_JOBS[job_id].update(status="failed", error=str(exc))
-        _push({"type": "complete", "data": {"status": "failed", "error": str(exc)}})
-        _persist_search_jobs()
-        logger.error("alpha.search job={} failed: {}", job_id, exc)
+    job_record = _SEARCH_JOBS.get(job_id) or {}
+    job_record["status"] = "running"
+    if request_id:
+        job_record["request_id"] = request_id
+    _SEARCH_JOBS[job_id] = job_record
+
+    cancel_event = _SEARCH_CANCEL.get(job_id)
+
+    with request_scope(request_id):
+        try:
+            if cancel_event is not None and cancel_event.is_set():
+                raise SearchCancelled(f"Job {job_id} cancelled before start")
+            market = params.pop("market", "crypto")
+            strategy = params.pop("strategy", "")
+            neural_batch = params.pop("neural_batch", 4096)
+            enum_max = params.pop("enum_max", 500)
+            enum_top_k = params.pop("enum_top_k", 30)
+            budget_caps = params.pop("budget_caps", None) or {}
+            budget = None
+            if any(
+                budget_caps.get(k, 0) for k in ("max_llm_tokens", "max_full_eval", "max_wall_time_sec", "max_cost_usd")
+            ):
+                from src.alpha.search.context import BudgetTracker
+
+                budget = BudgetTracker(
+                    max_llm_tokens=int(budget_caps.get("max_llm_tokens", 0) or 0),
+                    max_full_eval=int(budget_caps.get("max_full_eval", 0) or 0),
+                    max_wall_time_sec=float(budget_caps.get("max_wall_time_sec", 0) or 0),
+                    max_cost_usd=float(budget_caps.get("max_cost_usd", 0) or 0),
+                )
+            logger.info(
+                "alpha.search creating service strategy={!r} market={!r} request_id={}",
+                strategy,
+                market,
+                request_id,
+            )
+            svc = AlphaService(
+                market=market,
+                strategy=strategy,
+                neural_sample_batch=neural_batch,
+                enum_max=enum_max,
+                enum_top_k=enum_top_k,
+            )
+            logger.info("alpha.search strategies={}", [s.name for s in svc.search_engine.strategies])
+
+            def _should_abort() -> bool:
+                evt = _SEARCH_CANCEL.get(job_id)
+                return bool(evt and evt.is_set())
+
+            result = svc.search_formulas_on_db(
+                **params,
+                job_id=job_id,
+                on_stage_complete=_on_stage,
+                on_round_complete=_on_round,
+                should_abort=_should_abort,
+                budget=budget,
+            )
+            status = "cancelled" if (cancel_event and cancel_event.is_set()) else "completed"
+            _SEARCH_JOBS[job_id].update(status=status, result=result)
+            _push({"type": "complete", "data": {"status": status}})
+            _persist_search_jobs()
+            logger.info("alpha.search job={} {} request_id={}", job_id, status, request_id)
+        except SearchCancelled as exc:
+            _SEARCH_JOBS[job_id].update(status="cancelled", error=str(exc))
+            _push({"type": "complete", "data": {"status": "cancelled", "error": str(exc)}})
+            _persist_search_jobs()
+            logger.info("alpha.search job={} cancelled: {}", job_id, exc)
+        except Exception as exc:
+            _SEARCH_JOBS[job_id].update(status="failed", error=str(exc))
+            _push({"type": "complete", "data": {"status": "failed", "error": str(exc)}})
+            _persist_search_jobs()
+            logger.error("alpha.search job={} failed: {}", job_id, exc)
+        finally:
+            _SEARCH_CANCEL.pop(job_id, None)
 
 
 # ---------------------------------------------------------------------------
@@ -187,6 +245,11 @@ class SearchDbRequest(BaseModel):
     neural_batch: int = 4096
     enum_max: int = 500  # max formulas to enumerate (round 0)
     enum_top_k: int = 30  # top-K from enumeration to keep
+    # Budget caps (0 = unlimited)
+    max_llm_tokens: int = 0
+    max_full_eval: int = 0
+    max_wall_time_sec: float = 0.0
+    max_cost_usd: float = 0.0
 
 
 class CombineZooRequest(BaseModel):
@@ -387,18 +450,27 @@ async def submit_search(request: SearchDbRequest, background_tasks: BackgroundTa
         "universe": request.universe,
         "strategy": request.strategy,
         "neural_batch": request.neural_batch,
+        "budget_caps": {
+            "max_llm_tokens": request.max_llm_tokens,
+            "max_full_eval": request.max_full_eval,
+            "max_wall_time_sec": request.max_wall_time_sec,
+            "max_cost_usd": request.max_cost_usd,
+        },
     }
+    request_id = f"req_{uuid.uuid4().hex[:16]}"
     _SEARCH_JOBS[job_id] = {
         "status": "pending",
         "params": {k: str(v) if isinstance(v, datetime) else v for k, v in params.items()},
         "result": None,
         "error": None,
         "created_at": datetime.utcnow().isoformat(),
+        "request_id": request_id,
     }
     loop = asyncio.get_running_loop()
     _SEARCH_EVENTS[job_id] = asyncio.Queue()
-    background_tasks.add_task(_run_search_job, job_id, params, loop)
-    return {"job_id": job_id, "status": "pending"}
+    _SEARCH_CANCEL[job_id] = _threading.Event()
+    background_tasks.add_task(_run_search_job, job_id, params, loop, request_id)
+    return {"job_id": job_id, "status": "pending", "request_id": request_id}
 
 
 @router.get("/search-jobs/{job_id}")
@@ -472,6 +544,70 @@ async def get_run(run_id: str):
 @router.get("/zoo")
 async def list_zoo(limit: int = Query(default=50, ge=1, le=200)):
     return {"entries": _get_service().list_zoo(limit=limit)}
+
+
+class PromoteZooRequest(BaseModel):
+    factor_id: str  # canonical_hash (preferred) or expr_hash
+    name: str
+    strategy: str
+    symbol: str
+    start_date: str
+    end_date: str | None = None
+    params: dict[str, Any] = Field(default_factory=dict)
+    notification: dict[str, Any] = Field(default_factory=dict)
+    enabled: bool = True
+    schedule: str = "daily"
+
+
+@router.post("/zoo/{factor_id}/promote-to-simulation")
+async def promote_zoo_to_simulation(factor_id: str, request: PromoteZooRequest):
+    """Create a Simulation Job pre-filled with a Zoo factor's formula.
+
+    The new Simulation Job is lineage-linked back to the Zoo factor so
+    its future backtest metrics flow into the factor's ``live_metrics``
+    time-series.
+    """
+    svc = _get_service()
+    entry = svc.persistence.get_zoo_entry(factor_id)
+    if not entry:
+        raise HTTPException(status_code=404, detail="Zoo factor not found")
+
+    params = dict(request.params or {})
+    params["formula"] = entry["formula"]
+    params.setdefault("zoo_factor_id", factor_id)
+
+    from src.automation.service import AutomationService
+
+    automation = AutomationService()
+    job = automation.create_job(
+        name=request.name,
+        strategy=request.strategy,
+        symbol=request.symbol,
+        start_date=request.start_date,
+        end_date=request.end_date,
+        params=params,
+        notification=request.notification,
+        enabled=request.enabled,
+        schedule=request.schedule,
+        source_zoo_factor_id=entry.get("canonical_hash") or factor_id,
+    )
+    return {
+        "job_id": job["job_id"],
+        "source_zoo_factor_id": entry.get("canonical_hash") or factor_id,
+        "job": job,
+    }
+
+
+@router.get("/lineage/{kind}/{node_id}")
+async def get_lineage_graph(kind: str, node_id: str, max_depth: int = Query(default=4, ge=1, le=8)):
+    """Return the upstream + downstream lineage DAG rooted at ``node_id``."""
+    from session_db import SessionDB
+
+    try:
+        graph = SessionDB().get_lineage_graph(kind, node_id, max_depth=max_depth)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return graph
 
 
 @router.post("/zoo")
@@ -665,6 +801,31 @@ async def run_event_backtest(request: EventBacktestRequest, background_tasks: Ba
 # --- SSE: real-time search progress ---
 
 
+@router.post("/search-jobs/{job_id}/cancel")
+async def cancel_search_job(job_id: str):
+    """Request graceful cancellation of a running search job.
+
+    Sets the cancel event; the orchestrator polls it at round boundaries
+    and exits, saving partial results. Idempotent.
+    """
+    job = _SEARCH_JOBS.get(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if job.get("status") not in ("pending", "running"):
+        return {"job_id": job_id, "status": job.get("status"), "already_settled": True}
+    event = _SEARCH_CANCEL.setdefault(job_id, _threading.Event())
+    event.set()
+    job["status"] = "cancelling"
+    queue = _SEARCH_EVENTS.get(job_id)
+    if queue is not None:
+        try:
+            queue.put_nowait({"type": "status", "data": {"status": "cancelling"}})
+        except Exception:
+            pass
+    logger.info("alpha.search cancel requested job={}", job_id)
+    return {"job_id": job_id, "status": "cancelling"}
+
+
 @router.get("/search-jobs/{job_id}/events")
 async def stream_search_events(job_id: str):
     """SSE stream of pipeline stage/round events for a running search job."""
@@ -824,6 +985,34 @@ async def get_tracing_spans(
         "trace_id": trace_id or _memory_collector.latest_trace_id,
         "trace_ids": _memory_collector.trace_ids,
     }
+
+
+@router.get("/tracing/request/{request_id}")
+async def get_tracing_by_request(request_id: str):
+    """Aggregate all spans for a given request_id from the JSONL store.
+
+    Returns a flat list of span dicts (newest first). Useful for debugging
+    a specific search job end-to-end across the API → Celery → search boundary.
+    """
+    if jsonl_collector is None:
+        return {"request_id": request_id, "spans": [], "enabled": False}
+    spans = jsonl_collector.load_spans(request_id)
+    spans.sort(key=lambda s: s.get("start_time", 0), reverse=True)
+    return {
+        "request_id": request_id,
+        "spans": spans,
+        "total": len(spans),
+        "enabled": True,
+    }
+
+
+@router.get("/tracing/requests")
+async def list_tracing_requests(limit: int = Query(default=50, ge=1, le=500)):
+    """List known request_ids with JSONL traces on disk (newest first)."""
+    if jsonl_collector is None:
+        return {"requests": [], "enabled": False}
+    ids = jsonl_collector.list_request_ids()[:limit]
+    return {"requests": ids, "total": len(ids), "enabled": True}
 
 
 @router.get("/tracing/traces")

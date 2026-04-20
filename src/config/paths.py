@@ -32,6 +32,9 @@ SESSIONS_DB: Path = DATA_DIR / "sessions.db"
 ALPHA_DIR: Path = DATA_DIR / "alpha"
 ALPHA_RUNS_DIR: Path = ALPHA_DIR / "runs"
 ALPHA_ZOO_DIR: Path = ALPHA_DIR / "zoo"
+ALPHA_TRACES_DIR: Path = ALPHA_DIR / "traces"
+ALPHA_DLQ_DIR: Path = ALPHA_DIR / "dlq"
+ALPHA_STATE_DIR: Path = ALPHA_DIR / "state"
 
 # ── Alpha lab (experiments, training, checkpoints) ────────────────────────────
 
@@ -69,6 +72,9 @@ def ensure_data_dirs() -> None:
         LOGS_DIR,
         ALPHA_RUNS_DIR,
         ALPHA_ZOO_DIR,
+        ALPHA_TRACES_DIR,
+        ALPHA_DLQ_DIR,
+        ALPHA_STATE_DIR,
         ALPHA_LAB_DIR,
         ALPHA_LAB_CHECKPOINTS_DIR,
         ALPHA_LAB_NEURAL_DIR,

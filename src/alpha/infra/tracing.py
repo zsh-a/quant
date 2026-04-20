@@ -30,6 +30,7 @@ import uuid
 from contextvars import ContextVar
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Protocol
 
 from loguru import logger
@@ -63,6 +64,7 @@ class Span:
     end_time: float | None = None
     status: str = "ok"
     error: str | None = None
+    request_id: str | None = None
 
     # --- builder API ---
 
@@ -118,6 +120,8 @@ class Span:
             "duration_ms": round(self.duration_ms, 2),
             "start_time": self.start_time,
         }
+        if self.request_id:
+            d["request_id"] = self.request_id
         if self.error:
             d["error"] = self.error
         if self.attributes:
@@ -346,6 +350,68 @@ class LangfuseCollector:
             )
 
 
+class JsonlFileCollector:
+    """Appends spans as JSON-Lines to ``data/alpha/traces/{request_id}.jsonl``.
+
+    Spans without a ``request_id`` fall back to ``trace_id`` for the filename,
+    so every span remains discoverable.
+    """
+
+    def __init__(self, base_dir: Path | str | None = None) -> None:
+        from src.config.paths import ALPHA_TRACES_DIR
+
+        self._base = Path(base_dir) if base_dir else ALPHA_TRACES_DIR
+        self._base.mkdir(parents=True, exist_ok=True)
+
+    def _resolve_path(self, span: Span) -> Path:
+        key = span.request_id or span.trace_id
+        # Sanitize to safe filename
+        safe = "".join(c for c in str(key) if c.isalnum() or c in ("-", "_"))[:80] or "unknown"
+        return self._base / f"{safe}.jsonl"
+
+    def on_span_end(self, span: Span) -> None:
+        import json as _json
+
+        try:
+            path = self._resolve_path(span)
+            with path.open("a", encoding="utf-8") as fh:
+                fh.write(_json.dumps(span.to_dict(), ensure_ascii=False, default=str) + "\n")
+        except Exception as exc:
+            logger.debug("jsonl tracing write failed: {}", exc)
+
+    def list_request_ids(self) -> list[str]:
+        try:
+            return sorted(
+                (p.stem for p in self._base.glob("*.jsonl")),
+                key=lambda name: (self._base / f"{name}.jsonl").stat().st_mtime,
+                reverse=True,
+            )
+        except OSError:
+            return []
+
+    def load_spans(self, request_id: str) -> list[dict[str, Any]]:
+        import json as _json
+
+        safe = "".join(c for c in str(request_id) if c.isalnum() or c in ("-", "_"))[:80]
+        path = self._base / f"{safe}.jsonl"
+        if not path.exists():
+            return []
+        out: list[dict[str, Any]] = []
+        try:
+            with path.open("r", encoding="utf-8") as fh:
+                for line in fh:
+                    line = line.strip()
+                    if not line:
+                        continue
+                    try:
+                        out.append(_json.loads(line))
+                    except Exception:
+                        continue
+        except OSError:
+            return []
+        return out
+
+
 class InMemoryCollector:
     """Collects spans in memory for testing / analysis.
 
@@ -423,6 +489,44 @@ class InMemoryCollector:
 # ---------------------------------------------------------------------------
 
 _current_span: ContextVar[Span | None] = ContextVar("_current_span", default=None)
+_current_request_id: ContextVar[str | None] = ContextVar("_current_request_id", default=None)
+
+
+def set_request_id(request_id: str | None) -> Any:
+    """Bind a request_id to the current async/thread context.
+
+    Returns a token usable with ``reset_request_id`` to restore the prior value.
+    """
+    return _current_request_id.set(request_id)
+
+
+def reset_request_id(token: Any) -> None:
+    _current_request_id.reset(token)
+
+
+def current_request_id() -> str | None:
+    return _current_request_id.get(None)
+
+
+class _RequestIdScope:
+    """Context manager that binds a request_id for the duration of a block."""
+
+    def __init__(self, request_id: str | None) -> None:
+        self._request_id = request_id
+        self._token: Any = None
+
+    def __enter__(self) -> str | None:
+        self._token = _current_request_id.set(self._request_id)
+        return self._request_id
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self._token is not None:
+            _current_request_id.reset(self._token)
+
+
+def request_scope(request_id: str | None) -> _RequestIdScope:
+    """``with request_scope(rid):`` binds request_id to everything inside."""
+    return _RequestIdScope(request_id)
 
 
 class _SpanContext:
@@ -474,10 +578,14 @@ class Tracer:
         operation: str,
         kind: str = "internal",
         trace_id: str | None = None,
+        request_id: str | None = None,
         **initial_attrs: Any,
     ) -> _SpanContext:
         parent = _current_span.get(None)
         resolved_trace = trace_id or (parent.trace_id if parent else _new_id())
+        resolved_request = (
+            request_id if request_id is not None else (parent.request_id if parent else _current_request_id.get(None))
+        )
         span = Span(
             trace_id=resolved_trace,
             span_id=_new_id(),
@@ -486,6 +594,7 @@ class Tracer:
             kind=kind,
             start_time=time.time(),
             attributes=dict(initial_attrs),
+            request_id=resolved_request,
         )
         return _SpanContext(span, self)
 
@@ -521,6 +630,7 @@ class Tracer:
 # ---------------------------------------------------------------------------
 
 tracer = Tracer()
+jsonl_collector: "JsonlFileCollector | None" = None
 
 
 def _auto_configure_langfuse() -> None:
@@ -543,6 +653,21 @@ def _auto_configure_langfuse() -> None:
 
 
 _auto_configure_langfuse()
+
+
+def _auto_configure_jsonl() -> None:
+    """Auto-register JsonlFileCollector unless explicitly disabled."""
+    global jsonl_collector
+    if os.getenv("QUANT_ALPHA_TRACING_JSONL", "1") == "0":
+        return
+    try:
+        jsonl_collector = JsonlFileCollector()
+        tracer.add_collector(jsonl_collector)
+    except Exception as exc:
+        logger.debug("jsonl tracing init failed: {}", exc)
+
+
+_auto_configure_jsonl()
 
 
 # ---------------------------------------------------------------------------

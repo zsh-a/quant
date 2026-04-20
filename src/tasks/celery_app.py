@@ -49,6 +49,7 @@ app.conf.update(
         "src.tasks.data_tasks.*": {"queue": "default"},
         "src.tasks.automation.*": {"queue": "automation"},
         "src.tasks.crypto_tasks.*": {"queue": "automation"},
+        "src.tasks.alpha_dlq.*": {"queue": "alpha_dlq"},
     },
     # Queues
     task_queues=(
@@ -56,6 +57,7 @@ app.conf.update(
         Queue("backtest", Exchange("backtest"), routing_key="backtest"),
         Queue("analysis", Exchange("analysis"), routing_key="analysis"),
         Queue("automation", Exchange("automation"), routing_key="automation"),
+        Queue("alpha_dlq", Exchange("alpha_dlq"), routing_key="alpha_dlq"),
     ),
     beat_schedule={
         "scheduled-data-update-and-simulation": {
@@ -65,7 +67,13 @@ app.conf.update(
         }
     },
     # Explicit imports for task discovery
-    imports=["src.tasks.backtest", "src.tasks.data_tasks", "src.tasks.automation", "src.tasks.crypto_tasks"],
+    imports=[
+        "src.tasks.backtest",
+        "src.tasks.data_tasks",
+        "src.tasks.automation",
+        "src.tasks.crypto_tasks",
+        "src.tasks.alpha_dlq",
+    ],
 )
 
 if __name__ == "__main__":

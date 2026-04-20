@@ -341,8 +341,15 @@ def send_telegram_validation_notification_task(
     name="src.tasks.automation.run_data_update_pipeline",
     soft_time_limit=DATA_UPDATE_SOFT_TIME_LIMIT,
     time_limit=DATA_UPDATE_TIME_LIMIT,
+    bind=True,
+    autoretry_for=(ConnectionError, TimeoutError),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
 )
 def run_data_update_pipeline_task(
+    self,
     trigger_source: str = "manual",
     selected_steps=None,
     share_start_date: Optional[str] = None,
@@ -441,8 +448,17 @@ def run_data_update_pipeline_task(
         return {"update_run_id": update_run_id, "status": "failed", "error": str(exc)}
 
 
-@app.task(name="src.tasks.automation.run_simulation_job")
+@app.task(
+    name="src.tasks.automation.run_simulation_job",
+    bind=True,
+    autoretry_for=(ConnectionError, TimeoutError),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
 def run_simulation_job_task(
+    self,
     job_id: str,
     update_run_id: Optional[str] = None,
     trigger_source: str = "manual",
@@ -724,6 +740,32 @@ def run_simulation_job_task(
             snapshot=snapshot,
             error=None,
         )
+
+        # Flow live metrics back to the source Zoo factor (if this job
+        # was promoted from Zoo). Enables "Live Sharpe" columns in the UI
+        # and builds the time-series of OOS performance per factor.
+        try:
+            source_factor_id = job.get("source_zoo_factor_id")
+            if source_factor_id:
+                from src.alpha import AlphaService
+
+                AlphaService().persistence.append_live_metrics(
+                    source_factor_id,
+                    {
+                        "sharpe": metrics.get("sharpe"),
+                        "max_drawdown": metrics.get("max_drawdown"),
+                        "total_return": metrics.get("total_return"),
+                        "win_rate": metrics.get("win_rate"),
+                        "final_equity": float(final_equity),
+                        "bars_processed": step_index,
+                        "window": window,
+                    },
+                    source_run_id=run_id,
+                    source_simulation_job_id=job_id,
+                )
+        except Exception as live_exc:
+            logger.debug("live_metrics flow-back failed: {}", live_exc)
+
         return {
             "status": "completed",
             "job_id": job_id,
@@ -758,6 +800,26 @@ def run_simulation_job_task(
             latest_run_id=run_id,
             last_update_at=datetime.now().isoformat(),
         )
+        # Write to DLQ for manual replay only when retries are exhausted
+        try:
+            from src.tasks.alpha_dlq import write_dlq_entry
+
+            retries_remaining = getattr(getattr(self, "request", None), "retries", 0) < getattr(self, "max_retries", 0)
+            if not retries_remaining:
+                write_dlq_entry(
+                    source="simulation_run",
+                    error=str(exc),
+                    payload={
+                        "job_id": job_id,
+                        "run_id": run_id,
+                        "session_id": session_id,
+                        "trigger_source": trigger_source,
+                        "update_run_id": update_run_id,
+                        "force_full_replay": force_full_replay,
+                    },
+                )
+        except Exception as dlq_exc:
+            logger.debug("DLQ write failed: {}", dlq_exc)
         return {
             "status": "failed",
             "job_id": job_id,

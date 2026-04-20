@@ -219,6 +219,8 @@ export interface AlphaLabRunSummary {
 export interface AlphaLabZooEntry {
     formula: string;
     expr_hash?: string;
+    canonical_hash?: string;
+    signature_hash?: string;
     fitness?: number;
     metrics?: Record<string, number>;
     lineage?: Record<string, unknown>;
@@ -226,6 +228,20 @@ export interface AlphaLabZooEntry {
     tags?: string[];
     source?: string;
     saved_at?: string;
+    // Auto-archive lineage
+    source_job_id?: string | null;
+    source_run_id?: string | null;
+    source_cycle?: number | null;
+    source_strategy?: string | null;
+    source_round?: number | null;
+    parent_expr_hashes?: string[];
+    auto_archived?: boolean;
+    // OOS tracking
+    live_metrics?: Record<string, number | string | null>;
+    live_metrics_series?: Array<Record<string, number | string | null>>;
+    created_at?: string;
+    updated_at?: string;
+    path?: string;
 }
 
 export interface AlphaLabRunDetail {
@@ -285,11 +301,12 @@ export interface AlphaLabEngineInfo {
 
 export interface AlphaLabSearchJob {
     job_id: string;
-    status: 'pending' | 'running' | 'completed' | 'failed';
+    status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelling' | 'cancelled';
     created_at?: string;
     strategy?: string;
     error?: string;
     run_id?: string;
+    request_id?: string;
     top_results?: AlphaLabZooEntry[];
     top_count?: number;
     search_stats?: Record<string, number>;

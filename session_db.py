@@ -167,6 +167,22 @@ class SessionDB:
                 """
             )
 
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS lineage_edges (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    parent_kind TEXT NOT NULL,
+                    parent_id TEXT NOT NULL,
+                    child_kind TEXT NOT NULL,
+                    child_id TEXT NOT NULL,
+                    relation TEXT NOT NULL,
+                    meta TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    UNIQUE(parent_kind, parent_id, child_kind, child_id, relation)
+                )
+                """
+            )
+
             self._add_column_if_not_exists(cursor, "equity_history", "cash", "REAL DEFAULT 0.0")
             self._add_column_if_not_exists(cursor, "equity_history", "daily_pnl", "REAL DEFAULT 0.0")
             self._add_column_if_not_exists(cursor, "equity_history", "daily_return", "REAL DEFAULT 0.0")
@@ -177,6 +193,7 @@ class SessionDB:
             self._add_column_if_not_exists(cursor, "trades", "amount", "REAL")
             self._add_column_if_not_exists(cursor, "simulation_jobs", "end_date", "TEXT")
             self._add_column_if_not_exists(cursor, "simulation_jobs", "notification", "TEXT")
+            self._add_column_if_not_exists(cursor, "simulation_jobs", "source_zoo_factor_id", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "params", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "source", "TEXT DEFAULT 'manual'")
             self._add_column_if_not_exists(cursor, "sessions", "job_id", "TEXT")
@@ -193,6 +210,9 @@ class SessionDB:
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_simulation_steps_run ON simulation_run_steps(run_id, step_index DESC)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_data_update_runs_created ON data_update_runs(created_at DESC)")
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_session_logs_session_time ON session_logs(session_id, timestamp DESC)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_lineage_parent ON lineage_edges(parent_kind, parent_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_lineage_child ON lineage_edges(child_kind, child_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_lineage_relation ON lineage_edges(relation)")
             conn.commit()
 
     def _add_column_if_not_exists(self, cursor, table, column, type_def):
@@ -987,3 +1007,148 @@ class SessionDB:
             item["has_new_data"] = bool(item.get("has_new_data", 0))
             item["details"] = self._json_loads(item.get("details"), {})
             return item
+
+    # ------------------------------------------------------------------
+    # Lineage edges: unified provenance graph across search/zoo/simulation
+    # ------------------------------------------------------------------
+
+    _LINEAGE_KINDS = {"search_job", "zoo_factor", "simulation_job", "simulation_run", "data_update_run"}
+    _LINEAGE_RELATIONS = {
+        "produced",         # search_job --produced--> zoo_factor
+        "derived_from",     # zoo_factor --derived_from--> zoo_factor (parent formula)
+        "promoted_to",      # zoo_factor --promoted_to--> simulation_job
+        "backtests",        # simulation_run --backtests--> zoo_factor (records live metrics)
+        "triggered_by",     # simulation_job --triggered_by--> data_update_run
+    }
+
+    def add_lineage_edge(
+        self,
+        parent_kind: str,
+        parent_id: str,
+        child_kind: str,
+        child_id: str,
+        relation: str,
+        meta: Optional[Dict[str, Any]] = None,
+    ) -> bool:
+        if parent_kind not in self._LINEAGE_KINDS or child_kind not in self._LINEAGE_KINDS:
+            raise ValueError(f"Unknown lineage kind: {parent_kind!r}/{child_kind!r}")
+        if relation not in self._LINEAGE_RELATIONS:
+            raise ValueError(f"Unknown lineage relation: {relation!r}")
+        with self._get_conn() as conn:
+            try:
+                conn.execute(
+                    """
+                    INSERT INTO lineage_edges (parent_kind, parent_id, child_kind, child_id, relation, meta)
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (parent_kind, parent_id, child_kind, child_id, relation, self._json_dumps(meta or {})),
+                )
+                return True
+            except sqlite3.IntegrityError:
+                return False
+
+    def list_lineage_parents(self, kind: str, node_id: str) -> List[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT parent_kind, parent_id, relation, meta, created_at
+                FROM lineage_edges
+                WHERE child_kind = ? AND child_id = ?
+                ORDER BY created_at DESC
+                """,
+                (kind, node_id),
+            ).fetchall()
+        return [
+            {**dict(r), "meta": self._json_loads(r["meta"], {})}
+            for r in rows
+        ]
+
+    def list_lineage_children(self, kind: str, node_id: str) -> List[Dict[str, Any]]:
+        with self._get_conn() as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT child_kind, child_id, relation, meta, created_at
+                FROM lineage_edges
+                WHERE parent_kind = ? AND parent_id = ?
+                ORDER BY created_at DESC
+                """,
+                (kind, node_id),
+            ).fetchall()
+        return [
+            {**dict(r), "meta": self._json_loads(r["meta"], {})}
+            for r in rows
+        ]
+
+    def get_lineage_graph(
+        self,
+        kind: str,
+        node_id: str,
+        *,
+        max_depth: int = 4,
+    ) -> Dict[str, Any]:
+        """Return full upstream+downstream DAG within max_depth hops."""
+        nodes: Dict[str, Dict[str, Any]] = {}
+        edges: List[Dict[str, Any]] = []
+        seen_edges: set = set()
+
+        def _node_key(k: str, i: str) -> str:
+            return f"{k}:{i}"
+
+        def _add_node(k: str, i: str):
+            key = _node_key(k, i)
+            if key not in nodes:
+                nodes[key] = {"kind": k, "id": i}
+
+        _add_node(kind, node_id)
+
+        # Upstream
+        frontier = [(kind, node_id, 0)]
+        while frontier:
+            k, i, depth = frontier.pop(0)
+            if depth >= max_depth:
+                continue
+            for parent in self.list_lineage_parents(k, i):
+                edge_key = (parent["parent_kind"], parent["parent_id"], k, i, parent["relation"])
+                if edge_key in seen_edges:
+                    continue
+                seen_edges.add(edge_key)
+                _add_node(parent["parent_kind"], parent["parent_id"])
+                edges.append({
+                    "parent_kind": parent["parent_kind"],
+                    "parent_id": parent["parent_id"],
+                    "child_kind": k,
+                    "child_id": i,
+                    "relation": parent["relation"],
+                    "meta": parent["meta"],
+                })
+                frontier.append((parent["parent_kind"], parent["parent_id"], depth + 1))
+
+        # Downstream
+        frontier = [(kind, node_id, 0)]
+        while frontier:
+            k, i, depth = frontier.pop(0)
+            if depth >= max_depth:
+                continue
+            for child in self.list_lineage_children(k, i):
+                edge_key = (k, i, child["child_kind"], child["child_id"], child["relation"])
+                if edge_key in seen_edges:
+                    continue
+                seen_edges.add(edge_key)
+                _add_node(child["child_kind"], child["child_id"])
+                edges.append({
+                    "parent_kind": k,
+                    "parent_id": i,
+                    "child_kind": child["child_kind"],
+                    "child_id": child["child_id"],
+                    "relation": child["relation"],
+                    "meta": child["meta"],
+                })
+                frontier.append((child["child_kind"], child["child_id"], depth + 1))
+
+        return {
+            "root": {"kind": kind, "id": node_id},
+            "nodes": list(nodes.values()),
+            "edges": edges,
+        }

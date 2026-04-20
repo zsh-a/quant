@@ -559,6 +559,9 @@ class AlphaService:
         job_id: str = "",
         on_stage_complete: Any = None,
         on_round_complete: Any = None,
+        should_abort: Any = None,
+        prior_seen_hashes: Any = None,
+        budget: Any = None,
         **loader_kwargs,
     ) -> dict[str, Any]:
         from .infra.tracing import tracer
@@ -631,6 +634,9 @@ class AlphaService:
                 job_id=job_id,
                 on_stage_complete=on_stage_complete,
                 on_round_complete=on_round_complete,
+                should_abort=should_abort,
+                prior_seen_hashes=prior_seen_hashes,
+                budget=budget,
             )
 
             # 4b. Persist strategy memory for cross-session learning
@@ -688,7 +694,31 @@ class AlphaService:
             if persist:
                 with tracer.start_span("persist", kind="internal"):
                     run = self.persistence.save_run(result, run_name=run_name or "search_db")
-                    zoo_paths = self.persistence.save_zoo_entries(result["top_results"], run.run_id)
+                    # Enrich top-K entries with source + signature hashes for
+                    # automatic archival with full lineage.
+                    zoo_payloads: list[dict[str, Any]] = []
+                    for idx, top in enumerate(result["top_results"]):
+                        detail = search_result.details_by_hash.get(top.get("expr_hash"), {})
+                        payload = {
+                            **top,
+                            "source": "auto_archive",
+                            "source_job_id": job_id or None,
+                            "source_run_id": run.run_id,
+                            "source_strategy": (top.get("lineage") or {}).get("origin"),
+                            "source_round": (top.get("lineage") or {}).get("round_idx"),
+                            "auto_archived": True,
+                            "parent_expr_hashes": [
+                                h
+                                for h in [
+                                    (top.get("lineage") or {}).get("parent_a"),
+                                    (top.get("lineage") or {}).get("parent_b"),
+                                ]
+                                if h
+                            ],
+                            "alpha_signature": detail.get("alpha_signature"),
+                        }
+                        zoo_payloads.append(payload)
+                    zoo_paths = self.persistence.save_zoo_entries(zoo_payloads, run.run_id)
                 result["persistence"] = {
                     "run_id": run.run_id,
                     "run_path": run.run_path,
@@ -2026,9 +2056,8 @@ class AlphaService:
             "source": source,
             "validation": validation,
         }
-        paths = self.persistence.save_zoo_entries([payload], run_id=source)
-        payload["path"] = paths[0] if paths else None
-        return payload
+        merged = self.persistence.upsert_zoo_entry(payload, run_id=source)
+        return merged
 
     def get_lineage(self, run_id: str) -> dict[str, Any]:
         run = self.persistence.load_run(run_id)

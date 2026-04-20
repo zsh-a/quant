@@ -4,8 +4,8 @@
  * Consolidates all factor browsing/management into one place.
  */
 import React, { useCallback, useMemo, useState } from 'react'
-import { ExternalLink, Loader2, Play, RefreshCw, Workflow } from 'lucide-react'
-import type { AlphaLabCombineResult, AlphaLabWorkspace as WorkspacePayload, EventBacktestResponse } from '../../types'
+import { ExternalLink, Loader2, Play, RefreshCw, Rocket, Sparkles, Workflow } from 'lucide-react'
+import type { AlphaLabCombineResult, AlphaLabWorkspace as WorkspacePayload, AlphaLabZooEntry, EventBacktestResponse } from '../../types'
 import { SectionCard } from '../layout/SectionCard'
 import { EmptyState } from '../layout/EmptyState'
 import { Badge } from '../ui/badge'
@@ -133,20 +133,20 @@ export const FactorsTab: React.FC<FactorsTabProps> = ({
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="border-b border-border/70">
-                  {['Formula', 'Fitness', 'Sharpe', 'Rank IC', 'Turnover', 'Source', 'Saved', ''].map(h =>
+                  {['Formula', 'Fitness', 'Sharpe', 'Rank IC', 'Live Sharpe', 'Turnover', 'Source', 'Saved', ''].map(h =>
                     <th key={h} className={`px-3 py-2.5 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground ${h === 'Formula' ? 'text-left' : h === '' ? 'text-right' : 'text-right'}`}>{h}</th>)}
                 </tr></thead>
                 <tbody>{sortedZoo.map(e => (
-                  <tr key={e.expr_hash ?? e.formula} className="border-b border-border/40 hover:bg-accent/30 transition">
-                    <td className="max-w-xs px-3 py-2.5"><div className="truncate font-mono text-xs" title={e.formula}>{e.formula}</div></td>
-                    <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt('sharpe', e.fitness)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt('sharpe', e.metrics?.sharpe)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt('rank_ic', e.metrics?.rank_ic)}</td>
-                    <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt('avg_turnover', e.metrics?.avg_turnover)}</td>
-                    <td className="px-3 py-2.5">{e.source ? <Badge>{e.source}</Badge> : '--'}</td>
-                    <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtTime(e.saved_at)}</td>
-                    <td className="px-3 py-2.5 text-right"><Button variant="ghost" size="sm" onClick={() => onLoadFormula(e.formula)}>Load</Button></td>
-                  </tr>
+                  <ZooRow
+                    key={e.canonical_hash ?? e.expr_hash ?? e.formula}
+                    entry={e}
+                    symbol={symList()[0] ?? ''}
+                    startDate={startTime.slice(0, 10)}
+                    endDate={endTime.slice(0, 10)}
+                    onLoadFormula={onLoadFormula}
+                    setErr={setErr}
+                    onRefresh={onRefresh}
+                  />
                 ))}</tbody>
               </table>
             </div>
@@ -264,5 +264,137 @@ export const FactorsTab: React.FC<FactorsTabProps> = ({
         </>
       )}
     </div>
+  )
+}
+
+/* ── Zoo row with Promote-to-Simulation modal ─────────────────────── */
+
+function ZooRow({ entry, symbol, startDate, endDate, onLoadFormula, setErr, onRefresh }: {
+  entry: AlphaLabZooEntry
+  symbol: string
+  startDate: string
+  endDate: string
+  onLoadFormula: (f: string) => void
+  setErr: (e: string | null) => void
+  onRefresh: () => void
+}) {
+  const [promoting, setPromoting] = useState(false)
+  const [promoteOpen, setPromoteOpen] = useState(false)
+  const [name, setName] = useState(`Zoo factor · ${(entry.canonical_hash ?? entry.expr_hash ?? '').slice(0, 8)}`)
+  const [jobSymbol, setJobSymbol] = useState(symbol || 'BTC-USDT')
+  const [jobStart, setJobStart] = useState(startDate || '')
+  const [jobEnd, setJobEnd] = useState(endDate || '')
+  const factorId = entry.canonical_hash ?? entry.expr_hash ?? ''
+  const liveSharpe = typeof entry.live_metrics?.sharpe === 'number'
+    ? entry.live_metrics?.sharpe as number
+    : null
+
+  const handlePromote = async () => {
+    if (!factorId) return
+    try {
+      setPromoting(true)
+      setErr(null)
+      await alphaApi.promoteZooToSimulation(factorId, {
+        factor_id: factorId,
+        name,
+        strategy: 'precomputed_alpha',
+        symbol: jobSymbol,
+        start_date: jobStart,
+        end_date: jobEnd || null,
+        params: {},
+        notification: {},
+        enabled: true,
+        schedule: 'daily',
+      })
+      setPromoteOpen(false)
+      onRefresh()
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : 'Promote failed')
+    } finally {
+      setPromoting(false)
+    }
+  }
+
+  return (
+    <>
+      <tr className="border-b border-border/40 hover:bg-accent/30 transition">
+        <td className="max-w-xs px-3 py-2.5">
+          <div className="truncate font-mono text-xs" title={entry.formula}>{entry.formula}</div>
+          {entry.source_job_id && (
+            <div className="mt-0.5 text-[10px] text-muted-foreground font-mono truncate" title={entry.source_job_id}>
+              job:{entry.source_job_id.slice(0, 8)}
+              {entry.source_strategy && <span className="ml-1">· {entry.source_strategy}</span>}
+            </div>
+          )}
+        </td>
+        <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt('sharpe', entry.fitness)}</td>
+        <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt('sharpe', entry.metrics?.sharpe)}</td>
+        <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt('rank_ic', entry.metrics?.rank_ic)}</td>
+        <td className="px-3 py-2.5 text-right font-mono text-xs">
+          {liveSharpe != null ? (
+            <span className="text-emerald-400" title={`Latest live run — ${entry.live_metrics_series?.length ?? 0} samples`}>
+              {fmt('sharpe', liveSharpe)}
+            </span>
+          ) : '--'}
+        </td>
+        <td className="px-3 py-2.5 text-right font-mono text-xs">{fmt('avg_turnover', entry.metrics?.avg_turnover)}</td>
+        <td className="px-3 py-2.5">
+          <div className="flex flex-col gap-0.5">
+            {entry.source && <Badge>{entry.source}</Badge>}
+            {entry.auto_archived && (
+              <span className="inline-flex items-center gap-1 text-[9px] text-emerald-400">
+                <Sparkles className="size-2.5" /> auto
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="px-3 py-2.5 text-xs text-muted-foreground whitespace-nowrap">{fmtTime(entry.saved_at)}</td>
+        <td className="px-3 py-2.5 text-right">
+          <div className="flex justify-end gap-1">
+            <Button variant="ghost" size="sm" onClick={() => onLoadFormula(entry.formula)}>Load</Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!factorId}
+              onClick={() => setPromoteOpen(o => !o)}
+              title="Create a Simulation Job from this Zoo factor"
+            >
+              <Rocket className="size-3.5" />
+            </Button>
+          </div>
+        </td>
+      </tr>
+      {promoteOpen && (
+        <tr className="bg-secondary/20">
+          <td colSpan={9} className="px-3 py-3">
+            <div className="grid gap-2 md:grid-cols-4 items-end">
+              <div>
+                <label className="text-[10px] uppercase text-muted-foreground">Job Name</label>
+                <Input value={name} onChange={e => setName(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase text-muted-foreground">Symbol</label>
+                <Input value={jobSymbol} onChange={e => setJobSymbol(e.target.value)} />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase text-muted-foreground">Start</label>
+                <Input value={jobStart} onChange={e => setJobStart(e.target.value)} placeholder="YYYY-MM-DD" />
+              </div>
+              <div>
+                <label className="text-[10px] uppercase text-muted-foreground">End (optional)</label>
+                <Input value={jobEnd} onChange={e => setJobEnd(e.target.value)} placeholder="YYYY-MM-DD" />
+              </div>
+              <div className="md:col-span-4 flex gap-2 justify-end">
+                <Button variant="ghost" size="sm" onClick={() => setPromoteOpen(false)}>Cancel</Button>
+                <Button size="sm" onClick={() => void handlePromote()} disabled={promoting || !name || !jobSymbol || !jobStart}>
+                  {promoting ? <Loader2 className="size-3.5 animate-spin" /> : <Rocket className="size-3.5" />}
+                  Promote to Simulation
+                </Button>
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   )
 }

@@ -22,8 +22,9 @@ class AutomationService:
         notification: Optional[Dict[str, Any]] = None,
         enabled: bool = True,
         schedule: str = "daily",
+        source_zoo_factor_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        return self.session_db.create_simulation_job(
+        job = self.session_db.create_simulation_job(
             name=name,
             strategy_name=strategy,
             symbol=symbol,
@@ -34,6 +35,23 @@ class AutomationService:
             enabled=enabled,
             schedule=schedule,
         )
+        if source_zoo_factor_id:
+            self.session_db.update_simulation_job(
+                job["job_id"],
+                source_zoo_factor_id=source_zoo_factor_id,
+            )
+            try:
+                self.session_db.add_lineage_edge(
+                    parent_kind="zoo_factor",
+                    parent_id=source_zoo_factor_id,
+                    child_kind="simulation_job",
+                    child_id=job["job_id"],
+                    relation="promoted_to",
+                )
+            except Exception:
+                pass
+            job["source_zoo_factor_id"] = source_zoo_factor_id
+        return job
 
     def get_job(self, job_id: str, include_snapshot: bool = True) -> Optional[Dict[str, Any]]:
         return self.session_db.get_simulation_job(job_id, include_snapshot=include_snapshot)
