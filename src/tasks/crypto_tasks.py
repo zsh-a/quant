@@ -24,7 +24,14 @@ def _parse_iso_dt(value: str | None) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
-@app.task(name="src.tasks.crypto_tasks.sync_minute_bars")
+@app.task(
+    name="src.tasks.crypto_tasks.sync_minute_bars",
+    autoretry_for=(ConnectionError, TimeoutError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
 def sync_minute_bars_task(
     provider: str,
     symbols: list[str] | None = None,
@@ -49,7 +56,14 @@ def sync_minute_bars_task(
     }
 
 
-@app.task(name="src.tasks.crypto_tasks.sync_default_minute_bars")
+@app.task(
+    name="src.tasks.crypto_tasks.sync_default_minute_bars",
+    autoretry_for=(ConnectionError, TimeoutError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
 def sync_default_minute_bars_task():
     provider = crypto_market_config.default_provider
     logger.info(
@@ -95,7 +109,14 @@ def bootstrap_crypto_market_data_task(
     )
 
 
-@app.task(name="src.tasks.crypto_tasks.backfill_crypto_market_data")
+@app.task(
+    name="src.tasks.crypto_tasks.backfill_crypto_market_data",
+    autoretry_for=(ConnectionError, TimeoutError, OSError),
+    retry_backoff=True,
+    retry_backoff_max=900,
+    retry_jitter=True,
+    max_retries=2,
+)
 def backfill_crypto_market_data_task(
     provider: str | None = None,
     symbols: list[str] | None = None,

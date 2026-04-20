@@ -251,6 +251,13 @@ class AlphaPersistence:
           note, validation, parent_expr_hashes, alpha_signature, live_metrics,
           source_job_id, source_run_id, source_cycle, source_strategy, source_round,
           auto_archived.
+
+        Dedup strategy:
+          1. canonical_hash collision → merge into same file (same AST shape,
+             e.g. "a + b" and "b + a").
+          2. signature_hash match against a DIFFERENT canonical_hash → keep
+             both files, but add a ``similar_to`` lineage edge and cross-ref
+             ``aliases``. User keeps visibility into near-dups.
         """
         formula = str(entry.get("formula") or "").strip()
         if not formula:
@@ -277,6 +284,18 @@ class AlphaPersistence:
             except Exception:
                 existing = {}
 
+        # Track expr-hash aliases (same canonical, different raw form)
+        aliases = set(existing.get("aliases") or [])
+        prev_hash = existing.get("expr_hash")
+        if prev_hash and prev_hash != full_hash:
+            aliases.add(prev_hash)
+            try:
+                from src.monitoring.metrics import alpha_zoo_dedup_hits_total
+
+                alpha_zoo_dedup_hits_total.labels(kind="canonical_merge").inc()
+            except Exception:
+                pass
+
         merged: Dict[str, Any] = dict(existing)
         merged.update(
             {
@@ -284,6 +303,7 @@ class AlphaPersistence:
                 "expr_hash": full_hash,
                 "canonical_hash": canon,
                 "signature_hash": sig_hash or existing.get("signature_hash", ""),
+                "aliases": sorted(aliases),
                 "fitness": max(
                     float(entry.get("fitness") or 0.0),
                     float(existing.get("fitness") or 0.0),
@@ -311,17 +331,28 @@ class AlphaPersistence:
         )
 
         # Live metrics: append time-series entry so we can track OOS performance.
+        # Filter out None values so unmeasured metrics don't pollute the series.
         live_in: Any = entry.get("live_metrics")
         if live_in:
+
+            def _clean(item: Dict[str, Any]) -> Dict[str, Any]:
+                return {k: v for k, v in dict(item).items() if v is not None}
+
             live_series: List[Dict[str, Any]] = list(existing.get("live_metrics_series") or [])
             if isinstance(live_in, list):
-                live_series.extend(live_in)
+                for it in live_in:
+                    cleaned = _clean(it)
+                    if cleaned:
+                        cleaned.setdefault("recorded_at", now)
+                        live_series.append(cleaned)
             else:
-                item = dict(live_in)
-                item.setdefault("recorded_at", now)
-                live_series.append(item)
-            merged["live_metrics_series"] = live_series
-            merged["live_metrics"] = live_series[-1]
+                cleaned = _clean(live_in)
+                if cleaned:
+                    cleaned.setdefault("recorded_at", now)
+                    live_series.append(cleaned)
+            if live_series:
+                merged["live_metrics_series"] = live_series
+                merged["live_metrics"] = live_series[-1]
 
         path.write_text(
             json.dumps(merged, ensure_ascii=False, indent=2, default=str),
@@ -348,8 +379,53 @@ class AlphaPersistence:
                     relation="derived_from",
                 )
 
+        # Near-duplicate detection: scan existing Zoo for signature collisions
+        # with a DIFFERENT canonical form and record them as ``similar_to`` so
+        # the user can see semantic near-dups without losing either variant.
+        if sig_hash:
+            for other in self._scan_by_signature(sig_hash, exclude_canonical=canon):
+                other_canon = str(other.get("canonical_hash") or "")
+                if not other_canon:
+                    continue
+                self._write_lineage_edge(
+                    parent_kind="zoo_factor",
+                    parent_id=other_canon,
+                    child_kind="zoo_factor",
+                    child_id=canon,
+                    relation="similar_to",
+                    meta={"signature_hash": sig_hash},
+                )
+                try:
+                    from src.monitoring.metrics import alpha_zoo_dedup_hits_total
+
+                    alpha_zoo_dedup_hits_total.labels(kind="signature_similar").inc()
+                except Exception:
+                    pass
+
         merged["path"] = str(path)
         return merged
+
+    def _scan_by_signature(
+        self,
+        sig_hash: str,
+        *,
+        exclude_canonical: str = "",
+    ) -> list[dict[str, Any]]:
+        """Return Zoo entries whose stored signature_hash matches ``sig_hash``."""
+        if not sig_hash or sig_hash == "zero_std":
+            return []
+        matches: list[dict[str, Any]] = []
+        for other_path in self.zoo_dir.glob("alpha_*.json"):
+            try:
+                other = json.loads(other_path.read_text(encoding="utf-8"))
+            except Exception:
+                continue
+            if other.get("signature_hash") != sig_hash:
+                continue
+            if exclude_canonical and other.get("canonical_hash") == exclude_canonical:
+                continue
+            matches.append(other)
+        return matches
 
     def save_zoo_entries(self, entries: list[dict[str, Any]], run_id: str) -> list[str]:
         paths: list[str] = []

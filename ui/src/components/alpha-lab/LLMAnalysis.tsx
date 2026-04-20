@@ -19,7 +19,13 @@ interface LLMAnalysisProps {
 export const LLMAnalysis: React.FC<LLMAnalysisProps> = ({ jobId, onApplySeeds }) => {
   const [instruction, setInstruction] = useState('')
   const [loading, setLoading] = useState(false)
-  const [result, setResult] = useState<{ summary: string; analysis: string } | null>(null)
+  const [result, setResult] = useState<{
+    summary: string
+    analysis: string
+    suggested_seeds?: string[]
+    suggested_operators?: string[]
+    identified_weakness?: string
+  } | null>(null)
   const [error, setError] = useState<string | null>(null)
 
   const handleAnalyze = useCallback(async () => {
@@ -82,20 +88,54 @@ export const LLMAnalysis: React.FC<LLMAnalysisProps> = ({ jobId, onApplySeeds })
             </div>
           </div>
 
+          {/* Structured sections */}
+          {result.identified_weakness && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-400/90 mb-1">
+                Identified Weakness
+              </div>
+              <div className="text-xs text-amber-100/90 whitespace-pre-wrap">{result.identified_weakness}</div>
+            </div>
+          )}
+
+          {result.suggested_operators && result.suggested_operators.length > 0 && (
+            <div className="rounded-xl border border-border/40 bg-card/70 p-3">
+              <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-1">
+                Suggested Operators
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {result.suggested_operators.map(op => (
+                  <span key={op} className="rounded-md bg-secondary/60 px-2 py-0.5 text-[11px] font-mono">{op}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {/* Apply suggestions */}
           {onApplySeeds && (() => {
-            const formulas = extractFormulas(result.analysis)
-            if (formulas.length === 0) return null
+            const structured = result.suggested_seeds ?? []
+            const fallback = structured.length ? [] : extractFormulas(result.analysis)
+            const seeds = structured.length ? structured : fallback
+            if (seeds.length === 0) return null
             return (
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">{formulas.length} formulas found in analysis</span>
-                <Button
-                  variant="secondary"
-                  size="sm"
-                  onClick={() => onApplySeeds(formulas)}
-                >
-                  Apply as Seeds
-                </Button>
+              <div className="rounded-xl border border-border/40 bg-card/70 p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    Suggested Seeds ({seeds.length})
+                  </div>
+                  <Button
+                    variant="secondary"
+                    size="sm"
+                    onClick={() => onApplySeeds(seeds)}
+                  >
+                    Use as Seeds for Next Run
+                  </Button>
+                </div>
+                <ul className="space-y-0.5">
+                  {seeds.map(s => (
+                    <li key={s} className="truncate font-mono text-[11px] text-foreground/80" title={s}>{s}</li>
+                  ))}
+                </ul>
               </div>
             )
           })()}

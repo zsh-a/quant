@@ -4,7 +4,8 @@
  * Consolidates all factor browsing/management into one place.
  */
 import React, { useCallback, useMemo, useState } from 'react'
-import { ExternalLink, Loader2, Play, RefreshCw, Rocket, Sparkles, Workflow } from 'lucide-react'
+import { ExternalLink, GitBranch, Loader2, Play, RefreshCw, Rocket, Sparkles, Workflow } from 'lucide-react'
+import { LineageView } from './LineageView'
 import type { AlphaLabCombineResult, AlphaLabWorkspace as WorkspacePayload, AlphaLabZooEntry, EventBacktestResponse } from '../../types'
 import { SectionCard } from '../layout/SectionCard'
 import { EmptyState } from '../layout/EmptyState'
@@ -280,6 +281,7 @@ function ZooRow({ entry, symbol, startDate, endDate, onLoadFormula, setErr, onRe
 }) {
   const [promoting, setPromoting] = useState(false)
   const [promoteOpen, setPromoteOpen] = useState(false)
+  const [lineageOpen, setLineageOpen] = useState(false)
   const [name, setName] = useState(`Zoo factor · ${(entry.canonical_hash ?? entry.expr_hash ?? '').slice(0, 8)}`)
   const [jobSymbol, setJobSymbol] = useState(symbol || 'BTC-USDT')
   const [jobStart, setJobStart] = useState(startDate || '')
@@ -356,6 +358,15 @@ function ZooRow({ entry, symbol, startDate, endDate, onLoadFormula, setErr, onRe
               variant="ghost"
               size="sm"
               disabled={!factorId}
+              onClick={() => setLineageOpen(o => !o)}
+              title="Show lineage DAG for this factor"
+            >
+              <GitBranch className="size-3.5" />
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={!factorId}
               onClick={() => setPromoteOpen(o => !o)}
               title="Create a Simulation Job from this Zoo factor"
             >
@@ -364,6 +375,13 @@ function ZooRow({ entry, symbol, startDate, endDate, onLoadFormula, setErr, onRe
           </div>
         </td>
       </tr>
+      {lineageOpen && factorId && (
+        <tr className="bg-secondary/10">
+          <td colSpan={9} className="px-3 py-3">
+            <LineageView kind="zoo_factor" nodeId={factorId} height={300} />
+          </td>
+        </tr>
+      )}
       {promoteOpen && (
         <tr className="bg-secondary/20">
           <td colSpan={9} className="px-3 py-3">

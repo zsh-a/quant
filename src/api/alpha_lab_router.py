@@ -138,6 +138,7 @@ def _run_search_job(
             neural_batch = params.pop("neural_batch", 4096)
             enum_max = params.pop("enum_max", 500)
             enum_top_k = params.pop("enum_top_k", 30)
+            adaptive_scheduler = bool(params.pop("adaptive_scheduler", False))
             budget_caps = params.pop("budget_caps", None) or {}
             budget = None
             if any(
@@ -163,6 +164,7 @@ def _run_search_job(
                 neural_sample_batch=neural_batch,
                 enum_max=enum_max,
                 enum_top_k=enum_top_k,
+                adaptive_scheduler=adaptive_scheduler,
             )
             logger.info("alpha.search strategies={}", [s.name for s in svc.search_engine.strategies])
 
@@ -182,16 +184,40 @@ def _run_search_job(
             _SEARCH_JOBS[job_id].update(status=status, result=result)
             _push({"type": "complete", "data": {"status": status}})
             _persist_search_jobs()
+            # Prometheus
+            try:
+                from src.monitoring.metrics import (
+                    alpha_search_jobs_total,
+                    record_search_budget_snapshot,
+                )
+
+                alpha_search_jobs_total.labels(status=status).inc()
+                pipeline = (result or {}).get("pipeline") or {}
+                record_search_budget_snapshot(job_id, pipeline.get("budget_snapshot") or {})
+            except Exception:
+                pass
             logger.info("alpha.search job={} {} request_id={}", job_id, status, request_id)
         except SearchCancelled as exc:
             _SEARCH_JOBS[job_id].update(status="cancelled", error=str(exc))
             _push({"type": "complete", "data": {"status": "cancelled", "error": str(exc)}})
             _persist_search_jobs()
+            try:
+                from src.monitoring.metrics import alpha_search_jobs_total
+
+                alpha_search_jobs_total.labels(status="cancelled").inc()
+            except Exception:
+                pass
             logger.info("alpha.search job={} cancelled: {}", job_id, exc)
         except Exception as exc:
             _SEARCH_JOBS[job_id].update(status="failed", error=str(exc))
             _push({"type": "complete", "data": {"status": "failed", "error": str(exc)}})
             _persist_search_jobs()
+            try:
+                from src.monitoring.metrics import alpha_search_jobs_total
+
+                alpha_search_jobs_total.labels(status="failed").inc()
+            except Exception:
+                pass
             logger.error("alpha.search job={} failed: {}", job_id, exc)
         finally:
             _SEARCH_CANCEL.pop(job_id, None)
@@ -245,6 +271,7 @@ class SearchDbRequest(BaseModel):
     neural_batch: int = 4096
     enum_max: int = 500  # max formulas to enumerate (round 0)
     enum_top_k: int = 30  # top-K from enumeration to keep
+    adaptive_scheduler: bool = False  # enable UCB1 per-round strategy selection
     # Budget caps (0 = unlimited)
     max_llm_tokens: int = 0
     max_full_eval: int = 0
@@ -366,6 +393,23 @@ def _workspace_defaults() -> dict[str, object]:
 # ---------------------------------------------------------------------------
 
 
+@router.get("/search-presets")
+async def list_search_presets():
+    """Return presets + auto-archive config (authoritative source is YAML)."""
+    from src.alpha.search.presets import get_presets_payload
+
+    return get_presets_payload()
+
+
+@router.post("/search-presets/reload")
+async def reload_search_presets():
+    """Invalidate the cached YAML so the next call re-reads from disk."""
+    from src.alpha.search.presets import get_presets_payload, invalidate_presets_cache
+
+    invalidate_presets_cache()
+    return {"ok": True, "preset_count": len(get_presets_payload().get("presets") or [])}
+
+
 @router.get("/workspace")
 async def get_workspace(
     run_limit: int = Query(default=8, ge=1, le=50),
@@ -450,6 +494,7 @@ async def submit_search(request: SearchDbRequest, background_tasks: BackgroundTa
         "universe": request.universe,
         "strategy": request.strategy,
         "neural_batch": request.neural_batch,
+        "adaptive_scheduler": request.adaptive_scheduler,
         "budget_caps": {
             "max_llm_tokens": request.max_llm_tokens,
             "max_full_eval": request.max_full_eval,
@@ -816,6 +861,12 @@ async def cancel_search_job(job_id: str):
     event = _SEARCH_CANCEL.setdefault(job_id, _threading.Event())
     event.set()
     job["status"] = "cancelling"
+    try:
+        from src.monitoring.metrics import alpha_search_cancellations_total
+
+        alpha_search_cancellations_total.inc()
+    except Exception:
+        pass
     queue = _SEARCH_EVENTS.get(job_id)
     if queue is not None:
         try:
@@ -956,10 +1007,80 @@ async def analyze_search(job_id: str, request: AnalyzeSearchRequest):
     except Exception as e:
         analysis = f"(LLM analysis failed: {e})"
 
+    structured = _structure_llm_analysis(analysis)
+
+    # Persist structured insights so the next search cycle can read them.
+    try:
+        svc = _get_service()
+        mem = getattr(svc, "strategy_memory", None)
+        if mem is not None:
+            mem.add_llm_insight(
+                job_id=job_id,
+                suggested_seeds=structured["suggested_seeds"],
+                suggested_operators=structured["suggested_operators"],
+                identified_weakness=structured["identified_weakness"],
+            )
+            mem.save()
+    except Exception as exc:
+        logger.debug("strategy_memory insight store failed: {}", exc)
+
     return {
         "summary": summary,
         "analysis": analysis,
         "prompt_length": len(prompt),
+        **structured,
+    }
+
+
+def _structure_llm_analysis(text: str) -> dict[str, Any]:
+    """Extract seeds / operators / weakness from free-form LLM output.
+
+    We look for lightweight section markers first (``### Suggested Seeds``
+    etc.) since the prompt now requests them, and fall back to regex
+    scraping for back-compat with responses that lack structure.
+    """
+    import re
+
+    seeds: list[str] = []
+    operators: list[str] = []
+    weakness = ""
+
+    if not text:
+        return {"suggested_seeds": seeds, "suggested_operators": operators, "identified_weakness": weakness}
+
+    # Section-based extraction
+    def _section(name: str) -> str:
+        m = re.search(
+            rf"(?:^|\n)##+\s*{re.escape(name)}\s*\n(?P<body>.*?)(?=\n##+\s|\Z)",
+            text,
+            re.IGNORECASE | re.DOTALL,
+        )
+        return (m.group("body") if m else "").strip()
+
+    seeds_body = _section("Suggested Seeds") or _section("Seeds")
+    if seeds_body:
+        for line in seeds_body.splitlines():
+            m = re.search(r"`([^`]+)`", line)
+            if m:
+                seeds.append(m.group(1).strip())
+    operators_body = _section("Suggested Operators") or _section("Operators")
+    if operators_body:
+        for line in operators_body.splitlines():
+            m = re.search(r"`([^`]+)`", line)
+            if m:
+                operators.append(m.group(1).strip())
+    weakness_body = _section("Identified Weakness") or _section("Weakness")
+    if weakness_body:
+        weakness = weakness_body.strip()
+
+    # Fallback: regex-scrape formula-like backticks across the whole response
+    if not seeds:
+        fallback = re.findall(r"`((?:cs_rank|ts_\w+|if_else|where)\([^`]+\))`", text)
+        seeds = list(dict.fromkeys(fallback))[:10]
+    return {
+        "suggested_seeds": seeds,
+        "suggested_operators": operators,
+        "identified_weakness": weakness,
     }
 
 

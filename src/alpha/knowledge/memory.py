@@ -384,6 +384,7 @@ class StrategyMemory:
             "operator_stats": {op: {"mean": s.mean, "count": s.count} for op, s in self._operator_stats.items()},
             "feature_stats": {f: {"mean": s.mean, "count": s.count} for f, s in self._feature_stats.items()},
             "strategy_stats": {n: {"mean": s.mean, "count": s.count} for n, s in self._strategy_stats.items()},
+            "llm_insights": list(self._llm_insights),
         }
         path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
 
@@ -433,6 +434,10 @@ class StrategyMemory:
             s.mean = s_dict.get("mean", 0.0)
             s.count = s_dict.get("count", 0)
             self._strategy_stats[name] = s
+
+        for item in data.get("llm_insights", []) or []:
+            if isinstance(item, dict):
+                self._llm_insights.append(item)
 
     # ------------------------------------------------------------------
     # Helpers

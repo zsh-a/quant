@@ -76,13 +76,28 @@ export const alphaApi = {
     request<{ pipeline: AlphaPipelineRecord | null }>(`/alpha-lab/search-jobs/${jobId}/pipeline`),
 
   analyzeSearch: (jobId: string, instruction: string) =>
-    post<{ summary: string; analysis: string; prompt_length: number }>(
-      `/alpha-lab/search-jobs/${jobId}/analyze`, { instruction },
-    ),
+    post<{
+      summary: string
+      analysis: string
+      prompt_length: number
+      suggested_seeds?: string[]
+      suggested_operators?: string[]
+      identified_weakness?: string
+    }>(`/alpha-lab/search-jobs/${jobId}/analyze`, { instruction }),
 
   // Zoo
   listZoo: (limit = 50) => request<{ entries: AlphaLabZooEntry[] }>(`/alpha-lab/zoo?limit=${limit}`),
   saveToZoo: (params: Record<string, unknown>) => post<AlphaLabZooEntry>('/alpha-lab/zoo', params),
+
+  listSearchPresets: () =>
+    request<{
+      presets: Array<{
+        key: string; label: string; hint: string; strategy: string;
+        params: Record<string, number>
+        budget?: { max_wall_time_sec?: number; max_full_eval?: number; max_llm_tokens?: number }
+      }>
+      auto_archive?: { top_k: number }
+    }>('/alpha-lab/search-presets'),
 
   promoteZooToSimulation: (factorId: string, params: Record<string, unknown>) =>
     post<{ job_id: string; source_zoo_factor_id: string; job: Record<string, unknown> }>(

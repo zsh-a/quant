@@ -348,11 +348,28 @@ export interface AlphaRoundRecord {
     duration_ms: number;
 }
 
+export interface BudgetSnapshot {
+    max_llm_tokens: number;
+    max_full_eval: number;
+    max_wall_time_sec: number;
+    max_cost_usd: number;
+    used_llm_tokens: number;
+    used_full_eval: number;
+    used_cost_usd: number;
+    elapsed_sec: number;
+    remaining_wall_sec: number | null;
+    exhausted: boolean;
+    exhausted_reasons: string[];
+}
+
 export interface AlphaPipelineRecord {
     job_id: string;
     rounds: AlphaRoundRecord[];
     total_evaluations: number;
     total_rejected: number;
+    aborted?: boolean;
+    budget_exhausted?: boolean;
+    budget_snapshot?: BudgetSnapshot | null;
 }
 
 export type SearchSSEEvent =

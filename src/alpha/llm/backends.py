@@ -601,7 +601,17 @@ Output exactly {count} items:
             self.call_stats["total_calls"] += 1
             self.call_stats[f"{kind}_calls"] = self.call_stats.get(f"{kind}_calls", 0) + 1
             self.call_stats["total_seconds"] += span.duration_ms / 1000
-            self.call_stats["total_tokens"] += span.attributes.get("total_tokens") or 0
+            tokens_used = int(span.attributes.get("total_tokens") or 0)
+            self.call_stats["total_tokens"] += tokens_used
+
+            # Charge the current-cycle budget (if any). Skipped silently when
+            # no tracker is bound so standalone LLM calls stay cheap.
+            from ..search.context import current_budget
+
+            budget = current_budget()
+            if budget is not None:
+                cost = float(span.attributes.get("estimated_cost_usd") or 0.0)
+                budget.record_llm(tokens=tokens_used, cost_usd=cost)
             return content
 
     # -- RL feedback -------------------------------------------------------

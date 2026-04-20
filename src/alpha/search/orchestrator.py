@@ -118,6 +118,8 @@ class SearchOrchestrator:
         feature_kitchen: Any | None = None,
         population_cap: int = 30,
         checkpoint_manager: Any | None = None,
+        adaptive_scheduler: bool = False,
+        adaptive_scheduler_config: Any | None = None,
     ) -> None:
         self.registry = registry or OperatorRegistry()
         self.compiler = compiler or FormulaCompiler(self.registry)
@@ -129,6 +131,19 @@ class SearchOrchestrator:
         self.feature_kitchen = feature_kitchen
         self._population_cap = population_cap
         self._checkpoint_manager = checkpoint_manager
+
+        self._scheduler = None
+        if adaptive_scheduler:
+            from ..strategies.adaptive_scheduler import (
+                AdaptiveScheduler,
+                AdaptiveSchedulerConfig,
+            )
+
+            self._scheduler = AdaptiveScheduler(
+                self.strategies,
+                memory=strategy_memory,
+                config=adaptive_scheduler_config or AdaptiveSchedulerConfig(),
+            )
 
     # ------------------------------------------------------------------
     # Public API
@@ -224,11 +239,22 @@ class SearchOrchestrator:
 
         # Preload cross-cycle memory: prevents re-evaluating previously-seen
         # formulas in the next cycle even when the strategy re-generates them.
+        # Explicit seeds for THIS cycle are whitelisted — user obviously wants
+        # them evaluated again, even if a past cycle already saw them.
         if prior_seen_hashes:
-            ctx.seen_hashes.update(h for h in prior_seen_hashes if h)
+            whitelist: set[str] = set()
+            for f in seeds or []:
+                try:
+                    program = self.compiler.compile(f, self.schema)
+                    whitelist.add(program.expr_hash)
+                except Exception:
+                    continue
+            to_load = {h for h in prior_seen_hashes if h and h not in whitelist}
+            ctx.seen_hashes.update(to_load)
             logger.info(
-                "search.prior_seen loaded count={}",
-                len(prior_seen_hashes),
+                "search.prior_seen loaded count={} whitelisted={}",
+                len(to_load),
+                len(whitelist),
             )
 
         round_summaries: list[dict[str, Any]] = []
@@ -265,6 +291,10 @@ class SearchOrchestrator:
 
         aborted = False
         budget_exhausted = False
+        from .context import budget_scope
+
+        budget_ctx = budget_scope(budget)
+        budget_ctx.__enter__()
         for round_idx in range(rounds):
             if should_abort and should_abort():
                 logger.info("search.abort_requested round={} — exiting early", round_idx)
@@ -314,7 +344,13 @@ class SearchOrchestrator:
             }
             round_rec = RoundRecord(round_idx=round_idx)
 
-            for strategy in self.strategies:
+            # Adaptive scheduler narrows the candidate set first; each
+            # strategy still gets a final say via should_activate so
+            # round-local constraints (e.g. MCTS "every N rounds") hold.
+            candidate_strategies = (
+                self._scheduler.pick(round_idx) if self._scheduler is not None else list(self.strategies)
+            )
+            for strategy in candidate_strategies:
                 if not strategy.should_activate(ctx):
                     continue
 
@@ -569,6 +605,7 @@ class SearchOrchestrator:
                 )
 
         prefetch_executor.shutdown(wait=False)
+        budget_ctx.__exit__(None, None, None)
 
         # Ensure warm-start is off after search completes
         if _warm_start_active:

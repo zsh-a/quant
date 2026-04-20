@@ -73,6 +73,53 @@ websocket_connections = Gauge("websocket_connections_active", "Active WebSocket 
 
 websocket_messages = Counter("websocket_messages_total", "Total WebSocket messages", ["type"])
 
+# Alpha Lab Metrics — search automation observability
+alpha_search_jobs_total = Counter(
+    "alpha_search_jobs_total",
+    "Total Alpha Lab search jobs",
+    ["status"],  # completed | failed | cancelled
+)
+
+alpha_search_cancellations_total = Counter(
+    "alpha_search_cancellations_total",
+    "Total search cancel requests",
+)
+
+alpha_search_budget_remaining = Gauge(
+    "alpha_search_budget_remaining",
+    "Budget remaining at end of the most recent search cycle",
+    ["job_id", "kind"],  # kind: full_eval | llm_tokens | wall_sec | cost_usd
+)
+
+alpha_search_budget_exhausted_total = Counter(
+    "alpha_search_budget_exhausted_total",
+    "Search cycles that hit a budget cap",
+    ["reason"],  # full_eval | llm_tokens | wall_time | cost_usd
+)
+
+alpha_zoo_dedup_hits_total = Counter(
+    "alpha_zoo_dedup_hits_total",
+    "Zoo dedup outcomes",
+    ["kind"],  # canonical_merge | signature_similar
+)
+
+alpha_zoo_entries = Gauge(
+    "alpha_zoo_entries",
+    "Current count of factor entries in the Zoo",
+)
+
+alpha_auto_runner_cycle_duration_seconds = Histogram(
+    "alpha_auto_runner_cycle_duration_seconds",
+    "Duration of a single auto-runner cycle",
+    buckets=[10, 30, 60, 120, 300, 600, 1800, 3600, 10800],
+)
+
+alpha_auto_runner_cycles_total = Counter(
+    "alpha_auto_runner_cycles_total",
+    "Total auto-runner cycle outcomes",
+    ["status"],  # success | data_error | transient_error | fatal_error
+)
+
 # Application Info
 app_info = Info("app_info", "Application information")
 
@@ -157,3 +204,40 @@ def update_system_metrics():
         logger.warning("psutil not installed, system metrics unavailable")
     except Exception as e:
         logger.error(f"Failed to update system metrics: {e}")
+
+
+def update_alpha_lab_metrics() -> None:
+    """Refresh gauges that depend on on-disk Zoo state."""
+    try:
+        from src.config.paths import ALPHA_ZOO_DIR
+
+        count = len(list(ALPHA_ZOO_DIR.glob("alpha_*.json")))
+        alpha_zoo_entries.set(count)
+    except Exception as e:
+        logger.debug("update_alpha_lab_metrics failed: {}", e)
+
+
+def record_search_budget_snapshot(job_id: str, snapshot: dict) -> None:
+    """Emit budget-remaining gauges for a just-completed search cycle."""
+    if not snapshot:
+        return
+    try:
+        if snapshot.get("max_full_eval", 0) > 0:
+            alpha_search_budget_remaining.labels(job_id=job_id, kind="full_eval").set(
+                max(0, snapshot["max_full_eval"] - snapshot.get("used_full_eval", 0))
+            )
+        if snapshot.get("max_llm_tokens", 0) > 0:
+            alpha_search_budget_remaining.labels(job_id=job_id, kind="llm_tokens").set(
+                max(0, snapshot["max_llm_tokens"] - snapshot.get("used_llm_tokens", 0))
+            )
+        if snapshot.get("max_cost_usd", 0) > 0:
+            alpha_search_budget_remaining.labels(job_id=job_id, kind="cost_usd").set(
+                max(0.0, snapshot["max_cost_usd"] - snapshot.get("used_cost_usd", 0.0))
+            )
+        remaining_wall = snapshot.get("remaining_wall_sec")
+        if remaining_wall is not None:
+            alpha_search_budget_remaining.labels(job_id=job_id, kind="wall_sec").set(remaining_wall)
+        for reason in snapshot.get("exhausted_reasons") or []:
+            alpha_search_budget_exhausted_total.labels(reason=reason).inc()
+    except Exception as e:
+        logger.debug("record_search_budget_snapshot failed: {}", e)

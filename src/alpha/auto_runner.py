@@ -285,6 +285,20 @@ def run_auto_search_loop(
                 }
             _save_state(state_path, state)
 
+            # Prometheus: success counter + cycle duration
+            try:
+                from src.monitoring.metrics import (
+                    alpha_auto_runner_cycle_duration_seconds,
+                    alpha_auto_runner_cycles_total,
+                )
+
+                alpha_auto_runner_cycles_total.labels(status="success").inc()
+                cycle_secs = float((result.get("timing") or {}).get("overall_seconds") or 0.0)
+                if cycle_secs > 0:
+                    alpha_auto_runner_cycle_duration_seconds.observe(cycle_secs)
+            except Exception:
+                pass
+
             # Update persistent cross-cycle state with this cycle's discoveries.
             try:
                 top = result.get("top_results") or []
@@ -355,6 +369,16 @@ def run_auto_search_loop(
                 error_class.__name__,
                 exc,
             )
+            try:
+                from src.monitoring.metrics import alpha_auto_runner_cycles_total
+
+                status_label = {
+                    "DataError": "data_error",
+                    "FatalError": "fatal_error",
+                }.get(error_class.__name__, "transient_error")
+                alpha_auto_runner_cycles_total.labels(status=status_label).inc()
+            except Exception:
+                pass
 
             # Persist a replayable payload to DLQ so humans can re-drive.
             try:

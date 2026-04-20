@@ -4,8 +4,9 @@
  * Supports multiple concurrent search jobs. Job state is managed by
  * useSearchJobs (in workspace) and survives page refresh via backend recovery.
  */
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ChevronRight, Info, Loader2, RotateCcw, Settings2, StopCircle, X, Zap } from 'lucide-react'
+import { alphaApi } from '../../utils/alphaApi'
 import type { AlphaLabSearchJob, AlphaLabWorkspace as WorkspacePayload, StrategyModeInfo } from '../../types'
 import type { SearchJobsState } from '../../hooks/useSearchJobs'
 import { SectionCard } from '../layout/SectionCard'
@@ -168,9 +169,23 @@ export const SearchTab: React.FC<SearchTabProps> = ({
   const [strategy, setStrategy] = useState<string>('evolution')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [presetKey, setPresetKey] = useState<string>('balanced')
+  // Presets come from the backend (YAML-configured); hardcoded list is
+  // kept as a fallback so the UI still works when API is unreachable.
+  const [presetList, setPresetList] = useState<SearchPreset[]>(SEARCH_PRESETS)
+  useEffect(() => {
+    let cancelled = false
+    alphaApi.listSearchPresets()
+      .then(resp => {
+        if (cancelled) return
+        const remote = (resp.presets ?? []) as SearchPreset[]
+        if (remote.length) setPresetList(remote)
+      })
+      .catch(() => { /* fallback to hardcoded */ })
+    return () => { cancelled = true }
+  }, [])
   const activePreset = useMemo(
-    () => SEARCH_PRESETS.find(p => p.key === presetKey) ?? SEARCH_PRESETS[1],
-    [presetKey],
+    () => presetList.find(p => p.key === presetKey) ?? presetList[1] ?? SEARCH_PRESETS[1],
+    [presetKey, presetList],
   )
 
   // Strategy modes loaded from backend (or fallback)
@@ -194,11 +209,11 @@ export const SearchTab: React.FC<SearchTabProps> = ({
 
   const applyPreset = useCallback((key: string) => {
     setPresetKey(key)
-    const preset = SEARCH_PRESETS.find(p => p.key === key)
+    const preset = presetList.find(p => p.key === key)
     if (!preset) return
     setStrategy(preset.strategy)
     setParams(prev => ({ ...prev, ...preset.params }))
-  }, [])
+  }, [presetList])
 
   // Estimated search volume based on active strategies
   const estimatedVolume = useMemo(() => {
@@ -238,7 +253,7 @@ export const SearchTab: React.FC<SearchTabProps> = ({
             Preset
           </label>
           <div className="flex flex-wrap gap-2">
-            {SEARCH_PRESETS.map(p => (
+            {presetList.map(p => (
               <button
                 key={p.key}
                 type="button"

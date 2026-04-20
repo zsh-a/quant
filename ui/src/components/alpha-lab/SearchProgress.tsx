@@ -15,6 +15,7 @@ import {
 import { useSearchSSE } from '../../hooks/useSearchSSE'
 import type { AlphaLabSearchJob, AlphaLabZooEntry } from '../../types'
 import { PipelineView } from './PipelineView'
+import { BudgetMeter } from './BudgetMeter'
 import { Badge } from '../ui/badge'
 import { Button } from '../ui/button'
 import { fmt, fmtDur } from './shared'
@@ -190,6 +191,16 @@ export const SearchProgress: React.FC<SearchProgressProps> = ({ searchJob, onLoa
           {searchJob.run_id && <Badge>{searchJob.run_id}</Badge>}
         </div>
         {searchJob.error && <p className="text-xs text-rose-300">{searchJob.error}</p>}
+
+        {pipeline?.budget_snapshot && (
+          <BudgetMeter snapshot={pipeline.budget_snapshot} compact={isActive} />
+        )}
+
+        {pipeline?.aborted && (
+          <div className="text-xs text-amber-300">
+            pipeline aborted{pipeline.budget_exhausted ? ' (budget exhausted)' : ''}
+          </div>
+        )}
 
         {/* Live progress */}
         {isActive && currentStage && (

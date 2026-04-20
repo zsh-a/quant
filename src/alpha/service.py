@@ -65,6 +65,7 @@ class AlphaService:
         strategy_memory_path: str | None = None,
         enum_max: int = 500,
         enum_top_k: int = 30,
+        adaptive_scheduler: bool = False,
     ):
         self.market_profile = get_market_profile(market)
         self.registry = OperatorRegistry()
@@ -129,6 +130,7 @@ class AlphaService:
             knowledge_base=self.knowledge_base,
             feature_kitchen=self.feature_kitchen,
             checkpoint_manager=self.checkpoint_manager,
+            adaptive_scheduler=adaptive_scheduler,
         )
 
         self.signal_transformer = SignalTransformer()
@@ -697,7 +699,10 @@ class AlphaService:
                     # Enrich top-K entries with source + signature hashes for
                     # automatic archival with full lineage.
                     zoo_payloads: list[dict[str, Any]] = []
-                    for idx, top in enumerate(result["top_results"]):
+                    from .search.presets import auto_archive_top_k
+
+                    archive_cap = max(1, int(auto_archive_top_k()))
+                    for idx, top in enumerate(result["top_results"][:archive_cap]):
                         detail = search_result.details_by_hash.get(top.get("expr_hash"), {})
                         payload = {
                             **top,

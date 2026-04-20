@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import time
 from collections import defaultdict, deque
+from contextvars import ContextVar
 from dataclasses import asdict, dataclass, field
 from typing import Any, Callable, Protocol, runtime_checkable
 
@@ -406,6 +407,36 @@ class BudgetTracker:
             "exhausted": self.exhausted(),
             "exhausted_reasons": list(self.exhausted_reasons),
         }
+
+
+# Current-cycle handle so deep callees (LLM backend, evaluator) can record
+# usage without explicit dependency injection through every layer.
+_current_budget: ContextVar["BudgetTracker | None"] = ContextVar("_current_budget", default=None)
+
+
+def current_budget() -> "BudgetTracker | None":
+    """Return the BudgetTracker bound to the current search cycle, if any."""
+    return _current_budget.get(None)
+
+
+class _BudgetScope:
+    """``with budget_scope(tracker):`` binds the tracker for the block's span."""
+
+    def __init__(self, tracker: "BudgetTracker | None") -> None:
+        self._tracker = tracker
+        self._token: Any = None
+
+    def __enter__(self) -> "BudgetTracker | None":
+        self._token = _current_budget.set(self._tracker)
+        return self._tracker
+
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None:
+        if self._token is not None:
+            _current_budget.reset(self._token)
+
+
+def budget_scope(tracker: "BudgetTracker | None") -> _BudgetScope:
+    return _BudgetScope(tracker)
 
 
 @dataclass

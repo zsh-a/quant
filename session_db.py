@@ -1019,6 +1019,7 @@ class SessionDB:
         "promoted_to",      # zoo_factor --promoted_to--> simulation_job
         "backtests",        # simulation_run --backtests--> zoo_factor (records live metrics)
         "triggered_by",     # simulation_job --triggered_by--> data_update_run
+        "similar_to",       # zoo_factor --similar_to--> zoo_factor (signature near-dup)
     }
 
     def add_lineage_edge(

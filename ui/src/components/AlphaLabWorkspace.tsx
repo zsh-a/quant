@@ -2,7 +2,8 @@
  * Alpha Lab Workspace — thin shell with 5 tabs organized by user intent.
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, Cpu, LibraryBig, Workflow, Zap } from 'lucide-react'
+import { Activity, Bookmark, Cpu, LibraryBig, Trash2, Workflow, Zap } from 'lucide-react'
+import { useParameterSnapshots, type ParamSnapshotValue } from '../hooks/useParameterSnapshots'
 
 import type { AlphaLabWorkspace as WorkspacePayload } from '../types'
 import { useSearchJobs } from '../hooks/useSearchJobs'
@@ -101,6 +102,31 @@ export const AlphaLabWorkspace: React.FC<AlphaLabWorkspaceProps> = ({ onViewSess
   const searchJobs = useSearchJobs(() => void loadWorkspace())
   const handleLoadFormula = useCallback((f: string) => { setFormula(f); setTab('research') }, [])
 
+  // Parameter snapshots — save/restore workspace context across tabs/sessions
+  const { snapshots, save: saveSnapshot, remove: removeSnapshot } = useParameterSnapshots()
+  const [snapshotMenuOpen, setSnapshotMenuOpen] = useState(false)
+  const snapshotCurrent: ParamSnapshotValue = useMemo(() => ({
+    market, interval, symbols, universe, excludeST, startTime, endTime, formula,
+  }), [market, interval, symbols, universe, excludeST, startTime, endTime, formula])
+
+  const restoreSnapshot = useCallback((v: ParamSnapshotValue) => {
+    if (v.market && v.market !== market) {
+      // Market change triggers cascade reset; apply the rest AFTER.
+      setMarket(v.market)
+    }
+    setInterval(v.interval)
+    setSymbols(v.symbols)
+    setUniverse(v.universe)
+    setExcludeST(v.excludeST)
+    setStartTime(v.startTime)
+    setEndTime(v.endTime)
+    if (v.formula) setFormula(v.formula)
+    setSnapshotMenuOpen(false)
+    void import('sonner').then(({ toast }) => {
+      toast.success('Parameters restored')
+    }).catch(() => {})
+  }, [market])
+
   const engineLabel = ws?.engine
     ? `${ws.engine.backend}${ws.engine.triton ? '+Triton' : ''}`
     : '...'
@@ -139,6 +165,72 @@ export const AlphaLabWorkspace: React.FC<AlphaLabWorkspaceProps> = ({ onViewSess
           <span className="inline-flex items-center gap-1">
             <Workflow className="size-3" />{ws?.runs.length ?? 0} runs
           </span>
+        </div>
+
+        {/* Parameter snapshots */}
+        <div className="ml-auto relative">
+          <button
+            type="button"
+            onClick={() => setSnapshotMenuOpen(o => !o)}
+            className="inline-flex items-center gap-1 rounded-lg border border-border/60 bg-secondary/20 px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground transition"
+          >
+            <Bookmark className="size-3" />
+            Snapshots {snapshots.length > 0 && <span className="ml-1 text-[10px]">({snapshots.length})</span>}
+          </button>
+          {snapshotMenuOpen && (
+            <div className="absolute right-0 top-full z-50 mt-1 w-72 rounded-xl border border-border/70 bg-card/95 p-2 shadow-xl backdrop-blur">
+              <div className="flex items-center gap-2 pb-2 border-b border-border/40 mb-2">
+                <input
+                  className="flex-1 rounded-md border border-border bg-input px-2 py-1 text-xs outline-none"
+                  placeholder="Snapshot name"
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') {
+                      const v = (e.target as HTMLInputElement).value.trim()
+                      if (v) {
+                        saveSnapshot(v, snapshotCurrent)
+                        ;(e.target as HTMLInputElement).value = ''
+                      }
+                    }
+                  }}
+                />
+                <span className="text-[10px] text-muted-foreground">enter=save</span>
+              </div>
+              {snapshots.length === 0 ? (
+                <div className="text-xs text-muted-foreground py-2 text-center">
+                  No snapshots yet — save the current parameters to revisit later.
+                </div>
+              ) : (
+                <ul className="max-h-72 overflow-y-auto space-y-1">
+                  {snapshots.map(s => (
+                    <li
+                      key={s.name}
+                      className="group flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-accent/40 transition"
+                    >
+                      <button
+                        type="button"
+                        onClick={() => restoreSnapshot(s.value)}
+                        className="flex-1 text-left"
+                      >
+                        <div className="text-xs font-medium text-foreground truncate">{s.name}</div>
+                        <div className="text-[10px] text-muted-foreground truncate">
+                          {s.value.market} · {s.value.interval} ·{' '}
+                          {new Date(s.savedAt).toLocaleString()}
+                        </div>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => removeSnapshot(s.name)}
+                        className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-red-400 transition"
+                        title="Remove snapshot"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

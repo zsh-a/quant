@@ -351,64 +351,86 @@ class LangfuseCollector:
 
 
 class JsonlFileCollector:
-    """Appends spans as JSON-Lines to ``data/alpha/traces/{request_id}.jsonl``.
+    """Appends spans as JSON-Lines under ``data/alpha/traces/``.
 
-    Spans without a ``request_id`` fall back to ``trace_id`` for the filename,
-    so every span remains discoverable.
+    Spans without a ``request_id`` fall back to ``trace_id``.
+
+    Concurrency model:
+      - Each worker appends to ``{request_id}__{pid}.jsonl`` — no inter-
+        process interleaving, no fcntl required.
+      - Within a process a ``threading.Lock`` serialises writes.
+      - ``load_spans`` aggregates all per-pid files for a request_id.
     """
 
     def __init__(self, base_dir: Path | str | None = None) -> None:
+        import threading as _threading
+
         from src.config.paths import ALPHA_TRACES_DIR
 
         self._base = Path(base_dir) if base_dir else ALPHA_TRACES_DIR
         self._base.mkdir(parents=True, exist_ok=True)
+        self._pid = os.getpid()
+        self._lock = _threading.Lock()
+
+    @staticmethod
+    def _sanitize_key(key: str) -> str:
+        return "".join(c for c in str(key) if c.isalnum() or c in ("-", "_"))[:80] or "unknown"
 
     def _resolve_path(self, span: Span) -> Path:
         key = span.request_id or span.trace_id
-        # Sanitize to safe filename
-        safe = "".join(c for c in str(key) if c.isalnum() or c in ("-", "_"))[:80] or "unknown"
-        return self._base / f"{safe}.jsonl"
+        safe = self._sanitize_key(str(key))
+        return self._base / f"{safe}__{self._pid}.jsonl"
 
     def on_span_end(self, span: Span) -> None:
         import json as _json
 
         try:
             path = self._resolve_path(span)
-            with path.open("a", encoding="utf-8") as fh:
-                fh.write(_json.dumps(span.to_dict(), ensure_ascii=False, default=str) + "\n")
+            line = _json.dumps(span.to_dict(), ensure_ascii=False, default=str) + "\n"
+            with self._lock:
+                with path.open("a", encoding="utf-8") as fh:
+                    fh.write(line)
         except Exception as exc:
             logger.debug("jsonl tracing write failed: {}", exc)
 
+    def _paths_for(self, request_id: str) -> list[Path]:
+        safe = self._sanitize_key(request_id)
+        # Matches both legacy ``{safe}.jsonl`` and per-pid ``{safe}__{pid}.jsonl``.
+        return sorted(self._base.glob(f"{safe}*.jsonl"))
+
     def list_request_ids(self) -> list[str]:
+        """Distinct request_ids (PID suffix stripped), newest first."""
         try:
-            return sorted(
-                (p.stem for p in self._base.glob("*.jsonl")),
-                key=lambda name: (self._base / f"{name}.jsonl").stat().st_mtime,
-                reverse=True,
-            )
+            ids: dict[str, float] = {}
+            for p in self._base.glob("*.jsonl"):
+                stem = p.stem
+                if "__" in stem:
+                    stem = stem.rsplit("__", 1)[0]
+                mtime = p.stat().st_mtime
+                ids[stem] = max(ids.get(stem, 0.0), mtime)
+            return [k for k, _ in sorted(ids.items(), key=lambda kv: kv[1], reverse=True)]
         except OSError:
             return []
 
     def load_spans(self, request_id: str) -> list[dict[str, Any]]:
+        """Aggregate every per-pid file for ``request_id``, sorted by start_time."""
         import json as _json
 
-        safe = "".join(c for c in str(request_id) if c.isalnum() or c in ("-", "_"))[:80]
-        path = self._base / f"{safe}.jsonl"
-        if not path.exists():
-            return []
         out: list[dict[str, Any]] = []
-        try:
-            with path.open("r", encoding="utf-8") as fh:
-                for line in fh:
-                    line = line.strip()
-                    if not line:
-                        continue
-                    try:
-                        out.append(_json.loads(line))
-                    except Exception:
-                        continue
-        except OSError:
-            return []
+        for path in self._paths_for(request_id):
+            try:
+                with path.open("r", encoding="utf-8") as fh:
+                    for line in fh:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            out.append(_json.loads(line))
+                        except Exception:
+                            continue
+            except OSError:
+                continue
+        out.sort(key=lambda s: s.get("start_time", 0))
         return out
 
 

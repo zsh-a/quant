@@ -10,7 +10,7 @@ from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 from src.monitoring.alerts import alert_manager
 from src.monitoring.health import health_checker
-from src.monitoring.metrics import update_system_metrics
+from src.monitoring.metrics import update_alpha_lab_metrics, update_system_metrics
 
 router = APIRouter(prefix="/monitoring", tags=["monitoring"])
 
@@ -28,6 +28,7 @@ async def health_check():
 async def metrics():
     try:
         update_system_metrics()
+        update_alpha_lab_metrics()
         return PlainTextResponse(
             content=generate_latest().decode("utf-8"),
             media_type=CONTENT_TYPE_LATEST,
