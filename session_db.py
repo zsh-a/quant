@@ -199,6 +199,8 @@ class SessionDB:
             self._add_column_if_not_exists(cursor, "sessions", "job_id", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "run_id", "TEXT")
             self._add_column_if_not_exists(cursor, "sessions", "last_processed_at", "TEXT")
+            self._add_column_if_not_exists(cursor, "sessions", "market", "TEXT DEFAULT 'a_share'")
+            self._add_column_if_not_exists(cursor, "sessions", "interval", "TEXT DEFAULT '1d'")
             self._add_column_if_not_exists(cursor, "data_update_runs", "last_heartbeat_at", "TEXT")
 
             cursor.execute("CREATE INDEX IF NOT EXISTS idx_sessions_created_at ON sessions(created_at DESC)")
@@ -252,6 +254,8 @@ class SessionDB:
         job_id: Optional[str] = None,
         run_id: Optional[str] = None,
         last_processed_at: Optional[str] = None,
+        market: str = "a_share",
+        interval: str = "1d",
     ):
         params_json = self._json_dumps(params or {})
         with self._get_conn() as conn:
@@ -259,8 +263,9 @@ class SessionDB:
                 """
                 INSERT INTO sessions (
                     session_id, strategy_name, symbol, mode, start_date, end_date,
-                    status, progress, params, source, job_id, run_id, last_processed_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    status, progress, params, source, job_id, run_id, last_processed_at,
+                    market, interval
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     session_id,
@@ -276,6 +281,8 @@ class SessionDB:
                     job_id,
                     run_id,
                     last_processed_at,
+                    market,
+                    interval,
                 ),
             )
 

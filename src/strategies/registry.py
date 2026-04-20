@@ -93,6 +93,12 @@ class StrategyRegistry:
             _ = brooks_strategy
         except Exception:
             pass
+        try:
+            from src.strategies import brooks_v2
+
+            _ = brooks_v2
+        except Exception:
+            pass
 
 
 # Auto-register all strategies on module import

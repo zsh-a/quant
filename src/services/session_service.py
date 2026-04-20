@@ -26,6 +26,8 @@ class SessionRuntime:
     error: Optional[str] = None
     engine: Any = None
     broker: Any = None
+    market: str = "a_share"
+    interval: str = "1d"
 
 
 class SessionService:
@@ -50,6 +52,8 @@ class SessionService:
         run_id: Optional[str] = None,
         last_processed_at: Optional[str] = None,
         register_runtime: bool = True,
+        market: str = "a_share",
+        interval: str = "1d",
     ) -> SessionRuntime:
         runtime = SessionRuntime(
             session_id=session_id,
@@ -59,6 +63,8 @@ class SessionService:
             start_date=start_date,
             end_date=end_date,
             params=dict(params or {}),
+            market=market,
+            interval=interval,
         )
         self.session_db.create_session(
             session_id,
@@ -72,6 +78,8 @@ class SessionService:
             job_id=job_id,
             run_id=run_id,
             last_processed_at=last_processed_at,
+            market=market,
+            interval=interval,
         )
         if register_runtime:
             with self._lock:
@@ -210,6 +218,8 @@ class SessionService:
             "status": runtime.status,
             "progress": runtime.progress,
             "error": runtime.error,
+            "market": runtime.market,
+            "interval": runtime.interval,
         }
         equity_history = self.session_db.get_equity_history(session_id)
         trades = self.session_db.get_trades(session_id)
@@ -232,6 +242,8 @@ class SessionService:
             "end_date": base.get("end_date"),
             "params": base.get("params", {}),
             "error": runtime.error if runtime is not None else base.get("error"),
+            "market": base.get("market", "a_share") or "a_share",
+            "interval": base.get("interval", "1d") or "1d",
         }
         metadata = {
             "checkpoint_type": "manual",
@@ -254,6 +266,8 @@ class SessionService:
             progress=state.get("progress", 0.0),
             positions=dict(state.get("positions", {})),
             error=state.get("error"),
+            market=state.get("market") or "a_share",
+            interval=state.get("interval") or "1d",
         )
         if self.session_db.get_session(runtime.session_id) is None:
             self.session_db.create_session(
@@ -264,6 +278,8 @@ class SessionService:
                 runtime.start_date,
                 runtime.end_date,
                 runtime.params,
+                market=runtime.market,
+                interval=runtime.interval,
             )
             self.session_db.update_session(
                 runtime.session_id,

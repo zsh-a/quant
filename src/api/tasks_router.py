@@ -34,6 +34,8 @@ class BacktestTaskRequest(BaseModel):
     slippage: Ratio = broker_config.backtest.slippage
     enable_risk_management: bool = True
     chunk_size_months: Optional[int] = None
+    market: str = "a_share"
+    interval: str = "1d"
 
 
 class TaskResponse(BaseModel):
@@ -75,6 +77,8 @@ async def create_backtest_task(request: BacktestTaskRequest):
             "slippage": request.slippage,
             "enable_risk_management": request.enable_risk_management,
             "chunk_size_months": request.chunk_size_months,
+            "market": request.market,
+            "interval": request.interval,
         }
 
         # Submit task to Celery

@@ -180,6 +180,8 @@ async def run_session(req: SessionRequest, background_tasks: BackgroundTasks, re
         start_date=req.start_date,
         end_date=req.end_date,
         params=req.params,
+        market=req.market,
+        interval=req.interval,
     )
     loop = asyncio.get_running_loop()
 
@@ -291,6 +293,8 @@ async def run_session_async(req: SessionRequest, request: Request = None):
         end_date=req.end_date,
         params=req.params,
         register_runtime=False,
+        market=req.market,
+        interval=req.interval,
     )
 
     # Build config for Celery task (include request_id for tracing)

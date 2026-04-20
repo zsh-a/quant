@@ -32,6 +32,22 @@ class BacktestTask(Task):
         )
 
 
+def resolve_market_interval(session_id: str, config: dict, session_db) -> tuple[str, str]:
+    """Resolve market/interval for a backtest task.
+
+    Prefers the Celery payload; falls back to the persisted session record so
+    reruns and legacy payloads don't silently regress to A-share defaults.
+    """
+    market = config.get("market")
+    interval = config.get("interval")
+    if market is None or interval is None:
+        row = session_db.get_session(session_id) if session_db is not None else None
+        if row:
+            market = market or row.get("market")
+            interval = interval or row.get("interval")
+    return market or "a_share", interval or "1d"
+
+
 @app.task(
     bind=True,
     base=BacktestTask,
@@ -79,6 +95,7 @@ def run_backtest_task(self, session_id: str, config: dict):
 
     try:
         self.update_progress(session_id, 0, "Initializing backtest...")
+        market, interval = resolve_market_interval(session_id, config, session_db)
         result = execute_session(
             SessionExecutionConfig(
                 session_id=session_id,
@@ -87,6 +104,8 @@ def run_backtest_task(self, session_id: str, config: dict):
                 start_date=config["start_date"],
                 end_date=config.get("end_date"),
                 mode=config.get("mode", "backtest"),
+                market=market,
+                interval=interval,
                 params=config.get("params", {}),
                 initial_cash=config.get("initial_cash"),
                 commission=config.get("commission"),

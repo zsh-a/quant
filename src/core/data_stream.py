@@ -276,16 +276,9 @@ class CryptoDBDataStream(DataStream):
         interval: str = "1h",
         chunk_days: int = 90,
     ):
-        from clickhouse_driver import Client as CHClient
+        from src.market_data.clickhouse import create_clickhouse_client
 
-        from src.config.settings import get_settings
-
-        settings = get_settings()
-        self.ch = CHClient(
-            host=settings.database.host,
-            port=settings.database.port,
-            database="crypto_data",
-        )
+        self.ch = create_clickhouse_client()
         self.symbols = symbols
         self.interval = interval
         self.chunk_days = chunk_days
@@ -325,21 +318,27 @@ class CryptoDBDataStream(DataStream):
         if self.total_bars > 0:
             self._load_next_chunk()
 
+    @staticmethod
+    def _fmt_dt(dt) -> str:
+        # clickhouse_connect's DateTime binding accepts naive strings; strip tz.
+        dt_naive = dt.tz_convert("UTC").tz_localize(None) if dt.tzinfo is not None else dt
+        return dt_naive.strftime("%Y-%m-%d %H:%M:%S")
+
     def _load_timeline(self):
         """Get sorted unique timestamps for the first symbol."""
         ref = self.symbols[0] if self.symbols else "BTCUSDT"
         interval_expr = f"toStartOfInterval(open_time, INTERVAL {self._minutes} MINUTE)"
         q = (
             f"SELECT DISTINCT {interval_expr} AS t FROM {self._TABLE} "
-            "WHERE symbol = %(sym)s "
-            "AND open_time >= %(s)s AND open_time < %(e)s "
+            "WHERE symbol = {sym:String} "
+            "AND open_time >= {s:DateTime} AND open_time < {e:DateTime} "
             "ORDER BY t"
         )
-        rows = self.ch.execute(
+        result = self.ch.query(
             q,
-            {"sym": ref, "s": self.start_dt.isoformat(), "e": self.end_dt.isoformat()},
+            parameters={"sym": ref, "s": self._fmt_dt(self.start_dt), "e": self._fmt_dt(self.end_dt)},
         )
-        self.timestamps = [r[0] for r in rows]
+        self.timestamps = [r[0] for r in result.result_rows]
 
     def _build_query(self) -> str:
         interval_expr = f"toStartOfInterval(open_time, INTERVAL {self._minutes} MINUTE)"
@@ -353,8 +352,8 @@ class CryptoDBDataStream(DataStream):
                 cols.append(f"{agg}({col}) AS {col}")
         return (
             f"SELECT {', '.join(cols)} FROM {self._TABLE} "
-            "WHERE symbol IN %(syms)s "
-            "AND open_time >= %(s)s AND open_time < %(e)s "
+            "WHERE symbol IN {syms:Array(String)} "
+            "AND open_time >= {s:DateTime} AND open_time < {e:DateTime} "
             f"GROUP BY symbol, {interval_expr} ORDER BY _ot, symbol"
         )
 
@@ -370,18 +369,22 @@ class CryptoDBDataStream(DataStream):
             return
         self.chunk_end_idx = self.global_idx + len(chunk_ts)
 
-        rows = self.ch.execute(
+        # ClickHouse timestamps come back naive (UTC); format bounds the same way.
+        def _fmt(dt) -> str:
+            if hasattr(dt, "tzinfo") and dt.tzinfo is not None:
+                dt = pd.Timestamp(dt).tz_convert("UTC").tz_localize(None)
+            return pd.Timestamp(dt).strftime("%Y-%m-%d %H:%M:%S")
+
+        result = self.ch.query(
             self._build_query(),
-            {
-                "syms": self.symbols,
-                "s": chunk_start.isoformat(),
-                "e": (chunk_ts[-1] + pd.Timedelta(minutes=self._minutes)).isoformat(),
+            parameters={
+                "syms": list(self.symbols),
+                "s": _fmt(chunk_start),
+                "e": _fmt(chunk_ts[-1] + pd.Timedelta(minutes=self._minutes)),
             },
-            with_column_types=True,
         )
-        data, col_types = rows
-        col_names = [c[0] for c in col_types]
-        df = pd.DataFrame(data, columns=col_names)
+        col_names = list(result.column_names)
+        df = pd.DataFrame(result.result_rows, columns=col_names)
 
         self.current_chunk = {}
         if not df.empty:
