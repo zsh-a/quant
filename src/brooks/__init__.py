@@ -4,6 +4,7 @@ Top-level package for the Brooks-style multi-stage trading pipeline
 (detector → analyst → aggregator → TE → risk → execution).
 """
 
+from src.brooks.context import AccountSnapshot, Bar, BrooksContext, TFSnapshot
 from src.brooks.features import (
     BarFeatureExtractor,
     ExtendedBarFeatures,
@@ -17,7 +18,10 @@ from src.brooks.structure import (
 )
 
 __all__ = [
+    "AccountSnapshot",
+    "Bar",
     "BarFeatureExtractor",
+    "BrooksContext",
     "ChannelFit",
     "Decision",
     "ExtendedBarFeatures",
@@ -26,4 +30,5 @@ __all__ = [
     "Order",
     "Signal",
     "SwingPoint",
+    "TFSnapshot",
 ]
