@@ -10,6 +10,7 @@ from src.brooks.features import (
     ExtendedBarFeatures,
     SwingPoint,
 )
+from src.brooks.regime import BrooksRegime, BrooksRegimeClassifier, RegimeSnapshot
 from src.brooks.schema import Decision, Order, Signal
 from src.brooks.structure import (
     ChannelFit,
@@ -22,12 +23,15 @@ __all__ = [
     "Bar",
     "BarFeatureExtractor",
     "BrooksContext",
+    "BrooksRegime",
+    "BrooksRegimeClassifier",
     "ChannelFit",
     "Decision",
     "ExtendedBarFeatures",
     "MarketStructure",
     "MarketStructureTracker",
     "Order",
+    "RegimeSnapshot",
     "Signal",
     "SwingPoint",
     "TFSnapshot",
