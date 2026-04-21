@@ -11,9 +11,7 @@ import yaml
 
 from .provider import Provider
 
-_DEFAULT_REGISTRY_PATH = (
-    Path(__file__).resolve().parents[3] / "config" / "llm" / "registry.yaml"
-)
+_DEFAULT_REGISTRY_PATH = Path(__file__).resolve().parents[3] / "config" / "llm" / "registry.yaml"
 
 
 @dataclass

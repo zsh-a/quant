@@ -36,9 +36,7 @@ class GeminiProvider:
         client: Any = None,
     ) -> None:
         self.model = model
-        self._api_key = (
-            api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
-        )
+        self._api_key = api_key or os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if client is not None:
             self._client = client
             return
@@ -90,9 +88,7 @@ class GeminiProvider:
 
     # ---- rendering --------------------------------------------------------
 
-    def _split(
-        self, messages: list[Message]
-    ) -> tuple[str, list[dict[str, Any]]]:
+    def _split(self, messages: list[Message]) -> tuple[str, list[dict[str, Any]]]:
         system_fragments: list[str] = []
         contents: list[dict[str, Any]] = []
         for message in messages:

@@ -14,7 +14,6 @@ from src.alpha.llm.providers.gemini import GeminiProvider
 
 from .conftest import HelloOut
 
-
 # ----------------------------- fake google-genai ---------------------------------
 
 

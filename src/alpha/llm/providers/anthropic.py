@@ -113,11 +113,7 @@ class AnthropicProvider:
             rendered_parts: list[dict[str, Any]] = []
             for pi, part in enumerate(message.content):
                 block = self._render_part(part)
-                if (
-                    part.cache is not None
-                    and part.cache in cache_blocks
-                    and last_for_block.get(part.cache) == (mi, pi)
-                ):
+                if part.cache is not None and part.cache in cache_blocks and last_for_block.get(part.cache) == (mi, pi):
                     block["cache_control"] = _cache_control(ttl_seconds)
                 rendered_parts.append(block)
 
@@ -128,9 +124,7 @@ class AnthropicProvider:
         return system_blocks, chat_messages
 
     @staticmethod
-    def _last_part_per_block(
-        messages: list[Message], cache_blocks: set[str]
-    ) -> dict[str, tuple[int, int]]:
+    def _last_part_per_block(messages: list[Message], cache_blocks: set[str]) -> dict[str, tuple[int, int]]:
         last: dict[str, tuple[int, int]] = {}
         for mi, msg in enumerate(messages):
             for pi, part in enumerate(msg.content):
@@ -161,9 +155,7 @@ class AnthropicProvider:
             if get_attr(block, "type") == "tool_use" and get_attr(block, "name") == _STRUCTURED_TOOL_NAME:
                 payload = get_attr(block, "input", {}) or {}
                 return schema.model_validate(payload)
-        raise ValueError(
-            f"Anthropic response contained no tool_use block named {_STRUCTURED_TOOL_NAME!r}"
-        )
+        raise ValueError(f"Anthropic response contained no tool_use block named {_STRUCTURED_TOOL_NAME!r}")
 
     @staticmethod
     def _extract_usage(raw: Any) -> Usage:

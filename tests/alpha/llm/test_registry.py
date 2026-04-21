@@ -9,7 +9,6 @@ import pytest
 from src.alpha.llm.provider import Provider
 from src.alpha.llm.registry import ModelRegistry, ModelSpec
 
-
 REPO_ROOT = Path(__file__).resolve().parents[3]
 DEFAULT_YAML = REPO_ROOT / "config" / "llm" / "registry.yaml"
 

@@ -144,9 +144,5 @@ def _first_choice_text(raw: Any) -> str:
     content = get_attr(msg, "content", "") or ""
     if isinstance(content, list):
         # Some OpenAI-compatible backends return structured parts instead of a string.
-        content = "".join(
-            get_attr(p, "text", "") or ""
-            for p in content
-            if get_attr(p, "type") == "text"
-        )
+        content = "".join(get_attr(p, "text", "") or "" for p in content if get_attr(p, "type") == "text")
     return content

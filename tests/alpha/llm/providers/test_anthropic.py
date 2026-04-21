@@ -15,7 +15,6 @@ from src.alpha.llm.providers.anthropic import AnthropicProvider
 
 from .conftest import HelloOut
 
-
 # ----------------------------- fake Anthropic SDK --------------------------------
 
 

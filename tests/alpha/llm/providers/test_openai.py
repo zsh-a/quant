@@ -15,7 +15,6 @@ from src.alpha.llm.providers.openai import OpenAIProvider
 
 from .conftest import HelloOut
 
-
 # ------------------------------- fake OpenAI SDK ---------------------------------
 
 
@@ -163,10 +162,16 @@ def test_list_content_response_is_concatenated():
         content: list
 
     resp = _OpenAIResponse(
-        choices=[_Choice(message=_MessageWithParts(content=[
-            _TextPart(type="text", text='{"greeting":'),
-            _TextPart(type="text", text='"yo"}'),
-        ]))],
+        choices=[
+            _Choice(
+                message=_MessageWithParts(
+                    content=[
+                        _TextPart(type="text", text='{"greeting":'),
+                        _TextPart(type="text", text='"yo"}'),
+                    ]
+                )
+            )
+        ],
         usage=_OpenAIUsage(prompt_tokens=1, completion_tokens=2),
     )
     provider = OpenAIProvider(model="gpt-4.1-mini", client=_FakeOpenAIClient(resp))
@@ -187,9 +192,7 @@ def test_live_roundtrip_hello_schema():
     provider = OpenAIProvider(model="gpt-4.1-mini")
     result = asyncio.run(
         provider.complete(
-            messages=[
-                Message(role="user", content=[TextPart(text='Return JSON {"greeting":"hi"}.')])
-            ],
+            messages=[Message(role="user", content=[TextPart(text='Return JSON {"greeting":"hi"}.')])],
             schema=HelloOut,
             max_tokens=64,
         )
