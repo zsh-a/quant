@@ -1,0 +1,109 @@
+# Frontier-model registry for `src/alpha/llm/registry.py::ModelRegistry.from_yaml()`.
+# Each entry: id (local handle), provider (anthropic|openai|gemini), api_id (vendor model id),
+# capability flags, and USD pricing per 1M tokens.
+
+models:
+  # ---- Anthropic ----------------------------------------------------------
+  - id: claude-opus-4-7
+    provider: anthropic
+    api_id: claude-opus-4-7
+    context_window: 200000
+    max_output: 32000
+    supports_image: true
+    supports_tool_use: true
+    supports_cache: true
+    cache_min_tokens: 1024
+    pricing:
+      input_per_1m: 15.00
+      output_per_1m: 75.00
+      cache_write_per_1m: 18.75
+      cache_read_per_1m: 1.50
+    notes: "Frontier reasoning / long-horizon planning."
+
+  - id: claude-sonnet-4-6
+    provider: anthropic
+    api_id: claude-sonnet-4-6
+    context_window: 200000
+    max_output: 32000
+    supports_image: true
+    supports_tool_use: true
+    supports_cache: true
+    cache_min_tokens: 1024
+    pricing:
+      input_per_1m: 3.00
+      output_per_1m: 15.00
+      cache_write_per_1m: 3.75
+      cache_read_per_1m: 0.30
+    notes: "Workhorse; best cost/quality balance for most analyst prompts."
+
+  - id: claude-haiku-4-5
+    provider: anthropic
+    api_id: claude-haiku-4-5
+    context_window: 200000
+    max_output: 16000
+    supports_image: true
+    supports_tool_use: true
+    supports_cache: true
+    cache_min_tokens: 2048
+    pricing:
+      input_per_1m: 1.00
+      output_per_1m: 5.00
+      cache_write_per_1m: 1.25
+      cache_read_per_1m: 0.10
+    notes: "Low-latency tier for high-QPS structured classification."
+
+  # ---- OpenAI -------------------------------------------------------------
+  - id: gpt-4.1
+    provider: openai
+    api_id: gpt-4.1
+    context_window: 1000000
+    max_output: 32000
+    supports_image: true
+    supports_tool_use: true
+    supports_cache: true
+    pricing:
+      input_per_1m: 2.00
+      output_per_1m: 8.00
+      cache_read_per_1m: 0.50
+    notes: "1M context; caching is automatic via prompt_tokens_details.cached_tokens."
+
+  - id: gpt-4.1-mini
+    provider: openai
+    api_id: gpt-4.1-mini
+    context_window: 1000000
+    max_output: 32000
+    supports_image: true
+    supports_tool_use: true
+    supports_cache: true
+    pricing:
+      input_per_1m: 0.40
+      output_per_1m: 1.60
+      cache_read_per_1m: 0.10
+
+  # ---- Gemini -------------------------------------------------------------
+  - id: gemini-2.5-pro
+    provider: gemini
+    api_id: gemini-2.5-pro
+    context_window: 2000000
+    max_output: 65536
+    supports_image: true
+    supports_tool_use: true
+    supports_cache: true
+    pricing:
+      input_per_1m: 1.25
+      output_per_1m: 10.00
+      cache_read_per_1m: 0.3125
+    notes: "2M context; explicit cached_content API recommended for reused prefixes."
+
+  - id: gemini-2.5-flash
+    provider: gemini
+    api_id: gemini-2.5-flash
+    context_window: 1000000
+    max_output: 65536
+    supports_image: true
+    supports_tool_use: true
+    supports_cache: true
+    pricing:
+      input_per_1m: 0.30
+      output_per_1m: 2.50
+      cache_read_per_1m: 0.075
