@@ -1,0 +1,598 @@
+version: 1
+
+# ---------------------------------------------------------------------------
+# Brooks price-action taxonomy — single source of truth.
+#
+# Conventions for `detection` blocks:
+#   * Field names refer to `ExtendedBarFeatures` (src/analysis/brooks/features.py)
+#     and `MarketStructure` (src/analysis/brooks/structure.py). Comparison
+#     operators are encoded as quoted strings (">=2", "<10", "==long").
+#   * Values without an operator are equality predicates.
+#   * `requires` is an ordered AND list of predicates that must all hold.
+# ---------------------------------------------------------------------------
+
+bar_types:
+  - name: trend_bull
+    aliases: [strong_bull, bull_trend_bar]
+    definition: >
+      Bull bar with body_pct > 50 and close in the upper third of the range.
+      Indicates one-sided buying pressure during the bar.
+    detection:
+      is_bull: true
+      is_trend: true
+      body_pct_min: 50
+      close_position: high
+    examples:
+      positive:
+        - "body=78 close=high (e.g. o=100 h=110 l=99 c=109)"
+        - "body=62 close=high follow-through bar after H1 trigger"
+      negative:
+        - "body=78 close=mid — strong body but upper wick rejects → not trend_bull"
+        - "body=20 close=high — bull but doji-ish → doji_bull"
+
+  - name: trend_bear
+    aliases: [strong_bear, bear_trend_bar]
+    definition: >
+      Bear bar with body_pct > 50 and close in the lower third of the range.
+      One-sided selling pressure during the bar.
+    detection:
+      is_bull: false
+      is_trend: true
+      body_pct_min: 50
+      close_position: low
+    examples:
+      positive:
+        - "body=70 close=low follow-through after L1 trigger"
+      negative:
+        - "body=70 close=mid — long lower wick rejects → not trend_bear"
+
+  - name: doji_bull
+    aliases: [weak_bull, bull_body_small]
+    definition: Bull-coloured bar with body_pct <= 10 — effectively two-sided.
+    detection:
+      is_bull: true
+      is_doji: true
+    examples:
+      positive:
+        - "body=4 close=mid — barely-bull doji inside a tight range"
+      negative:
+        - "body=30 — small but not doji"
+
+  - name: doji_bear
+    aliases: [weak_bear, bear_body_small]
+    definition: Bear-coloured bar with body_pct <= 10.
+    detection:
+      is_bull: false
+      is_doji: true
+
+  - name: signal_bar
+    aliases: [setup_bar]
+    definition: >
+      A bar whose extreme defines the next bar's stop-entry price. In Brooks
+      practice a *good* signal bar is a trend bar in the direction of the
+      intended trade. Detection here is the structural role; quality is graded
+      separately by the L3 detectors.
+    detection:
+      role: setup_for_next_bar_stop_entry
+
+  - name: climactic_bar
+    aliases: [climax, blowoff]
+    definition: >
+      Trend bar that is unusually large (range >> ATR) and closes near the
+      extreme in the direction of the dominant trend. Often marks exhaustion.
+    detection:
+      is_trend: true
+      ema_atr_distance_abs_min: 2.0
+      close_position_in_trend: extreme
+    examples:
+      positive:
+        - "after 6 consecutive bull bars: trend_bull with range = 2.4*ATR"
+      negative:
+        - "trend bar 1.2*ATR — large but not blow-off"
+
+  - name: reversal_bar
+    aliases: [pin_bar, hammer_or_shooting_star]
+    definition: >
+      Bar with a wick >= 40% of its range pointing against the prior swing,
+      and a close that rejects that direction (close in opposite third).
+    detection:
+      is_reversal_bar: true
+    examples:
+      positive:
+        - "long lower wick, close in upper third after a 5-bar bear leg"
+      negative:
+        - "wick=20% — too small to qualify"
+
+  - name: ii
+    aliases: [inside_inside]
+    definition: Two consecutive inside bars (the second inside the first).
+    detection:
+      requires:
+        - "feat[-1].is_inside_bar == true"
+        - "feat[0].is_inside_bar == true"
+    examples:
+      positive: ["bar(t-1) inside bar(t-2); bar(t) inside bar(t-1)"]
+
+  - name: iii
+    aliases: [inside_inside_inside]
+    definition: Three consecutive inside bars; a tight squeeze, often a breakout setup.
+    detection:
+      requires:
+        - "feat[-2].is_inside_bar == true"
+        - "feat[-1].is_inside_bar == true"
+        - "feat[0].is_inside_bar == true"
+
+  - name: outside_bar
+    aliases: [engulfing]
+    definition: Bar whose high > prior high AND low < prior low.
+    detection:
+      is_outside_bar: true
+
+  - name: shaved_bar
+    aliases: [shaved_top, shaved_bottom]
+    definition: >
+      Trend bar whose close equals the extreme in the trend direction (no
+      wick on the trend side). Strong continuation signal.
+    detection:
+      is_trend: true
+      no_wick_on_trend_side: true
+
+# ---------------------------------------------------------------------------
+
+patterns:
+  - name: h1
+    full_name: "High 1 (first pullback in bull leg)"
+    setup: |
+      In a leg up (always_in == long, current_leg_dir == up), price pulls back
+      with one or more bear bars and forms a bull reversal bar whose high is
+      the trigger. H1 is the *first* such pullback after always-in flipped
+      long (or after the previous Hn structure reset).
+    detection:
+      requires:
+        - "structure.always_in == long"
+        - "structure.current_leg_dir == up"
+        - "pullback_bear_bars_count >= 1"
+        - "pullback_bear_bars_count <= 2"
+        - "signal_bar.kind == bull_reversal_or_bull_trend"
+      signal_bar: "bull bar at or near the pullback low (ideally close in upper third)"
+    entry: "signal_bar.high + 1 tick (stop-buy on next bar)"
+    stop: "signal_bar.low - 1 tick"
+    target: "measured_move from leg origin OR last swing high"
+    typical_probability: 0.55
+    common_misreads:
+      - "在 broad trading range 中将顶部反弹的小阳线当 H1 — 没有上涨腿背景，应忽略"
+      - "把 always_in == short 时的小反弹叫 H1（应叫 L1 of bear）"
+
+  - name: h2
+    full_name: "High 2 (second pullback in bull leg)"
+    setup: |
+      A second discrete pullback in the same up-leg: after H1 either fails
+      or is consumed, price pulls back again, prints another bull reversal
+      whose high triggers entry. Higher quality than H1 in tight bull channels.
+    detection:
+      requires:
+        - "structure.always_in == long"
+        - "leg_count_down >= 2"
+        - "signal_bar at or below leg-1 pullback low or marginally lower"
+      signal_bar: "bull reversal at or below the leg-1 low; trend body preferred"
+    entry: "signal_bar.high + 1 tick (stop-buy)"
+    stop: "signal_bar.low - 1 tick"
+    target: "measured_move OR last swing high"
+    typical_probability: 0.60
+    common_misreads:
+      - "在 broad TR 中错把 L2 反弹当 H2 — TR 没有 always-in 多头方向"
+      - "H1 触发后的延续小阳线被算成新的 H2 — 必须是新的 leg down 后的反弹"
+
+  - name: h3
+    full_name: "High 3 (third pullback — wedge bull flag)"
+    setup: |
+      Three discrete bull pullbacks in the same leg, often forming a wedge bull
+      flag (each pullback shallower or each high higher). Lower-probability
+      because the trend is older.
+    detection:
+      requires:
+        - "structure.always_in == long"
+        - "leg_count_down >= 3"
+        - "signal_bar.kind == bull_reversal_or_bull_trend"
+    entry: "signal_bar.high + 1 tick"
+    stop: "signal_bar.low - 1 tick"
+    target: "measured_move; trail aggressively"
+    typical_probability: 0.50
+    common_misreads:
+      - "未确认是 wedge 而是 3-push down → 实际是 reversal 而非 continuation"
+
+  - name: h4
+    full_name: "High 4 (fourth pullback — late, often reverses)"
+    setup: |
+      Four discrete bull pullbacks in the same leg. Brooks treats H4 as a
+      *reversal* setup more often than continuation; many H4s mark the start
+      of the bear leg.
+    detection:
+      requires:
+        - "structure.always_in == long"
+        - "leg_count_down >= 4"
+    entry: "signal_bar.high + 1 tick (continuation) OR L1 short on failure"
+    stop: "signal_bar.low - 1 tick"
+    target: "scalp; tight risk/reward"
+    typical_probability: 0.40
+    common_misreads:
+      - "把 H4 当 H1 入场（极易亏）"
+
+  - name: l1
+    full_name: "Low 1 (first pullback in bear leg)"
+    setup: Mirror of H1 in a bear leg.
+    detection:
+      requires:
+        - "structure.always_in == short"
+        - "structure.current_leg_dir == down"
+        - "pullback_bull_bars_count >= 1"
+        - "pullback_bull_bars_count <= 2"
+        - "signal_bar.kind == bear_reversal_or_bear_trend"
+      signal_bar: "bear bar near pullback high; close in lower third preferred"
+    entry: "signal_bar.low - 1 tick (stop-sell)"
+    stop: "signal_bar.high + 1 tick"
+    target: "measured_move OR last swing low"
+    typical_probability: 0.55
+    common_misreads:
+      - "TR 顶部当 L1 — 缺少 always-in short 背景"
+
+  - name: l2
+    full_name: "Low 2 (second pullback in bear leg)"
+    setup: Mirror of H2 in a bear leg; high-quality continuation.
+    detection:
+      requires:
+        - "structure.always_in == short"
+        - "leg_count_up >= 2"
+        - "signal_bar at or above leg-1 pullback high"
+    entry: "signal_bar.low - 1 tick"
+    stop: "signal_bar.high + 1 tick"
+    target: "measured_move"
+    typical_probability: 0.60
+    common_misreads:
+      - "把 H2 当 L2（搞反 always-in）"
+
+  - name: l3
+    full_name: "Low 3 (wedge bear flag)"
+    setup: Mirror of H3.
+    detection:
+      requires:
+        - "structure.always_in == short"
+        - "leg_count_up >= 3"
+    entry: "signal_bar.low - 1 tick"
+    stop: "signal_bar.high + 1 tick"
+    target: "measured_move; trail"
+    typical_probability: 0.50
+
+  - name: l4
+    full_name: "Low 4 (late, often reverses)"
+    setup: Mirror of H4 — usually a reversal setup.
+    detection:
+      requires:
+        - "structure.always_in == short"
+        - "leg_count_up >= 4"
+    entry: "signal_bar.low - 1 tick (continuation) OR H1 long on failure"
+    stop: "signal_bar.high + 1 tick"
+    target: "scalp"
+    typical_probability: 0.40
+
+  - name: ii_breakout
+    full_name: "ii (inside-inside) breakout"
+    setup: |
+      After two consecutive inside bars, the next bar breaks one extreme. The
+      ii body is the signal bar; entry is on stop in the breakout direction.
+    detection:
+      requires:
+        - "bar(t-1).is_inside_bar == true"
+        - "bar(t).is_inside_bar == true"
+      signal_bar: "the second inside bar"
+    entry: "ii_high + 1 tick (long) OR ii_low - 1 tick (short)"
+    stop: "opposite extreme of the ii"
+    target: "measured_move = ii.range projected from breakout level"
+    typical_probability: 0.55
+    common_misreads:
+      - "在 strong trend 中只交易 with-trend 突破；逆势 ii 突破极易失败"
+
+  - name: iii_breakout
+    full_name: "iii (three inside bars) breakout"
+    setup: Stronger compression than ii; breakout has larger expected range.
+    detection:
+      requires:
+        - "bar(t-2).is_inside_bar == true"
+        - "bar(t-1).is_inside_bar == true"
+        - "bar(t).is_inside_bar == true"
+    entry: "iii_high + 1 tick (long) OR iii_low - 1 tick (short)"
+    stop: "opposite extreme of the iii"
+    target: "measured_move from iii_range"
+    typical_probability: 0.60
+
+  - name: two_bar_reversal
+    full_name: "Two-bar reversal"
+    setup: |
+      A trend bar in one direction immediately followed by a trend bar in the
+      opposite direction with a similar-sized body, both at a swing extreme.
+    detection:
+      requires:
+        - "bar(t-1).is_trend == true"
+        - "bar(t).is_trend == true"
+        - "bar(t-1).is_bull != bar(t).is_bull"
+        - "at_or_near_swing_extreme(bar(t-1))"
+    entry: "second bar's extreme in the new direction +/- 1 tick"
+    stop: "opposite extreme of the two-bar combo"
+    target: "measured_move OR opposite swing"
+    typical_probability: 0.55
+
+  - name: wedge
+    full_name: "Wedge (3-push)"
+    setup: |
+      Three pushes (pullbacks/highs or pullbacks/lows) where momentum decays:
+      slope of swing-extreme regression flattens. Often a reversal setup.
+    detection:
+      requires:
+        - "swing_count_in_direction >= 3"
+        - "abs(slope_of_swings) decreasing across pushes"
+    entry: "1 tick beyond the reversal-bar after push 3"
+    stop: "1 tick beyond push-3 extreme"
+    target: "start of wedge OR measured_move from wedge height"
+    typical_probability: 0.55
+    common_misreads:
+      - "未到 push 3 就当 wedge 反转 — 等第三推确认"
+
+  - name: double_top
+    full_name: "Double Top"
+    setup: |
+      Two swing highs within ~1 ATR of each other separated by a pullback;
+      neckline is the intervening swing low. Bear reversal or pullback.
+    detection:
+      requires:
+        - "two_recent_swing_highs_within_1_atr"
+        - "intervening_swing_low_present"
+    entry: "neckline - 1 tick (stop-sell) OR bar after second-high reversal bar"
+    stop: "1 tick above the second high"
+    target: "measured_move = (high - neckline) projected below neckline"
+    typical_probability: 0.55
+    common_misreads:
+      - "在 strong bull trend 中把任意双高当反转 — 需要弱化的二推或 climax"
+
+  - name: double_bottom
+    full_name: "Double Bottom"
+    setup: Mirror of double_top — bull reversal.
+    detection:
+      requires:
+        - "two_recent_swing_lows_within_1_atr"
+        - "intervening_swing_high_present"
+    entry: "neckline + 1 tick (stop-buy)"
+    stop: "1 tick below the second low"
+    target: "measured_move = (neckline - low) projected above neckline"
+    typical_probability: 0.55
+
+  - name: final_flag
+    full_name: "Final Flag"
+    setup: |
+      A tight pullback late in a trend that breaks out *briefly* in the trend
+      direction and immediately fails — the breakout bar is reversed within
+      1-2 bars. Flag is the last with-trend pause before reversal.
+    detection:
+      requires:
+        - "leg_age >= 10 bars"
+        - "tight_pullback_after_climax == true"
+        - "breakout_then_reverse_within_2_bars == true"
+    entry: "1 tick beyond the failure bar in the new (counter-trend) direction"
+    stop: "1 tick beyond the failed-breakout extreme"
+    target: "start of final flag OR last major swing"
+    typical_probability: 0.50
+    common_misreads:
+      - "early-trend pullback 当 final flag — 至少要 climax 或长腿背景"
+
+  - name: micro_channel
+    full_name: "Micro Channel"
+    setup: |
+      A tight one-sided sequence of bars where each bar's low (in a bull
+      micro-channel) is above the prior bar's low. Often produces no
+      pullback for many bars; first pullback is high-probability.
+    detection:
+      requires:
+        - "structure.micro_channel_top != null OR structure.micro_channel_bot != null"
+        - "consecutive_with_trend_bars >= 4"
+        - "no_overlap_with_prior_bar_for_4+_bars"
+    entry: "first pullback's signal_bar in trend direction +/- 1 tick"
+    stop: "1 tick beyond signal_bar"
+    target: "measured_move from channel height; trail aggressively"
+    typical_probability: 0.65
+    common_misreads:
+      - "在 micro_channel 内逆势 fade — 直到通道破裂前几乎必亏"
+
+  - name: breakout
+    full_name: "Range/structure breakout"
+    setup: |
+      Close beyond the prior N-bar (default 20) extreme. With-trend bar
+      preferred; large body and close at extreme = strong breakout.
+    detection:
+      requires:
+        - "feat.is_breakout_up_20 == true OR feat.is_breakout_down_20 == true"
+        - "feat.is_trend == true"
+    entry: "breakout bar close +/- a tick (or stop-entry beyond breakout high/low)"
+    stop: "1 tick beyond opposite extreme of breakout bar"
+    target: "measured_move from range height"
+    typical_probability: 0.55
+    common_misreads:
+      - "doji/小体突破当强突破 — 要求 trend body + 极端 close"
+
+  - name: breakout_pullback
+    full_name: "Breakout Pullback (BP)"
+    setup: |
+      First pullback after a confirmed breakout; entry on with-trend signal
+      bar that doesn't break back inside the prior range.
+    detection:
+      requires:
+        - "structure.breakout_state in (bull_breakout, bear_breakout) within last 5 bars"
+        - "pullback_does_not_close_back_inside_range"
+        - "signal_bar in trend direction"
+    entry: "signal_bar extreme in trend direction +/- 1 tick"
+    stop: "1 tick beyond signal_bar"
+    target: "measured_move from breakout"
+    typical_probability: 0.65
+
+  - name: failed_breakout
+    full_name: "Failed Breakout (FBO)"
+    setup: |
+      A breakout bar that closes back inside the prior range within 1-5
+      bars; reversal entry in the opposite direction.
+    detection:
+      requires:
+        - "feat.is_breakout_up_20 == true OR feat.is_breakout_down_20 == true"
+        - "close_back_inside_prior_range_within_5_bars == true"
+    entry: "1 tick beyond the failure bar in the counter direction"
+    stop: "1 tick beyond the failed-breakout extreme"
+    target: "opposite extreme of the prior range"
+    typical_probability: 0.60
+
+  - name: mtr
+    full_name: "Major Trend Reversal (MTR)"
+    setup: |
+      Lower-high after a higher-low (or higher-low after lower-high) with
+      a wedge/climax preceding the reversal. Brooks' classic reversal pattern;
+      higher confidence than a single double-top.
+    detection:
+      requires:
+        - "wedge_or_climax_preceded == true"
+        - "lower_high_after_break_below_prior_swing_low (bull→bear) OR mirror"
+    entry: "1 tick beyond the second-leg signal bar"
+    stop: "1 tick beyond the lower-high (bull→bear) or higher-low (bear→bull)"
+    target: "measured_move OR opposite extreme of the prior trend"
+    typical_probability: 0.65
+
+  - name: measured_move
+    full_name: "Measured Move (MM)"
+    setup: |
+      Projection target equal to the height of leg-1 added to the start of
+      leg-2 (in trend direction). Used as default profit target for most
+      continuation patterns.
+    detection:
+      requires:
+        - "leg_1_height_known == true"
+        - "leg_2_in_progress_or_breakout_just_occurred"
+    entry: "(target only — not an entry pattern)"
+    stop: "n/a"
+    target: "leg_1.height projected from leg_2 start"
+    typical_probability: 0.55
+
+# ---------------------------------------------------------------------------
+
+regimes:
+  - name: strong_bull_trend
+    detection:
+      always_in: long
+      consecutive_trend_bars_min: 3
+      ema_relation: above
+      ema_atr_distance_min: 0.5
+    entry_bias: "long-only on H1/H2 pullbacks; avoid all shorts"
+    typical_probability: 0.65
+
+  - name: weak_bull_trend
+    detection:
+      always_in: long
+      ema_relation: above
+      ema_atr_distance_max: 0.5
+      consecutive_trend_bars_max: 2
+    entry_bias: "small-size H2/H3 longs at swing lows; tighter targets"
+    typical_probability: 0.55
+
+  - name: strong_bear_trend
+    detection:
+      always_in: short
+      consecutive_trend_bars_min: 3
+      ema_relation: below
+      ema_atr_distance_max: -0.5
+    entry_bias: "short-only on L1/L2 pullbacks; avoid all longs"
+    typical_probability: 0.65
+
+  - name: weak_bear_trend
+    detection:
+      always_in: short
+      ema_relation: below
+      ema_atr_distance_min: -0.5
+      consecutive_trend_bars_max: 2
+    entry_bias: "small-size L2/L3 shorts at swing highs"
+    typical_probability: 0.55
+
+  - name: tight_trading_range
+    detection:
+      always_in: neutral
+      ema_relation: at
+      range_height_atr_max: 2.0
+    entry_bias: "fade extremes (sell highs, buy lows); no breakouts"
+    typical_probability: 0.55
+
+  - name: broad_trading_range
+    detection:
+      always_in: neutral
+      ema_relation: at
+      range_height_atr_min: 2.0
+    entry_bias: "fade extremes with stops beyond opposite extreme; play swing legs"
+    typical_probability: 0.55
+    common_misreads:
+      - "把 broad TR 内的腿当作 trend → 用 H2/L2 标准入场，结果反向被打"
+
+  - name: breakout_mode
+    detection:
+      breakout_state_in: [bull_breakout, bear_breakout]
+      consecutive_trend_bars_min: 1
+    entry_bias: "with-breakout entries; breakout-pullback preferred over chasing"
+    typical_probability: 0.60
+
+  - name: climax_then_reversal
+    detection:
+      climactic_bar_within: 5
+      always_in_after_climax: opposite
+    entry_bias: "fade climax — wait for reversal-bar / two-bar reversal at extreme"
+    typical_probability: 0.55
+
+# ---------------------------------------------------------------------------
+
+trader_equation:
+  formula: "expectancy = P(win) * reward - P(loss) * risk"
+  notes: |
+    For every setup the trader must estimate (1) probability of reaching
+    target before stop, (2) reward (target - entry) and (3) risk (entry - stop).
+    A setup is acceptable when expectancy >= 1R after costs.
+  probability_buckets:
+    - bucket: 0.40
+      description: "speculative scalp — only valid if R:R >= 2:1"
+    - bucket: 0.55
+      description: "default for solid breakouts and Hn/Ln in normal trends"
+    - bucket: 0.65
+      description: "strong setups: micro-channel first pullback, BP, MTR"
+    - bucket: 0.75
+      description: "high-conviction confluence: H2 in strong bull + 20EMA bounce"
+    - bucket: 0.85
+      description: "rare 'A+' setups (multiple confluence + favourable HTF)"
+  worked_examples:
+    - name: h2_in_strong_bull
+      probability: 0.65
+      risk_ticks: 8
+      reward_ticks: 16
+      expectancy_R: 0.69
+      verdict: "take"
+    - name: counter_trend_l2_in_strong_bull
+      probability: 0.30
+      risk_ticks: 8
+      reward_ticks: 8
+      expectancy_R: -0.40
+      verdict: "skip — negative expectancy"
+
+# ---------------------------------------------------------------------------
+
+always_in_rules:
+  description: |
+    `always_in` is the side a discretionary trader would choose to be on if
+    forced to take a position right now. It flips on a *close* beyond the
+    prior N-bar (default 20) extreme that is also confirmed by structure.
+  flip_to_long_when:
+    - "close > max(high[-N..-1]) AND bar(t).is_trend == true AND bar(t).is_bull == true"
+    - "OR after a successful breakout-pullback long"
+  flip_to_short_when:
+    - "close < min(low[-N..-1]) AND bar(t).is_trend == true AND bar(t).is_bull == false"
+    - "OR after a successful breakout-pullback short"
+  stay_neutral_when:
+    - "ema_relation == at AND no recent breakout AND range_height_atr < 2.0"
+  hysteresis: "once set, do not flip on chop; require fresh breakout or MTR"
