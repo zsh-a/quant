@@ -12,3 +12,4 @@ from .provider import (
     TextPart,
     Usage,
 )
+from .registry import ModelRegistry, ModelSpec, Pricing
