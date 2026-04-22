@@ -78,12 +78,7 @@ class BreakoutPullbackLongDetector(_BreakoutPullbackBase):
                 self._reset()
             return None
 
-        if (
-            self._saw_pullback
-            and feat.is_bull
-            and feat.body_pct >= 30
-            and feat.close > self._breakout_level
-        ):
+        if self._saw_pullback and feat.is_bull and feat.body_pct >= 30 and feat.close > self._breakout_level:
             self._last_signal_bar_idx = feat.bar_idx
             entry = feat.high + _TICK
             stop = feat.low - _TICK
@@ -136,12 +131,7 @@ class BreakoutPullbackShortDetector(_BreakoutPullbackBase):
                 self._reset()
             return None
 
-        if (
-            self._saw_pullback
-            and not feat.is_bull
-            and feat.body_pct >= 30
-            and feat.close < self._breakout_level
-        ):
+        if self._saw_pullback and not feat.is_bull and feat.body_pct >= 30 and feat.close < self._breakout_level:
             self._last_signal_bar_idx = feat.bar_idx
             entry = feat.low - _TICK
             stop = feat.high + _TICK

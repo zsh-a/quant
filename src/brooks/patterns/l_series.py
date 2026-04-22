@@ -97,10 +97,7 @@ class _LnDetector(PatternDetector):
             entry_px=entry,
             stop_px=stop,
             timestamp_ns=feat.timestamp_ns,
-            reason=(
-                f"{self.name.upper()} formed: pullback #{self.target_pullback_count} "
-                f"completed in always_in=short"
-            ),
+            reason=(f"{self.name.upper()} formed: pullback #{self.target_pullback_count} completed in always_in=short"),
             metadata={
                 "pullback_count": self.target_pullback_count,
                 "quality": self.quality,

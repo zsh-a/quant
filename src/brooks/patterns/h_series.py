@@ -104,10 +104,7 @@ class _HnDetector(PatternDetector):
             entry_px=entry,
             stop_px=stop,
             timestamp_ns=feat.timestamp_ns,
-            reason=(
-                f"{self.name.upper()} formed: pullback #{self.target_pullback_count} "
-                f"completed in always_in=long"
-            ),
+            reason=(f"{self.name.upper()} formed: pullback #{self.target_pullback_count} completed in always_in=long"),
             metadata={
                 "pullback_count": self.target_pullback_count,
                 "quality": self.quality,

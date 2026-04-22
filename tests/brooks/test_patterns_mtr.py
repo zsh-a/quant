@@ -76,7 +76,6 @@ def _mtr_short_bars() -> List[Bar]:
         p = v[3]
     # strong bear break of pb_low
     target = pb_low - 0.5
-    body = p - target
     vals.append((p, p + 0.05, target - 0.05, target))
     return make_series(vals)
 

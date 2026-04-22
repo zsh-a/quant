@@ -67,11 +67,7 @@ class MicroChannelShortDetector(_MicroChannelBase):
     def on_bar(self, ctx: DetectorContext) -> Optional[PatternSignal]:
         feat = ctx.feat
 
-        if (
-            self._snap_top is not None
-            and self._snap_bot is not None
-            and self._snap_len >= self.min_channel_bars
-        ):
+        if self._snap_top is not None and self._snap_bot is not None and self._snap_len >= self.min_channel_bars:
             projected_bot = self._snap_bot.project(feat.bar_idx)
             if (
                 feat.close < projected_bot
@@ -127,11 +123,7 @@ class MicroChannelLongDetector(_MicroChannelBase):
     def on_bar(self, ctx: DetectorContext) -> Optional[PatternSignal]:
         feat = ctx.feat
 
-        if (
-            self._snap_top is not None
-            and self._snap_bot is not None
-            and self._snap_len >= self.min_channel_bars
-        ):
+        if self._snap_top is not None and self._snap_bot is not None and self._snap_len >= self.min_channel_bars:
             projected_top = self._snap_top.project(feat.bar_idx)
             if (
                 feat.close > projected_top
