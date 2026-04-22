@@ -44,9 +44,7 @@ class WedgeLongDetector(_WedgeBase):
     side: Literal["long", "short"] = "long"
 
     def on_bar(self, ctx: DetectorContext) -> Optional[PatternSignal]:
-        pivots = [
-            s for s in ctx.structure.confirmed_swing_lows if s.confirmed_at_idx <= ctx.feat.bar_idx
-        ]
+        pivots = [s for s in ctx.structure.confirmed_swing_lows if s.confirmed_at_idx <= ctx.feat.bar_idx]
         if len(pivots) < 3:
             return None
         p1, p2, p3 = pivots[-3:]
@@ -84,9 +82,7 @@ class WedgeShortDetector(_WedgeBase):
     side: Literal["long", "short"] = "short"
 
     def on_bar(self, ctx: DetectorContext) -> Optional[PatternSignal]:
-        pivots = [
-            s for s in ctx.structure.confirmed_swing_highs if s.confirmed_at_idx <= ctx.feat.bar_idx
-        ]
+        pivots = [s for s in ctx.structure.confirmed_swing_highs if s.confirmed_at_idx <= ctx.feat.bar_idx]
         if len(pivots) < 3:
             return None
         p1, p2, p3 = pivots[-3:]

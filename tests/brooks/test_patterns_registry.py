@@ -9,7 +9,6 @@ from src.brooks.patterns.base import PatternDetector
 from src.brooks.patterns.h2_l2 import H2Detector
 from src.brooks.patterns.wedge import WedgeLongDetector, WedgeShortDetector
 
-
 EXPECTED = {
     "h2",
     "l2",

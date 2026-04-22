@@ -27,10 +27,7 @@ class PatternRegistry:
     def register(cls, name: str):
         def decorator(klass: Type[PatternDetector]) -> Type[PatternDetector]:
             if name in _REGISTRY and _REGISTRY[name] is not klass:
-                raise ValueError(
-                    f"PatternRegistry: name {name!r} already registered "
-                    f"to {_REGISTRY[name].__name__}"
-                )
+                raise ValueError(f"PatternRegistry: name {name!r} already registered to {_REGISTRY[name].__name__}")
             _REGISTRY[name] = klass
             klass.name = name
             return klass

@@ -50,9 +50,7 @@ class DoubleBottomDetector(_DoubleTwinBase):
     side: Literal["long", "short"] = "long"
 
     def on_bar(self, ctx: DetectorContext) -> Optional[PatternSignal]:
-        lows = [
-            s for s in ctx.structure.confirmed_swing_lows if s.confirmed_at_idx <= ctx.feat.bar_idx
-        ]
+        lows = [s for s in ctx.structure.confirmed_swing_lows if s.confirmed_at_idx <= ctx.feat.bar_idx]
         if len(lows) < 2:
             return None
         a, b = lows[-2], lows[-1]
@@ -93,9 +91,7 @@ class DoubleTopDetector(_DoubleTwinBase):
     side: Literal["long", "short"] = "short"
 
     def on_bar(self, ctx: DetectorContext) -> Optional[PatternSignal]:
-        highs = [
-            s for s in ctx.structure.confirmed_swing_highs if s.confirmed_at_idx <= ctx.feat.bar_idx
-        ]
+        highs = [s for s in ctx.structure.confirmed_swing_highs if s.confirmed_at_idx <= ctx.feat.bar_idx]
         if len(highs) < 2:
             return None
         a, b = highs[-2], highs[-1]

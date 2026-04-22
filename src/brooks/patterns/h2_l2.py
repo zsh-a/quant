@@ -25,9 +25,7 @@ _TICK = 1e-6
 
 @dataclass
 class _PBState:
-    state: Literal[
-        "IDLE", "PB_LEG1", "PB_LEG1_RECOVERY", "PB_LEG2", "H2_FORMED", "TRIGGERED", "INVALID"
-    ] = "IDLE"
+    state: Literal["IDLE", "PB_LEG1", "PB_LEG1_RECOVERY", "PB_LEG2", "H2_FORMED", "TRIGGERED", "INVALID"] = "IDLE"
     pb_start_idx: int = -1
     leg1_extreme: float = 0.0
     recovery_extreme: float = 0.0
