@@ -9,7 +9,6 @@ import pytest
 from src.brooks.context import AccountSnapshot, Bar, BrooksContext, TFSnapshot
 from src.brooks.render import render_context_text
 
-
 # ---------------------------------------------------------------------------
 # Fixtures / helpers
 # ---------------------------------------------------------------------------
@@ -56,9 +55,7 @@ def _trendy_with_pullbacks(n: int, base: float = 100.0) -> List[Bar]:
             c = price + 0.8
             h = c + 0.2
             l = o - 0.15
-            bars.append(
-                Bar(timestamp_ns=ts, open=o, high=h, low=l, close=c, volume=1)
-            )
+            bars.append(Bar(timestamp_ns=ts, open=o, high=h, low=l, close=c, volume=1))
             price = c
             ts += 300_000_000_000
             if len(bars) >= n:
@@ -68,9 +65,7 @@ def _trendy_with_pullbacks(n: int, base: float = 100.0) -> List[Bar]:
             c = price - 0.5
             h = o + 0.1
             l = c - 0.2
-            bars.append(
-                Bar(timestamp_ns=ts, open=o, high=h, low=l, close=c, volume=1)
-            )
+            bars.append(Bar(timestamp_ns=ts, open=o, high=h, low=l, close=c, volume=1))
             price = c
             ts += 300_000_000_000
             if len(bars) >= n:
@@ -161,9 +156,7 @@ def test_bullish_run_reports_leg_up(ctx_small: BrooksContext) -> None:
 
 
 def test_ltf_only_context_omits_htf_section() -> None:
-    ctx = BrooksContext(
-        symbol="X", primary=TFSnapshot(interval="5m", bars=_bull_run(20))
-    )
+    ctx = BrooksContext(symbol="X", primary=TFSnapshot(interval="5m", bars=_bull_run(20)))
     text = render_context_text(ctx, budget_tokens=5_000)
     assert "HTF" not in text
     assert "LTF 5m" in text
@@ -209,18 +202,14 @@ def test_budget_trims_ltf_before_htf(ctx_bullish_60: BrooksContext) -> None:
 
 
 def test_render_text_tolerates_empty_primary() -> None:
-    ctx = BrooksContext(
-        symbol="X", primary=TFSnapshot(interval="5m", bars=[])
-    )
+    ctx = BrooksContext(symbol="X", primary=TFSnapshot(interval="5m", bars=[]))
     text = render_context_text(ctx, budget_tokens=500)
     assert "LTF 5m" in text
 
 
 def test_render_text_handles_single_bar() -> None:
     bar = Bar(timestamp_ns=0, open=100.0, high=101.0, low=99.0, close=100.5, volume=1)
-    ctx = BrooksContext(
-        symbol="X", primary=TFSnapshot(interval="5m", bars=[bar])
-    )
+    ctx = BrooksContext(symbol="X", primary=TFSnapshot(interval="5m", bars=[bar]))
     text = render_context_text(ctx, budget_tokens=500)
     assert "#0" in text
     assert "bull" in text or "bear" in text or "doji" in text

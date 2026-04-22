@@ -24,7 +24,7 @@ should import :func:`render_context_text` directly.
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import List, Optional, Tuple
+from typing import List, Optional
 
 from src.brooks.context import BrooksContext, TFSnapshot
 from src.brooks.features import BarFeatureExtractor, ExtendedBarFeatures, SwingPoint
@@ -123,9 +123,7 @@ def _build_tf_block(snap: TFSnapshot, *, is_htf: bool) -> _TFBlock:
         bars_text: List[str] = []
         summary_lines = _htf_summary_lines(features, structures, ext.confirmed_swings)
     else:
-        bars_text = [
-            _format_bar_line(f, idx, len(features)) for idx, f in enumerate(features)
-        ]
+        bars_text = [_format_bar_line(f, idx, len(features)) for idx, f in enumerate(features)]
         summary_lines = []
 
     return _TFBlock(
@@ -226,9 +224,7 @@ def _htf_summary_lines(
     regime_str = regime_snap.regime.value
     conf = regime_snap.confidence
     always_in = last_struct.always_in
-    lines.append(
-        f"regime={regime_str} (conf={conf:.2f}) always_in={always_in}"
-    )
+    lines.append(f"regime={regime_str} (conf={conf:.2f}) always_in={always_in}")
 
     swing_line = _swing_line(last_feat, swings)
     if swing_line:
@@ -328,11 +324,7 @@ def _render_block(block: _TFBlock, n: int) -> str:
     lines: List[str] = [header]
     lines.extend(block.summary_lines)
     if not block.is_htf:
-        tail = (
-            block.bars_text[-n:]
-            if n and n < len(block.bars_text)
-            else list(block.bars_text)
-        )
+        tail = block.bars_text[-n:] if n and n < len(block.bars_text) else list(block.bars_text)
         lines.extend(tail)
     return "\n".join(lines)
 

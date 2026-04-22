@@ -15,7 +15,6 @@ from src.brooks.prompts import (
 )
 from src.brooks.schema import Decision
 
-
 # ---------------------------------------------------------------------------
 # Schema description — generated from Pydantic, never hand-written
 # ---------------------------------------------------------------------------
@@ -97,9 +96,7 @@ def test_build_messages_default_returns_three_messages() -> None:
     first one carries the cache marker on concept_manual, the second
     carries the few-shot cache marker."""
     bundle = PromptBundle.load(DEFAULT_PROMPT_DIR)
-    msgs = bundle.build_messages(
-        user_context="== LTF 5m ==\n#0 bull body=62% close=hi"
-    )
+    msgs = bundle.build_messages(user_context="== LTF 5m ==\n#0 bull body=62% close=hi")
     assert len(msgs) == 3
     system_msg, fewshot_msg, live_msg = msgs
 
@@ -135,9 +132,7 @@ def test_build_messages_first_message_carries_concept_manual_cache() -> None:
     system_parts = msgs[0].content
     # concept_manual is the cached part and must appear after system_text
     # so the cached prefix covers system + schema + manual.
-    last_cached = next(
-        (p for p in reversed(system_parts) if p.cache == "concept_manual"), None
-    )
+    last_cached = next((p for p in reversed(system_parts) if p.cache == "concept_manual"), None)
     assert last_cached is not None
     assert "Brooks" in last_cached.text
     # Schema description lives in the system message (not hand-baked).
@@ -168,9 +163,7 @@ def test_build_messages_with_empty_fewshot_skips_fewshot_message() -> None:
     msgs = bundle.build_messages(user_context="ctx", include_fewshot=True)
     assert len(msgs) == 2
     assert msgs[0].role == "system"
-    assert not any(
-        part.cache == "fewshot" for msg in msgs for part in msg.content
-    )
+    assert not any(part.cache == "fewshot" for msg in msgs for part in msg.content)
 
 
 # ---------------------------------------------------------------------------
@@ -189,9 +182,7 @@ def synthetic_prompt_dir(tmp_path: Path) -> Path:
         "",  # blank line tolerated
         json.dumps({"user": "CTX2", "assistant": {"side": "short"}}),
     ]
-    (root / "fewshot" / "analyst_examples.jsonl").write_text(
-        "\n".join(lines), encoding="utf-8"
-    )
+    (root / "fewshot" / "analyst_examples.jsonl").write_text("\n".join(lines), encoding="utf-8")
     return root
 
 
@@ -208,9 +199,7 @@ def test_load_rejects_malformed_jsonl(tmp_path: Path) -> None:
     (root / "fewshot").mkdir(parents=True)
     (root / "system_analyst.md").write_text("x", encoding="utf-8")
     (root / "concept_manual.md").write_text("y", encoding="utf-8")
-    (root / "fewshot" / "analyst_examples.jsonl").write_text(
-        "{not valid json\n", encoding="utf-8"
-    )
+    (root / "fewshot" / "analyst_examples.jsonl").write_text("{not valid json\n", encoding="utf-8")
     with pytest.raises(ValueError, match="invalid JSON"):
         PromptBundle.load(root)
 

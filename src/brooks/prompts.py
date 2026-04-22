@@ -129,9 +129,7 @@ class PromptBundle:
                 )
             )
 
-        messages.append(
-            Message(role="user", content=[TextPart(text=user_context)])
-        )
+        messages.append(Message(role="user", content=[TextPart(text=user_context)]))
         return messages
 
     # ------------------------------------------------------------------
@@ -171,7 +169,5 @@ def _load_jsonl(path: Path) -> list[dict]:
             try:
                 rows.append(json.loads(line))
             except json.JSONDecodeError as e:
-                raise ValueError(
-                    f"{path}: invalid JSON on line {lineno}: {e}"
-                ) from e
+                raise ValueError(f"{path}: invalid JSON on line {lineno}: {e}") from e
     return rows
