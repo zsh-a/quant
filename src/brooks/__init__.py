@@ -25,6 +25,7 @@ __all__ = [
     "BrooksContext",
     "BrooksRegime",
     "BrooksRegimeClassifier",
+    "BrooksStrategy",
     "ChannelFit",
     "Decision",
     "ExtendedBarFeatures",
@@ -36,3 +37,14 @@ __all__ = [
     "SwingPoint",
     "TFSnapshot",
 ]
+
+
+def __getattr__(name: str):
+    # Lazy import avoids a circular dependency at package import time:
+    # ``src.brooks.strategy`` imports ``src.strategies.registry``, which
+    # in turn imports the strategies that depend on this package.
+    if name == "BrooksStrategy":
+        from src.brooks.strategy import BrooksStrategy
+
+        return BrooksStrategy
+    raise AttributeError(f"module 'src.brooks' has no attribute {name!r}")

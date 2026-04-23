@@ -2,10 +2,9 @@
 :class:`PromptBundle` and surfaces its structured output as unified
 :class:`Signal` records.
 
-This is the Phase 3.4 replacement for ``src/strategies/brooks_llm_pipeline.py``:
-the provider, prompt assets, context renderer, and output schema are all
-injected, so the analyst itself stays under 150 lines and has zero hardcoded
-vendor SDK calls.
+Provider, prompt assets, context renderer, and output schema are all
+injected, so the analyst itself stays under 150 lines and has zero
+hardcoded vendor SDK calls.
 """
 
 from __future__ import annotations

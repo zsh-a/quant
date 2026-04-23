@@ -81,9 +81,7 @@ def test_snapshot_to_dict_roundtrip():
 
 
 def test_bull_climax_after_consecutive_trend_bars():
-    clf = BrooksRegimeClassifier(
-        tr_lookback=10, climax_consecutive_bars=3, climax_ema_dist_atr=2.0
-    )
+    clf = BrooksRegimeClassifier(tr_lookback=10, climax_consecutive_bars=3, climax_ema_dist_atr=2.0)
     bars = _warmup_sideways(10)
     # 3 huge bull trend bars — body_pct=100, ema_atr_distance ≫ 2.
     bars.append((10, 100.0, 106.0, 100.0, 106.0))
@@ -96,9 +94,7 @@ def test_bull_climax_after_consecutive_trend_bars():
 
 
 def test_bear_climax_after_consecutive_trend_bars():
-    clf = BrooksRegimeClassifier(
-        tr_lookback=10, climax_consecutive_bars=3, climax_ema_dist_atr=2.0
-    )
+    clf = BrooksRegimeClassifier(tr_lookback=10, climax_consecutive_bars=3, climax_ema_dist_atr=2.0)
     bars = _warmup_sideways(10)
     bars.append((10, 100.0, 100.0, 94.0, 94.0))
     bars.append((11, 94.0, 94.0, 88.0, 88.0))
@@ -240,9 +236,7 @@ def test_weak_bull_trend():
 
 
 def test_strong_bear_trend():
-    clf = BrooksRegimeClassifier(
-        tr_lookback=10, breakout_decay_bars=5, climax_ema_dist_atr=5.0
-    )
+    clf = BrooksRegimeClassifier(tr_lookback=10, breakout_decay_bars=5, climax_ema_dist_atr=5.0)
     bars = _warmup_sideways(10)
     bars.append((10, 100.0, 100.1, 90.0, 90.5))  # big breakdown
     for i in range(10):
@@ -338,13 +332,9 @@ def test_transition_strong_bull_to_climax_to_weak_bull_within_3_bars():
     assert climax_idx - climax_condition_start < 3, (
         f"climax detection latency {climax_idx - climax_condition_start} ≥ 3"
     )
-    assert weak_idx - weak_condition_start < 3, (
-        f"weak-bull detection latency {weak_idx - weak_condition_start} ≥ 3"
-    )
+    assert weak_idx - weak_condition_start < 3, f"weak-bull detection latency {weak_idx - weak_condition_start} ≥ 3"
     # The regime must reach STRONG_BULL before the climax bars arrive.
-    assert strong_idx < climax_condition_start, (
-        f"STRONG_BULL must precede CLIMAX (strong_idx={strong_idx})"
-    )
+    assert strong_idx < climax_condition_start, f"STRONG_BULL must precede CLIMAX (strong_idx={strong_idx})"
 
 
 # ---------------------------------------------------------------------------

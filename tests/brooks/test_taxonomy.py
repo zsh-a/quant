@@ -51,9 +51,17 @@ def test_taxonomy_loads_and_validates(taxonomy: Taxonomy) -> None:
 def test_required_bar_types_present(taxonomy: Taxonomy) -> None:
     names = {b.name for b in taxonomy.bar_types}
     expected = {
-        "trend_bull", "trend_bear", "doji_bull", "doji_bear",
-        "signal_bar", "climactic_bar", "reversal_bar",
-        "ii", "iii", "outside_bar", "shaved_bar",
+        "trend_bull",
+        "trend_bear",
+        "doji_bull",
+        "doji_bear",
+        "signal_bar",
+        "climactic_bar",
+        "reversal_bar",
+        "ii",
+        "iii",
+        "outside_bar",
+        "shaved_bar",
     }
     assert expected.issubset(names), f"missing: {expected - names}"
 
@@ -61,10 +69,26 @@ def test_required_bar_types_present(taxonomy: Taxonomy) -> None:
 def test_required_patterns_present(taxonomy: Taxonomy) -> None:
     names = {p.name for p in taxonomy.patterns}
     expected = {
-        "h1", "h2", "h3", "h4", "l1", "l2", "l3", "l4",
-        "ii_breakout", "iii_breakout", "two_bar_reversal", "wedge",
-        "double_top", "double_bottom", "final_flag", "micro_channel",
-        "breakout", "breakout_pullback", "failed_breakout", "mtr",
+        "h1",
+        "h2",
+        "h3",
+        "h4",
+        "l1",
+        "l2",
+        "l3",
+        "l4",
+        "ii_breakout",
+        "iii_breakout",
+        "two_bar_reversal",
+        "wedge",
+        "double_top",
+        "double_bottom",
+        "final_flag",
+        "micro_channel",
+        "breakout",
+        "breakout_pullback",
+        "failed_breakout",
+        "mtr",
         "measured_move",
     }
     assert expected.issubset(names), f"missing: {expected - names}"
@@ -155,38 +179,28 @@ def test_render_is_idempotent_on_disk_via_check(tmp_path: Path) -> None:
 def test_token_count_under_budget(taxonomy: Taxonomy, sections: dict[str, str]) -> None:
     text = render(taxonomy, sections)
     n_tokens, encoder = count_tokens(text)
-    assert n_tokens <= TOKEN_BUDGET, (
-        f"manual is {n_tokens} tokens (encoder={encoder}); budget={TOKEN_BUDGET}"
-    )
+    assert n_tokens <= TOKEN_BUDGET, f"manual is {n_tokens} tokens (encoder={encoder}); budget={TOKEN_BUDGET}"
 
 
-def test_render_includes_all_pattern_names(
-    taxonomy: Taxonomy, sections: dict[str, str]
-) -> None:
+def test_render_includes_all_pattern_names(taxonomy: Taxonomy, sections: dict[str, str]) -> None:
     text = render(taxonomy, sections)
     for p in taxonomy.patterns:
         assert f"`{p.name}`" in text, f"pattern {p.name} missing from manual"
 
 
-def test_render_includes_all_bar_type_names(
-    taxonomy: Taxonomy, sections: dict[str, str]
-) -> None:
+def test_render_includes_all_bar_type_names(taxonomy: Taxonomy, sections: dict[str, str]) -> None:
     text = render(taxonomy, sections)
     for b in taxonomy.bar_types:
         assert f"`{b.name}`" in text
 
 
-def test_render_includes_all_regime_names(
-    taxonomy: Taxonomy, sections: dict[str, str]
-) -> None:
+def test_render_includes_all_regime_names(taxonomy: Taxonomy, sections: dict[str, str]) -> None:
     text = render(taxonomy, sections)
     for r in taxonomy.regimes:
         assert f"`{r.name}`" in text
 
 
-def test_render_unaffected_by_pattern_dict_key_order(
-    raw_taxonomy: dict, sections: dict[str, str]
-) -> None:
+def test_render_unaffected_by_pattern_dict_key_order(raw_taxonomy: dict, sections: dict[str, str]) -> None:
     # Build two taxonomies whose dict keys are inserted in different orders
     # (json roundtrip then re-validate). Output must be identical.
     import json

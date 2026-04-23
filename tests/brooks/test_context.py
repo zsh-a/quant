@@ -66,9 +66,7 @@ def ctx_with_htf() -> BrooksContext:
             "1h": TFSnapshot(interval="1h", bars=_bars(24)),
             "1d": TFSnapshot(interval="1d", bars=_bars(10)),
         },
-        account=AccountSnapshot(
-            equity=100_000.0, cash=50_000.0, open_positions={"BTCUSDT": 0.5}
-        ),
+        account=AccountSnapshot(equity=100_000.0, cash=50_000.0, open_positions={"BTCUSDT": 0.5}),
         now_ns=1_700_000_000_000_000_000,
     )
 
@@ -115,15 +113,9 @@ def test_render_text_generous_budget_keeps_all_bars(
 
 def test_render_text_bar_classification() -> None:
     # Strong bull bar: close at high, large body.
-    bull = Bar(
-        timestamp_ns=0, open=100.0, high=110.1, low=99.9, close=110.0, volume=1
-    )
-    bear = Bar(
-        timestamp_ns=0, open=110.0, high=110.1, low=99.9, close=100.0, volume=1
-    )
-    doji = Bar(
-        timestamp_ns=0, open=100.0, high=101.0, low=99.0, close=100.05, volume=1
-    )
+    bull = Bar(timestamp_ns=0, open=100.0, high=110.1, low=99.9, close=110.0, volume=1)
+    bear = Bar(timestamp_ns=0, open=110.0, high=110.1, low=99.9, close=100.0, volume=1)
+    doji = Bar(timestamp_ns=0, open=100.0, high=101.0, low=99.0, close=100.05, volume=1)
     ctx = BrooksContext(
         symbol="X",
         primary=TFSnapshot(interval="5m", bars=[doji, bear, bull]),
@@ -139,9 +131,7 @@ def test_render_text_bar_classification() -> None:
 
 def test_render_text_handles_zero_range_bar() -> None:
     flat = Bar(timestamp_ns=0, open=100.0, high=100.0, low=100.0, close=100.0, volume=0)
-    ctx = BrooksContext(
-        symbol="X", primary=TFSnapshot(interval="5m", bars=[flat])
-    )
+    ctx = BrooksContext(symbol="X", primary=TFSnapshot(interval="5m", bars=[flat]))
     text = ctx.render_text(budget_tokens=10_000)
     assert "doji" in text
     assert "body=0%" in text

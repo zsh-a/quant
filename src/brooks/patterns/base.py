@@ -9,20 +9,30 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Literal, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Literal, Optional
 
 from src.brooks.features import ExtendedBarFeatures
 from src.brooks.structure import MarketStructure
 
+if TYPE_CHECKING:  # pragma: no cover — imported only for typing to avoid cycles
+    from src.brooks.context import TFSnapshot
+
 
 @dataclass
 class DetectorContext:
-    """Everything a detector needs from the outer layers."""
+    """Everything a detector needs from the outer layers.
+
+    ``htf`` carries the most recent higher-timeframe snapshots keyed by
+    interval (e.g. ``"1h"``). Detectors may consult it to annotate or
+    gate signals, but the default implementations only use the primary
+    LTF features and structure — HTF awareness is opt-in.
+    """
 
     feat: ExtendedBarFeatures
     structure: MarketStructure
     recent_features: List[ExtendedBarFeatures]
     params: Dict[str, Any] = field(default_factory=dict)
+    htf: Dict[str, "TFSnapshot"] = field(default_factory=dict)
 
 
 @dataclass

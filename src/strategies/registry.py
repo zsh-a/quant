@@ -88,15 +88,9 @@ class StrategyRegistry:
         except Exception:
             pass
         try:
-            from src.strategies import brooks_strategy
+            from src.brooks import strategy as _brooks_module
 
-            _ = brooks_strategy
-        except Exception:
-            pass
-        try:
-            from src.strategies import brooks_v2
-
-            _ = brooks_v2
+            _ = _brooks_module
         except Exception:
             pass
 
