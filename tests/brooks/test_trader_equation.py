@@ -5,7 +5,7 @@ from __future__ import annotations
 import pandas as pd
 import pytest
 
-from src.brooks.decision.hit_rate import HitRateKey, HitRateTable
+from src.brooks.decision.hit_rate import HitRateTable
 from src.brooks.decision.trader_equation import TraderEquation
 from src.brooks.schema import Signal
 

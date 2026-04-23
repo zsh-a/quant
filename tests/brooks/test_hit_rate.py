@@ -67,9 +67,7 @@ def test_is_sufficient_threshold():
     # Bucket has only 12 samples — below default 30.
     assert not table.is_sufficient(HitRateKey("l2", "weak_bear_trend", False, "short"))
     # Custom min_samples
-    assert table.is_sufficient(
-        HitRateKey("l2", "weak_bear_trend", False, "short"), min_samples=10
-    )
+    assert table.is_sufficient(HitRateKey("l2", "weak_bear_trend", False, "short"), min_samples=10)
     # Missing key always insufficient
     assert not table.is_sufficient(HitRateKey("missing", "x", True, "long"))
 
