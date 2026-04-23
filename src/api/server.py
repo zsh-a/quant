@@ -38,6 +38,8 @@ from src.api.analysis_router import router as analysis_router
 from src.api.auth import require_auth
 from src.api.auth import router as auth_router
 from src.api.automation_router import router as automation_router
+from src.api.brooks_router import router as brooks_router
+from src.api.brooks_router import ws_router as brooks_ws_router
 from src.api.crypto_market_router import router as crypto_market_router
 from src.api.events import (
     EventType,
@@ -130,6 +132,8 @@ app.include_router(market_admin_router, dependencies=[Depends(require_auth)])
 if _ALPHA_AVAILABLE:
     app.include_router(alpha_lab_router, dependencies=[Depends(require_auth)])
 app.include_router(crypto_market_router, dependencies=[Depends(require_auth)])
+app.include_router(brooks_router, dependencies=[Depends(require_auth)])
+app.include_router(brooks_ws_router)  # WS endpoints authenticate via query token
 
 logger.info(f"API Server starting with config: port={api_config.port}")
 

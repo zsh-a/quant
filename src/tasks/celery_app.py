@@ -50,6 +50,7 @@ app.conf.update(
         "src.tasks.automation.*": {"queue": "automation"},
         "src.tasks.crypto_tasks.*": {"queue": "automation"},
         "src.tasks.alpha_dlq.*": {"queue": "alpha_dlq"},
+        "src.tasks.brooks_live_task.*": {"queue": "automation"},
     },
     # Queues
     task_queues=(
@@ -64,7 +65,12 @@ app.conf.update(
             "task": "src.tasks.automation.run_automation_cycle",
             "schedule": crontab(hour=18, minute=0),
             "options": {"queue": "automation"},
-        }
+        },
+        "brooks-live-daily-close": {
+            "task": "src.tasks.brooks_live_task.close_brooks_live_day",
+            "schedule": crontab(hour=23, minute=55),
+            "options": {"queue": "automation"},
+        },
     },
     # Explicit imports for task discovery
     imports=[
@@ -73,6 +79,7 @@ app.conf.update(
         "src.tasks.automation",
         "src.tasks.crypto_tasks",
         "src.tasks.alpha_dlq",
+        "src.tasks.brooks_live_task",
     ],
 )
 
