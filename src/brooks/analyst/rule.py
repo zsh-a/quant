@@ -86,6 +86,7 @@ class RuleAnalyst:
                 structure=last_struct,
                 recent_features=history,
                 params={},
+                htf=ctx.htf,
             )
             for det in self._detectors:
                 ps = det.on_bar(detector_ctx)

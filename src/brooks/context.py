@@ -11,16 +11,22 @@ construct prompts or charts directly:
 * :meth:`BrooksContext.to_llm_messages` — conversion to the
   :mod:`src.alpha.llm.provider` ``Message`` list.
 
-Feature / structure / regime fields are left off the ``TFSnapshot``
-dataclass for now; they will be added in Phase 2 once the detectors land.
+Phase 3.5 extends :class:`TFSnapshot` with optional ``features``,
+``structure``, and ``regime`` fields so that HTF snapshots can be passed
+directly to detectors and the EV gate without streaming reconstruction.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
+from typing import TYPE_CHECKING, Optional
 
 from src.alpha.llm.provider import Message, TextPart
+
+if TYPE_CHECKING:  # pragma: no cover — type-only imports, avoid cycles
+    from src.brooks.features import ExtendedBarFeatures
+    from src.brooks.regime import RegimeSnapshot
+    from src.brooks.structure import MarketStructure
 
 __all__ = [
     "Bar",
@@ -44,15 +50,19 @@ class Bar:
 
 @dataclass
 class TFSnapshot:
-    """Recent bars at a single timeframe.
+    """Recent bars at a single timeframe with optional derived state.
 
-    ``bars`` is ordered oldest → newest. Phase 2 will extend this struct
-    with ``features`` / ``structure`` / ``regime`` once those detectors
-    exist.
+    ``bars`` is ordered oldest → newest. Phase 3.5 populates the optional
+    ``features`` / ``structure`` / ``regime`` fields when available so
+    that downstream consumers (detectors, EV gate, renderer) do not need
+    to replay every bar through the streaming extractors.
     """
 
     interval: str
     bars: list[Bar] = field(default_factory=list)
+    features: Optional["ExtendedBarFeatures"] = None
+    structure: Optional["MarketStructure"] = None
+    regime: Optional["RegimeSnapshot"] = None
 
 
 @dataclass
@@ -71,6 +81,63 @@ class BrooksContext:
     htf: dict[str, TFSnapshot] = field(default_factory=dict)
     account: Optional[AccountSnapshot] = None
     now_ns: int = 0
+
+    # ---- HTF helpers -------------------------------------------------
+
+    def htf_alignment_for(self, side: str) -> str:
+        """Classify HTF alignment against ``side`` as a three-way tag.
+
+        Alignment uses the trending sign of :class:`BrooksRegime`: a
+        ``bull`` regime aligns with ``long``; ``bear`` with ``short``.
+        Non-trending regimes (ranges, breakout, climax, unknown) are
+        treated as neutral — they never block alignment but also never
+        confirm it on their own.
+
+        Returns one of:
+
+        * ``"conflict"`` — at least one HTF trending regime opposes ``side``
+        * ``"aligned"``  — at least one HTF trending regime matches ``side``
+          and none oppose it
+        * ``"neutral"``  — no HTF carries a trending regime (or no HTF)
+        """
+        saw_agree = False
+        for snap in self.htf.values():
+            regime = snap.regime
+            if regime is None:
+                continue
+            direction = _regime_trend_side(regime)
+            if direction is None:
+                continue
+            if direction != side:
+                return "conflict"
+            saw_agree = True
+        return "aligned" if saw_agree else "neutral"
+
+    def htf_aligned_for(self, side: str) -> bool:
+        """Boolean convenience: ``True`` iff ``htf_alignment_for == "aligned"``."""
+        return self.htf_alignment_for(side) == "aligned"
+
+    def htf_alignment_score(self, side: str) -> float:
+        """Weighted alignment score in ``[-1, 1]``.
+
+        Aggregates each HTF's trend direction with a weight equal to its
+        ``RegimeSnapshot.confidence``: ``+conf`` when trending in
+        ``side``, ``-conf`` when opposed, ``0`` otherwise. The final
+        score is the mean over HTFs that carry a regime (``0`` if none).
+        """
+        values: list[float] = []
+        for snap in self.htf.values():
+            regime = snap.regime
+            if regime is None:
+                continue
+            direction = _regime_trend_side(regime)
+            if direction is None:
+                values.append(0.0)
+                continue
+            values.append(regime.confidence if direction == side else -regime.confidence)
+        if not values:
+            return 0.0
+        return sum(values) / len(values)
 
     # ---- rendering ---------------------------------------------------
 
@@ -202,3 +269,20 @@ def _count_tokens(text: str) -> int:
         return len(tiktoken.get_encoding("cl100k_base").encode(text))
     except ImportError:
         return max(1, len(text) // 4)
+
+
+def _regime_trend_side(regime) -> Optional[str]:
+    """Map a :class:`RegimeSnapshot` to ``"long"``/``"short"``/``None``.
+
+    Bull trend regimes vote ``long``, bear trend regimes vote ``short``.
+    Ranges, breakouts, climax and unknown are neutral — they return
+    ``None`` so the alignment helpers can skip them.
+    """
+    from src.brooks.regime import BrooksRegime
+
+    r = regime.regime if hasattr(regime, "regime") else regime
+    if r in (BrooksRegime.STRONG_BULL_TREND, BrooksRegime.WEAK_BULL_TREND):
+        return "long"
+    if r in (BrooksRegime.STRONG_BEAR_TREND, BrooksRegime.WEAK_BEAR_TREND):
+        return "short"
+    return None
