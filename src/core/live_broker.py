@@ -275,3 +275,31 @@ class LiveBroker(Broker):
     def process_same_bar_orders(self, bars: Dict[str, Bar], timing: str):
         """Live mode: immediate orders are submitted directly."""
         pass  # 实盘中 IMMEDIATE 订单在 submit_order 中直接发送
+
+
+def create_live_broker(mode: str = "paper", **kwargs) -> Broker:
+    """Factory for the Phase 4.6 BrooksLive stack.
+
+    ``mode="paper"`` returns a :class:`BacktestBroker` configured to simulate
+    fills locally — no real orders are placed. ``mode="live"`` is explicitly
+    disabled by Phase 4.6 scope and raises :class:`ValueError`; callers must
+    opt-in through a future release once real-order safeguards land.
+    """
+    if mode == "paper":
+        from src.core.backtest_broker import BacktestBroker
+
+        allowed = {
+            "initial_cash",
+            "commission",
+            "slippage",
+            "db_client",
+            "risk_manager",
+            "on_order_submitted",
+            "allow_short",
+            "session_id",
+        }
+        filtered = {k: v for k, v in kwargs.items() if k in allowed}
+        return BacktestBroker(**filtered)
+    if mode == "live":
+        raise ValueError("live mode is disabled in Phase 4.6 (BrooksLive is paper-only). Use mode='paper'.")
+    raise ValueError(f"Unknown live broker mode: {mode!r} (expected 'paper' or 'live')")

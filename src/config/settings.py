@@ -172,6 +172,28 @@ class CryptoMarketConfig(BaseModel):
     state_file: str = str(paths.CRYPTO_SYNC_STATE_PATH)
 
 
+class BrooksLiveConfig(BaseModel):
+    """Phase 4.6 BrooksStrategy paper-trading runtime parameters."""
+
+    default_symbol: str = "BTC/USDT"
+    default_interval: str = "5m"
+    default_exchange: str = "binance"
+    default_analyst: str = "rule"
+    initial_cash: float = 100_000.0
+    commission: float = 0.0003
+    slippage: float = 0.001
+    equity_sync_interval_seconds: float = 5.0
+    bar_queue_timeout_seconds: float = 120.0
+    # LLM/VLM rate limits — avoid exploding the budget.
+    llm_daily_budget_usd: float = 10.0
+    llm_min_interval_seconds: float = 60.0
+    recent_signals_window: int = 50
+    decision_history_window: int = 200
+    # Where incremental hit-rate samples are appended by the daily close task.
+    hit_rate_samples_path: str = "data/brooks/hit_rate_samples.parquet"
+    hit_rate_table_path: str = "data/brooks/hit_rate_table.parquet"
+
+
 class Settings(BaseSettings):
     """Application settings with environment variable support"""
 
@@ -194,6 +216,7 @@ class Settings(BaseSettings):
     live_trading: LiveTradingConfig = Field(default_factory=LiveTradingConfig)
     bitget: BitgetConfig = Field(default_factory=BitgetConfig)
     crypto_market: CryptoMarketConfig = Field(default_factory=CryptoMarketConfig)
+    brooks: BrooksLiveConfig = Field(default_factory=BrooksLiveConfig)
 
 
 def _load_yaml_settings() -> Dict[str, Any]:
@@ -295,3 +318,8 @@ def get_bitget_config() -> BitgetConfig:
 def get_crypto_market_config() -> CryptoMarketConfig:
     """Get unified crypto market data configuration."""
     return get_settings().crypto_market
+
+
+def get_brooks_live_config() -> BrooksLiveConfig:
+    """Get Phase 4.6 BrooksLive configuration."""
+    return get_settings().brooks

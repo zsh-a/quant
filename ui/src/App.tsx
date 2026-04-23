@@ -32,6 +32,7 @@ const GlobalOverview = lazy(() => import('./components/GlobalOverview'));
 const LabPanel = lazy(() => import('./components/LabPanel'));
 const MarketAdminPanel = lazy(() => import('./components/MarketAdminPanel'));
 const SessionDetail = lazy(() => import('./components/SessionDetail'));
+const BrooksLive = lazy(() => import('./components/BrooksLive'));
 
 const ROUTE_META: Record<string, { title: string; description: string }> = {
   '/': { title: 'Overview', description: 'Monitor strategy runs, recent sessions, and system status.' },
@@ -42,6 +43,7 @@ const ROUTE_META: Record<string, { title: string; description: string }> = {
   '/portfolio': { title: 'Portfolio', description: 'Portfolio allocation and weighting management.' },
   '/market-admin': { title: 'Market Data', description: 'Database coverage, batch history, and update console.' },
   '/optimizer': { title: 'Optimizer', description: 'Parameter optimization workspace.' },
+  '/brooks-live': { title: 'BrooksLive', description: 'Realtime Brooks strategy paper trading.' },
 };
 
 function getRouteMeta(pathname: string) {
@@ -138,7 +140,9 @@ const App = () => {
               ? 'marketAdmin'
               : location.pathname === '/optimizer'
                 ? 'optimizer'
-                : 'overview';
+                : location.pathname === '/brooks-live'
+                  ? 'brooksLive'
+                  : 'overview';
 
   return (
     <AppShell
@@ -155,6 +159,7 @@ const App = () => {
               portfolio: '/portfolio',
               marketAdmin: '/market-admin',
               optimizer: '/optimizer',
+              brooksLive: '/brooks-live',
             };
             navigate(routes[key] || '/');
           }}
@@ -247,6 +252,7 @@ const App = () => {
           <Route path="/heatmap" element={<IndustryHeatmap />} />
           <Route path="/portfolio" element={<PortfolioManager />} />
           <Route path="/optimizer" element={<OptimizerPanel />} />
+          <Route path="/brooks-live" element={<BrooksLive />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
