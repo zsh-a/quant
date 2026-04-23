@@ -16,3 +16,4 @@ utils/TGW-SDK_V1.0.8
 logs
 *.db*
 .dev/
+tests/brooks/_artifacts/
