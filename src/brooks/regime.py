@@ -198,9 +198,7 @@ class BrooksRegimeClassifier:
             ]
             # Fresh breakout → high confidence; decays toward 0.5 as it ages.
             conf = 1.0 - (bars_since_breakout / self.breakout_decay_bars) * 0.5
-            return RegimeSnapshot(
-                regime=BrooksRegime.BREAKOUT_MODE, confidence=conf, reasons=reasons, **metrics
-            )
+            return RegimeSnapshot(regime=BrooksRegime.BREAKOUT_MODE, confidence=conf, reasons=reasons, **metrics)
 
         # --- Trend regimes (always_in long/short) ---
         if structure.always_in == "long":

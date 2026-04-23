@@ -115,9 +115,7 @@ class StopLadder:
             return None
         return max(pos.recent_highs) + self.tick_size
 
-    def _swing_trail_stop(
-        self, pos: PositionState, confirmed_swings: List[SwingPoint]
-    ) -> Optional[float]:
+    def _swing_trail_stop(self, pos: PositionState, confirmed_swings: List[SwingPoint]) -> Optional[float]:
         candidate: Optional[float] = None
         kind = "low" if pos.side == "long" else "high"
         used = pos.used_swing_lows if pos.side == "long" else pos.used_swing_highs
@@ -139,9 +137,7 @@ class StopLadder:
     def _better(pos: PositionState, a: float, b: float) -> bool:
         return a > b if pos.side == "long" else a < b
 
-    def _pick_stop(
-        self, current: Optional[float], pos: PositionState, proposed: float
-    ) -> float:
+    def _pick_stop(self, current: Optional[float], pos: PositionState, proposed: float) -> float:
         if current is None:
             return proposed
         return proposed if self._better(pos, proposed, current) else current

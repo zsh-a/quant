@@ -190,9 +190,7 @@ def test_analyze_returns_signals_with_source_and_meta(ctx, stub_prompts) -> None
         model="claude-opus-4-7",
         cache_hit=True,
     )
-    analyst = LLMAnalyst(
-        provider=provider, model="claude-opus-4-7", prompts=stub_prompts
-    )
+    analyst = LLMAnalyst(provider=provider, model="claude-opus-4-7", prompts=stub_prompts)
 
     out = _run(analyst.analyze(ctx))
     assert provider.call_count == 1
@@ -208,9 +206,7 @@ def test_analyze_returns_signals_with_source_and_meta(ctx, stub_prompts) -> None
         assert s.meta["model"] == "claude-opus-4-7"
 
 
-def test_analyze_passes_cache_spec_with_concept_and_fewshot_blocks(
-    ctx, stub_prompts
-) -> None:
+def test_analyze_passes_cache_spec_with_concept_and_fewshot_blocks(ctx, stub_prompts) -> None:
     provider = MockProvider(payload=LLMSignalBatch(reasoning="", signals=[]))
     analyst = LLMAnalyst(
         provider=provider,
@@ -253,9 +249,7 @@ def test_analyze_builds_messages_from_prompt_bundle(ctx, stub_prompts) -> None:
     assert "LTF" in live_text
 
 
-def test_analyze_returns_empty_when_provider_returns_no_signals(
-    ctx, stub_prompts
-) -> None:
+def test_analyze_returns_empty_when_provider_returns_no_signals(ctx, stub_prompts) -> None:
     provider = MockProvider(payload=LLMSignalBatch(reasoning="quiet", signals=[]))
     analyst = LLMAnalyst(provider=provider, model="m", prompts=stub_prompts)
     out = _run(analyst.analyze(ctx))
@@ -279,9 +273,7 @@ def test_cache_miss_records_cache_hit_false(ctx, stub_prompts) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_analyze_raises_when_provider_payload_violates_schema(
-    ctx, stub_prompts
-) -> None:
+def test_analyze_raises_when_provider_payload_violates_schema(ctx, stub_prompts) -> None:
     """If the provider returns a dict that fails Pydantic validation, the
     error must propagate — silently dropping malformed output would mask
     upstream prompt regressions."""

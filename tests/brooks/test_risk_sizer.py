@@ -13,8 +13,12 @@ class TestFixedPercentSizer:
     def test_basic_sizing(self):
         sizer = FixedPercentSizer(risk_pct=0.01)
         qty = sizer.size(
-            equity=100_000, entry_px=100.0, stop_px=99.0,
-            probability=0.6, expected_r=2.0, available_cash=100_000,
+            equity=100_000,
+            entry_px=100.0,
+            stop_px=99.0,
+            probability=0.6,
+            expected_r=2.0,
+            available_cash=100_000,
         )
         # risk_usd = 1000, per_unit = 1, qty = 1000, cash_cap = 1000 → 1000
         assert qty == pytest.approx(1000.0)
@@ -69,16 +73,24 @@ class TestKellySizer:
     def test_negative_edge_returns_zero_size(self):
         sizer = KellySizer(max_risk_pct=0.02, fraction=0.5)
         qty = sizer.size(
-            equity=100_000, entry_px=100.0, stop_px=99.0,
-            probability=0.4, expected_r=1.0, available_cash=100_000,
+            equity=100_000,
+            entry_px=100.0,
+            stop_px=99.0,
+            probability=0.4,
+            expected_r=1.0,
+            available_cash=100_000,
         )
         assert qty == 0.0
 
     def test_size_uses_capped_risk_pct(self):
         sizer = KellySizer(max_risk_pct=0.02, fraction=0.5)
         qty = sizer.size(
-            equity=100_000, entry_px=100.0, stop_px=99.0,
-            probability=0.6, expected_r=2.0, available_cash=100_000,
+            equity=100_000,
+            entry_px=100.0,
+            stop_px=99.0,
+            probability=0.6,
+            expected_r=2.0,
+            available_cash=100_000,
         )
         # effective risk_pct = 0.02 → risk_usd = 2000, per_unit = 1 → qty 2000
         # cash cap = 100_000 / 100 = 1000 → 1000 wins.
@@ -87,8 +99,12 @@ class TestKellySizer:
     def test_size_no_cash_cap_when_unconstrained(self):
         sizer = KellySizer(max_risk_pct=0.02, fraction=0.5)
         qty = sizer.size(
-            equity=100_000, entry_px=10.0, stop_px=9.0,
-            probability=0.6, expected_r=2.0, available_cash=100_000,
+            equity=100_000,
+            entry_px=10.0,
+            stop_px=9.0,
+            probability=0.6,
+            expected_r=2.0,
+            available_cash=100_000,
         )
         # risk 2000 / 1 = 2000; cash cap 100_000 / 10 = 10_000 → 2000 wins
         assert qty == pytest.approx(2000.0)

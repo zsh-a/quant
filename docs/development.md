@@ -21,7 +21,21 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 uv venv
 source .venv/bin/activate
 uv pip install -e ".[dev]"
+
+# Install the pre-commit hook so every commit auto-fixes lint + format.
+# Required once after cloning; CI will fail if you skip it and push lint
+# violations.
+make hooks
 ```
+
+Useful Make targets:
+
+| Target | Purpose |
+|--------|---------|
+| `make hooks`    | Install `pre-commit` git hook (runs `ruff --fix` + `ruff format` on staged files at commit time) |
+| `make hooks_run`| Run all pre-commit hooks against the entire tree once |
+| `make lint`     | Read-only lint check (matches CI exactly) |
+| `make lint_fix` | Auto-fix lint + format across `src/` and `tests/` |
 
 ### 2. Frontend
 

@@ -48,8 +48,7 @@ class PortfolioGuard:
         if symbol_count >= self.max_symbol_positions:
             return (
                 False,
-                f"symbol {new_symbol} already has {symbol_count} open position(s) "
-                f"(max {self.max_symbol_positions})",
+                f"symbol {new_symbol} already has {symbol_count} open position(s) (max {self.max_symbol_positions})",
             )
 
         daily_risk = sum(p.risk_pct for p in active) + new_risk_pct
@@ -68,9 +67,7 @@ class PortfolioGuard:
 
         return True, "ok"
 
-    def _find_correlation_conflict(
-        self, new_symbol: str, active: List[PositionState]
-    ) -> Optional[str]:
+    def _find_correlation_conflict(self, new_symbol: str, active: List[PositionState]) -> Optional[str]:
         for group_name, members in self.correlation_groups.items():
             if new_symbol not in members:
                 continue

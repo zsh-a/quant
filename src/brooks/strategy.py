@@ -32,7 +32,8 @@ from typing import Any, Dict, List, Optional
 
 from src.brooks.analyst.base import AnalystRegistry
 from src.brooks.analyst.rule import RuleAnalyst  # noqa: F401 — triggers registration
-from src.brooks.context import AccountSnapshot, Bar as BrooksBar, BrooksContext, TFSnapshot
+from src.brooks.context import AccountSnapshot, BrooksContext, TFSnapshot
+from src.brooks.context import Bar as BrooksBar
 from src.brooks.decision.aggregator import AggregatedDecision, SignalAggregator
 from src.brooks.decision.ev_gate import EVGate
 from src.brooks.decision.hit_rate import HitRateTable
@@ -98,9 +99,7 @@ class BrooksStrategy(Strategy):
 
         # --- plug components --------------------------------------------------
         analyst_name: str = self.params["analyst"]
-        self._analyst = AnalystRegistry.build(
-            analyst_name, **self.params.get("analyst_params", {})
-        )
+        self._analyst = AnalystRegistry.build(analyst_name, **self.params.get("analyst_params", {}))
         self._aggregator = SignalAggregator(**self.params.get("aggregator_params", {}))
         self._te = _build_te(self.params.get("te_params", {}))
         self._ev_gate = EVGate(
@@ -200,9 +199,7 @@ class BrooksStrategy(Strategy):
 
         mtf = self.params.get("mtf_intervals") or []
         if mtf:
-            self._resamplers[symbol] = TimeframeResampler(
-                base=self.params["base_interval"], higher=list(mtf)
-            )
+            self._resamplers[symbol] = TimeframeResampler(base=self.params["base_interval"], higher=list(mtf))
             for h in mtf:
                 self._htf_state[symbol][h] = _HTFState(
                     extractor=BarFeatureExtractor(),
@@ -354,9 +351,7 @@ class BrooksStrategy(Strategy):
         account = AccountSnapshot(
             equity=equity,
             cash=cash,
-            open_positions={
-                s: p.qty_open for s, p in self._positions.items() if p.qty_open > 0
-            },
+            open_positions={s: p.qty_open for s, p in self._positions.items() if p.qty_open > 0},
         )
         return BrooksContext(
             symbol=symbol,
@@ -444,11 +439,7 @@ class BrooksStrategy(Strategy):
             return
 
         # 3) ladder advance
-        confirmed = (
-            structure.confirmed_swing_lows
-            if pos.side == "long"
-            else structure.confirmed_swing_highs
-        )
+        confirmed = structure.confirmed_swing_lows if pos.side == "long" else structure.confirmed_swing_highs
         new_stop = self._stop_ladder.update(
             pos,
             bar_high=bar.high,
@@ -538,9 +529,7 @@ def _risk_pct_from_qty(qty: float, decision: Decision, equity: float) -> float:
     return (qty * per_unit) / equity
 
 
-def _select_decision(
-    decisions: List[Decision], combined: AggregatedDecision
-) -> Optional[Decision]:
+def _select_decision(decisions: List[Decision], combined: AggregatedDecision) -> Optional[Decision]:
     """Pick the decision that matches the aggregator's resolved entry/stop.
 
     The aggregator combines signals into a single (side, entry, stop)

@@ -141,9 +141,7 @@ def test_strategy_e2e_matches_legacy_v2_entry(h2_bars: List[Bar]) -> None:
         bar_idx=27, side=long, entry=118.55, stop=117.45
     """
     strat = _make_strategy()
-    broker = BacktestBroker(
-        initial_cash=100_000, commission=0.0001, slippage=0.0, allow_short=True
-    )
+    broker = BacktestBroker(initial_cash=100_000, commission=0.0001, slippage=0.0, allow_short=True)
     engine = TradingEngine(strategy=strat, broker=broker, data_stream=_ListStream(h2_bars))
     engine.run()
 
@@ -189,15 +187,10 @@ def test_strategy_e2e_is_deterministic(h2_bars: List[Bar]) -> None:
 
     def run() -> list[tuple]:
         strat = _make_strategy()
-        broker = BacktestBroker(
-            initial_cash=100_000, commission=0.0001, slippage=0.0, allow_short=True
-        )
+        broker = BacktestBroker(initial_cash=100_000, commission=0.0001, slippage=0.0, allow_short=True)
         engine = TradingEngine(strategy=strat, broker=broker, data_stream=_ListStream(h2_bars))
         engine.run()
-        return [
-            (t["timestamp"], t["type"], round(t["price"], 4), round(t["quantity"], 6))
-            for t in broker.trades
-        ]
+        return [(t["timestamp"], t["type"], round(t["price"], 4), round(t["quantity"], 6)) for t in broker.trades]
 
     assert run() == run()
 
