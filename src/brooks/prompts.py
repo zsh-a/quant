@@ -17,7 +17,7 @@ from typing import Type
 
 from pydantic import BaseModel
 
-from src.alpha.llm.provider import Message, TextPart
+from src.alpha.llm.provider import ImagePart, Message, TextPart
 from src.brooks.schema import Decision
 
 __all__ = ["PromptBundle", "build_schema_description", "DEFAULT_PROMPT_DIR"]
@@ -26,8 +26,10 @@ __all__ = ["PromptBundle", "build_schema_description", "DEFAULT_PROMPT_DIR"]
 DEFAULT_PROMPT_DIR = Path("prompts/brooks")
 
 _SYSTEM_FILE = "system_analyst.md"
+_SYSTEM_VLM_FILE = "system_vlm.md"
 _CONCEPT_FILE = "concept_manual.md"
 _FEWSHOT_FILE = Path("fewshot") / "analyst_examples.jsonl"
+_FEWSHOT_VLM_FILE = Path("fewshot") / "vlm_examples.jsonl"
 
 _SCHEMA_HEADING = "## Output schema (authoritative)"
 
@@ -87,6 +89,46 @@ class PromptBundle:
             schema_description=build_schema_description(schema_model),
         )
 
+    @classmethod
+    def load_vlm(
+        cls,
+        dir: Path | str = DEFAULT_PROMPT_DIR,
+        *,
+        schema_model: Type[BaseModel] | None = None,
+    ) -> "PromptBundle":
+        """Load the VLM-specific bundle.
+
+        Differs from :meth:`load` in two places: the system prompt comes
+        from ``system_vlm.md`` (chart-annotator role) and the few-shot
+        transcript comes from ``fewshot/vlm_examples.jsonl``. The concept
+        manual is shared — bar / pattern / regime vocabulary is identical
+        across text and vision analysts.
+
+        ``schema_model`` defaults to
+        :class:`src.brooks.analyst.vlm.VLMSignalBatch` (imported lazily to
+        avoid a prompts↔analyst import cycle).
+        """
+        if schema_model is None:
+            from src.brooks.analyst.vlm import VLMSignalBatch
+
+            schema_model = VLMSignalBatch
+
+        root = Path(dir)
+        system_text = (root / _SYSTEM_VLM_FILE).read_text(encoding="utf-8")
+        concept_manual = (root / _CONCEPT_FILE).read_text(encoding="utf-8")
+
+        fewshot: list[dict] = []
+        fewshot_path = root / _FEWSHOT_VLM_FILE
+        if fewshot_path.exists():
+            fewshot = _load_jsonl(fewshot_path)
+
+        return cls(
+            system_text=system_text,
+            concept_manual=concept_manual,
+            fewshot=fewshot,
+            schema_description=build_schema_description(schema_model),
+        )
+
     # ------------------------------------------------------------------
     # Message assembly
     # ------------------------------------------------------------------
@@ -130,6 +172,53 @@ class PromptBundle:
             )
 
         messages.append(Message(role="user", content=[TextPart(text=user_context)]))
+        return messages
+
+    def build_messages_multimodal(
+        self,
+        user_text: str,
+        user_image: ImagePart,
+        include_fewshot: bool = True,
+    ) -> list[Message]:
+        """Assemble a provider-facing message list with a chart image.
+
+        Shape:
+
+        * ``messages[0]`` — ``system`` message with three TextParts
+          (``system_text`` / schema / ``concept_manual``). The last part
+          carries ``cache="concept_manual"``.
+        * ``messages[1]`` — ``user`` few-shot transcript, cached under
+          ``fewshot_vlm`` so text-only analysts and VLM analysts maintain
+          distinct cache namespaces even when sharing a bundle dir.
+          Emitted only when ``include_fewshot=True`` *and* examples exist.
+        * ``messages[-1]`` — ``user`` message carrying ``[image, text]``.
+          Image first so the model anchors its reading on the chart
+          before the compact text summary.
+        """
+        system_parts = [
+            TextPart(text=self.system_text),
+            TextPart(text="\n" + self.schema_description),
+            TextPart(text="\n" + self.concept_manual, cache="concept_manual"),
+        ]
+
+        messages: list[Message] = [Message(role="system", content=system_parts)]
+
+        if include_fewshot and self.fewshot:
+            messages.append(
+                Message(
+                    role="user",
+                    content=[
+                        TextPart(text=self._fewshot_text(), cache="fewshot_vlm"),
+                    ],
+                )
+            )
+
+        messages.append(
+            Message(
+                role="user",
+                content=[user_image, TextPart(text=user_text)],
+            )
+        )
         return messages
 
     # ------------------------------------------------------------------
