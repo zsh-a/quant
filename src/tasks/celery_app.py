@@ -51,6 +51,7 @@ app.conf.update(
         "src.tasks.crypto_tasks.*": {"queue": "automation"},
         "src.tasks.alpha_dlq.*": {"queue": "alpha_dlq"},
         "src.tasks.brooks_live_task.*": {"queue": "automation"},
+        "src.tasks.brooks_leaderboard_task.*": {"queue": "automation"},
     },
     # Queues
     task_queues=(
@@ -71,6 +72,12 @@ app.conf.update(
             "schedule": crontab(hour=23, minute=55),
             "options": {"queue": "automation"},
         },
+        "brooks-leaderboard-weekly": {
+            "task": "src.tasks.brooks_leaderboard_task.run_weekly_leaderboard",
+            # Weekly on Monday 03:00 UTC — matches leaderboard.yaml `schedule`.
+            "schedule": crontab(hour=3, minute=0, day_of_week="mon"),
+            "options": {"queue": "automation"},
+        },
     },
     # Explicit imports for task discovery
     imports=[
@@ -80,6 +87,7 @@ app.conf.update(
         "src.tasks.crypto_tasks",
         "src.tasks.alpha_dlq",
         "src.tasks.brooks_live_task",
+        "src.tasks.brooks_leaderboard_task",
     ],
 )
 

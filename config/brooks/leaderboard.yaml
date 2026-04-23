@@ -1,0 +1,43 @@
+# Brooks leaderboard — weekly cross-model regression evaluation.
+#
+# Adding a new model is a one-line change: append a new entry under
+# ``analysts``. Entries are resolved by ``AnalystFactory`` in
+# ``src.brooks.eval.leaderboard``.
+#
+# Analyst types:
+#   - rule                  — deterministic pattern detectors
+#   - llm  (model: <id>)    — LLMAnalyst with the given model id
+#   - vlm  (model: <id>)    — VLMAnalyst (registered in Phase 4.3)
+#   - ensemble.critic       — producer + critic pipeline
+#   - ensemble.vote         — fan-out + consensus
+#   - ensemble.router       — regime-routed analyst
+
+dataset: data/brooks/golden/v1.parquet
+
+analysts:
+  - type: rule
+  - type: llm
+    model: claude-opus-4-7
+  - type: llm
+    model: claude-sonnet-4-6
+  - type: llm
+    model: gpt-4.1
+  - type: llm
+    model: gemini-2.5-pro
+  - type: vlm
+    model: gemini-2.5-pro
+  - type: ensemble.critic
+    label: critic(rule+sonnet)
+    producer: rule
+    critic: llm:claude-sonnet-4-6
+
+# Cron for the Celery beat schedule (weekly, Monday 03:00 UTC).
+schedule: "0 3 * * MON"
+
+output_dir: data/brooks/leaderboards
+history_path: data/brooks/leaderboard.parquet
+max_concurrent: 4
+
+# USD per 1M tokens by model. Overrides DEFAULT_COST_PER_MTOKEN.
+# cost_per_mtoken:
+#   claude-opus-4-7: {input: 15.0, output: 75.0}
