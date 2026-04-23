@@ -1,0 +1,19 @@
+# RouterAnalyst defaults — analyst selection per Brooks regime.
+#
+# Each value is the registered analyst name (`AnalystRegistry`).
+# Strong/clean trends and climaxes route to the strict rule analyst —
+# overfit-prone LLM/VLM judgement is reserved for fuzzier regimes:
+#   * tight ranges        → LLM picks subtle reversal patterns
+#   * broad ranges        → producer/critic raises the bar before entering
+#   * breakout transitions → VLM reads chart shape better than text rules
+default: rule
+routes:
+  strong_bull_trend: rule
+  weak_bull_trend: rule
+  strong_bear_trend: rule
+  weak_bear_trend: rule
+  climax: rule
+  tight_trading_range: "llm:claude-opus-4-7"
+  broad_trading_range: "ensemble.critic"
+  breakout_mode: "vlm:gemini-2.5-pro"
+  unknown: rule
