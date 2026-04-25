@@ -1,16 +1,15 @@
 /**
- * ChartCanvas — bare lightweight-charts candlestick container.
+ * ChartCanvas — bare lightweight-charts candlestick container with the
+ * pluggable layer registry mounted on top.
  *
- * Owns the `IChartApi` instance via `useEffect(create / cleanup)` and
- * surfaces it through a layer-registry callback so future S3 layers can
- * mount additional series/markers/primitives without touching this file.
- *
- * The chart re-uses ResizeObserver for parent-size tracking. Live bar
- * updates use `series.update()` (single-bar diff) when the new bar shares
- * the same timestamp as the last point, otherwise we append.
+ * Owns the `IChartApi` instance via `useEffect(create / cleanup)` and surfaces
+ * it through `useLayerRegistry` so every registered layer mounts onto the
+ * same chart. Live bar updates use `series.update()` (single-bar diff) when
+ * the new bar shares the same timestamp as the last point, otherwise we
+ * append.
  */
 
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ColorType,
   CandlestickSeries,
@@ -22,22 +21,14 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import type { Bar } from '../../types';
-import { useEffectiveBarIdx, useStudioActions, useTimelineState } from '../../store';
-
-export interface ChartLayerCtx {
-  chart: IChartApi;
-  primarySeries: ISeriesApi<'Candlestick'>;
-}
-
-interface ChartCanvasProps {
-  /**
-   * Optional callback invoked once after chart mount and after every
-   * tear-down, so future S3 layer plugins can attach extra series /
-   * markers / primitives. Returning a cleanup function from this
-   * registry hook is mandatory.
-   */
-  onChartReady?: (ctx: ChartLayerCtx) => () => void;
-}
+import {
+  useEffectiveBarIdx,
+  useStudioActions,
+  useTimelineState,
+  useVisibleLayers,
+} from '../../store';
+import { useLayerRegistry } from '../../hooks/useLayerRegistry';
+import type { LayerCtx } from '../../layers/types';
 
 const THEME = {
   background: '#0e1116',
@@ -62,18 +53,23 @@ function toCandlestickData(bars: Bar[]): CandlestickData<UTCTimestamp>[] {
   return out;
 }
 
-export function ChartCanvas({ onChartReady }: ChartCanvasProps) {
+export function ChartCanvas() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const lastBarCountRef = useRef(0);
   const fittedRef = useRef(false);
 
+  const [layerCtx, setLayerCtx] = useState<LayerCtx | null>(null);
+
   const timeline = useTimelineState();
   const currentBarIdx = useEffectiveBarIdx();
+  const visibleLayers = useVisibleLayers();
   const { setHoveredBar } = useStudioActions();
 
   const candles = useMemo(() => (timeline ? toCandlestickData(timeline.bars) : []), [timeline]);
+
+  useLayerRegistry(layerCtx, timeline, currentBarIdx, visibleLayers);
 
   // Mount chart once.
   useEffect(() => {
@@ -115,7 +111,7 @@ export function ChartCanvas({ onChartReady }: ChartCanvasProps) {
     });
     ro.observe(container);
 
-    const subscription = chart.subscribeCrosshairMove((param) => {
+    chart.subscribeCrosshairMove((param) => {
       if (!param.time || !timeline) {
         setHoveredBar(null);
         return;
@@ -127,15 +123,11 @@ export function ChartCanvas({ onChartReady }: ChartCanvasProps) {
       setHoveredBar(idx >= 0 ? idx : null);
     });
 
-    let cleanupLayers: (() => void) | undefined;
-    if (onChartReady) {
-      cleanupLayers = onChartReady({ chart, primarySeries: series });
-    }
+    setLayerCtx({ chart, primarySeries: series, theme: 'dark' });
 
     return () => {
-      cleanupLayers?.();
+      setLayerCtx(null);
       ro.disconnect();
-      subscription;
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
