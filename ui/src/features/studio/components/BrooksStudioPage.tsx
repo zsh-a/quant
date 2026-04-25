@@ -1,12 +1,19 @@
 /**
  * BrooksStudioPage — top-level route for `/studio/:sessionId`.
  *
- * S2 ships the skeleton: chart + scrubber + playback + URL/keyboard
- * bindings. S3 fills in the side panels & layer toggle into the placeholders
- * outlined below.
+ * Layout (S4):
+ *   ┌───────────────────────┬──────────┐
+ *   │ ChartCanvas           │ SidePanel│
+ *   │ (LayerToggle overlay) │ (tabs)   │
+ *   ├───────────────────────┴──────────┤
+ *   │ TimelineScrubber + PlaybackCtrls │
+ *   └──────────────────────────────────┘
+ * Horizontal split is `react-resizable-panels`; user drag-resize is persisted
+ * by the library's autoSaveId.
  */
 
 import { useParams } from 'react-router-dom';
+import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'react-resizable-panels';
 import { useTimeline } from '../hooks/useTimeline';
 import { useReplay } from '../hooks/useReplay';
 import { useUrlState } from '../hooks/useUrlState';
@@ -19,6 +26,7 @@ import { ChartCanvas } from './chart/ChartCanvas';
 import { TimelineScrubber } from './timeline/TimelineScrubber';
 import { PlaybackControls } from './timeline/PlaybackControls';
 import { LayerToggle } from './timeline/LayerToggle';
+import { SidePanel } from './side/SidePanel';
 
 export default function BrooksStudioPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -53,21 +61,36 @@ export default function BrooksStudioPage() {
         <code className="text-[11px] text-muted-foreground">{sessionId}</code>
       </header>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-border/70 bg-[#0e1116]">
-        <ChartCanvas />
-        <div className="pointer-events-auto absolute right-3 top-3 z-10">
-          <LayerToggle />
-        </div>
-        {loading && !timeline && (
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-muted-foreground">
-            Loading timeline…
-          </div>
-        )}
-        {error && (
-          <div className="absolute left-3 top-3 max-w-md rounded-md border border-destructive/60 bg-destructive/15 px-3 py-1.5 text-xs text-destructive-foreground">
-            {error}
-          </div>
-        )}
+      <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-border/70 bg-[#0e1116]">
+        <PanelGroup
+          orientation="horizontal"
+          defaultLayout={{ 'chart-panel': 72, 'side-panel': 28 }}
+          className="h-full"
+        >
+          <Panel id="chart-panel" minSize={40} className="relative">
+            <ChartCanvas />
+            <div className="pointer-events-auto absolute right-3 top-3 z-10">
+              <LayerToggle />
+            </div>
+            {loading && !timeline && (
+              <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-muted-foreground">
+                Loading timeline…
+              </div>
+            )}
+            {error && (
+              <div className="absolute left-3 top-3 max-w-md rounded-md border border-destructive/60 bg-destructive/15 px-3 py-1.5 text-xs text-destructive-foreground">
+                {error}
+              </div>
+            )}
+          </Panel>
+          <PanelResizeHandle
+            className="w-1.5 cursor-col-resize bg-border/40 transition-colors data-[separator-state=hover]:bg-primary/50 data-[separator-state=drag]:bg-primary"
+            data-testid="side-panel-resize-handle"
+          />
+          <Panel id="side-panel" minSize={18} maxSize={50}>
+            <SidePanel />
+          </Panel>
+        </PanelGroup>
       </div>
 
       <div className="rounded-xl border border-border/70 bg-card">
