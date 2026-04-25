@@ -15,6 +15,12 @@ Quent is an AI-powered quantitative trading platform for crypto and A-share mark
 | [Data Pipeline](data-pipeline.md) | Market data sources, processors, ClickHouse storage |
 | [Frontend](frontend.md) | React UI architecture, components, state management |
 | [Development](development.md) | Local setup, testing, Docker deployment, configuration |
+| [Brooks Price-Action Platform](brooks/README.md) | Multi-analyst (rule / LLM / VLM / ensemble) Brooks strategy pipeline, eval, leaderboard, paper trading |
+
+### Brooks subdocs
+
+- [Usage recipes](brooks/usage.md) - Eight runnable end-to-end recipes (rule / LLM / VLM / ensemble / leaderboard / paper trading / auto-label)
+- [Taxonomy](brooks/taxonomy.yaml) - Bar / pattern / regime single source of truth
 
 ## Quick Links
 
