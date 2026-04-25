@@ -32,6 +32,18 @@ class EventType:
     SIMULATION_BATCH_COMPLETED = "simulation_batch_completed"
     SIMULATION_BATCH_FAILED = "simulation_batch_failed"
     STRATEGY_STEP = "strategy_step"
+    STUDIO_BAR_EVENT = "studio_bar_event"
+
+
+# Brooks Studio WebSocket channel: connections register against this key so
+# the studio panel sees only the per-bar event stream and not the legacy
+# ad-hoc strategy_step / equity_update payloads broadcast on the raw
+# session id.
+STUDIO_CHANNEL_PREFIX = "brooks_studio"
+
+
+def studio_channel_key(session_id: str) -> str:
+    return f"{STUDIO_CHANNEL_PREFIX}:{session_id}"
 
 
 class SessionEventBus:
@@ -164,3 +176,17 @@ async def emit_simulation_batch_failed(session_id: str, payload: dict):
 
 async def emit_strategy_step(session_id: str, payload: dict):
     await event_bus.emit(EventType.STRATEGY_STEP, session_id, payload)
+
+
+async def emit_studio_bar_event(session_id: str, bar_event: dict):
+    """Emit a per-bar :class:`BarEvent`-shaped payload to the Studio channel.
+
+    The event is broadcast on the dedicated ``brooks_studio:{session_id}``
+    channel so subscribers of the legacy ``/ws/{session_id}`` endpoint are
+    unaffected.
+    """
+    await event_bus.emit(
+        EventType.STUDIO_BAR_EVENT,
+        studio_channel_key(session_id),
+        {"bar_event": bar_event},
+    )
