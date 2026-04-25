@@ -1,12 +1,13 @@
 """Brooks Studio router — single backend truth for live + replay.
 
-The router exposes three endpoints used by the Studio panel:
+The router exposes the endpoints used by the Studio panel:
 
 * ``GET  /brooks-studio/sessions/{session_id}/timeline``           — full snapshot
 * ``GET  /brooks-studio/sessions/{session_id}/timeline/since/{seq}`` — incremental page
+* ``POST /brooks-studio/sessions/{session_id}/replay-bar``         — re-run analysts on one bar
 * ``WS   /ws/brooks-studio/{session_id}``                          — live BarEvent stream
 
-All three speak the same :class:`SessionTimeline` / :class:`BarEvent`
+All four speak the same :class:`SessionTimeline` / :class:`BarEvent`
 contract from :mod:`src.api.schemas.brooks_studio`, so the frontend has
 exactly one rendering path for both modes.
 """
@@ -19,9 +20,16 @@ from fastapi import APIRouter, HTTPException, Query, WebSocket, WebSocketDisconn
 
 from session_db import SessionDB
 from src.api.events import studio_channel_key
-from src.api.schemas.brooks_studio import SessionTimeline, TimelinePage
+from src.api.schemas.brooks_studio import (
+    ReplayBarAnalystResult,
+    ReplayBarRequest,
+    ReplayBarResponse,
+    SessionTimeline,
+    TimelinePage,
+)
 from src.api.websocket_manager import handle_websocket_message
 from src.api.websocket_manager import manager as ws_manager
+from src.services.brooks_replay_runner import BrooksReplayRunner
 from src.services.brooks_timeline_loader import BrooksTimelineLoader
 from src.utils.logging_config import get_logger
 
@@ -74,6 +82,32 @@ async def get_timeline_page(
         )
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
+
+
+@router.post(
+    "/sessions/{session_id}/replay-bar",
+    response_model=ReplayBarResponse,
+)
+async def replay_bar(session_id: str, req: ReplayBarRequest) -> ReplayBarResponse:
+    """Re-run a chosen set of analysts against a single bar of a session.
+
+    Powers the MultiAnalystCompare side panel: the user selects a bar and a
+    set of analysts (``rule``, ``llm:claude-opus-4-7``, ``vlm:gemini``,
+    ``ensemble.critic``, …); each analyst's signals + decision (when one was
+    persisted) are returned for direct comparison.
+    """
+    runner = BrooksReplayRunner(SessionDB())
+    try:
+        results = await runner.run(session_id, req.bar_idx, req.analysts)
+    except KeyError:
+        raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+
+    return ReplayBarResponse(
+        bar_idx=req.bar_idx,
+        results=[ReplayBarAnalystResult(**r.to_dict()) for r in results],
+    )
 
 
 @ws_router.websocket("/ws/brooks-studio/{session_id}")

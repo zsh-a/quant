@@ -109,6 +109,27 @@ class TimelinePage(BaseModel):
     has_more: bool
 
 
+class ReplayBarRequest(BaseModel):
+    """Body for ``POST /sessions/{id}/replay-bar``."""
+
+    bar_idx: int = Field(ge=0)
+    analysts: List[str] = Field(min_length=1)
+
+
+class ReplayBarAnalystResult(BaseModel):
+    analyst: str
+    bar_idx: int
+    signals: List[Signal] = Field(default_factory=list)
+    decision: Optional[Decision] = None
+    error: Optional[str] = None
+    cached: bool = False
+
+
+class ReplayBarResponse(BaseModel):
+    bar_idx: int
+    results: List[ReplayBarAnalystResult] = Field(default_factory=list)
+
+
 __all__ = [
     "Bar",
     "RegimeView",
@@ -121,4 +142,7 @@ __all__ = [
     "PnLPoint",
     "SessionTimeline",
     "TimelinePage",
+    "ReplayBarRequest",
+    "ReplayBarAnalystResult",
+    "ReplayBarResponse",
 ]
