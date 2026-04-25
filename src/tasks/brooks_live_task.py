@@ -728,7 +728,6 @@ class _BrooksLiveEngine:
         htf_payload: Dict[str, Dict[str, Any]] = {}
         htf_bars: Dict[str, Dict[str, Any]] = {}
         for tf, st in ((getattr(self.strategy, "_htf_state", None) or {}).get(symbol) or {}).items():
-            last_feat = getattr(st, "last_feat", None)
             last_regime = getattr(st, "last_regime", None)
             last_struct = getattr(st, "last_struct", None)
             htf_payload[tf] = {
@@ -882,9 +881,9 @@ def _feature_to_view_dict(feat) -> Dict[str, Any]:
 
 def _structure_to_view_dict(struct) -> Dict[str, Any]:
     swings = []
-    for s in (getattr(struct, "confirmed_swing_highs", []) or []):
+    for s in getattr(struct, "confirmed_swing_highs", []) or []:
         swings.append({"idx": s.bar_idx, "kind": "high", "price": s.price})
-    for s in (getattr(struct, "confirmed_swing_lows", []) or []):
+    for s in getattr(struct, "confirmed_swing_lows", []) or []:
         swings.append({"idx": s.bar_idx, "kind": "low", "price": s.price})
     top = getattr(struct, "micro_channel_top", None)
     bot = getattr(struct, "micro_channel_bot", None)

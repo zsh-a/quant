@@ -8,13 +8,12 @@ both the full-load and the incremental-page paths.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import pytest
 
 from session_db import SessionDB
 from src.services.brooks_timeline_loader import BrooksTimelineLoader, load_timeline
-
 
 SESSION_ID = "studio-fixture-1"
 SYMBOL = "BTC/USDT"
@@ -251,9 +250,7 @@ class TestLoadPage:
         page_c = loader.load_page(SESSION_ID, since_seq=page_b.next_seq, limit=50)
 
         merged_ids = (
-            [e.bar_idx for e in page_a.events]
-            + [e.bar_idx for e in page_b.events]
-            + [e.bar_idx for e in page_c.events]
+            [e.bar_idx for e in page_a.events] + [e.bar_idx for e in page_b.events] + [e.bar_idx for e in page_c.events]
         )
         assert merged_ids == [e.bar_idx for e in full]
         assert page_a.has_more is True

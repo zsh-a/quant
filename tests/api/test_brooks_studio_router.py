@@ -11,11 +11,9 @@ We seed the same fixture session as the loader tests (30 bars, 5 signals,
 from __future__ import annotations
 
 import asyncio
-import os
 
 import pytest
 from fastapi.testclient import TestClient
-
 
 SESSION_ID = "studio-router-fixture-1"
 SYMBOL = "BTC/USDT"
@@ -111,8 +109,20 @@ def app_client(tmp_path, monkeypatch):
     db.add_trades(
         SESSION_ID,
         [
-            {"timestamp": _ns_to_iso(base_ns + 11 * BAR_NS_STEP), "symbol": SYMBOL, "type": "buy", "price": 105.0, "quantity": 0.5},
-            {"timestamp": _ns_to_iso(base_ns + 21 * BAR_NS_STEP), "symbol": SYMBOL, "type": "sell", "price": 110.0, "quantity": 0.5},
+            {
+                "timestamp": _ns_to_iso(base_ns + 11 * BAR_NS_STEP),
+                "symbol": SYMBOL,
+                "type": "buy",
+                "price": 105.0,
+                "quantity": 0.5,
+            },
+            {
+                "timestamp": _ns_to_iso(base_ns + 21 * BAR_NS_STEP),
+                "symbol": SYMBOL,
+                "type": "sell",
+                "price": 110.0,
+                "quantity": 0.5,
+            },
         ],
     )
 
@@ -149,9 +159,7 @@ class TestTimelinePage:
         full = app_client.get(f"/brooks-studio/sessions/{SESSION_ID}/timeline").json()
         full_ids = [e["bar_idx"] for e in full["events"]]
 
-        page_a = app_client.get(
-            f"/brooks-studio/sessions/{SESSION_ID}/timeline/since/0?limit=10"
-        ).json()
+        page_a = app_client.get(f"/brooks-studio/sessions/{SESSION_ID}/timeline/since/0?limit=10").json()
         page_b = app_client.get(
             f"/brooks-studio/sessions/{SESSION_ID}/timeline/since/{page_a['next_seq']}?limit=10"
         ).json()
