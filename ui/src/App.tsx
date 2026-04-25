@@ -33,6 +33,7 @@ const LabPanel = lazy(() => import('./components/LabPanel'));
 const MarketAdminPanel = lazy(() => import('./components/MarketAdminPanel'));
 const SessionDetail = lazy(() => import('./components/SessionDetail'));
 const BrooksLive = lazy(() => import('./components/BrooksLive'));
+const BrooksStudioPage = lazy(() => import('./features/studio/components/BrooksStudioPage'));
 
 const ROUTE_META: Record<string, { title: string; description: string }> = {
   '/': { title: 'Overview', description: 'Monitor strategy runs, recent sessions, and system status.' },
@@ -44,11 +45,13 @@ const ROUTE_META: Record<string, { title: string; description: string }> = {
   '/market-admin': { title: 'Market Data', description: 'Database coverage, batch history, and update console.' },
   '/optimizer': { title: 'Optimizer', description: 'Parameter optimization workspace.' },
   '/brooks-live': { title: 'BrooksLive', description: 'Realtime Brooks strategy paper trading.' },
+  '/studio': { title: 'Brooks Studio', description: 'Unified live + replay K-line studio with timeline scrubber.' },
 };
 
 function getRouteMeta(pathname: string) {
   if (pathname.startsWith('/session')) return ROUTE_META['/session'];
   if (pathname.startsWith('/lab')) return ROUTE_META['/lab'];
+  if (pathname.startsWith('/studio')) return ROUTE_META['/studio'];
   return ROUTE_META[pathname] || ROUTE_META['/'];
 }
 
@@ -253,6 +256,7 @@ const App = () => {
           <Route path="/portfolio" element={<PortfolioManager />} />
           <Route path="/optimizer" element={<OptimizerPanel />} />
           <Route path="/brooks-live" element={<BrooksLive />} />
+          <Route path="/studio/:sessionId" element={<BrooksStudioPage />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
