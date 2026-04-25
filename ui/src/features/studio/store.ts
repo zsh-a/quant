@@ -11,6 +11,30 @@ import type { BarEvent, PlayState, SessionTimeline, StudioMode, StudioSpeed } fr
 
 export const LIVE_TAIL = -1;
 
+export const LAYERS_STORAGE_KEY = 'brooks-studio-layers';
+
+function readVisibleLayersFromStorage(): Set<string> | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(LAYERS_STORAGE_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return null;
+    return new Set(parsed.filter((x): x is string => typeof x === 'string'));
+  } catch {
+    return null;
+  }
+}
+
+function writeVisibleLayersToStorage(set: Set<string>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(LAYERS_STORAGE_KEY, JSON.stringify([...set]));
+  } catch {
+    // storage may be full / unavailable — non-fatal
+  }
+}
+
 export interface StudioState {
   timeline: SessionTimeline | null;
   loading: boolean;
@@ -21,6 +45,8 @@ export interface StudioState {
   playState: PlayState;
   speed: StudioSpeed;
   hoveredBarIdx: number | null;
+
+  visibleLayers: Set<string>;
 }
 
 export interface StudioActions {
@@ -39,10 +65,18 @@ export interface StudioActions {
   setHoveredBar: (idx: number | null) => void;
 
   applyLiveEvent: (ev: BarEvent) => void;
+
+  setVisibleLayers: (ids: Iterable<string>) => void;
+  toggleLayer: (id: string) => void;
+
   reset: () => void;
 }
 
 export type StudioStore = StudioState & { actions: StudioActions };
+
+function initialVisibleLayers(): Set<string> {
+  return readVisibleLayersFromStorage() ?? new Set<string>();
+}
 
 const INITIAL: StudioState = {
   timeline: null,
@@ -53,6 +87,7 @@ const INITIAL: StudioState = {
   playState: 'paused',
   speed: 1,
   hoveredBarIdx: null,
+  visibleLayers: initialVisibleLayers(),
 };
 
 const SPEED_LADDER: StudioSpeed[] = [1, 2, 5, 10];
@@ -149,9 +184,33 @@ export const useStudioStore = create<StudioStore>()((set, get) => ({
       });
     },
 
-    reset: () => set({ ...INITIAL }),
+    setVisibleLayers: (ids) => {
+      const next = new Set(ids);
+      writeVisibleLayersToStorage(next);
+      set({ visibleLayers: next });
+    },
+
+    toggleLayer: (id) => {
+      const { visibleLayers } = get();
+      const next = new Set(visibleLayers);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      writeVisibleLayersToStorage(next);
+      set({ visibleLayers: next });
+    },
+
+    reset: () => set({ ...INITIAL, visibleLayers: initialVisibleLayers() }),
   },
 }));
+
+/**
+ * Returns true if the studio's visibleLayers came from a fresh init (no
+ * localStorage entry yet). UI code uses this to decide whether to seed the
+ * store with registry-provided defaults.
+ */
+export function hasStoredVisibleLayers(): boolean {
+  return readVisibleLayersFromStorage() !== null;
+}
 
 // Selectors
 export const useStudioActions = () => useStudioStore((s) => s.actions);
@@ -163,6 +222,7 @@ export const useStudioMode = () => useStudioStore((s) => s.mode);
 export const useStudioPlayState = () => useStudioStore((s) => s.playState);
 export const useStudioSpeed = () => useStudioStore((s) => s.speed);
 export const useHoveredBarIdx = () => useStudioStore((s) => s.hoveredBarIdx);
+export const useVisibleLayers = () => useStudioStore((s) => s.visibleLayers);
 
 /** Effective bar index resolving the `LIVE_TAIL` sentinel against the current timeline. */
 export const useEffectiveBarIdx = (): number => {

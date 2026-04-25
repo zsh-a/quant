@@ -18,6 +18,7 @@ import {
 import { ChartCanvas } from './chart/ChartCanvas';
 import { TimelineScrubber } from './timeline/TimelineScrubber';
 import { PlaybackControls } from './timeline/PlaybackControls';
+import { LayerToggle } from './timeline/LayerToggle';
 
 export default function BrooksStudioPage() {
   const { sessionId } = useParams<{ sessionId: string }>();
@@ -54,6 +55,9 @@ export default function BrooksStudioPage() {
 
       <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-border/70 bg-[#0e1116]">
         <ChartCanvas />
+        <div className="pointer-events-auto absolute right-3 top-3 z-10">
+          <LayerToggle />
+        </div>
         {loading && !timeline && (
           <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-muted-foreground">
             Loading timeline…
