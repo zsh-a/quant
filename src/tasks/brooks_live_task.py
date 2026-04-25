@@ -39,6 +39,7 @@ from src.api.events import (
     emit_session_started,
     emit_session_stopped,
     emit_strategy_step,
+    emit_studio_bar_event,
     emit_trade_executed,
 )
 from src.brooks.strategy import BrooksStrategy
@@ -642,6 +643,13 @@ class _BrooksLiveEngine:
                 del self.session.last_signals[:-window]
         self.emit(emit_strategy_step(self.session.session_id, payload))
 
+        # Studio: persist a per-bar snapshot row + push the BarEvent payload
+        # on the dedicated channel so the new panel can drive both replay and
+        # live from the same schema.
+        bar_event = self._build_studio_bar_event(symbol, bar, regime_payload, decision)
+        self._persist_studio_bar_log(bar_event)
+        self.emit(emit_studio_bar_event(self.session.session_id, bar_event))
+
     def _emit_equity_update(self, bars) -> None:
         now = time.monotonic()
         if now - self._last_equity_emit < float(self.live_cfg.equity_sync_interval_seconds):
@@ -687,6 +695,96 @@ class _BrooksLiveEngine:
             ),
             extra=payload,
         )
+
+    # ---- studio per-bar plumbing -------------------------------------
+
+    def _build_studio_bar_event(
+        self,
+        symbol: str,
+        bar,
+        regime_payload: Optional[Dict[str, Any]],
+        decision,
+    ) -> Dict[str, Any]:
+        """Snapshot the analyst's per-bar context as a :class:`BarEvent` dict."""
+        ts_ns = int(bar.timestamp.timestamp() * 1_000_000_000)
+
+        feat_obj = None
+        struct_obj = None
+        history = (getattr(self.strategy, "_feature_history", None) or {}).get(symbol) or []
+        if history:
+            feat_obj = history[-1]
+        struct_state = (getattr(self.strategy, "_structures", None) or {}).get(symbol)
+        if struct_state is not None:
+            struct_obj = getattr(struct_state, "state", None)
+
+        bar_idx = int(getattr(feat_obj, "bar_idx", 0)) if feat_obj is not None else 0
+
+        decision_dict: Optional[Dict[str, Any]] = None
+        signals_list: list = []
+        if decision is not None:
+            decision_dict = _decision_to_full_dict(decision)
+            signals_list = [s.model_dump() for s in (decision.signals or [])]
+
+        htf_payload: Dict[str, Dict[str, Any]] = {}
+        htf_bars: Dict[str, Dict[str, Any]] = {}
+        for tf, st in ((getattr(self.strategy, "_htf_state", None) or {}).get(symbol) or {}).items():
+            last_regime = getattr(st, "last_regime", None)
+            last_struct = getattr(st, "last_struct", None)
+            htf_payload[tf] = {
+                "regime": getattr(getattr(last_regime, "regime", None), "value", None) if last_regime else None,
+                "always_in": getattr(last_struct, "always_in", None) if last_struct else None,
+                "last_swing_idx": (
+                    getattr(last_struct, "confirmed_swing_highs", [-1])[-1].bar_idx
+                    if last_struct and getattr(last_struct, "confirmed_swing_highs", None)
+                    else None
+                ),
+            }
+            recent = getattr(st, "recent_bars", []) or []
+            if recent:
+                latest = recent[-1]
+                htf_bars[tf] = {
+                    "timestamp_ns": int(latest.timestamp_ns),
+                    "open": float(latest.open),
+                    "high": float(latest.high),
+                    "low": float(latest.low),
+                    "close": float(latest.close),
+                    "volume": float(latest.volume),
+                }
+
+        return {
+            "bar_idx": bar_idx,
+            "timestamp_ns": ts_ns,
+            "bar": {
+                "timestamp_ns": ts_ns,
+                "open": float(bar.open),
+                "high": float(bar.high),
+                "low": float(bar.low),
+                "close": float(bar.close),
+                "volume": float(bar.volume),
+            },
+            "features": _feature_to_view_dict(feat_obj) if feat_obj is not None else None,
+            "structure": _structure_to_view_dict(struct_obj) if struct_obj is not None else None,
+            "regime": _regime_to_view_dict(regime_payload),
+            "signals": signals_list,
+            "decision": decision_dict,
+            "htf": htf_payload,
+            "htf_bars": htf_bars,
+            "symbol": symbol,
+            "analyst": self.session.analyst_name,
+        }
+
+    def _persist_studio_bar_log(self, bar_event: Dict[str, Any]) -> None:
+        try:
+            self.session_db.add_session_log(
+                session_id=self.session.session_id,
+                timestamp=datetime.now().isoformat(),
+                level="DEBUG",
+                source="brooks_bar",
+                message=f"bar_idx={bar_event.get('bar_idx')} ts_ns={bar_event.get('timestamp_ns')}",
+                extra=bar_event,
+            )
+        except Exception as e:  # pragma: no cover — logging is best-effort
+            logger.debug("brooks_bar log persist failed: {}", e)
 
     def _persist_decision_outcomes(self, bars) -> None:
         # Compare broker.trades to what we've already tracked; for each new trade,
@@ -761,3 +859,49 @@ def _decision_to_dict(decision) -> Dict[str, Any]:
 
 def _is_live_stream(stream: DataStream) -> bool:
     return stream.__class__.__name__ == "CcxtRealtimeDataStream"
+
+
+def _decision_to_full_dict(decision) -> Dict[str, Any]:
+    """Pydantic-friendly Decision dump (loader rebuilds via ``Decision(**dict)``)."""
+    return decision.model_dump(mode="json")
+
+
+def _feature_to_view_dict(feat) -> Dict[str, Any]:
+    return {
+        "is_bull": bool(getattr(feat, "is_bull", False)),
+        "body_pct": int(getattr(feat, "body_pct", 0)),
+        "close_position": getattr(feat, "close_position", "mid"),
+        "ema_relation": getattr(feat, "ema_relation", "at"),
+        "leg_dir": getattr(feat, "leg_dir", "flat"),
+        "leg_length": int(getattr(feat, "leg_length", 0)),
+        "is_doji": bool(getattr(feat, "is_doji", False)),
+        "is_inside_bar": bool(getattr(feat, "is_inside_bar", False)),
+    }
+
+
+def _structure_to_view_dict(struct) -> Dict[str, Any]:
+    swings = []
+    for s in getattr(struct, "confirmed_swing_highs", []) or []:
+        swings.append({"idx": s.bar_idx, "kind": "high", "price": s.price})
+    for s in getattr(struct, "confirmed_swing_lows", []) or []:
+        swings.append({"idx": s.bar_idx, "kind": "low", "price": s.price})
+    top = getattr(struct, "micro_channel_top", None)
+    bot = getattr(struct, "micro_channel_bot", None)
+    return {
+        "always_in": getattr(struct, "always_in", "neutral"),
+        "confirmed_swings": swings,
+        "micro_channel_top": top.to_dict() if top is not None else None,
+        "micro_channel_bot": bot.to_dict() if bot is not None else None,
+        "last_breakout_lookback_high": getattr(struct, "last_breakout_lookback_high", None),
+        "last_breakout_lookback_low": getattr(struct, "last_breakout_lookback_low", None),
+    }
+
+
+def _regime_to_view_dict(regime_payload: Optional[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    if not regime_payload:
+        return None
+    return {
+        "name": regime_payload.get("regime") or regime_payload.get("name"),
+        "confidence": float(regime_payload.get("confidence") or 0.0),
+        "reasons": list(regime_payload.get("reasons") or []),
+    }

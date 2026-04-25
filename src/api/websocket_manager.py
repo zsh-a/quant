@@ -205,6 +205,22 @@ class ConnectionManager:
         """Internal broadcast callback for throttler"""
         await self.broadcast_to_session(session_id, message)
 
+    async def broadcast_to_studio(self, session_id: str, bar_event: dict):
+        """Push a :class:`BarEvent`-shaped payload to a Studio channel.
+
+        Uses the ``brooks_studio:{session_id}`` connection key so the
+        Studio panel receives the per-bar event stream in isolation from
+        the legacy ad-hoc dict broadcasts on the raw session id.
+        """
+        from src.api.events import studio_channel_key
+
+        message = {
+            "type": "studio_bar_event",
+            "session_id": session_id,
+            "bar_event": bar_event,
+        }
+        await self.broadcast_to_session(studio_channel_key(session_id), message)
+
     async def broadcast_to_all(self, message: dict):
         """Broadcast message to all active connections"""
         message["timestamp"] = datetime.now().isoformat()
