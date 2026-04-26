@@ -69,6 +69,10 @@ export interface StudioActions {
   setSelectedSignalId: (id: string | null) => void;
 
   applyLiveEvent: (ev: BarEvent) => void;
+  /** Apply a coalesced batch in a single set() call. Used by useTimeline to
+   *  flush WS events accumulated over a 50 ms window, so the renderer wakes
+   *  up at most ~20 times per second on bursty streams. */
+  applyLiveEventBatch: (events: BarEvent[]) => void;
 
   setVisibleLayers: (ids: Iterable<string>) => void;
   toggleLayer: (id: string) => void;
@@ -184,6 +188,26 @@ export const useStudioStore = create<StudioStore>()((set, get) => ({
         events[events.length - 1] = { ...lastEvent, ...ev };
       } else {
         events.push(ev);
+      }
+
+      set({
+        timeline: { ...timeline, events },
+      });
+    },
+
+    applyLiveEventBatch: (incoming) => {
+      if (incoming.length === 0) return;
+      const { timeline } = get();
+      if (!timeline) return;
+
+      const events = timeline.events.slice();
+      for (const ev of incoming) {
+        const lastEvent = events[events.length - 1];
+        if (lastEvent && lastEvent.bar_idx === ev.bar_idx) {
+          events[events.length - 1] = { ...lastEvent, ...ev };
+        } else {
+          events.push(ev);
+        }
       }
 
       set({

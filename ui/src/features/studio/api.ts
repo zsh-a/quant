@@ -1,9 +1,5 @@
 /**
- * Studio API client — talks to the S1 backend (`/brooks-studio/...`).
- *
- * Falls back to the legacy `/brooks-live/{id}/state` snapshot if the studio
- * timeline endpoint is missing (so spike work can run against the existing
- * BrooksLive backend until S1 ships).
+ * Studio API client — talks to the Brooks Studio backend (`/brooks-studio/...`).
  */
 
 import { WS_BASE, apiFetch, getToken } from '../../utils/api';

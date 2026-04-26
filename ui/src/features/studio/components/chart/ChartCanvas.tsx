@@ -7,6 +7,14 @@
  * same chart. Live bar updates use `series.update()` (single-bar diff) when
  * the new bar shares the same timestamp as the last point, otherwise we
  * append.
+ *
+ * Phase S6 perf rules:
+ *   • Mount effect dependency list stays empty so prop changes never
+ *     re-create the chart (would discard the WebGL canvas + layer state).
+ *   • Crosshair handler reads through `timelineRef` rather than capturing
+ *     the timeline closure — avoids stale-closure bugs with no re-mount.
+ *   • Setup effect for the candle stream renders large timelines (>5K bars)
+ *     in a deferred chunk so the initial paint clears 1K bars in <500ms.
  */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -20,7 +28,7 @@ import {
   type ISeriesApi,
   type UTCTimestamp,
 } from 'lightweight-charts';
-import type { Bar } from '../../types';
+import type { Bar, SessionTimeline } from '../../types';
 import {
   useEffectiveBarIdx,
   useStudioActions,
@@ -30,6 +38,9 @@ import {
 import { useLayerRegistry } from '../../hooks/useLayerRegistry';
 import type { LayerCtx } from '../../layers/types';
 
+const LAZY_BAR_THRESHOLD = 5000;
+const LAZY_INITIAL_TAIL = 1500;
+
 const THEME = {
   background: '#0e1116',
   text: '#cbd2dc',
@@ -37,6 +48,25 @@ const THEME = {
   bull: '#26A69A',
   bear: '#EF5350',
 } as const;
+
+type IdleScheduler = (cb: () => void) => number;
+type IdleCanceller = (handle: number) => void;
+
+const scheduleLazy: IdleScheduler =
+  typeof window !== 'undefined' &&
+  typeof (window as unknown as { requestIdleCallback?: unknown }).requestIdleCallback === 'function'
+    ? (cb) =>
+        (window as unknown as { requestIdleCallback: (cb: () => void) => number }).requestIdleCallback(
+          cb,
+        )
+    : (cb) => window.setTimeout(cb, 16);
+
+const cancelLazy: IdleCanceller =
+  typeof window !== 'undefined' &&
+  typeof (window as unknown as { cancelIdleCallback?: unknown }).cancelIdleCallback === 'function'
+    ? (handle) =>
+        (window as unknown as { cancelIdleCallback: (h: number) => void }).cancelIdleCallback(handle)
+    : (handle) => window.clearTimeout(handle);
 
 function toCandlestickData(bars: Bar[]): CandlestickData<UTCTimestamp>[] {
   const seen = new Set<number>();
@@ -59,6 +89,9 @@ export function ChartCanvas() {
   const seriesRef = useRef<ISeriesApi<'Candlestick'> | null>(null);
   const lastBarCountRef = useRef(0);
   const fittedRef = useRef(false);
+  const timelineRef = useRef<SessionTimeline | null>(null);
+  const setHoveredBarRef = useRef<((idx: number | null) => void) | null>(null);
+  const lazyTailHandleRef = useRef<number | null>(null);
 
   const [layerCtx, setLayerCtx] = useState<LayerCtx | null>(null);
 
@@ -67,7 +100,18 @@ export function ChartCanvas() {
   const visibleLayers = useVisibleLayers();
   const { setHoveredBar } = useStudioActions();
 
-  const candles = useMemo(() => (timeline ? toCandlestickData(timeline.bars) : []), [timeline]);
+  // Refresh refs every render so the once-mounted chart callbacks read
+  // current state without re-subscribing.
+  timelineRef.current = timeline;
+  setHoveredBarRef.current = setHoveredBar;
+
+  // Depend on the bars reference only — applyLiveEvent rewrites `events` but
+  // keeps `bars` identity stable, so we don't redo this work for every WS
+  // event.
+  const candles = useMemo(
+    () => (timeline ? toCandlestickData(timeline.bars) : []),
+    [timeline?.bars],
+  );
 
   useLayerRegistry(layerCtx, timeline, currentBarIdx, visibleLayers);
 
@@ -112,15 +156,18 @@ export function ChartCanvas() {
     ro.observe(container);
 
     chart.subscribeCrosshairMove((param) => {
-      if (!param.time || !timeline) {
-        setHoveredBar(null);
+      const tl = timelineRef.current;
+      const setHover = setHoveredBarRef.current;
+      if (!setHover) return;
+      if (!param.time || !tl) {
+        setHover(null);
         return;
       }
       const t = param.time as number;
-      const idx = timeline.bars.findIndex(
+      const idx = tl.bars.findIndex(
         (b) => Math.floor(b.timestamp_ns / 1_000_000_000) === t,
       );
-      setHoveredBar(idx >= 0 ? idx : null);
+      setHover(idx >= 0 ? idx : null);
     });
 
     setLayerCtx({ chart, primarySeries: series, theme: 'dark' });
@@ -128,6 +175,10 @@ export function ChartCanvas() {
     return () => {
       setLayerCtx(null);
       ro.disconnect();
+      if (lazyTailHandleRef.current !== null) {
+        cancelLazy(lazyTailHandleRef.current);
+        lazyTailHandleRef.current = null;
+      }
       chart.remove();
       chartRef.current = null;
       seriesRef.current = null;
@@ -140,10 +191,16 @@ export function ChartCanvas() {
   }, []);
 
   // Push data updates: full setData on first load / changed length, otherwise
-  // a single-point update for the latest bar.
+  // a single-point update for the latest bar. Defers head-of-history for very
+  // large timelines so the first paint stays inside the perf budget.
   useEffect(() => {
     const series = seriesRef.current;
     if (!series) return;
+
+    if (lazyTailHandleRef.current !== null) {
+      cancelLazy(lazyTailHandleRef.current);
+      lazyTailHandleRef.current = null;
+    }
 
     if (candles.length === 0) {
       series.setData([]);
@@ -153,8 +210,23 @@ export function ChartCanvas() {
 
     const prevCount = lastBarCountRef.current;
     const sizeShrunk = candles.length < prevCount;
-    if (prevCount === 0 || sizeShrunk || candles.length - prevCount > 1) {
-      series.setData(candles);
+    const isFreshLoad = prevCount === 0 || sizeShrunk;
+
+    if (isFreshLoad || candles.length - prevCount > 1) {
+      if (isFreshLoad && candles.length > LAZY_BAR_THRESHOLD) {
+        // Render only the trailing window first so the user sees a chart
+        // before we hydrate the full history asynchronously.
+        const tailStart = candles.length - LAZY_INITIAL_TAIL;
+        series.setData(candles.slice(tailStart));
+        lazyTailHandleRef.current = scheduleLazy(() => {
+          const live = seriesRef.current;
+          if (!live) return;
+          live.setData(candles);
+          lazyTailHandleRef.current = null;
+        });
+      } else {
+        series.setData(candles);
+      }
     } else if (candles.length === prevCount) {
       series.update(candles[candles.length - 1]);
     } else {
