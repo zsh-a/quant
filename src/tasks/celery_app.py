@@ -51,6 +51,7 @@ app.conf.update(
         "src.tasks.crypto_tasks.*": {"queue": "automation"},
         "src.tasks.alpha_dlq.*": {"queue": "alpha_dlq"},
         "src.tasks.brooks_live_task.*": {"queue": "automation"},
+        "src.tasks.brooks_replay_task.*": {"queue": "automation"},
         "src.tasks.brooks_leaderboard_task.*": {"queue": "automation"},
     },
     # Queues
@@ -87,6 +88,7 @@ app.conf.update(
         "src.tasks.crypto_tasks",
         "src.tasks.alpha_dlq",
         "src.tasks.brooks_live_task",
+        "src.tasks.brooks_replay_task",
         "src.tasks.brooks_leaderboard_task",
     ],
 )

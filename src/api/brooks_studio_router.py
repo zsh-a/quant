@@ -5,6 +5,7 @@ The router exposes the endpoints used by the Studio panel:
 * ``GET  /brooks-studio/sessions/{session_id}/timeline``           — full snapshot
 * ``GET  /brooks-studio/sessions/{session_id}/timeline/since/{seq}`` — incremental page
 * ``POST /brooks-studio/sessions/{session_id}/replay-bar``         — re-run analysts on one bar
+* ``POST /brooks-studio/replay``                                   — start a historical replay session
 * ``WS   /ws/brooks-studio/{session_id}``                          — live BarEvent stream
 
 All four speak the same :class:`SessionTimeline` / :class:`BarEvent`
@@ -13,6 +14,8 @@ exactly one rendering path for both modes.
 """
 
 from __future__ import annotations
+
+import uuid
 
 import anyio
 import orjson
@@ -24,13 +27,17 @@ from src.api.schemas.brooks_studio import (
     ReplayBarAnalystResult,
     ReplayBarRequest,
     ReplayBarResponse,
+    ReplayStartRequest,
+    ReplayStartResponse,
     SessionTimeline,
     TimelinePage,
 )
 from src.api.websocket_manager import handle_websocket_message
 from src.api.websocket_manager import manager as ws_manager
-from src.services.brooks_replay_runner import BrooksReplayRunner
+from src.brooks.analyst.base import AnalystRegistry
+from src.services.brooks_bar_reanalyzer import BrooksBarReanalyzer
 from src.services.brooks_timeline_loader import BrooksTimelineLoader
+from src.tasks.brooks_replay_task import brooks_replay_task
 from src.utils.logging_config import get_logger
 
 try:
@@ -84,6 +91,75 @@ async def get_timeline_page(
         raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
 
 
+@router.post("/replay", response_model=ReplayStartResponse)
+async def start_replay(req: ReplayStartRequest) -> ReplayStartResponse:
+    """Spawn a historical replay session.
+
+    A Celery worker walks the chosen ``(symbol, interval, start, end)``
+    window, runs the same Brooks pipeline a live session uses, and
+    persists per-bar BarEvents. The frontend polls the timeline
+    endpoint once the task completes (no WS streaming during replay).
+
+    The session row is created here (not in the worker) so that the
+    polling client can immediately reach ``/session/{id}/status`` —
+    otherwise there is a worker-startup race where the row only exists
+    seconds after the task is dispatched.
+    """
+    if req.analyst not in AnalystRegistry.all():
+        raise HTTPException(status_code=400, detail=f"Unknown analyst: {req.analyst!r}")
+
+    session_id = str(uuid.uuid4())
+    db = SessionDB()
+    db.create_session(
+        session_id=session_id,
+        strategy_name="brooks",
+        symbol=req.symbol,
+        mode="paper",
+        start_date=_iso_date(req.start),
+        end_date=_iso_date(req.end),
+        params={
+            "analyst": req.analyst,
+            "analyst_params": req.analyst_params,
+            "interval": req.interval,
+            "provider": req.provider,
+            "mode": "paper",
+            "session_kind": "replay",
+            "source": "brooks_replay",
+            "mtf_intervals": list(req.mtf_intervals or []),
+            "replay_start": req.start,
+            "replay_end": req.end,
+        },
+        market="crypto",
+        interval=req.interval,
+    )
+
+    payload = req.model_dump(exclude_none=True)
+    task = brooks_replay_task.apply_async(args=[session_id, payload], queue="automation")
+    logger.info(
+        "brooks-studio replay: session={} task={} symbol={} interval={} {}..{}",
+        session_id,
+        task.id,
+        req.symbol,
+        req.interval,
+        req.start,
+        req.end,
+    )
+    return ReplayStartResponse(session_id=session_id, task_id=task.id)
+
+
+def _iso_date(value: str) -> str:
+    """Coerce an ISO timestamp to a YYYY-MM-DD start_date column value."""
+    from datetime import date
+    from datetime import datetime as _dt
+
+    if not value:
+        return date.today().isoformat()
+    try:
+        return _dt.fromisoformat(str(value).replace("Z", "+00:00")).date().isoformat()
+    except ValueError:
+        return date.today().isoformat()
+
+
 @router.post(
     "/sessions/{session_id}/replay-bar",
     response_model=ReplayBarResponse,
@@ -96,7 +172,7 @@ async def replay_bar(session_id: str, req: ReplayBarRequest) -> ReplayBarRespons
     ``ensemble.critic``, …); each analyst's signals + decision (when one was
     persisted) are returned for direct comparison.
     """
-    runner = BrooksReplayRunner(SessionDB())
+    runner = BrooksBarReanalyzer(SessionDB())
     try:
         results = await runner.run(session_id, req.bar_idx, req.analysts)
     except KeyError:

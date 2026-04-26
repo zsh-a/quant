@@ -1,10 +1,14 @@
-"""Re-run analysts against a single bar for the Brooks Studio compare panel.
+"""Re-analyse a single bar with N analysts for the Brooks Studio compare panel.
 
 The MultiAnalystCompare side panel asks the backend for the output of N
-analysts on the same bar so the user can diff their decisions while
-replaying. This module builds a :class:`BrooksContext` from the data already
-captured in ``session_db`` (per-bar OHLCV plus any HTF bars persisted by the
-strategy) and runs each requested analyst against it.
+analysts on the same bar so the user can diff their decisions. This is
+distinct from a *full-session historical replay* (see
+:mod:`src.tasks.brooks_replay_task`) — this module operates on a single
+bar of an existing session, not a fresh historical run.
+
+It builds a :class:`BrooksContext` from data already captured in
+``session_db`` (per-bar OHLCV plus any HTF bars persisted by the strategy)
+and runs each requested analyst against it.
 
 Design notes:
 
@@ -32,7 +36,7 @@ from src.services.brooks_timeline_loader import BrooksTimelineLoader
 
 __all__ = [
     "AnalystResult",
-    "BrooksReplayRunner",
+    "BrooksBarReanalyzer",
     "DEFAULT_BAR_CONTEXT",
 ]
 
@@ -62,7 +66,7 @@ class AnalystResult:
         }
 
 
-class BrooksReplayRunner:
+class BrooksBarReanalyzer:
     """Run the requested analysts against a chosen bar of a session."""
 
     def __init__(
@@ -87,9 +91,7 @@ class BrooksReplayRunner:
         if not timeline.bars:
             raise ValueError(f"session {session_id!r} has no bars")
         if bar_idx < 0 or bar_idx >= len(timeline.bars):
-            raise ValueError(
-                f"bar_idx {bar_idx} out of range [0, {len(timeline.bars) - 1}]"
-            )
+            raise ValueError(f"bar_idx {bar_idx} out of range [0, {len(timeline.bars) - 1}]")
         if not analysts:
             raise ValueError("analysts list is empty")
 

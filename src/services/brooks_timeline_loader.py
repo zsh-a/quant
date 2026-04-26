@@ -89,9 +89,11 @@ class BrooksTimelineLoader:
             "params": params,
         }
         htf_intervals = list(params.get("mtf_intervals") or list(htf_bars.keys()))
+        session_kind = "replay" if str(params.get("session_kind") or "live") == "replay" else "live"
 
         return SessionTimeline(
             session_id=session_id,
+            session_kind=session_kind,
             symbol=str(session.get("symbol") or ""),
             base_interval=str(session.get("interval") or params.get("base_interval") or "1d"),
             htf_intervals=htf_intervals,

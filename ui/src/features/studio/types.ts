@@ -123,6 +123,8 @@ export interface PnLPoint {
 
 export interface SessionTimeline {
   session_id: string;
+  /** "live" — CCXT realtime stream; "replay" — historical bars over a closed window. */
+  session_kind?: 'live' | 'replay';
   symbol: string;
   base_interval: string;
   htf_intervals: string[];

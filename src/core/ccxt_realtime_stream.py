@@ -46,6 +46,8 @@ class CcxtRealtimeDataStream(DataStream):
     reconnects with exponential backoff.
     """
 
+    is_live = True
+
     def __init__(
         self,
         symbols: List[str],

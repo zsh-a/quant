@@ -34,6 +34,50 @@ export interface ReplayBarResponse {
   results: ReplayBarAnalystResult[];
 }
 
+export interface ReplayStartRequest {
+  symbol: string;
+  interval: string;
+  start: string;
+  end: string;
+  analyst?: string;
+  analyst_params?: Record<string, unknown>;
+  mtf_intervals?: string[];
+  provider?: string;
+  initial_cash?: number;
+  commission?: number;
+  slippage?: number;
+  min_expected_r?: number;
+  llm_min_interval_seconds?: number;
+}
+
+export interface ReplayStartResponse {
+  session_id: string;
+  task_id: string;
+  status: string;
+}
+
+/**
+ * Start a historical replay session. The backend walks the given
+ * (symbol, interval, start, end) window in a Celery task and persists
+ * BarEvents to ``session_logs``. Poll task state, then navigate to
+ * `/studio/<session_id>` to load the timeline.
+ */
+export async function startReplay(
+  req: ReplayStartRequest,
+  signal?: AbortSignal,
+): Promise<ReplayStartResponse> {
+  const resp = await apiFetch('/brooks-studio/replay', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(req),
+    signal,
+  });
+  if (!resp.ok) {
+    throw new StudioApiError(`Failed to start replay (${resp.status})`, resp.status);
+  }
+  return (await resp.json()) as ReplayStartResponse;
+}
+
 /**
  * Re-run a chosen set of analysts on a single bar of a session — backs the
  * MultiAnalystCompare side panel.

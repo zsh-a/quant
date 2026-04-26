@@ -198,6 +198,27 @@ class TestLoadTimeline:
         assert timeline.htf_intervals == HTF_INTERVALS
         assert timeline.config["analyst"] == "rule"
         assert timeline.config["mtf_intervals"] == HTF_INTERVALS
+        # No session_kind in params → default to "live".
+        assert timeline.session_kind == "live"
+
+    def test_session_kind_replay_when_params_set(self, tmp_path, monkeypatch):
+        """A session created with ``session_kind='replay'`` round-trips through the loader."""
+        db_path = tmp_path / "replay.db"
+        monkeypatch.setenv("SESSION_DB_PATH", str(db_path))
+        db = SessionDB(str(db_path))
+        db.create_session(
+            session_id="replay-fixture-1",
+            strategy_name="brooks",
+            symbol=SYMBOL,
+            mode="paper",
+            start_date="2026-04-25",
+            end_date=None,
+            params={"analyst": "rule", "session_kind": "replay", "base_interval": INTERVAL},
+            market="crypto",
+            interval=INTERVAL,
+        )
+        timeline = load_timeline("replay-fixture-1", db)
+        assert timeline.session_kind == "replay"
 
     def test_bars_match_log_count(self, session_db):
         timeline = load_timeline(SESSION_ID, session_db)

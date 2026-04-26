@@ -90,6 +90,7 @@ class PnLPoint(BaseModel):
 
 class SessionTimeline(BaseModel):
     session_id: str
+    session_kind: Literal["live", "replay"] = "live"
     symbol: str
     base_interval: str
     htf_intervals: List[str] = Field(default_factory=list)
@@ -114,6 +115,36 @@ class ReplayBarRequest(BaseModel):
 
     bar_idx: int = Field(ge=0)
     analysts: List[str] = Field(min_length=1)
+
+
+class ReplayStartRequest(BaseModel):
+    """Body for ``POST /brooks-studio/replay`` — historical replay session."""
+
+    symbol: str = Field(description="Trading symbol, e.g. 'BTC/USDT'")
+    interval: str = Field(default="5m", description="Bar interval, e.g. '1m', '5m', '1h'")
+    start: str = Field(description="ISO timestamp for inclusive replay window start")
+    end: str = Field(description="ISO timestamp for inclusive replay window end")
+    analyst: str = Field(default="rule")
+    analyst_params: Dict[str, Any] = Field(default_factory=dict)
+    mtf_intervals: List[str] = Field(default_factory=list)
+    provider: str = Field(default="bitget", description="ClickHouse ingest provider")
+    initial_cash: Optional[float] = None
+    commission: Optional[float] = None
+    slippage: Optional[float] = None
+    min_expected_r: Optional[float] = None
+    llm_min_interval_seconds: Optional[float] = Field(
+        default=None,
+        description=(
+            "Min bar-time gap between LLM/VLM analyst calls. Defaults to "
+            "the live session value (60s); set to 0 to disable."
+        ),
+    )
+
+
+class ReplayStartResponse(BaseModel):
+    session_id: str
+    task_id: str
+    status: str = "submitted"
 
 
 class ReplayBarAnalystResult(BaseModel):
@@ -145,4 +176,6 @@ __all__ = [
     "ReplayBarRequest",
     "ReplayBarAnalystResult",
     "ReplayBarResponse",
+    "ReplayStartRequest",
+    "ReplayStartResponse",
 ]

@@ -16,6 +16,24 @@ describe('studio store', () => {
     expect(s.speed).toBe(1);
   });
 
+  it('replay sessions: initial cursor lands on the last bar (not LIVE_TAIL)', () => {
+    const { actions } = useStudioStore.getState();
+    const tl = { ...makeTimeline(5), session_kind: 'replay' as const };
+    actions.setTimeline(tl);
+    const s = useStudioStore.getState();
+    expect(s.mode).toBe('replay');
+    expect(s.currentBarIdx).toBe(4);
+  });
+
+  it('live sessions: cursor stays on LIVE_TAIL after timeline load', () => {
+    const { actions } = useStudioStore.getState();
+    const tl = { ...makeTimeline(5), session_kind: 'live' as const };
+    actions.setTimeline(tl);
+    const s = useStudioStore.getState();
+    expect(s.mode).toBe('live');
+    expect(s.currentBarIdx).toBe(LIVE_TAIL);
+  });
+
   it('clamps setBar against timeline bounds', () => {
     const { actions } = useStudioStore.getState();
     actions.setTimeline(makeTimeline(5));

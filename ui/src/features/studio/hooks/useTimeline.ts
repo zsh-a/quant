@@ -49,9 +49,11 @@ export function useTimeline(sessionId: string | null) {
     actions.setError(null);
 
     (async () => {
+      let kind: 'live' | 'replay' = 'live';
       try {
         const timeline = await fetchTimeline(sessionId, ac.signal);
         if (disposed) return;
+        kind = timeline.session_kind === 'replay' ? 'replay' : 'live';
         actions.setTimeline(timeline);
       } catch (e) {
         if (disposed || ac.signal.aborted) return;
@@ -61,6 +63,9 @@ export function useTimeline(sessionId: string | null) {
       }
 
       if (disposed) return;
+      // Replay sessions are pre-computed end to end — no live tail, no WS.
+      // The chart renders straight from the timeline snapshot.
+      if (kind === 'replay') return;
       wsHandle = subscribeStudio(sessionId, {
         onEvent: enqueue,
       });

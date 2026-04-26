@@ -16,6 +16,7 @@ import { SectionCard } from '../../../components/layout/SectionCard';
 import { Button } from '../../../components/ui/button';
 import { Input } from '../../../components/ui/input';
 import { apiFetch } from '../../../utils/api';
+import ReplayLauncher from './ReplayLauncher';
 
 interface BrooksSessionSummary {
   session_id: string;
@@ -101,6 +102,8 @@ export default function StudioLanding() {
           </label>
         </div>
       </SectionCard>
+
+      <ReplayLauncher />
 
       <SectionCard
         title="Active sessions"

@@ -118,11 +118,21 @@ export const useStudioStore = create<StudioStore>()((set, get) => ({
     setTimeline: (timeline) => {
       const { currentBarIdx } = get();
       const barCount = timeline?.bars.length ?? 0;
+      const kind: StudioMode = timeline?.session_kind === 'replay' ? 'replay' : 'live';
+
       // Re-clamp any URL-driven currentBarIdx now that we know the bounds.
+      let nextBar = clampBarIdx(currentBarIdx, barCount);
+      // Replay sessions have no live tail — pin the cursor inside the loaded
+      // bar range so the chart shows real bars instead of an empty tail.
+      if (kind === 'replay' && barCount > 0 && nextBar === LIVE_TAIL) {
+        nextBar = barCount - 1;
+      }
+
       set({
         timeline,
         error: null,
-        currentBarIdx: clampBarIdx(currentBarIdx, barCount),
+        currentBarIdx: nextBar,
+        mode: kind,
       });
     },
 

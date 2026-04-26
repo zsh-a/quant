@@ -20,6 +20,15 @@ class Bar:
 
 
 class DataStream(ABC):
+    """Abstract bar source.
+
+    ``is_live`` lets engines branch on stream semantics without resorting
+    to ``isinstance`` / class-name checks. Override to ``True`` only on
+    streams whose ``next_bar`` blocks waiting for fresh real-time data.
+    """
+
+    is_live: bool = False
+
     @abstractmethod
     def next_bar(self) -> Optional[Dict[str, Bar]]:
         """Return the next bar for all active symbols, or None if end of stream."""
