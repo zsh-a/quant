@@ -45,6 +45,9 @@ export interface StudioState {
   playState: PlayState;
   speed: StudioSpeed;
   hoveredBarIdx: number | null;
+  /** Selected signal id (e.g. clicked in the SignalSidebar) — used by layers
+   * to highlight the matching marker / price lines. `null` = nothing pinned. */
+  selectedSignalId: string | null;
 
   visibleLayers: Set<string>;
 }
@@ -63,6 +66,7 @@ export interface StudioActions {
   setMode: (mode: StudioMode) => void;
   jumpToLive: () => void;
   setHoveredBar: (idx: number | null) => void;
+  setSelectedSignalId: (id: string | null) => void;
 
   applyLiveEvent: (ev: BarEvent) => void;
 
@@ -87,6 +91,7 @@ const INITIAL: StudioState = {
   playState: 'paused',
   speed: 1,
   hoveredBarIdx: null,
+  selectedSignalId: null,
   visibleLayers: initialVisibleLayers(),
 };
 
@@ -166,6 +171,8 @@ export const useStudioStore = create<StudioStore>()((set, get) => ({
 
     setHoveredBar: (idx) => set({ hoveredBarIdx: idx }),
 
+    setSelectedSignalId: (id) => set({ selectedSignalId: id }),
+
     applyLiveEvent: (ev) => {
       const { timeline } = get();
       if (!timeline) return;
@@ -222,7 +229,32 @@ export const useStudioMode = () => useStudioStore((s) => s.mode);
 export const useStudioPlayState = () => useStudioStore((s) => s.playState);
 export const useStudioSpeed = () => useStudioStore((s) => s.speed);
 export const useHoveredBarIdx = () => useStudioStore((s) => s.hoveredBarIdx);
+export const useSelectedSignalId = () => useStudioStore((s) => s.selectedSignalId);
 export const useVisibleLayers = () => useStudioStore((s) => s.visibleLayers);
+
+/**
+ * Resolves the bar idx that side panels should display: the hovered bar if the
+ * cursor is on the chart, otherwise the current bar. Returns the inspected idx
+ * along with a flag so the UI can render a subtle "preview" badge.
+ *
+ * Implemented as two primitive selectors so the hook remains stable across
+ * renders — returning a fresh object from a single selector would re-render
+ * subscribers unconditionally.
+ */
+export const useInspectedBarIdx = (): { barIdx: number; preview: boolean } => {
+  const barIdx = useStudioStore((s) => {
+    const barCount = s.timeline?.bars.length ?? 0;
+    const current = s.currentBarIdx === LIVE_TAIL && barCount > 0 ? barCount - 1 : s.currentBarIdx;
+    return s.hoveredBarIdx !== null ? s.hoveredBarIdx : current;
+  });
+  const preview = useStudioStore((s) => {
+    if (s.hoveredBarIdx === null) return false;
+    const barCount = s.timeline?.bars.length ?? 0;
+    const current = s.currentBarIdx === LIVE_TAIL && barCount > 0 ? barCount - 1 : s.currentBarIdx;
+    return s.hoveredBarIdx !== current;
+  });
+  return { barIdx, preview };
+};
 
 /** Effective bar index resolving the `LIVE_TAIL` sentinel against the current timeline. */
 export const useEffectiveBarIdx = (): number => {

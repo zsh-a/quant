@@ -1,4 +1,4 @@
-import type { BarEvent, SessionTimeline } from '../types';
+import type { BarEvent, Decision, RegimeView, SessionTimeline, Signal } from '../types';
 
 const NS = 1_000_000_000;
 
@@ -34,6 +34,41 @@ export function makeBarEvent(barIdx: number, overrides: Partial<BarEvent> = {}):
     bar_idx: barIdx,
     timestamp_ns: (1_700_000_000 + barIdx * 300) * NS,
     signals: [],
+    ...overrides,
+  };
+}
+
+export function makeSignal(overrides: Partial<Signal> & { id: string } & Record<string, unknown>): Signal {
+  return {
+    pattern: 'p',
+    side: 'long',
+    source: 'rule:h2',
+    ...overrides,
+  } as Signal;
+}
+
+export function makeDecision(overrides: Partial<Decision> = {}): Decision {
+  return {
+    side: 'long',
+    entry_px: 100,
+    stop_px: 95,
+    target_px: 110,
+    quantity: 1,
+    probability: 0.6,
+    expected_r: 1.5,
+    regime: 'strong_bull_trend',
+    htf_aligned: true,
+    pattern: 'h2',
+    source: 'rule:h2',
+    ...overrides,
+  };
+}
+
+export function makeRegime(name: string, overrides: Partial<RegimeView> = {}): RegimeView {
+  return {
+    name,
+    confidence: 0.7,
+    reasons: [],
     ...overrides,
   };
 }
