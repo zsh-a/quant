@@ -4,9 +4,6 @@
  * Order is the order they appear in the `LayerToggle` panel and the order
  * they mount onto the chart. Adding a new layer = export a `ChartLayer`
  * from a sibling file and append it here.
- *
- * Phase S5 will append: channelsLayer, stopAdjLayer, htfOverlayLayer,
- * reasoningLayer.
  */
 
 import type { ChartLayer } from './types';
@@ -16,6 +13,10 @@ import { ema20Layer, ema200Layer } from './ema';
 import { signalsLayer } from './signals';
 import { decisionsLayer } from './decisions';
 import { fillsLayer } from './fills';
+import { channelsLayer } from './channels';
+import { stopAdjLayer } from './stop_adj';
+import { htfOverlayLayer } from './htf_overlay';
+import { reasoningLayer } from './reasoning';
 
 export const LAYERS: readonly ChartLayer[] = [
   regimeLayer,
@@ -25,6 +26,10 @@ export const LAYERS: readonly ChartLayer[] = [
   signalsLayer,
   decisionsLayer,
   fillsLayer,
+  channelsLayer,
+  stopAdjLayer,
+  htfOverlayLayer,
+  reasoningLayer,
 ];
 
 export const DEFAULT_VISIBLE: ReadonlySet<string> = new Set(

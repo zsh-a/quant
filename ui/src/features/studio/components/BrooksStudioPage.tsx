@@ -1,11 +1,12 @@
 /**
  * BrooksStudioPage — top-level route for `/studio/:sessionId`.
  *
- * Layout (S4):
+ * Layout:
  *   ┌───────────────────────┬──────────┐
  *   │ ChartCanvas           │ SidePanel│
- *   │ (LayerToggle overlay) │ (tabs)   │
+ *   │ (LayerToggle + HTF)   │ (tabs)   │
  *   ├───────────────────────┴──────────┤
+ *   │ PnLStrip                         │
  *   │ TimelineScrubber + PlaybackCtrls │
  *   └──────────────────────────────────┘
  * Horizontal split is `react-resizable-panels`; user drag-resize is persisted
@@ -23,9 +24,11 @@ import {
   useTimelineState,
 } from '../store';
 import { ChartCanvas } from './chart/ChartCanvas';
+import { HTFInset } from './chart/HTFInset';
 import { TimelineScrubber } from './timeline/TimelineScrubber';
 import { PlaybackControls } from './timeline/PlaybackControls';
 import { LayerToggle } from './timeline/LayerToggle';
+import { PnLStrip } from './timeline/PnLStrip';
 import { SidePanel } from './side/SidePanel';
 
 export default function BrooksStudioPage() {
@@ -69,7 +72,8 @@ export default function BrooksStudioPage() {
         >
           <Panel id="chart-panel" minSize={40} className="relative">
             <ChartCanvas />
-            <div className="pointer-events-auto absolute right-3 top-3 z-10">
+            <div className="pointer-events-auto absolute right-3 top-3 z-10 flex items-start gap-2">
+              <HTFInset />
               <LayerToggle />
             </div>
             {loading && !timeline && (
@@ -94,7 +98,10 @@ export default function BrooksStudioPage() {
       </div>
 
       <div className="rounded-xl border border-border/70 bg-card">
-        <TimelineScrubber />
+        <PnLStrip />
+        <div className="border-t border-border/60">
+          <TimelineScrubber />
+        </div>
         <div className="border-t border-border/60">
           <PlaybackControls />
         </div>

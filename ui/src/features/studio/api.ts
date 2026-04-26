@@ -7,7 +7,7 @@
  */
 
 import { WS_BASE, apiFetch, getToken } from '../../utils/api';
-import type { BarEvent, SessionTimeline } from './types';
+import type { BarEvent, Decision, SessionTimeline, Signal } from './types';
 
 export class StudioApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -22,6 +22,42 @@ export async function fetchTimeline(sessionId: string, signal?: AbortSignal): Pr
     throw new StudioApiError(`Failed to load timeline (${resp.status})`, resp.status);
   }
   return (await resp.json()) as SessionTimeline;
+}
+
+export interface ReplayBarAnalystResult {
+  analyst: string;
+  bar_idx: number;
+  signals: Signal[];
+  decision: Decision | null;
+  error: string | null;
+  cached: boolean;
+}
+
+export interface ReplayBarResponse {
+  bar_idx: number;
+  results: ReplayBarAnalystResult[];
+}
+
+/**
+ * Re-run a chosen set of analysts on a single bar of a session — backs the
+ * MultiAnalystCompare side panel.
+ */
+export async function replayBar(
+  sessionId: string,
+  bar_idx: number,
+  analysts: string[],
+  signal?: AbortSignal,
+): Promise<ReplayBarResponse> {
+  const resp = await apiFetch(`/brooks-studio/sessions/${sessionId}/replay-bar`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ bar_idx, analysts }),
+    signal,
+  });
+  if (!resp.ok) {
+    throw new StudioApiError(`Failed to replay bar (${resp.status})`, resp.status);
+  }
+  return (await resp.json()) as ReplayBarResponse;
 }
 
 export type WsHandlers = {

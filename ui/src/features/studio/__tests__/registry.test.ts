@@ -13,7 +13,7 @@ vi.mock('lightweight-charts', () => ({
 import { DEFAULT_VISIBLE, LAYERS, findLayer } from '../layers/registry';
 
 describe('layer registry', () => {
-  it('exposes the six core layers (with EMA split)', () => {
+  it('exposes core + S5 advanced layers in registration order', () => {
     expect(LAYERS.map((l) => l.id)).toEqual([
       'regime',
       'swings',
@@ -22,13 +22,21 @@ describe('layer registry', () => {
       'signals',
       'decisions',
       'fills',
+      'channels',
+      'stop_adj',
+      'htf_overlay',
+      'reasoning',
     ]);
   });
 
-  it('default-visible omits ema200', () => {
+  it('default-visible omits ema200, htf_overlay, and reasoning', () => {
     expect(DEFAULT_VISIBLE.has('ema200')).toBe(false);
+    expect(DEFAULT_VISIBLE.has('htf_overlay')).toBe(false);
+    expect(DEFAULT_VISIBLE.has('reasoning')).toBe(false);
     expect(DEFAULT_VISIBLE.has('ema20')).toBe(true);
     expect(DEFAULT_VISIBLE.has('regime')).toBe(true);
+    expect(DEFAULT_VISIBLE.has('channels')).toBe(true);
+    expect(DEFAULT_VISIBLE.has('stop_adj')).toBe(true);
   });
 
   it('layer ids are unique', () => {

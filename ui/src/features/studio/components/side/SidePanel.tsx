@@ -1,15 +1,16 @@
 /**
  * SidePanel — tab container for the inspector sidebars (Signals / Decision /
- * Regime). All three reuse the studio store, so the tab is purely a visual
- * grouping; switching tabs does not reset state.
+ * Regime / Compare). All tabs reuse the studio store, so switching tabs is
+ * purely a visual grouping; selection / hover / current bar persist.
  */
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../../../../components/ui/tabs';
 import { SignalSidebar } from './SignalSidebar';
 import { DecisionInspector } from './DecisionInspector';
 import { RegimeTimeline } from './RegimeTimeline';
+import { MultiAnalystCompare } from './MultiAnalystCompare';
 
-export type SidePanelTab = 'signals' | 'decision' | 'regime';
+export type SidePanelTab = 'signals' | 'decision' | 'regime' | 'compare';
 
 const DEFAULT_TAB: SidePanelTab = 'decision';
 
@@ -31,6 +32,9 @@ export function SidePanel() {
             <TabsTrigger value="regime" className="flex-1" data-testid="tab-regime">
               Regime
             </TabsTrigger>
+            <TabsTrigger value="compare" className="flex-1" data-testid="tab-compare">
+              Compare
+            </TabsTrigger>
           </TabsList>
         </div>
         <TabsContent value="signals" className="mt-2 min-h-0 flex-1 overflow-hidden">
@@ -41,6 +45,9 @@ export function SidePanel() {
         </TabsContent>
         <TabsContent value="regime" className="mt-2 min-h-0 flex-1 overflow-y-auto">
           <RegimeTimeline />
+        </TabsContent>
+        <TabsContent value="compare" className="mt-2 min-h-0 flex-1 overflow-y-auto">
+          <MultiAnalystCompare />
         </TabsContent>
       </Tabs>
     </div>

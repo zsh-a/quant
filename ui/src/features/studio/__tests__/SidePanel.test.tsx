@@ -23,12 +23,21 @@ function loadFixture() {
 }
 
 describe('SidePanel tab container', () => {
-  it('renders all three tab triggers', () => {
+  it('renders all four tab triggers', () => {
     loadFixture();
     render(<SidePanel />);
     expect(screen.getByTestId('tab-signals')).toBeInTheDocument();
     expect(screen.getByTestId('tab-decision')).toBeInTheDocument();
     expect(screen.getByTestId('tab-regime')).toBeInTheDocument();
+    expect(screen.getByTestId('tab-compare')).toBeInTheDocument();
+  });
+
+  it('switching to the compare tab reveals MultiAnalystCompare', async () => {
+    loadFixture();
+    const user = userEvent.setup();
+    render(<SidePanel />);
+    await user.click(screen.getByTestId('tab-compare'));
+    expect(screen.getByTestId('multi-analyst-compare')).toBeInTheDocument();
   });
 
   it('defaults to the decision tab', () => {

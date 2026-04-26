@@ -181,6 +181,57 @@ class TestTimelinePage:
         assert resp.status_code == 422
 
 
+class TestReplayBar:
+    def test_runs_rule_analyst(self, app_client):
+        resp = app_client.post(
+            f"/brooks-studio/sessions/{SESSION_ID}/replay-bar",
+            json={"bar_idx": 10, "analysts": ["rule"]},
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        assert body["bar_idx"] == 10
+        assert len(body["results"]) == 1
+        result = body["results"][0]
+        assert result["analyst"] == "rule"
+        assert result["bar_idx"] == 10
+        assert isinstance(result["signals"], list)
+        # rule analyst is best-effort: error stays None unless something exploded
+        assert result["error"] is None
+
+    def test_unknown_analyst_returns_error_not_500(self, app_client):
+        resp = app_client.post(
+            f"/brooks-studio/sessions/{SESSION_ID}/replay-bar",
+            json={"bar_idx": 0, "analysts": ["does-not-exist"]},
+        )
+        assert resp.status_code == 200, resp.text
+        body = resp.json()
+        result = body["results"][0]
+        assert result["analyst"] == "does-not-exist"
+        assert result["error"] is not None
+        assert "unknown" in result["error"].lower()
+
+    def test_unknown_session_404(self, app_client):
+        resp = app_client.post(
+            "/brooks-studio/sessions/no-such/replay-bar",
+            json={"bar_idx": 0, "analysts": ["rule"]},
+        )
+        assert resp.status_code == 404
+
+    def test_out_of_range_bar_idx_422(self, app_client):
+        resp = app_client.post(
+            f"/brooks-studio/sessions/{SESSION_ID}/replay-bar",
+            json={"bar_idx": 9999, "analysts": ["rule"]},
+        )
+        assert resp.status_code == 422
+
+    def test_empty_analyst_list_rejected(self, app_client):
+        resp = app_client.post(
+            f"/brooks-studio/sessions/{SESSION_ID}/replay-bar",
+            json={"bar_idx": 0, "analysts": []},
+        )
+        assert resp.status_code == 422
+
+
 class TestStudioWebSocket:
     def test_studio_ws_receives_bar_event(self, app_client):
         from src.api.events import emit_studio_bar_event
