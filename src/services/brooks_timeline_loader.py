@@ -48,6 +48,12 @@ _OUTCOME_LOG_SOURCE = "brooks_decision_outcome"
 _DEFAULT_PAGE_LIMIT = 500
 _MAX_PAGE_LIMIT = 5000
 
+# Cap historical structure.confirmed_swings — older sessions persisted the
+# full cumulative swing list every bar (O(N²) JSON). Truncate during
+# materialise so the in-memory ``extra`` dict stays bounded even when the
+# row on disk is hundreds of KB. Mirrors :data:`src.brooks.runtime.views.MAX_SWINGS_IN_VIEW`.
+_MAX_SWINGS_IN_VIEW = 200
+
 
 @dataclass(frozen=True)
 class _RawLogRow:
@@ -67,7 +73,7 @@ class BrooksTimelineLoader:
 
     # ------------------------------------------------------------------ public
 
-    def load(self, session_id: str) -> SessionTimeline:
+    def load(self, session_id: str, event_limit: Optional[int] = None) -> SessionTimeline:
         session = self.session_db.get_session(session_id)
         if session is None:
             raise KeyError(session_id)
@@ -76,10 +82,23 @@ class BrooksTimelineLoader:
         fills = self._read_fills(session_id)
         equity = self._read_equity(session_id)
 
-        events = [self._row_to_event(row) for row in bar_rows]
+        # Bars list is cheap (~100B/row, ~2MB at 23k bars) — always include
+        # the full set so the chart's candle layer can render any range.
+        # Events are the heavy ones; cap them to ``event_limit`` and let
+        # the frontend page in the rest via ``/timeline/since/{seq}``.
+        if event_limit is not None and event_limit > 0 and len(bar_rows) > event_limit:
+            event_rows = bar_rows[:event_limit]
+            has_more_events = True
+            next_event_seq = event_rows[-1].id if event_rows else 0
+        else:
+            event_rows = bar_rows
+            has_more_events = False
+            next_event_seq = 0
+
+        events = [self._row_to_event(row) for row in event_rows]
         events = self._attach_fills(events, fills)
-        bars, htf_bars = self._extract_bars(bar_rows, events)
-        pnl_curve = self._build_pnl_curve(events, equity)
+        bars, htf_bars = self._extract_bars(bar_rows)
+        pnl_curve = self._build_pnl_curve(events, equity) if not has_more_events else []
 
         params = dict(session.get("params") or {})
         config = {
@@ -103,6 +122,8 @@ class BrooksTimelineLoader:
             pnl_curve=pnl_curve,
             config=config,
             created_at=str(session.get("created_at") or ""),
+            next_event_seq=next_event_seq,
+            has_more_events=has_more_events,
         )
 
     def load_page(
@@ -129,6 +150,11 @@ class BrooksTimelineLoader:
     # ------------------------------------------------------------------ db reads
 
     def _read_bar_rows(self, session_id: str) -> List[_RawLogRow]:
+        # Stream the cursor instead of fetchall(): a 23k-bar replay used
+        # to load 2.5 GB of raw JSON into memory just to materialise it.
+        # Iterating row-by-row + capping swings inside ``_materialise``
+        # bounds peak memory to a few hundred MB.
+        out: List[_RawLogRow] = []
         with sqlite3.connect(self.session_db.db_path) as conn:
             conn.row_factory = sqlite3.Row
             cursor = conn.execute(
@@ -140,7 +166,9 @@ class BrooksTimelineLoader:
                 """,
                 (session_id, _BAR_LOG_SOURCE),
             )
-            return [self._materialise(row) for row in cursor.fetchall()]
+            for row in cursor:
+                out.append(self._materialise(row))
+        return out
 
     def _read_bar_rows_page(
         self,
@@ -187,6 +215,14 @@ class BrooksTimelineLoader:
                 extra = json.loads(extra_raw) or {}
             except (TypeError, ValueError):
                 extra = {}
+        # Defence against historical sessions that persisted the full
+        # cumulative swing list on every bar — drop everything but the
+        # most recent entries before the dict propagates further.
+        struct = extra.get("structure")
+        if isinstance(struct, dict):
+            swings = struct.get("confirmed_swings")
+            if isinstance(swings, list) and len(swings) > _MAX_SWINGS_IN_VIEW * 2:
+                struct["confirmed_swings"] = swings[-_MAX_SWINGS_IN_VIEW * 2 :]
         return _RawLogRow(
             id=int(row["id"]),
             source=str(row["source"]),
@@ -258,15 +294,19 @@ class BrooksTimelineLoader:
     def _extract_bars(
         self,
         rows: List[_RawLogRow],
-        events: List[BarEvent],
     ) -> Tuple[List[Bar], Dict[str, List[Bar]]]:
+        # Iterate rows directly — used to zip with events but events can
+        # be paginated now while bars must always be full. The bar dict
+        # already carries its own timestamp_ns, with the row's outer
+        # timestamp_ns as a defensive fallback.
         bars: List[Bar] = []
         htf_bars: Dict[str, List[Bar]] = {}
         seen_htf: Dict[str, set] = {}
-        for row, event in zip(rows, events):
+        for row in rows:
+            outer_ts = int(row.extra.get("timestamp_ns") or 0)
             ohlcv = row.extra.get("bar")
             if isinstance(ohlcv, dict):
-                bars.append(_bar_from_dict(ohlcv, default_ts_ns=event.timestamp_ns))
+                bars.append(_bar_from_dict(ohlcv, default_ts_ns=outer_ts))
 
             for tf, htf_payload in (row.extra.get("htf_bars") or {}).items():
                 if not isinstance(htf_payload, dict):
@@ -317,8 +357,13 @@ class BrooksTimelineLoader:
 # ---------------------------------------------------------------------------
 
 
-def load_timeline(session_id: str, session_db: SessionDB) -> SessionTimeline:
-    return BrooksTimelineLoader(session_db).load(session_id)
+def load_timeline(
+    session_id: str,
+    session_db: SessionDB,
+    *,
+    event_limit: Optional[int] = None,
+) -> SessionTimeline:
+    return BrooksTimelineLoader(session_db).load(session_id, event_limit=event_limit)
 
 
 def load_timeline_page(

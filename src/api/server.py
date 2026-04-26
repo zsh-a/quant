@@ -547,6 +547,28 @@ async def persistence_stats():
     return stats
 
 
+@app.get("/sessions/storage", dependencies=[Depends(require_auth)])
+async def sessions_storage():
+    """Per-table row counts + orphan log bytes + DB file size."""
+    return await anyio.to_thread.run_sync(session_db.get_storage_summary)
+
+
+@app.post("/sessions/storage/cleanup", dependencies=[Depends(require_auth)])
+async def sessions_storage_cleanup(vacuum: bool = True):
+    """Drop session_logs / equity_history / trades rows whose owning
+    session has already been deleted, then ``VACUUM`` to release pages.
+
+    Use after bulk session deletions or whenever the DB file looks larger
+    than expected — historical sessions accumulate orphan rows when they
+    are removed via SQL rather than ``DELETE /session/{id}``.
+    """
+    deleted = await anyio.to_thread.run_sync(session_db.cleanup_orphan_data)
+    if vacuum:
+        await anyio.to_thread.run_sync(session_db.vacuum)
+    summary = await anyio.to_thread.run_sync(session_db.get_storage_summary)
+    return {"deleted": deleted, "vacuum": vacuum, "after": summary}
+
+
 @app.get("/cache/stats", dependencies=[Depends(require_auth)])
 async def cache_stats():
     """Get cache statistics"""

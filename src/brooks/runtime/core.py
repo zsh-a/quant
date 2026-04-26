@@ -60,6 +60,8 @@ class BrooksCore:
         analyst_name: str,
         clock: Clock,
         equity_throttle: Optional[Throttle] = None,
+        equity_emit_every_n_bars: int = 1,
+        equity_points_window: int = 2000,
         emit: Optional[Callable[[Any], None]] = None,
         recent_signals_window: int = 50,
     ):
@@ -71,6 +73,8 @@ class BrooksCore:
         self.analyst_name = analyst_name
         self.clock = clock
         self.equity_throttle = equity_throttle
+        self.equity_emit_every_n_bars = max(1, int(equity_emit_every_n_bars))
+        self._equity_points_window = max(100, int(equity_points_window))
         self._emit = emit
         self._recent_signals_window = max(1, int(recent_signals_window))
 
@@ -336,6 +340,11 @@ class BrooksCore:
         self._emit(emit_strategy_step(self.session_id, legacy_payload))
 
     def _maybe_emit_equity(self, bars: Dict[str, Bar]) -> None:
+        # Bar-count gate first (cheap) — replay sets every_n>1 to avoid
+        # 1 equity row per bar on multi-day 1m windows. Live keeps every_n=1
+        # and uses the wall-clock throttle below.
+        if self.equity_emit_every_n_bars > 1 and (self._step_index % self.equity_emit_every_n_bars) != 0:
+            return
         if self.equity_throttle is not None:
             now = self.clock.now_seconds()
             if self.equity_throttle.should_skip("equity", now):
@@ -351,6 +360,11 @@ class BrooksCore:
             "positions": acct.get("detailed_positions", {}),
         }
         self._equity_points.append(equity_pt)
+        # Cap the in-memory rolling buffer — long-running live sessions
+        # otherwise grow this list unbounded (~17k entries/day at 5s emit).
+        # Persistent history lives in ``equity_history`` table, not here.
+        if len(self._equity_points) > self._equity_points_window:
+            del self._equity_points[: -self._equity_points_window]
         try:
             self.session_db.add_equity_point(
                 self.session_id,

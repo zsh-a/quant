@@ -346,6 +346,60 @@ class SessionDB:
             result = conn.execute("DELETE FROM sessions WHERE session_id = ?", (session_id,))
             return result.rowcount > 0
 
+    def cleanup_orphan_data(self) -> Dict[str, int]:
+        """Remove ``session_logs`` / ``equity_history`` / ``trades`` rows whose
+        owning session has been deleted, plus simulation rows pointing at
+        missing session ids.
+
+        These accumulate when sessions are deleted before
+        :meth:`delete_session` was wired (older code paths) or when rows
+        are dropped from ``sessions`` directly. Returns a dict of deleted
+        row counts per table, useful for logging / status pages.
+        """
+        report: Dict[str, int] = {}
+        with self._get_conn() as conn:
+            for table in ("session_logs", "equity_history", "trades"):
+                cursor = conn.execute(
+                    f"DELETE FROM {table} WHERE session_id NOT IN "
+                    "(SELECT session_id FROM sessions WHERE session_id IS NOT NULL)"
+                )
+                report[table] = int(cursor.rowcount or 0)
+        return report
+
+    def vacuum(self) -> None:
+        """Compact the SQLite file. Releases space freed by deletions back
+        to the OS — ``DELETE`` alone leaves pages allocated.
+
+        ``VACUUM`` cannot run inside a transaction; we drop isolation_level
+        and explicitly commit any pending state before issuing it.
+        """
+        conn = sqlite3.connect(self.db_path, isolation_level=None)
+        try:
+            conn.execute("VACUUM")
+        finally:
+            conn.close()
+
+    def get_storage_summary(self) -> Dict[str, Any]:
+        """Return per-table row counts + bytes for a quick health view."""
+        out: Dict[str, Any] = {}
+        with self._get_conn() as conn:
+            for tbl in ("sessions", "session_logs", "equity_history", "trades"):
+                row = conn.execute(f"SELECT count(*) FROM {tbl}").fetchone()
+                out[f"{tbl}_rows"] = int(row[0] or 0)
+            row = conn.execute(
+                "SELECT count(*), coalesce(sum(length(extra)), 0) FROM session_logs "
+                "WHERE session_id NOT IN (SELECT session_id FROM sessions WHERE session_id IS NOT NULL)"
+            ).fetchone()
+            out["orphan_session_logs_rows"] = int(row[0] or 0)
+            out["orphan_session_logs_bytes"] = int(row[1] or 0)
+        try:
+            import os
+
+            out["db_file_bytes"] = int(os.path.getsize(self.db_path))
+        except Exception:
+            out["db_file_bytes"] = -1
+        return out
+
     def delete_simulation_job(self, job_id: str) -> bool:
         with self._get_conn() as conn:
             conn.execute(

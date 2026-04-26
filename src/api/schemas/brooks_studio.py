@@ -100,6 +100,12 @@ class SessionTimeline(BaseModel):
     pnl_curve: List[PnLPoint] = Field(default_factory=list)
     config: Dict[str, Any] = Field(default_factory=dict)
     created_at: str = ""
+    # Pagination — populated when the timeline endpoint was called with an
+    # ``event_limit`` smaller than the row count. Frontend continues with
+    # ``GET /timeline/since/{next_event_seq}`` until ``has_more_events`` is
+    # ``False``. ``0`` / ``False`` indicate no pagination needed.
+    next_event_seq: int = 0
+    has_more_events: bool = False
 
 
 class TimelinePage(BaseModel):

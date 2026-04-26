@@ -9,6 +9,14 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+# ``MarketStructureTracker.confirmed_swing_highs/lows`` accumulate without
+# bound. Embedding the full list in every BarEvent is O(N²) — a 20k-bar
+# replay grew per-bar JSON to 200KB+ (≈ 2.5 GB total session_logs). Cap
+# to the most recent ``N`` highs and ``N`` lows; the chart only renders
+# swings near the visible viewport, and the strategy's pattern detectors
+# only reach back ~200 bars anyway.
+MAX_SWINGS_IN_VIEW = 200
+
 
 def decision_to_dict(decision: Any) -> Dict[str, Any]:
     """Flatten a :class:`Decision` for legacy ``strategy_step`` payloads."""
@@ -49,9 +57,11 @@ def features_to_view_dict(feat: Any) -> Dict[str, Any]:
 
 def structure_to_view_dict(struct: Any) -> Dict[str, Any]:
     swings = []
-    for s in getattr(struct, "confirmed_swing_highs", []) or []:
+    raw_highs = list(getattr(struct, "confirmed_swing_highs", []) or [])[-MAX_SWINGS_IN_VIEW:]
+    raw_lows = list(getattr(struct, "confirmed_swing_lows", []) or [])[-MAX_SWINGS_IN_VIEW:]
+    for s in raw_highs:
         swings.append({"idx": s.bar_idx, "kind": "high", "price": s.price})
-    for s in getattr(struct, "confirmed_swing_lows", []) or []:
+    for s in raw_lows:
         swings.append({"idx": s.bar_idx, "kind": "low", "price": s.price})
     top = getattr(struct, "micro_channel_top", None)
     bot = getattr(struct, "micro_channel_bot", None)

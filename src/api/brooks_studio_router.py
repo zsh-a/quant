@@ -62,9 +62,21 @@ def _loader() -> BrooksTimelineLoader:
 
 
 @router.get("/sessions/{session_id}/timeline", response_model=SessionTimeline)
-async def get_timeline(session_id: str) -> SessionTimeline:
+async def get_timeline(
+    session_id: str,
+    event_limit: int | None = Query(
+        None,
+        ge=1,
+        le=10_000,
+        description=(
+            "Cap the events list to the first N. The full bars list is always "
+            "returned; remaining events page in via /timeline/since/{seq}. "
+            "Frontend uses ~500 to keep first-paint cheap on huge sessions."
+        ),
+    ),
+) -> SessionTimeline:
     try:
-        return await anyio.to_thread.run_sync(_loader().load, session_id)
+        return await anyio.to_thread.run_sync(_loader().load, session_id, event_limit)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Session {session_id!r} not found")
 

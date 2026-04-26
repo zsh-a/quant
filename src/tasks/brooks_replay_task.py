@@ -152,7 +152,12 @@ def brooks_replay_task(self, session_id: str, config: Dict[str, Any]) -> Dict[st
         session_db=session_db,
         analyst_name=analyst_name,
         clock=clock,
-        equity_throttle=None,  # replay records equity every bar
+        equity_throttle=None,
+        # Replay can sample equity sparsely — the PnL strip only renders
+        # ~200 points and equity_history is the fallback source. 1 row per
+        # 10 bars is plenty and keeps multi-day 1m runs from writing tens
+        # of thousands of redundant rows.
+        equity_emit_every_n_bars=int(config.get("equity_emit_every_n_bars", 10)),
         emit=None,
         recent_signals_window=int(live_cfg.recent_signals_window),
     )

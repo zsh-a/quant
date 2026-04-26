@@ -201,6 +201,62 @@ class TestLoadTimeline:
         # No session_kind in params → default to "live".
         assert timeline.session_kind == "live"
 
+    def test_event_limit_caps_events_but_not_bars(self, session_db):
+        """Pagination — first call truncates events, ``next_event_seq`` and
+        ``has_more_events`` flag tells the frontend where to resume. The
+        full bars list still ships so the chart renders any range."""
+        full = load_timeline(SESSION_ID, session_db)
+        assert len(full.events) == 30
+        assert full.has_more_events is False
+        assert full.next_event_seq == 0
+
+        page1 = load_timeline(SESSION_ID, session_db, event_limit=10)
+        assert len(page1.events) == 10
+        assert len(page1.bars) == 30  # bars are not paginated
+        assert page1.has_more_events is True
+        assert page1.next_event_seq > 0
+
+    def test_loader_caps_legacy_unbounded_swings(self, tmp_path, monkeypatch):
+        """Older session_logs persisted the full cumulative swing list every
+        bar (O(N²) JSON). The loader must clamp them on read so memory
+        stays bounded for tens of thousands of bars."""
+        db_path = tmp_path / "fat.db"
+        monkeypatch.setenv("SESSION_DB_PATH", str(db_path))
+        db = SessionDB(str(db_path))
+        db.create_session(
+            session_id="fat-1",
+            strategy_name="brooks",
+            symbol=SYMBOL,
+            mode="paper",
+            start_date="2026-04-25",
+            end_date=None,
+            params={"analyst": "rule", "session_kind": "live", "base_interval": INTERVAL},
+            market="crypto",
+            interval=INTERVAL,
+        )
+        # One bar with 5000 swings persisted into the structure dict.
+        ts_ns = 1_700_000_000_000_000_000
+        big_swings = [{"idx": i, "kind": "high", "price": 100.0 + i} for i in range(5_000)]
+        db.add_session_log(
+            session_id="fat-1",
+            timestamp="2026-04-25T00:00:00",
+            level="DEBUG",
+            source="brooks_bar",
+            message="bar_idx=0",
+            extra={
+                "bar_idx": 0,
+                "timestamp_ns": ts_ns,
+                "bar": {"timestamp_ns": ts_ns, "open": 1, "high": 1, "low": 1, "close": 1, "volume": 0},
+                "structure": {"always_in": "neutral", "confirmed_swings": big_swings},
+            },
+        )
+        timeline = load_timeline("fat-1", db)
+        assert len(timeline.events) == 1
+        ev = timeline.events[0]
+        assert ev.structure is not None
+        # MAX_SWINGS_IN_VIEW * 2 covers highs + lows; cap should bite.
+        assert len(ev.structure.confirmed_swings) <= 400
+
     def test_session_kind_replay_when_params_set(self, tmp_path, monkeypatch):
         """A session created with ``session_kind='replay'`` round-trips through the loader."""
         db_path = tmp_path / "replay.db"

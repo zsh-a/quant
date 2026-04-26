@@ -49,6 +49,37 @@ def test_attribute_forwarding():
     assert wrapped.config_value == 42
 
 
+def test_structure_view_caps_confirmed_swings():
+    """structure_to_view_dict must cap confirmed_swings, otherwise per-bar
+    BarEvent JSON grows O(N²) and tens of MB / GB session_logs."""
+    from src.brooks.runtime.views import MAX_SWINGS_IN_VIEW, structure_to_view_dict
+
+    class _Swing:
+        def __init__(self, idx, price):
+            self.bar_idx = idx
+            self.price = price
+
+    class _Struct:
+        def __init__(self, n):
+            self.always_in = "neutral"
+            self.confirmed_swing_highs = [_Swing(i, 100 + i) for i in range(n)]
+            self.confirmed_swing_lows = [_Swing(i, 50 + i) for i in range(n)]
+            self.micro_channel_top = None
+            self.micro_channel_bot = None
+            self.last_breakout_lookback_high = None
+            self.last_breakout_lookback_low = None
+
+    view = structure_to_view_dict(_Struct(5_000))
+    swings = view["confirmed_swings"]
+    # At most MAX × 2 (highs + lows).
+    assert len(swings) == MAX_SWINGS_IN_VIEW * 2
+    # The kept entries are the *most recent* ones — first kept index =
+    # 5000 - MAX_SWINGS_IN_VIEW.
+    high_idxs = [s["idx"] for s in swings if s["kind"] == "high"]
+    assert min(high_idxs) == 5_000 - MAX_SWINGS_IN_VIEW
+    assert max(high_idxs) == 4_999
+
+
 def test_works_with_real_classifier():
     """Sanity check: wrapping the real BrooksRegimeClassifier still classifies."""
     real = BrooksRegimeClassifier()

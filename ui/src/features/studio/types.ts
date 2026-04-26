@@ -134,6 +134,17 @@ export interface SessionTimeline {
   pnl_curve: PnLPoint[];
   config: Record<string, unknown>;
   created_at: string;
+  /** Pagination — when the timeline endpoint is called with `event_limit`,
+   *  remaining events are fetched via /timeline/since/{seq} until
+   *  `has_more_events === false`. */
+  next_event_seq?: number;
+  has_more_events?: boolean;
+}
+
+export interface TimelinePage {
+  events: BarEvent[];
+  next_seq: number;
+  has_more: boolean;
 }
 
 export type StudioMode = 'live' | 'replay';

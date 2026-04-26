@@ -3,7 +3,7 @@
  */
 
 import { WS_BASE, apiFetch, getToken } from '../../utils/api';
-import type { BarEvent, Decision, SessionTimeline, Signal } from './types';
+import type { BarEvent, Decision, SessionTimeline, Signal, TimelinePage } from './types';
 
 export class StudioApiError extends Error {
   constructor(message: string, readonly status: number) {
@@ -12,12 +12,42 @@ export class StudioApiError extends Error {
   }
 }
 
-export async function fetchTimeline(sessionId: string, signal?: AbortSignal): Promise<SessionTimeline> {
-  const resp = await apiFetch(`/brooks-studio/sessions/${sessionId}/timeline`, { signal });
+/**
+ * Load a SessionTimeline. ``eventLimit`` caps the events list for fast
+ * first paint on huge sessions; remaining events page in via
+ * :func:`fetchTimelinePage`. Bars are always returned in full.
+ */
+export async function fetchTimeline(
+  sessionId: string,
+  signal?: AbortSignal,
+  eventLimit?: number,
+): Promise<SessionTimeline> {
+  const qs = eventLimit ? `?event_limit=${eventLimit}` : '';
+  const resp = await apiFetch(`/brooks-studio/sessions/${sessionId}/timeline${qs}`, { signal });
   if (!resp.ok) {
     throw new StudioApiError(`Failed to load timeline (${resp.status})`, resp.status);
   }
   return (await resp.json()) as SessionTimeline;
+}
+
+/**
+ * Fetch the next batch of BarEvents for an already-loaded session — used
+ * to page through huge replay timelines without blocking first paint.
+ */
+export async function fetchTimelinePage(
+  sessionId: string,
+  sinceSeq: number,
+  limit: number,
+  signal?: AbortSignal,
+): Promise<TimelinePage> {
+  const resp = await apiFetch(
+    `/brooks-studio/sessions/${sessionId}/timeline/since/${sinceSeq}?limit=${limit}`,
+    { signal },
+  );
+  if (!resp.ok) {
+    throw new StudioApiError(`Failed to load timeline page (${resp.status})`, resp.status);
+  }
+  return (await resp.json()) as TimelinePage;
 }
 
 export interface ReplayBarAnalystResult {
