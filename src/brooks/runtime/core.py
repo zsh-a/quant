@@ -36,6 +36,7 @@ from src.brooks.runtime.event_sink import BarEventSink
 from src.brooks.runtime.regime_capture import RegimeCapturingClassifier
 from src.brooks.runtime.throttle import Throttle
 from src.brooks.runtime.views import (
+    background_to_view_dict,
     decision_to_dict,
     decision_to_full_dict,
     features_to_view_dict,
@@ -300,6 +301,19 @@ class BrooksCore:
                     "volume": float(latest.volume),
                 }
 
+        # ContextFilter telemetry — failed signals (rejected this bar) and
+        # the per-bar background summary the filter produced. The Studio
+        # panel uses these to render rejected setups + the regime/structure
+        # context behind the decision.
+        failed_signals_state = getattr(self.strategy, "_last_failed_signals", {}) or {}
+        failed_signals_list: List[Dict[str, Any]] = [
+            s.model_dump() for s in (failed_signals_state.get(symbol) or [])
+        ]
+        ctx_decision = (
+            getattr(self.strategy, "_last_context_decision", {}) or {}
+        ).get(symbol)
+        background_payload = background_to_view_dict(ctx_decision)
+
         return {
             "bar_idx": bar_idx,
             "timestamp_ns": ts_ns,
@@ -315,7 +329,9 @@ class BrooksCore:
             "structure": structure_to_view_dict(struct_obj) if struct_obj is not None else None,
             "regime": regime_to_view_dict(regime_payload),
             "signals": signals_list,
+            "failed_signals": failed_signals_list,
             "decision": decision_dict,
+            "background": background_payload,
             "htf": htf_payload,
             "htf_bars": htf_bars,
             "symbol": symbol,

@@ -87,7 +87,26 @@ def regime_to_view_dict(
     }
 
 
+def background_to_view_dict(
+    ctx_decision: Any,
+) -> Optional[Dict[str, Any]]:
+    """Project a :class:`~src.brooks.decision.context_filter.ContextDecision`
+    into the BarEvent.background payload."""
+    if ctx_decision is None:
+        return None
+    return {
+        "regime": getattr(ctx_decision, "regime", None),
+        "leg_dir": getattr(ctx_decision, "leg_dir", None),
+        "in_trading_range": bool(getattr(ctx_decision, "in_trading_range", False)),
+        "swing_age_bars": getattr(ctx_decision, "swing_age_bars", None),
+        "pattern_types": list(getattr(ctx_decision, "pattern_types", []) or []),
+        "allow": bool(getattr(ctx_decision, "allow", True)),
+        "reason": getattr(ctx_decision, "reason", "") or "",
+    }
+
+
 __all__ = [
+    "background_to_view_dict",
     "decision_to_dict",
     "decision_to_full_dict",
     "features_to_view_dict",
