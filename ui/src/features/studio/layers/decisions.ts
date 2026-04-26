@@ -1,8 +1,12 @@
 /**
- * Decisions layer — solid in-bar arrows for accepted Brooks decisions, plus
- * entry / stop / target price lines for any decision within
+ * Decisions layer — entry / stop / target price lines for any decision within
  * `currentBarIdx ± WINDOW`. Outside the window the lines are removed so a
  * busy chart doesn't drown in horizontals.
+ *
+ * Bar markers used to live here too, but they are now produced by the
+ * aggregated `annotations` layer (Brooks shorthand, one per bar). The marker
+ * helpers here remain exported for unit tests + downstream tools that still
+ * want the raw decision markers.
  */
 
 import {
@@ -94,11 +98,14 @@ export function decisionsInWindow(
 
 export const decisionsLayer: ChartLayer = {
   id: 'decisions',
-  name: 'Decisions',
-  swatch: LONG_COLOR,
+  name: 'Decision price lines',
+  swatch: ENTRY_COLOR,
   defaultVisible: true,
 
   mount(ctx: LayerCtx): LayerHandle {
+    // The plugin is preserved so downstream toggles (legacy "raw decisions"
+    // overlay) can opt back into showing markers; by default we leave it
+    // empty since the aggregated `annotations` layer owns bar labels now.
     let plugin: ISeriesMarkersPluginApi<Time> | null = createSeriesMarkers(
       ctx.primarySeries,
       [],
@@ -131,9 +138,6 @@ export const decisionsLayer: ChartLayer = {
 
     return {
       update(timeline, currentBarIdx) {
-        if (!plugin) return;
-        plugin.setMarkers(buildDecisionMarkers(timeline, currentBarIdx));
-
         clearLines();
         for (const { decision, bar_idx } of decisionsInWindow(timeline, currentBarIdx)) {
           addLine(decision.entry_px, ENTRY_COLOR, `entry @${bar_idx}`);
@@ -155,4 +159,3 @@ export const decisionsLayer: ChartLayer = {
     };
   },
 };
-

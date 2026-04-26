@@ -19,6 +19,8 @@ describe('layer registry', () => {
       'swings',
       'ema20',
       'ema200',
+      'annotations',
+      'trades',
       'signals',
       'decisions',
       'fills',
@@ -29,7 +31,10 @@ describe('layer registry', () => {
     ]);
   });
 
-  it('default-visible omits ema200, htf_overlay, and reasoning', () => {
+  it('default-visible favours the aggregated annotations layer over raw fills', () => {
+    expect(DEFAULT_VISIBLE.has('annotations')).toBe(true);
+    expect(DEFAULT_VISIBLE.has('trades')).toBe(true);
+    expect(DEFAULT_VISIBLE.has('fills')).toBe(false);
     expect(DEFAULT_VISIBLE.has('ema200')).toBe(false);
     expect(DEFAULT_VISIBLE.has('htf_overlay')).toBe(false);
     expect(DEFAULT_VISIBLE.has('reasoning')).toBe(false);

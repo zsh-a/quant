@@ -1,7 +1,9 @@
 /**
- * Signals layer — circle markers for every detector signal up to (and
- * including) the current bar, plus entry / stop price lines for any signals
- * landing on the current bar.
+ * Signals layer (raw) — entry / stop price lines for any signal landing on the
+ * current bar. Used to also drop a circle marker for every past signal, but
+ * those are now produced by the aggregated `annotations` layer (Brooks
+ * shorthand, one label per bar). Marker helpers stay exported because they
+ * are useful as opt-in raw view and tests still cover them.
  *
  * Future-info safety: signals from `bar_idx > currentBarIdx` are filtered out
  * before render, so scrubbing back hides them.
@@ -86,11 +88,12 @@ export function buildSignalMarkers(
 
 export const signalsLayer: ChartLayer = {
   id: 'signals',
-  name: 'Signals',
-  swatch: LONG_COLOR,
+  name: 'Signal price lines',
+  swatch: ENTRY_LINE_COLOR,
   defaultVisible: true,
 
   mount(ctx: LayerCtx): LayerHandle {
+    // Plugin retained for parity with the test suite + opt-in raw markers.
     let plugin: ISeriesMarkersPluginApi<Time> | null = createSeriesMarkers(
       ctx.primarySeries,
       [],
@@ -110,9 +113,6 @@ export const signalsLayer: ChartLayer = {
 
     return {
       update(timeline, currentBarIdx) {
-        if (!plugin) return;
-        plugin.setMarkers(buildSignalMarkers(timeline, currentBarIdx));
-
         clearLines();
         const ev = timeline.events.find((e) => e.bar_idx === currentBarIdx);
         if (!ev?.signals?.length) return;

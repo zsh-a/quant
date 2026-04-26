@@ -5,7 +5,12 @@ vi.mock('lightweight-charts', () => ({
   LineStyle: { Solid: 0, Dotted: 1, Dashed: 2 },
 }));
 
-import { buildChannelLineData, channelsLayer, latestStructure } from '../layers/channels';
+import {
+  buildChannelLineData,
+  buildChannelMidlineData,
+  channelsLayer,
+  latestStructure,
+} from '../layers/channels';
 import { makeLayerCtx } from './mockChart';
 import { makeTimeline } from './fixtures';
 
@@ -41,10 +46,24 @@ describe('channels layer', () => {
     ).toBe(0);
   });
 
-  it('mounts two line series and pushes data on update', () => {
+  it('builds a midline averaging top + bot, only when both exist', () => {
+    const tl = makeTimeline(5);
+    const top = { slope: 1, intercept: 100, start: 0, end: 4 };
+    const bot = { slope: -1, intercept: 100, start: 0, end: 4 };
+    const data = buildChannelMidlineData(tl, top, bot, 3);
+    expect(data.length).toBe(2);
+    // y_mid = ((1*x + 100) + (-1*x + 100)) / 2 = 100 at every x
+    expect(data[0].value).toBe(100);
+    expect(data[1].value).toBe(100);
+
+    expect(buildChannelMidlineData(tl, top, null, 3).length).toBe(0);
+    expect(buildChannelMidlineData(tl, null, bot, 3).length).toBe(0);
+  });
+
+  it('mounts top + bot + mid line series and pushes data on update', () => {
     const { ctx, chart } = makeLayerCtx();
     const handle = channelsLayer.mount(ctx);
-    expect(chart.added.length).toBe(2);
+    expect(chart.added.length).toBe(3);
 
     const tl = makeTimeline(5);
     tl.events[1].structure = {
@@ -57,8 +76,9 @@ describe('channels layer', () => {
 
     expect(chart.added[0].data.length).toBe(2); // top
     expect(chart.added[1].data.length).toBe(2); // bot
+    expect(chart.added[2].data.length).toBe(2); // mid
 
     handle.unmount();
-    expect(chart.removed.length).toBe(2);
+    expect(chart.removed.length).toBe(3);
   });
 });

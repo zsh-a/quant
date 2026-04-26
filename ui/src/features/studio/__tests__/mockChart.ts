@@ -13,6 +13,7 @@ export interface MockSeries {
   data: unknown[];
   setData: ReturnType<typeof vi.fn>;
   update: ReturnType<typeof vi.fn>;
+  applyOptions: ReturnType<typeof vi.fn>;
   setMarkers: ReturnType<typeof vi.fn>;
   markers: unknown[];
   priceLines: { id: number; opts: Record<string, unknown> }[];
@@ -39,6 +40,9 @@ function makeSeries(type: string, options: Record<string, unknown>): MockSeries 
       series.data = d;
     }),
     update: vi.fn(),
+    applyOptions: vi.fn((opts: Record<string, unknown>) => {
+      series.options = { ...series.options, ...opts };
+    }),
     setMarkers: vi.fn((markers: unknown[]) => {
       series.markers = markers;
     }),

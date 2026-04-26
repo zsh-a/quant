@@ -124,6 +124,10 @@ class BrooksStrategy(Strategy):
         self._positions: Dict[str, PositionState] = {}
         self._pending_decisions: Dict[str, Decision] = {}
         self._entry_order_ids: Dict[str, str] = {}
+        # Bar count at which the current pending decision was submitted —
+        # used to time out stale stop-entries (see ``pending_entry_max_bars``).
+        self._pending_submit_bar: Dict[str, int] = {}
+        self._symbol_bar_count: Dict[str, int] = {}
 
     # ------------------------------------------------------------------ defaults
 
@@ -144,6 +148,11 @@ class BrooksStrategy(Strategy):
             "mtf_intervals": [],
             "primary_bar_window": 200,
             "htf_bar_window": 120,
+            # Cancel a pending stop-entry if it doesn't trigger within N
+            # bars. Brooks setups expect near-immediate follow-through;
+            # stale pending entries block new analysis and clutter the
+            # Studio chart with carry-forward decision markers.
+            "pending_entry_max_bars": 5,
             # Context rendering
             "context_budget_tokens": 2000,
             # Misc
@@ -182,8 +191,34 @@ class BrooksStrategy(Strategy):
     def on_bar(self, bars: Dict[str, Bar]) -> None:
         for symbol, bar in bars.items():
             self._ensure_symbol_state(symbol)
+            self._symbol_bar_count[symbol] = self._symbol_bar_count.get(symbol, -1) + 1
+            self._expire_stale_pending(symbol)
             self._fill_pending_entry(symbol, bar)
             self._process_symbol_bar(symbol, bar)
+
+    def _expire_stale_pending(self, symbol: str) -> None:
+        """Drop pending entries that haven't triggered within
+        ``pending_entry_max_bars`` bars. Without this, a stop-entry that
+        the market never reaches blocks new analysis indefinitely and
+        leaves the Studio chart's decision marker stuck on every bar."""
+        if symbol not in self._pending_decisions:
+            return
+        max_bars = int(self.params.get("pending_entry_max_bars", 5))
+        if max_bars <= 0:
+            return
+        submitted_at = self._pending_submit_bar.get(symbol, -1)
+        if submitted_at < 0:
+            return
+        age = self._symbol_bar_count[symbol] - submitted_at
+        if age < max_bars:
+            return
+        self._log(
+            f"pending entry expired: {symbol} after {age} bars",
+            level="DEBUG",
+        )
+        self._pending_decisions.pop(symbol, None)
+        self._pending_submit_bar.pop(symbol, None)
+        self._entry_order_ids.pop(symbol, None)
 
     # ------------------------------------------------------------------ setup
 
@@ -271,12 +306,18 @@ class BrooksStrategy(Strategy):
 
         # ---- portfolio guard -----------------------------------------------
         equity, cash = self._account_equity_cash()
+        # Sizer's ``expected_r`` parameter is the **reward ratio** ``b = reward / risk``
+        # (Kelly's ``b``), not the EV. Compute it from the decision's
+        # entry/stop/target — feeding the EVGate's ``expected_r`` (which is the
+        # signed expected value) here treats e.g. 0.45 as "1:0.45 reward",
+        # making Kelly negative and qty=0 for every signal.
+        reward_r = _reward_r_from_decision(decision)
         qty = self._sizer.size(
             equity=equity,
             entry_px=decision.entry_px,
             stop_px=decision.stop_px,
             probability=decision.probability,
-            expected_r=decision.expected_r,
+            expected_r=reward_r,
             available_cash=cash,
         )
         qty = round(qty, 6)
@@ -380,6 +421,7 @@ class BrooksStrategy(Strategy):
         )
         oid = self.engine.submit_order(order) if self.engine else None
         self._pending_decisions[symbol] = decision
+        self._pending_submit_bar[symbol] = self._symbol_bar_count.get(symbol, 0)
         if oid is not None:
             self._entry_order_ids[symbol] = oid
         # Stash the intended risk % on the decision for the portfolio guard later.
@@ -394,26 +436,47 @@ class BrooksStrategy(Strategy):
         )
         if not triggered:
             return
+
+        # Verify the broker actually opened the position. Without this
+        # check, a broker rejection (insufficient cash, insufficient qty,
+        # margin block, etc.) leaves the strategy with a phantom local
+        # PositionState — _manage_position then fires "exits" the broker
+        # never recorded, the pending decision is cleared, and the next
+        # bar's analyst is free to enter again. Result: tens of ENTRY logs
+        # per second, zero broker.trades. Drop the decision instead so the
+        # cycle stops on the first rejection.
+        broker_positions = getattr(self.engine.broker, "positions", None) if self.engine is not None else None
+        if broker_positions is not None:
+            filled = abs(broker_positions.get(symbol, 0.0))
+            if filled <= 0:
+                self._log(
+                    f"entry rejected by broker (no fill): {symbol} {decision.side} "
+                    f"qty={decision.quantity} entry={decision.entry_px}",
+                    level="DEBUG",
+                )
+                del self._pending_decisions[symbol]
+                self._pending_submit_bar.pop(symbol, None)
+                self._entry_order_ids.pop(symbol, None)
+                return
+            qty_open = filled
+        else:
+            qty_open = decision.quantity
+
         pos = PositionState(
             symbol=symbol,
             side=decision.side,
             entry_px=decision.entry_px,
             stop_px=decision.stop_px,
-            qty_initial=decision.quantity,
-            qty_open=decision.quantity,
+            qty_initial=qty_open,
+            qty_open=qty_open,
             one_r=abs(decision.entry_px - decision.stop_px),
             risk_pct=float(decision.signals[0].meta.get("risk_pct", 0.0)) if decision.signals else 0.0,
             entry_bar_idx=decision.signals[0].signal_bar_idx if decision.signals else -1,
             entry_timestamp_ns=int(bar.timestamp.timestamp() * 1_000_000_000),
         )
-        # Reconcile qty against broker fill if available.
-        if self.engine and hasattr(self.engine.broker, "positions"):
-            filled = abs(self.engine.broker.positions.get(symbol, 0.0))
-            if filled > 0:
-                pos.qty_initial = filled
-                pos.qty_open = filled
         self._positions[symbol] = pos
         del self._pending_decisions[symbol]
+        self._pending_submit_bar.pop(symbol, None)
         self._entry_order_ids.pop(symbol, None)
 
     # ------------------------------------------------------------------ management
@@ -517,6 +580,22 @@ def _bar_to_brooks(bar: Bar, ts_ns: int) -> BrooksBar:
         close=float(bar.close),
         volume=float(bar.volume),
     )
+
+
+def _reward_r_from_decision(decision: Decision) -> float:
+    """Reward-to-risk ratio (``b`` in Kelly) implied by the decision's
+    entry / stop / target. Falls back to ``DEFAULT_REWARD_R`` when no
+    target is set."""
+    one_r = abs(decision.entry_px - decision.stop_px)
+    if one_r <= 0:
+        return 0.0
+    if decision.target_px is None:
+        from src.brooks.decision.trader_equation import DEFAULT_REWARD_R
+
+        return float(DEFAULT_REWARD_R)
+    if decision.side == "long":
+        return max(0.0, (decision.target_px - decision.entry_px) / one_r)
+    return max(0.0, (decision.entry_px - decision.target_px) / one_r)
 
 
 def _risk_pct_from_qty(qty: float, decision: Decision, equity: float) -> float:

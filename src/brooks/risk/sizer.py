@@ -30,10 +30,27 @@ class Sizer(Protocol):
     ) -> float: ...
 
 
-def _apply_cap(qty: float, entry_px: float, available_cash: float) -> float:
+# Default buffer for slippage + commission + price drift between submit
+# and fill. Without it the broker rejects "Insufficient cash" because the
+# actual fill costs ``qty × (entry × (1 + slippage)) × (1 + commission)``
+# — slightly above ``qty × entry``. 1% covers the realistic 0.1% slip +
+# 0.03% commission default with margin to spare.
+DEFAULT_CASH_SAFETY_BUFFER = 0.01
+
+
+def _apply_cap(
+    qty: float,
+    entry_px: float,
+    available_cash: float,
+    cash_safety_buffer: float | None = None,
+) -> float:
     if qty <= 0 or entry_px <= 0:
         return 0.0
-    cash_cap = available_cash / entry_px if available_cash > 0 else 0.0
+    # Resolve the buffer at call-time so monkey-patching DEFAULT_CASH_SAFETY_BUFFER
+    # (e.g. unit tests verifying pure cap math) takes effect.
+    buf = cash_safety_buffer if cash_safety_buffer is not None else DEFAULT_CASH_SAFETY_BUFFER
+    usable_cash = available_cash * (1.0 - buf) if available_cash > 0 else 0.0
+    cash_cap = usable_cash / entry_px if usable_cash > 0 else 0.0
     return max(0.0, min(qty, cash_cap))
 
 

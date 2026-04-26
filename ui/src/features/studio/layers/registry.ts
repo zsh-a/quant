@@ -17,12 +17,16 @@ import { channelsLayer } from './channels';
 import { stopAdjLayer } from './stop_adj';
 import { htfOverlayLayer } from './htf_overlay';
 import { reasoningLayer } from './reasoning';
+import { annotationsLayer } from './annotations';
+import { tradesLayer } from './trades';
 
 export const LAYERS: readonly ChartLayer[] = [
   regimeLayer,
   swingsLayer,
   ema20Layer,
   ema200Layer,
+  annotationsLayer,
+  tradesLayer,
   signalsLayer,
   decisionsLayer,
   fillsLayer,

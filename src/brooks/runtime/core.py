@@ -84,6 +84,12 @@ class BrooksCore:
         self._last_signals: List[Dict[str, Any]] = []
         self._last_regime: Dict[str, Any] = {}
         self._equity_points: List[Dict[str, Any]] = []
+        # Per-symbol identity (Python ``id``) of the last decision we
+        # already emitted on a BarEvent. Pending stop-entries can linger
+        # for many bars before the price triggers them — without this
+        # guard the chart shows the same decision marker on every one of
+        # those bars, drowning real signals in repetition.
+        self._emitted_decision_id: Dict[str, int] = {}
 
         # Wrap any classifiers that already exist (rare — strategy creates
         # them lazily on first bar) and patch the strategy's setup point so
@@ -93,6 +99,12 @@ class BrooksCore:
 
         # Hook the broker so we can persist decision/order pairing.
         self._install_broker_order_hook()
+
+        # Strategy._submit_entry calls ``self.engine.submit_order(...)`` —
+        # without a connected engine all entries silently no-op. The
+        # legacy live engine got this wiring for free via ``TradingEngine``;
+        # BrooksCore replaces that wrapper, so we provide the same shim.
+        strategy.set_engine(_StrategyEngineShim(broker))
 
     # ------------------------------------------------------------------ public
 
@@ -243,13 +255,24 @@ class BrooksCore:
         decision = pending.get(symbol)
         decision_dict: Optional[Dict[str, Any]] = None
         signals_list: List[Dict[str, Any]] = []
-        if decision is not None:
+        # Only render the decision/signals on the bar where they were
+        # FIRST submitted. A stop-entry can sit pending for several bars
+        # before the price triggers it; carrying the decision payload
+        # forward turns one signal into a row of duplicate markers on
+        # the chart. Once it fills (and ``_pending_decisions`` clears)
+        # or expires, the next genuinely-new decision will pass identity
+        # check and emit again.
+        decision_id = id(decision) if decision is not None else None
+        if decision is not None and self._emitted_decision_id.get(symbol) != decision_id:
             decision_dict = decision_to_full_dict(decision)
             signals_list = [s.model_dump() for s in (decision.signals or [])]
             self._last_decision = decision_to_dict(decision)
             self._last_signals.append(self._last_decision)
             if len(self._last_signals) > self._recent_signals_window:
                 del self._last_signals[: -self._recent_signals_window]
+            self._emitted_decision_id[symbol] = decision_id
+        elif decision is None and symbol in self._emitted_decision_id:
+            del self._emitted_decision_id[symbol]
 
         htf_payload: Dict[str, Dict[str, Any]] = {}
         htf_bars: Dict[str, Dict[str, Any]] = {}
@@ -456,6 +479,23 @@ class BrooksCore:
             )
         except Exception as e:
             logger.debug("brooks_decision_outcome persist failed: {}", e)
+
+
+class _StrategyEngineShim:
+    """Minimal engine surface ``BrooksStrategy._submit_entry`` requires.
+
+    BrooksStrategy was built to live inside a :class:`TradingEngine`,
+    which exposes ``submit_order`` and a ``broker`` attribute. The
+    runtime drives the strategy directly so we synthesise the smallest
+    object that satisfies both calls — the alternative (instantiating
+    a full TradingEngine) would re-introduce the bar loop we replaced.
+    """
+
+    def __init__(self, broker: Broker):
+        self.broker = broker
+
+    def submit_order(self, order: Any) -> str:
+        return self.broker.submit_order(order)
 
 
 __all__ = ["BrooksCore"]

@@ -15,15 +15,52 @@ vi.mock('lightweight-charts', () => ({
   }),
 }));
 
-import { buildSwingMarkers, isHighSwing, swingsLayer } from '../layers/swings';
+import { buildSwingMarkers, classifySwingLabel, isHighSwing, swingsLayer } from '../layers/swings';
 import { makeLayerCtx } from './mockChart';
 import { makeTimeline } from './fixtures';
+import type { SwingPoint } from '../types';
 
 describe('swings layer', () => {
   it('classifies high vs low by kind name', () => {
     expect(isHighSwing('hh')).toBe(false); // depends only on /high/
     expect(isHighSwing('higher_high')).toBe(true);
     expect(isHighSwing('low')).toBe(false);
+  });
+
+  it('classifies HH/HL/LH/LL based on prior same-kind swing prices', () => {
+    const swings: SwingPoint[] = [
+      { idx: 0, kind: 'low', price: 100 },   // L
+      { idx: 1, kind: 'high', price: 110 },  // H
+      { idx: 2, kind: 'low', price: 102 },   // HL (102 > 100)
+      { idx: 3, kind: 'high', price: 115 },  // HH (115 > 110)
+      { idx: 4, kind: 'high', price: 113 },  // LH (113 < 115)
+      { idx: 5, kind: 'low', price: 99 },    // LL (99 < 102)
+    ];
+    expect(classifySwingLabel(swings, 0)).toBe('L');
+    expect(classifySwingLabel(swings, 1)).toBe('H');
+    expect(classifySwingLabel(swings, 2)).toBe('HL');
+    expect(classifySwingLabel(swings, 3)).toBe('HH');
+    expect(classifySwingLabel(swings, 4)).toBe('LH');
+    expect(classifySwingLabel(swings, 5)).toBe('LL');
+  });
+
+  it('emits Brooks-style labels with sequence subscripts on recent swings', () => {
+    const tl = makeTimeline(8);
+    tl.events[7].structure = {
+      always_in: 'long',
+      confirmed_swings: [
+        { idx: 0, kind: 'low', price: 100 },
+        { idx: 1, kind: 'high', price: 110 },
+        { idx: 2, kind: 'low', price: 102 },
+        { idx: 3, kind: 'high', price: 115 },
+      ],
+    };
+    const markers = buildSwingMarkers(tl, 7);
+    const texts = markers.map((m) => m.text);
+    expect(texts).toContain('L₁');
+    expect(texts).toContain('H₁');
+    expect(texts).toContain('HL₁');
+    expect(texts).toContain('HH₁');
   });
 
   it('only emits markers for swings whose idx <= currentBarIdx', () => {

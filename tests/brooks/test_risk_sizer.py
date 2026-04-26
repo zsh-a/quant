@@ -6,7 +6,17 @@ import math
 
 import pytest
 
+from src.brooks.risk import sizer as sizer_mod
 from src.brooks.risk.sizer import FixedPercentSizer, KellySizer
+
+
+@pytest.fixture(autouse=True)
+def _disable_cash_buffer(monkeypatch):
+    """Pin the cash safety buffer to 0 in unit tests so cap math is exact.
+
+    Production sizing keeps a 1% buffer for slippage + commission so the
+    broker actually fills; these tests verify the pure formula."""
+    monkeypatch.setattr(sizer_mod, "DEFAULT_CASH_SAFETY_BUFFER", 0.0)
 
 
 class TestFixedPercentSizer:

@@ -58,9 +58,9 @@ export function buildFillMarkers(
 
 export const fillsLayer: ChartLayer = {
   id: 'fills',
-  name: 'Fills',
+  name: 'Fills (raw)',
   swatch: BUY_COLOR,
-  defaultVisible: true,
+  defaultVisible: false,
 
   mount(ctx: LayerCtx): LayerHandle {
     let plugin: ISeriesMarkersPluginApi<Time> | null = createSeriesMarkers(

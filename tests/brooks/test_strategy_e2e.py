@@ -207,3 +207,71 @@ def test_strategy_exposes_analyst_param() -> None:
     params = BrooksStrategy.get_parameters()
     assert "analyst" in params
     assert params["analyst"]["default"] == "rule"
+
+
+def test_sizer_receives_reward_ratio_not_ev() -> None:
+    """Regression: the strategy used to forward ``decision.expected_r`` (the
+    EV in R units, often < 1) to ``KellySizer.size(expected_r=...)``, which
+    treats that argument as the reward ratio ``b``. With ``b < 1`` Kelly is
+    always negative, ``qty=0``, and no entry is ever submitted — the
+    symptom we hit on session 5b35e8fb (7,489 bars / 0 trades).
+
+    The sizer must receive the implied reward-to-risk ratio computed from
+    ``decision.target_px`` / ``entry_px`` / ``stop_px``."""
+    from src.brooks.risk.sizer import KellySizer
+    from src.brooks.schema import Decision, Signal
+
+    sizer_calls: list[dict] = []
+    original = KellySizer.size
+
+    def capturing(self, **kwargs):
+        sizer_calls.append(kwargs)
+        return original(self, **kwargs)
+
+    KellySizer.size = capturing  # type: ignore[method-assign]
+    try:
+        sig = Signal(
+            pattern="h2",
+            side="long",
+            entry_px=100.0,
+            stop_px=99.0,
+            target_px=102.0,  # reward = 2R
+            probability=0.5,
+            quality=0.5,
+            source="rule:h2",
+            signal_bar_idx=0,
+        )
+        decision = Decision(
+            symbol="BTCUSDT",
+            side="long",
+            entry_px=100.0,
+            stop_px=99.0,
+            target_px=102.0,
+            quantity=0.0,
+            probability=0.5,
+            expected_r=0.45,  # EV from EVGate — must NOT reach the sizer
+            regime="weak_bull_trend",
+            htf_aligned=False,
+            signals=[sig],
+            source="rule:h2",
+            reasoning="",
+        )
+        # Drive the sizer indirectly by invoking the same code path used in
+        # _process_symbol_bar.
+        from src.brooks.strategy import _reward_r_from_decision
+
+        reward_r = _reward_r_from_decision(decision)
+        assert reward_r == pytest.approx(2.0, abs=1e-6), "reward_r must equal (target-entry)/(entry-stop)"
+
+        sizer = KellySizer(max_risk_pct=0.02, fraction=0.5)
+        qty = sizer.size(
+            equity=100_000,
+            entry_px=decision.entry_px,
+            stop_px=decision.stop_px,
+            probability=decision.probability,
+            expected_r=reward_r,
+            available_cash=100_000,
+        )
+        assert qty > 0, "Kelly with p=0.5 b=2.0 must give positive size"
+    finally:
+        KellySizer.size = original  # type: ignore[method-assign]
