@@ -69,6 +69,23 @@ class FillView(BaseModel):
     reason: str = ""
 
 
+class BackgroundSummary(BaseModel):
+    """Compact "what is the market doing now" summary attached to BarEvent.
+
+    Populated by :class:`~src.brooks.decision.context_filter.ContextFilter`
+    so the Studio panel can render the regime + structure context that
+    decided whether the bar's signals were allowed through.
+    """
+
+    regime: Optional[str] = None
+    leg_dir: Optional[str] = None
+    in_trading_range: bool = False
+    swing_age_bars: Optional[int] = None
+    pattern_types: List[str] = Field(default_factory=list)
+    allow: bool = True
+    reason: str = ""
+
+
 class BarEvent(BaseModel):
     bar_idx: int
     timestamp_ns: int
@@ -76,11 +93,13 @@ class BarEvent(BaseModel):
     features: Optional[FeaturesView] = None
     structure: Optional[StructureView] = None
     signals: List[Signal] = Field(default_factory=list)
+    failed_signals: List[Signal] = Field(default_factory=list)
     decision: Optional[Decision] = None
     fill: Optional[FillView] = None
     stop_adj: Optional[StopAdj] = None
     pnl_r: Optional[float] = None
     htf: Dict[str, HTFView] = Field(default_factory=dict)
+    background: Optional[BackgroundSummary] = None
 
 
 class PnLPoint(BaseModel):
@@ -169,6 +188,7 @@ class ReplayBarResponse(BaseModel):
 
 __all__ = [
     "Bar",
+    "BackgroundSummary",
     "RegimeView",
     "StructureView",
     "FeaturesView",

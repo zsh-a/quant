@@ -35,6 +35,7 @@ from src.brooks.analyst.rule import RuleAnalyst  # noqa: F401 — triggers regis
 from src.brooks.context import AccountSnapshot, BrooksContext, TFSnapshot
 from src.brooks.context import Bar as BrooksBar
 from src.brooks.decision.aggregator import AggregatedDecision, SignalAggregator
+from src.brooks.decision.context_filter import ContextDecision, ContextFilter
 from src.brooks.decision.ev_gate import EVGate
 from src.brooks.decision.hit_rate import HitRateTable
 from src.brooks.decision.trader_equation import TraderEquation
@@ -101,6 +102,11 @@ class BrooksStrategy(Strategy):
         analyst_name: str = self.params["analyst"]
         self._analyst = AnalystRegistry.build(analyst_name, **self.params.get("analyst_params", {}))
         self._aggregator = SignalAggregator(**self.params.get("aggregator_params", {}))
+        self._context_filter = (
+            ContextFilter(**self.params.get("context_filter_params", {}))
+            if self.params.get("context_filter_enabled", True)
+            else None
+        )
         self._te = _build_te(self.params.get("te_params", {}))
         self._ev_gate = EVGate(
             self._te,
@@ -124,6 +130,12 @@ class BrooksStrategy(Strategy):
         self._positions: Dict[str, PositionState] = {}
         self._pending_decisions: Dict[str, Decision] = {}
         self._entry_order_ids: Dict[str, str] = {}
+        # Per-symbol bookkeeping for the most recent ContextFilter pass — read
+        # by the runtime BarEvent builder so the Studio panel can render
+        # ``failed_signals`` and the background summary even when no order
+        # was placed.
+        self._last_failed_signals: Dict[str, List[Any]] = {}
+        self._last_context_decision: Dict[str, ContextDecision] = {}
         # Bar count at which the current pending decision was submitted —
         # used to time out stale stop-entries (see ``pending_entry_max_bars``).
         self._pending_submit_bar: Dict[str, int] = {}
@@ -137,6 +149,8 @@ class BrooksStrategy(Strategy):
             "analyst": "rule",
             "analyst_params": {},
             "aggregator_params": {"confluence_n": 1},
+            "context_filter_enabled": True,
+            "context_filter_params": {},
             "te_params": {},
             "min_expected_r": 0.1,
             "sizer_params": {"kind": "kelly"},
@@ -251,6 +265,12 @@ class BrooksStrategy(Strategy):
     def _process_symbol_bar(self, symbol: str, bar: Bar) -> None:
         ts_ns = int(bar.timestamp.timestamp() * 1_000_000_000)
 
+        # Reset per-bar context-filter bookkeeping. Anything left in here from
+        # the prior bar would otherwise re-render on the Studio chart even
+        # though it relates to a stale evaluation.
+        self._last_failed_signals[symbol] = []
+        self._last_context_decision.pop(symbol, None)
+
         # ---- LTF features/structure/regime for this bar ---------------------
         feat = self._extractors[symbol].on_bar(ts_ns, bar.open, bar.high, bar.low, bar.close)
         struct = self._structures[symbol].on_features(feat)
@@ -290,6 +310,28 @@ class BrooksStrategy(Strategy):
             return
         if symbol in self._positions or symbol in self._pending_decisions:
             return  # don't stack
+
+        # ---- Brooks "background → signal" gate -----------------------------
+        # The aggregated signal is now subjected to a regime/structure check
+        # before any EV math runs. Reject early so the Studio panel can still
+        # render the rejected signals as ``failed_signals`` (they carry
+        # diagnostic value even when we don't trade them).
+        if self._context_filter is not None:
+            ctx_decision = self._context_filter.check(
+                side=combined.side,
+                signals=combined.raw_signals,
+                regime=regime.regime,
+                structure=struct,
+            )
+            self._last_context_decision[symbol] = ctx_decision
+            if not ctx_decision.allow:
+                self._last_failed_signals[symbol] = list(combined.raw_signals)
+                self._log(
+                    f"context_filter rejected {combined.side} {symbol}: "
+                    f"{ctx_decision.reason}",
+                    level="DEBUG",
+                )
+                return
 
         htf_tag = ctx.htf_alignment_for(combined.side)
         decisions = self._ev_gate.filter(

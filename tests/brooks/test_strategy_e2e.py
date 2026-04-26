@@ -120,6 +120,11 @@ def _make_strategy() -> BrooksStrategy:
         te_params={"cost_r": 0.0},
         min_expected_r=-100.0,
         sizer_params={"kind": "fixed", "risk_pct": 0.01},
+        # The legacy v2 contract pins the analyst+aggregator output and
+        # predates the QUA-68 ContextFilter. Disable the filter here so
+        # this test still measures only the signal-level path it was
+        # designed to lock down.
+        context_filter_enabled=False,
     )
 
 

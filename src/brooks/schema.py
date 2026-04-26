@@ -16,6 +16,7 @@ class Signal(BaseModel):
     """A pattern-detection signal produced by a rule/LLM/VLM detector."""
 
     pattern: str
+    pattern_type: Optional[str] = None
     side: Literal["long", "short"]
     signal_bar_idx: int
     entry_px: float = Field(gt=0)
@@ -31,6 +32,14 @@ class Signal(BaseModel):
     def _entry_differs_from_stop(self) -> "Signal":
         if self.entry_px == self.stop_px:
             raise ValueError("entry_px must differ from stop_px")
+        return self
+
+    @model_validator(mode="after")
+    def _populate_pattern_type(self) -> "Signal":
+        if self.pattern_type is None:
+            from src.brooks.decision.context_filter import pattern_type_for
+
+            object.__setattr__(self, "pattern_type", pattern_type_for(self.pattern))
         return self
 
     @property
