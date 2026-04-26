@@ -1,20 +1,21 @@
 /**
- * Annotations layer — Al Brooks-style sparse labels, one per bar.
+ * Annotations layer — Al Brooks-style sparse markers, one per bar.
  *
- * The legacy stack of layers (signals + decisions + fills + reasoning) each
- * pushed their own marker on the same bar, producing a wall of overlapping
- * text. This layer collapses every event into at most one short, bar-anchored
- * label using Brooks shorthand (H1/H2/L1/L2/MTR/BO/ii/FF/M2B/MM/…).
+ * Driven by the backend schema introduced in QUA-68:
+ *   - `BarEvent.fill`             → entry arrow (green ↑ / red ↓)
+ *   - `BarEvent.signals[].pattern_type` → strong-pattern text label
+ *                                  ("Wedge", "Double top", …)
+ *   - `BarEvent.failed_signals`   → red dot (signal that ContextFilter
+ *                                  rejected; never traded)
  *
- * Priority when a single bar carries multiple kinds of event:
- *   fill > decision > top-priority signal
+ * Priority when several apply on the same bar: **fill > pattern label >
+ * failed-signal dot**. Anything not in that priority list (every H1/L2/MTR
+ * shorthand the legacy layer used to spam) is intentionally dropped from
+ * the chart — those still show up in the tooltip / SignalSidebar so the
+ * structure is recoverable on demand.
  *
- * The full per-bar detail (all signals, full reasoning) is still available in
- * the side panel; here we deliberately keep the chart sparse so the user can
- * read structure at a glance, then drill in.
- *
- * Future-info safety: bars with `bar_idx > currentBarIdx` are dropped before
- * label construction, so scrubbing back hides them.
+ * Future-info safety: bars with `bar_idx > currentBarIdx` are skipped, so
+ * scrubbing back hides them.
  */
 
 import {
@@ -38,13 +39,50 @@ import type { BarEvent, FillView, SessionTimeline, Signal } from '../types';
 
 const LONG_COLOR = '#26A69A';
 const SHORT_COLOR = '#EF5350';
-const SIGNAL_NEUTRAL = '#90A4AE';
+const FAILED_DOT_COLOR = '#EF5350';
 const FILL_BUY_COLOR = '#26A69A';
 const FILL_SELL_COLOR = '#EF5350';
 
 /**
- * Brooks shorthand — keep these short (≤4 chars) so they don't crowd the
- * chart. Anything missing falls through to the raw `pattern` text.
+ * Pattern categories worth a verbose chart label. Anything not listed here
+ * (pullbacks, breakouts, micro-channels, generic "unknown") stays out of
+ * the chart text — Brooks notes only foreground the strong reversals /
+ * failed breakouts that mark a structural turn.
+ */
+const PATTERN_LABEL: Record<string, string> = {
+  wedge: 'Wedge',
+  double_top: 'Double top',
+  double_bottom: 'Double bottom',
+  mtr: 'MTR',
+  final_flag: 'Final flag',
+  failed_breakout: 'Failed BO',
+};
+
+/**
+ * Detector-name → category fallback for older replays that pre-date the
+ * server-side ``pattern_type`` field. Keeping this list narrow; legacy
+ * shorthand (h2/l1/mtr_long…) maps onto the same six categories the Brooks
+ * `PATTERN_TYPE_MAP` uses.
+ */
+const PATTERN_NAME_FALLBACK: Record<string, string> = {
+  wedge: 'wedge',
+  wedge_long: 'wedge',
+  wedge_short: 'wedge',
+  double_top: 'double_top',
+  double_bottom: 'double_bottom',
+  mtr: 'mtr',
+  mtr_long: 'mtr',
+  mtr_short: 'mtr',
+  major_trend_reversal: 'mtr',
+  final_flag: 'final_flag',
+  failed_breakout: 'failed_breakout',
+  ff: 'failed_breakout',
+};
+
+/**
+ * Brooks shorthand — kept exported for tooltips / SidePanel use; the chart
+ * itself no longer uses these as default text. Anything missing falls back
+ * to the first-letter compaction of the raw pattern name.
  */
 const BROOKS_SHORTHAND: Record<string, string> = {
   high_1: 'H1',
@@ -82,43 +120,10 @@ const BROOKS_SHORTHAND: Record<string, string> = {
   pullback: 'PB',
 };
 
-/**
- * Built-in priority ordering when a bar has multiple raw signals — Brooks
- * traders care about MTR/BO over H1/L1, so we surface the strongest one and
- * drop the rest into the inspector.
- */
-const SIGNAL_PRIORITY = new Map<string, number>([
-  ['mtr', 100],
-  ['major_trend_reversal', 100],
-  ['bo', 90],
-  ['breakout', 90],
-  ['failed_breakout', 85],
-  ['ff', 85],
-  ['m2b', 80],
-  ['m2t', 80],
-  ['micro_double_bottom', 80],
-  ['micro_double_top', 80],
-  ['mm', 75],
-  ['measured_move', 75],
-  ['wedge', 70],
-  ['ii', 60],
-  ['ioi', 60],
-  ['inside_inside', 60],
-  ['h2', 50],
-  ['l2', 50],
-  ['high_2', 50],
-  ['low_2', 50],
-  ['h1', 30],
-  ['l1', 30],
-  ['high_1', 30],
-  ['low_1', 30],
-]);
-
 export function brooksShorthand(pattern: string | undefined | null): string {
   if (!pattern) return '?';
   const key = pattern.toLowerCase().replace(/[\s-]+/g, '_');
   if (BROOKS_SHORTHAND[key]) return BROOKS_SHORTHAND[key];
-  // Fallback: take the first letter of each `_`-separated chunk, uppercased.
   const compact = key
     .split('_')
     .map((chunk) => chunk.charAt(0).toUpperCase())
@@ -126,19 +131,29 @@ export function brooksShorthand(pattern: string | undefined | null): string {
   return compact.slice(0, 4) || pattern.slice(0, 4);
 }
 
-function topSignal(signals: Signal[] | undefined): Signal | null {
+/**
+ * Resolve a signal's category. Prefers the server-provided
+ * `pattern_type` (populated since QUA-68) and falls back to the detector
+ * name for older replays.
+ */
+export function categoryOf(sig: Signal | undefined | null): string {
+  if (!sig) return '';
+  const explicit = (sig.pattern_type ?? '').toString().toLowerCase();
+  if (explicit) return explicit;
+  const name = (sig.pattern ?? '').toLowerCase().replace(/[\s-]+/g, '_');
+  return PATTERN_NAME_FALLBACK[name] ?? '';
+}
+
+/**
+ * Pick the strong-reversal signal worth foregrounding. The detector list
+ * is small, so a linear scan is fine even on the busiest bars.
+ */
+export function strongPatternSignal(signals: Signal[] | undefined): Signal | null {
   if (!signals || signals.length === 0) return null;
-  let best: Signal | null = null;
-  let bestScore = -1;
   for (const s of signals) {
-    const key = (s.pattern ?? '').toLowerCase().replace(/[\s-]+/g, '_');
-    const score = SIGNAL_PRIORITY.get(key) ?? 10;
-    if (score > bestScore) {
-      bestScore = score;
-      best = s;
-    }
+    if (PATTERN_LABEL[categoryOf(s)]) return s;
   }
-  return best;
+  return null;
 }
 
 function fillSideColor(side: FillView['side']): string {
@@ -150,14 +165,16 @@ function isBuySide(side: FillView['side']): boolean {
   return side === 'buy' || side === 'buy_to_cover';
 }
 
+export type AnnotationKind = 'fill' | 'pattern' | 'failed_signal';
+
 export interface BarAnnotation {
   bar_idx: number;
   text: string;
   color: string;
   position: BarMarkerPosition;
   shape: SeriesMarkerShape;
-  /** Coarse classification for the inspector. */
-  kind: 'fill' | 'decision' | 'signal';
+  size: number;
+  kind: AnnotationKind;
   /** Title — full pattern name for the marker tooltip / a11y. */
   title: string;
 }
@@ -169,8 +186,10 @@ function timeForBar(timeline: SessionTimeline, idx: number): UTCTimestamp | null
 }
 
 /**
- * Build at most one annotation per bar. Priority: fill > decision > top
- * signal. Fills get a ▲/▼ arrow; decisions a smaller arrow; signals a circle.
+ * Build at most one annotation per bar. Priority:
+ *   1. fill           — entry arrow, no text
+ *   2. pattern label  — strong-pattern text (Wedge / Double top / …)
+ *   3. failed signal  — red dot
  */
 export function buildAnnotations(
   timeline: SessionTimeline,
@@ -185,48 +204,54 @@ export function buildAnnotations(
   return out;
 }
 
-function annotationForEvent(ev: BarEvent): BarAnnotation | null {
+export function annotationForEvent(ev: BarEvent): BarAnnotation | null {
   if (ev.fill) {
     const buy = isBuySide(ev.fill.side);
-    const tag = ev.fill.reason ? ev.fill.reason.toUpperCase().slice(0, 4) : (buy ? 'BUY' : 'SLL');
     return {
       bar_idx: ev.bar_idx,
-      text: `${tag} ${ev.fill.price.toFixed(2)}`,
+      text: '',
       color: fillSideColor(ev.fill.side),
       position: buy ? 'belowBar' : 'aboveBar',
       shape: buy ? 'arrowUp' : 'arrowDown',
+      size: 2,
       kind: 'fill',
       title: `${ev.fill.side} @${ev.fill.price.toFixed(2)} (${ev.fill.reason || 'fill'})`,
     };
   }
-  if (ev.decision) {
-    const tag = brooksShorthand(ev.decision.pattern);
-    const arrow = ev.decision.side === 'long' ? 'arrowUp' : 'arrowDown';
+
+  const strong = strongPatternSignal(ev.signals);
+  if (strong) {
+    const cat = categoryOf(strong);
+    const label = PATTERN_LABEL[cat] ?? brooksShorthand(strong.pattern);
+    const long = strong.side === 'long';
     return {
       bar_idx: ev.bar_idx,
-      text: tag,
-      color: ev.decision.side === 'long' ? LONG_COLOR : SHORT_COLOR,
-      position: ev.decision.side === 'long' ? 'belowBar' : 'aboveBar',
-      shape: arrow,
-      kind: 'decision',
-      title: `${ev.decision.side} ${ev.decision.pattern} → ${ev.decision.entry_px}`,
+      text: label,
+      color: long ? LONG_COLOR : SHORT_COLOR,
+      position: long ? 'belowBar' : 'aboveBar',
+      shape: long ? 'arrowUp' : 'arrowDown',
+      size: 1,
+      kind: 'pattern',
+      title: `${label}${strong.side ? ` (${strong.side})` : ''}`,
     };
   }
-  const sig = topSignal(ev.signals);
-  if (sig) {
-    const tag = brooksShorthand(sig.pattern);
-    const color =
-      sig.side === 'long' ? LONG_COLOR : sig.side === 'short' ? SHORT_COLOR : SIGNAL_NEUTRAL;
+
+  const failed = ev.failed_signals && ev.failed_signals[0];
+  if (failed) {
+    const reason = ev.background?.reason ?? '';
+    const labelTitle = failed.pattern ?? 'signal';
     return {
       bar_idx: ev.bar_idx,
-      text: tag,
-      color,
-      position: sig.side === 'short' ? 'aboveBar' : 'belowBar',
+      text: '',
+      color: FAILED_DOT_COLOR,
+      position: failed.side === 'short' ? 'aboveBar' : 'belowBar',
       shape: 'circle',
-      kind: 'signal',
-      title: `${sig.pattern ?? 'signal'}${sig.side ? ` (${sig.side})` : ''}`,
+      size: 0,
+      kind: 'failed_signal',
+      title: reason ? `Failed: ${labelTitle} — ${reason}` : `Failed: ${labelTitle}`,
     };
   }
+
   return null;
 }
 
@@ -244,9 +269,7 @@ export function buildAnnotationMarkers(
       shape: ann.shape,
       color: ann.color,
       text: ann.text,
-      // Decisions/fills are size 1; signals are slightly smaller so the eye is
-      // drawn to actual entries first.
-      size: ann.kind === 'signal' ? 0 : 1,
+      size: ann.size,
       id: `ann-${ann.bar_idx}-${ann.kind}`,
     });
   }
