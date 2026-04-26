@@ -7,7 +7,7 @@
  * Virtualization kicks in past `VIRTUALIZE_THRESHOLD` rows (react-window).
  */
 
-import { useMemo, useState } from 'react';
+import { memo, useMemo, useState } from 'react';
 import { FixedSizeList, type ListChildComponentProps } from 'react-window';
 import AutoSizer from 'react-virtualized-auto-sizer';
 import { ArrowDown, ArrowUp, Filter } from 'lucide-react';
@@ -25,7 +25,10 @@ export type SourceKind = (typeof SOURCE_KINDS)[number];
 export type SourceFilter = SourceKind | 'all';
 export type SideFilter = 'long' | 'short' | 'all';
 
-const VIRTUALIZE_THRESHOLD = 100;
+// Phase S6: lowered from 100 → 50 so mid-sized lists also benefit from
+// react-window. Below 50 rows the FixedSizeList overhead isn't worth it
+// (DOM is small enough to layout in a few ms).
+const VIRTUALIZE_THRESHOLD = 50;
 const ROW_HEIGHT = 56;
 
 export interface SignalRow {
@@ -97,15 +100,17 @@ export function collectSidebarSignals(
   return out;
 }
 
-function SignalRowView({
-  row,
-  selected,
-  onClick,
-}: {
+interface SignalRowViewProps {
   row: SignalRow;
   selected: boolean;
   onClick: () => void;
-}) {
+}
+
+const SignalRowView = memo(function SignalRowView({
+  row,
+  selected,
+  onClick,
+}: SignalRowViewProps) {
   const { signal, bar_idx } = row;
   const side = signal.side;
   const prob = signalProbability(signal);
@@ -149,7 +154,7 @@ function SignalRowView({
       </span>
     </button>
   );
-}
+});
 
 export function SignalSidebar() {
   const timeline = useTimelineState();

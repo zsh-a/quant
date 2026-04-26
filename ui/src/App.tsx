@@ -32,8 +32,8 @@ const GlobalOverview = lazy(() => import('./components/GlobalOverview'));
 const LabPanel = lazy(() => import('./components/LabPanel'));
 const MarketAdminPanel = lazy(() => import('./components/MarketAdminPanel'));
 const SessionDetail = lazy(() => import('./components/SessionDetail'));
-const BrooksLive = lazy(() => import('./components/BrooksLive'));
 const BrooksStudioPage = lazy(() => import('./features/studio/components/BrooksStudioPage'));
+const StudioLanding = lazy(() => import('./features/studio/components/StudioLanding'));
 
 const ROUTE_META: Record<string, { title: string; description: string }> = {
   '/': { title: 'Overview', description: 'Monitor strategy runs, recent sessions, and system status.' },
@@ -44,7 +44,6 @@ const ROUTE_META: Record<string, { title: string; description: string }> = {
   '/portfolio': { title: 'Portfolio', description: 'Portfolio allocation and weighting management.' },
   '/market-admin': { title: 'Market Data', description: 'Database coverage, batch history, and update console.' },
   '/optimizer': { title: 'Optimizer', description: 'Parameter optimization workspace.' },
-  '/brooks-live': { title: 'BrooksLive', description: 'Realtime Brooks strategy paper trading.' },
   '/studio': { title: 'Brooks Studio', description: 'Unified live + replay K-line studio with timeline scrubber.' },
 };
 
@@ -143,8 +142,8 @@ const App = () => {
               ? 'marketAdmin'
               : location.pathname === '/optimizer'
                 ? 'optimizer'
-                : location.pathname === '/brooks-live'
-                  ? 'brooksLive'
+                : location.pathname.startsWith('/studio') || location.pathname.startsWith('/brooks-live')
+                  ? 'trade'
                   : 'overview';
 
   return (
@@ -162,7 +161,7 @@ const App = () => {
               portfolio: '/portfolio',
               marketAdmin: '/market-admin',
               optimizer: '/optimizer',
-              brooksLive: '/brooks-live',
+              trade: '/studio',
             };
             navigate(routes[key] || '/');
           }}
@@ -255,8 +254,10 @@ const App = () => {
           <Route path="/heatmap" element={<IndustryHeatmap />} />
           <Route path="/portfolio" element={<PortfolioManager />} />
           <Route path="/optimizer" element={<OptimizerPanel />} />
-          <Route path="/brooks-live" element={<BrooksLive />} />
+          <Route path="/studio" element={<StudioLanding />} />
           <Route path="/studio/:sessionId" element={<BrooksStudioPage />} />
+          <Route path="/brooks-live" element={<Navigate to="/studio" replace />} />
+          <Route path="/brooks-live/*" element={<Navigate to="/studio" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

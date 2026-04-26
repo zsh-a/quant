@@ -37,7 +37,7 @@ const NAV_ITEMS = [
     { key: 'portfolio', label: 'Portfolio', icon: BriefcaseBusiness },
     { key: 'marketAdmin', label: 'Market Data', icon: Database },
     { key: 'optimizer', label: 'Optimizer', icon: Sparkles },
-    { key: 'brooksLive', label: 'BrooksLive', icon: LineChart },
+    { key: 'trade', label: 'Trade', icon: LineChart },
 ] as const;
 
 const SidebarInner: React.FC<SidebarProps> = ({ activeTab, onTabChange, activeSessions, onSessionSelect, hasSelectedSession, theme, onToggleTheme }) => {

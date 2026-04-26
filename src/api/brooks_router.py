@@ -1,5 +1,14 @@
 """Phase 4.6 BrooksLive router — start/stop paper-trading + realtime WS.
 
+.. deprecated:: Phase S6 (Brooks Studio cutover)
+
+   All ``/brooks-live/*`` endpoints below are deprecated. The Studio panel
+   reuses ``/brooks-live/start`` and ``/brooks-live/sessions`` for the
+   session launcher today, but the long-term home is
+   ``/brooks-studio/*`` (see :mod:`src.api.brooks_studio_router`). This
+   router is scheduled for removal in the release after S6 — clients
+   should migrate.
+
 Exposes:
 
 * ``POST   /brooks-live/start``              start a new paper session
@@ -22,7 +31,7 @@ import uuid
 from typing import Any, Dict, List, Optional
 
 import orjson
-from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, Response, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel, Field
 
 from src.api.websocket_manager import handle_websocket_message
@@ -43,8 +52,26 @@ except ImportError:  # pragma: no cover — websockets may be missing in tests
 
 logger = get_logger(__name__)
 
-router = APIRouter(prefix="/brooks-live", tags=["brooks_live"])
-ws_router = APIRouter(tags=["brooks_live"])
+logger.warning(
+    "/brooks-live/* router loaded — endpoints are deprecated as of Phase S6 "
+    "(Brooks Studio cutover). Frontend should use /studio + /brooks-studio/*."
+)
+
+router = APIRouter(prefix="/brooks-live", tags=["brooks_live"], deprecated=True)
+ws_router = APIRouter(tags=["brooks_live"], deprecated=True)
+
+
+_DEPRECATION_HEADER = (
+    "299 - "
+    '"Deprecated: /brooks-live/* will be removed in the next release. '
+    'Migrate clients to /brooks-studio/*."'
+)
+
+
+def _attach_deprecation_warning(response) -> None:
+    """Attach an RFC 7234 §5.5 Warning header to deprecated REST responses."""
+    response.headers["Deprecation"] = "true"
+    response.headers["Warning"] = _DEPRECATION_HEADER
 
 
 # ---------------------------------------------------------------------------
@@ -98,13 +125,14 @@ class SessionsResponse(BaseModel):
 
 
 @router.get("/analysts")
-async def list_analysts() -> Dict[str, List[str]]:
+async def list_analysts(response: Response) -> Dict[str, List[str]]:
     """Return the names of every analyst currently registered."""
+    _attach_deprecation_warning(response)
     return {"analysts": AnalystRegistry.all()}
 
 
 @router.post("/start", response_model=StartResponse)
-async def start_session(req: StartRequest) -> StartResponse:
+async def start_session(req: StartRequest, response: Response) -> StartResponse:
     if req.mode != "paper":
         raise HTTPException(status_code=400, detail="Phase 4.6 supports mode='paper' only")
     cfg = get_brooks_live_config()
@@ -129,34 +157,40 @@ async def start_session(req: StartRequest) -> StartResponse:
 
     task = brooks_live_task.apply_async(args=[session_id, payload], queue="automation")
     logger.info("brooks-live start: session={} task={} payload={}", session_id, task.id, payload)
+    _attach_deprecation_warning(response)
     return StartResponse(session_id=session_id, task_id=task.id)
 
 
 @router.post("/{session_id}/stop")
-async def stop_session(session_id: str) -> Dict[str, str]:
+async def stop_session(session_id: str, response: Response) -> Dict[str, str]:
     sess = BrooksLiveRegistry.get(session_id)
     if sess is None:
         raise HTTPException(status_code=404, detail="session not found or not running in this worker")
     sess.request_stop()
+    _attach_deprecation_warning(response)
     return {"session_id": session_id, "status": "stop_requested"}
 
 
 @router.post("/{session_id}/switch")
-async def switch_analyst(session_id: str, req: SwitchRequest) -> Dict[str, str]:
+async def switch_analyst(
+    session_id: str, req: SwitchRequest, response: Response
+) -> Dict[str, str]:
     if req.analyst not in AnalystRegistry.all():
         raise HTTPException(status_code=400, detail=f"Unknown analyst: {req.analyst!r}")
     sess = BrooksLiveRegistry.get(session_id)
     if sess is None:
         raise HTTPException(status_code=404, detail="session not found or not running in this worker")
     sess.request_switch(req.analyst)
+    _attach_deprecation_warning(response)
     return {"session_id": session_id, "requested_analyst": req.analyst, "status": "switch_requested"}
 
 
 @router.get("/{session_id}/state", response_model=BrooksSessionState)
-async def session_state(session_id: str) -> BrooksSessionState:
+async def session_state(session_id: str, response: Response) -> BrooksSessionState:
     sess = BrooksLiveRegistry.get(session_id)
     if sess is None:
         raise HTTPException(status_code=404, detail="session not found or not running in this worker")
+    _attach_deprecation_warning(response)
     return BrooksSessionState(
         session_id=sess.session_id,
         analyst=sess.analyst_name,
@@ -171,7 +205,8 @@ async def session_state(session_id: str) -> BrooksSessionState:
 
 
 @router.get("/sessions", response_model=SessionsResponse)
-async def list_sessions() -> SessionsResponse:
+async def list_sessions(response: Response) -> SessionsResponse:
+    _attach_deprecation_warning(response)
     sessions = [
         BrooksSessionState(
             session_id=s.session_id,
@@ -190,9 +225,12 @@ async def list_sessions() -> SessionsResponse:
 
 
 @router.post("/close-day")
-async def close_day(session_ids: Optional[List[str]] = None) -> Dict[str, Any]:
+async def close_day(
+    response: Response, session_ids: Optional[List[str]] = None
+) -> Dict[str, Any]:
     """Trigger :func:`brooks_live_close_task` on demand (mirrors celery-beat job)."""
     task = brooks_live_close_task.apply_async(args=[session_ids], queue="automation")
+    _attach_deprecation_warning(response)
     return {"task_id": task.id, "status": "submitted"}
 
 

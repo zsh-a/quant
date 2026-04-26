@@ -142,8 +142,9 @@ Live paper trading is just the same strategy under a Celery task — see
 | Context      | `src/brooks/context.py`    | `BrooksContext`, `TFSnapshot`, `AccountSnapshot` |
 | Eval         | `src/brooks/eval/`         | `GoldenDataset`, `AutoLabeler`, `EvalRunner`, `EvalReport`, `Leaderboard` |
 | Tasks        | `src/tasks/brooks_live_task.py`, `src/tasks/brooks_leaderboard_task.py` | Paper-trading runner + weekly leaderboard cron |
-| API          | `src/api/brooks_router.py` | `/brooks-live` REST + WebSocket panel endpoints |
-| UI           | `ui/src/components/BrooksLive/` | Live paper-trading panel (route `/brooks-live`) |
+| API          | `src/api/brooks_router.py` | `/brooks-live` REST + WebSocket panel endpoints (**deprecated** since Phase S6 — migrate to `/brooks-studio/*`) |
+| API (Studio) | `src/api/brooks_studio_router.py` | `/brooks-studio/*` timeline + replay-bar + WS bar-event stream |
+| UI           | `ui/src/features/studio/` | **Brooks Studio** — unified live + replay K-line workspace (route `/studio`) |
 
 ## Analyst Routes
 
@@ -580,10 +581,16 @@ REST + WebSocket surface lives at `/brooks-live` (router in
 | POST   | `/brooks-live/close-day`            | Trigger the daily close manually |
 | WS     | `/ws/brooks/{session_id}`           | Push regime/signal/decision/equity/trade events |
 
-UI panel: `ui/src/components/BrooksLive/` (route `/brooks-live`).
-Top-level layout is `index.tsx`; sub-panels are `ChartPanel`,
-`AnalystSwitch`, `DecisionLog`, `PnLCard`. The hook
-`useBrooksLive(session_id)` subscribes to the per-session WebSocket.
+UI panel: **Brooks Studio** (`ui/src/features/studio/`, route `/studio`).
+The legacy `/brooks-live` route now client-side redirects to `/studio`,
+and the `BrooksLive` component / `useBrooksLive` hook have been removed.
+See [studio.md](studio.md) for the user guide and
+[studio-extension.md](studio-extension.md) for adding layers and panels.
+
+The `/brooks-live/*` REST endpoints below remain available for one
+release and are returning the `Deprecation: true` HTTP header — clients
+should migrate to `/brooks-studio/*` (see
+`src/api/brooks_studio_router.py`).
 
 Cost / frequency control (configured under `BrooksLiveConfig` in
 `src/config/settings.py`, override with `QUANT_BROOKS__*` env vars):
@@ -706,6 +713,8 @@ pattern) so the suite has zero network and zero API-key requirements.
 
 ## Further Reading
 
+* [Brooks Studio user guide](studio.md) — `/studio` workspace, layers, keyboard shortcuts, URL params
+* [Brooks Studio extension guide](studio-extension.md) — add a layer, side-panel tab, or `BarEvent` field
 * [Usage recipes](usage.md) — eight runnable end-to-end recipes
 * [Taxonomy](taxonomy.yaml) — bar / pattern / regime reference
 * `prompts/brooks/concept_manual.md` — Brooks vocabulary used by analysts

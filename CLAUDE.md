@@ -109,7 +109,7 @@ make clean_all                         # Remove .pth, runs/, .log files
 2. **Alpha Search** (`src/alpha/`): Multi-market (crypto futures, A-shares) DSL compiler → StackVM bytecode → vectorized evaluation. Market profiles (`MarketType`/`MarketProfile`) configure schema, data loader, field aliases, and LLM persona per market. Strategies: LLM evolution, LLM-guided MCTS (paper: "Navigating the Alpha Jungle"), neural formula (Transformer+REINFORCE), enumeration.
 3. **Market Data** (`src/market_data/`): Multi-source pipeline (Akshare, Baostock, TDX, CCXT/Binance). ClickHouse storage with chunked loading.
 4. **Task Queue** (`src/tasks/`): Celery queues - `backtest`, `default`, `automation`. Redis broker.
-5. **Brooks Strategy Pipeline** (`src/brooks/`): Multi-analyst Brooks price-action framework. Plug-in analyst layer (`rule` / `llm` / `vlm` / `ensemble.{vote,router,critic}`) → unified `Signal` → aggregator → Trader's Equation + EV gate → risk layer (Kelly/Fixed sizer, stop ladder, time stop, portfolio guard) → `BrooksStrategy` (registered as `"brooks"`). Includes eval pipeline (`GoldenDataset` / `EvalRunner` / `Leaderboard`) and paper-trading runner (`src/tasks/brooks_live_task.py`, UI panel at `/brooks-live`). See [docs/brooks/README.md](docs/brooks/README.md) and [docs/brooks/usage.md](docs/brooks/usage.md).
+5. **Brooks Strategy Pipeline** (`src/brooks/`): Multi-analyst Brooks price-action framework. Plug-in analyst layer (`rule` / `llm` / `vlm` / `ensemble.{vote,router,critic}`) → unified `Signal` → aggregator → Trader's Equation + EV gate → risk layer (Kelly/Fixed sizer, stop ladder, time stop, portfolio guard) → `BrooksStrategy` (registered as `"brooks"`). Includes eval pipeline (`GoldenDataset` / `EvalRunner` / `Leaderboard`) and paper-trading runner (`src/tasks/brooks_live_task.py`). UI: **Brooks Studio** at `/studio` (live + replay K-line workspace; legacy `/brooks-live` redirects there). See [docs/brooks/README.md](docs/brooks/README.md), [docs/brooks/studio.md](docs/brooks/studio.md), and [docs/brooks/usage.md](docs/brooks/usage.md).
 
 ## Configuration
 
@@ -169,4 +169,4 @@ See [docs/README.md](docs/README.md) for detailed documentation:
 - [Data Pipeline](docs/data-pipeline.md) - Market data sources and storage
 - [Frontend](docs/frontend.md) - React components and state management
 - [Development](docs/development.md) - Setup, testing, deployment
-- [Brooks Price-Action Platform](docs/brooks/README.md) - Multi-analyst Brooks strategy pipeline ([usage recipes](docs/brooks/usage.md))
+- [Brooks Price-Action Platform](docs/brooks/README.md) - Multi-analyst Brooks strategy pipeline ([usage recipes](docs/brooks/usage.md), [Studio user guide](docs/brooks/studio.md), [Studio extension guide](docs/brooks/studio-extension.md))

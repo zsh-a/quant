@@ -18,6 +18,7 @@ import { Group as PanelGroup, Panel, Separator as PanelResizeHandle } from 'reac
 import { useTimeline } from '../hooks/useTimeline';
 import { useReplay } from '../hooks/useReplay';
 import { useUrlState } from '../hooks/useUrlState';
+import { useMobileViewport } from '../hooks/useMobileViewport';
 import {
   useStudioError,
   useStudioLoading,
@@ -41,11 +42,55 @@ export default function BrooksStudioPage() {
   const timeline = useTimelineState();
   const loading = useStudioLoading();
   const error = useStudioError();
+  const isMobile = useMobileViewport();
 
   if (!sessionId) {
     return (
       <div className="flex h-[calc(100vh-120px)] items-center justify-center text-sm text-muted-foreground">
         Missing session id. Open <code className="rounded bg-muted px-1.5">/studio/&lt;session_id&gt;</code>.
+      </div>
+    );
+  }
+
+  if (isMobile) {
+    // Read-only simplification: chart + scrubber, no side panel / layer
+    // toggle / HTF inset. Live updates still flow through the WS pipeline.
+    return (
+      <div
+        className="flex h-[calc(100vh-120px)] flex-col gap-2 px-3 pb-3"
+        data-testid="studio-mobile-readonly"
+      >
+        <header className="flex items-center justify-between gap-2 text-xs">
+          <div className="flex min-w-0 items-center gap-2">
+            <span className="font-medium">Brooks Studio</span>
+            <span className="rounded-sm bg-amber-500/15 px-1.5 py-0.5 text-amber-400">
+              read-only
+            </span>
+          </div>
+          {timeline && (
+            <span className="truncate text-muted-foreground tabular-nums">
+              {timeline.symbol} · {timeline.base_interval}
+            </span>
+          )}
+        </header>
+
+        <div className="relative min-h-0 flex-1 overflow-hidden rounded-xl border border-border/70 bg-[#0e1116]">
+          <ChartCanvas />
+          {loading && !timeline && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-muted-foreground">
+              Loading timeline…
+            </div>
+          )}
+          {error && (
+            <div className="absolute left-2 top-2 max-w-[calc(100%-16px)] rounded-md border border-destructive/60 bg-destructive/15 px-2 py-1 text-[11px] text-destructive-foreground">
+              {error}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-xl border border-border/70 bg-card">
+          <TimelineScrubber />
+        </div>
       </div>
     );
   }
