@@ -57,11 +57,17 @@ export interface StructureView {
 /**
  * Loose mirror of `src.brooks.schema.Signal` — frontend treats it as
  * mostly opaque metadata for hover/inspector panels.
+ *
+ * `pattern_type` is the high-level Brooks category (`wedge`,
+ * `double_top`, `pullback`, …) populated server-side via
+ * `PATTERN_TYPE_MAP`. The chart picks visual treatment off this category
+ * rather than the raw detector name (`h2`, `wedge_long`, …).
  */
 export interface Signal {
   id?: string;
   bar_idx?: number;
   pattern?: string;
+  pattern_type?: string | null;
   side?: 'long' | 'short';
   source?: string;
   [key: string]: unknown;
@@ -102,6 +108,21 @@ export interface HTFView {
   last_swing_idx?: number | null;
 }
 
+/**
+ * Compact "what is the market doing now" summary attached to BarEvent —
+ * mirror of `src.api.schemas.brooks_studio.BackgroundSummary`. Produced
+ * by the ContextFilter when it accepts/rejects a bar's signals.
+ */
+export interface BackgroundSummary {
+  regime?: string | null;
+  leg_dir?: string | null;
+  in_trading_range?: boolean;
+  swing_age_bars?: number | null;
+  pattern_types?: string[];
+  allow?: boolean;
+  reason?: string;
+}
+
 export interface BarEvent {
   bar_idx: number;
   timestamp_ns: number;
@@ -109,11 +130,15 @@ export interface BarEvent {
   features?: FeaturesView | null;
   structure?: StructureView | null;
   signals?: Signal[];
+  /** Signals that the ContextFilter rejected — never traded but rendered
+   * on the chart as red dots for visual diagnosis. */
+  failed_signals?: Signal[];
   decision?: Decision | null;
   fill?: FillView | null;
   stop_adj?: StopAdj | null;
   pnl_r?: number | null;
   htf?: Record<string, HTFView>;
+  background?: BackgroundSummary | null;
 }
 
 export interface PnLPoint {

@@ -18,6 +18,7 @@ import { stopAdjLayer } from './stop_adj';
 import { htfOverlayLayer } from './htf_overlay';
 import { reasoningLayer } from './reasoning';
 import { annotationsLayer } from './annotations';
+import { patternShapesLayer } from './pattern_shapes';
 import { tradesLayer } from './trades';
 
 export const LAYERS: readonly ChartLayer[] = [
@@ -26,6 +27,7 @@ export const LAYERS: readonly ChartLayer[] = [
   ema20Layer,
   ema200Layer,
   annotationsLayer,
+  patternShapesLayer,
   tradesLayer,
   signalsLayer,
   decisionsLayer,
