@@ -21,7 +21,10 @@ The rules below intentionally err on the **conservative** side:
 * tight ranges reject every breakout follow-through; only reversals
   inside the range are allowed
 * broad ranges allow both edges to fade and trend-internal pullbacks
-* breakout mode allows the freshly-broken side's continuation only
+* breakout mode allows any with-breakout continuation pattern
+  (pullback / breakout / bp / measured_move / micro_channel) plus an
+  aligned reversal entry; counter-breakout signals require a reversal
+  package (failed_breakout / wedge / double / mtr / final_flag)
 * climax + unknown reject everything except strong counter-climax
   reversals (climax) or nothing at all (unknown)
 
@@ -477,30 +480,47 @@ class ContextFilter:
             or (always_in == "short" and side == "short")
         )
         if with_breakout:
-            # Brooks: chase the breakout *only* on a confirmed pullback
-            # ("BO + BP"). Naked breakout-on-breakout (ii/iii / measured
-            # move alone) trades the spike, which usually mean-reverts.
-            if "breakout_pullback" in types:
+            # Brooks: a fresh breakout's first leg is exactly the move we
+            # want to ride. Accept any with-breakout continuation pattern
+            # — H1/H2/H3 (or L1/L2/L3) pullbacks, ii/iii breakouts,
+            # bp_long / bp_short, measured_move, micro_channel — plus a
+            # structurally-aligned reversal entry (double_bottom on a
+            # long-side breakout / double_top on a short-side one). A
+            # narrower "BO + BP only" gate dropped the entire first-leg
+            # run-up that drives strong-breakout days.
+            with_breakout_reversals = (
+                {"double_bottom"} if always_in == "long" else {"double_top"}
+            )
+            allowed = (CONTINUATION_TYPES & types) | (with_breakout_reversals & types)
+            if allowed:
                 return ContextDecision(
                     allow=True,
-                    reason="breakout_with_direction_bp",
+                    reason=f"breakout_with_direction_continuation: {sorted(allowed)}",
                     **base,
                 )
             return ContextDecision(
                 allow=False,
                 reason=(
-                    f"breakout_needs_pullback_re_entry: types={sorted(types)}"
+                    f"breakout_with_direction_no_continuation: types={sorted(types)}"
                 ),
                 **base,
             )
-        # Counter-breakout — allow only the explicit failed-breakout package.
-        if types & {"failed_breakout", "wedge", "double_top", "double_bottom"}:
+        # Counter-breakout — pure counter-direction continuation patterns
+        # (e.g. an H/L pullback against a fresh breakout) are rejected by
+        # default; allow only when a reversal package is present
+        # (failed_breakout / wedge / double / mtr / final_flag — any of
+        # the climax-exhaustion-style markers in REVERSAL_TYPES).
+        reversal_hits = types & REVERSAL_TYPES
+        if "failed_breakout" in reversal_hits:
             return ContextDecision(
                 allow=True,
-                reason=(
-                    f"breakout_failure_reversal: "
-                    f"{sorted(types & (REVERSAL_TYPES | {'failed_breakout'}))}"
-                ),
+                reason=f"breakout_failure_reversal: {sorted(reversal_hits)}",
+                **base,
+            )
+        if reversal_hits:
+            return ContextDecision(
+                allow=True,
+                reason=f"counter_breakout_reversal_package: {sorted(reversal_hits)}",
                 **base,
             )
         return ContextDecision(

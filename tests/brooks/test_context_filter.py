@@ -434,9 +434,19 @@ def test_broad_range_blocks_naked_breakout():
 # ---------------------------------------------------------------------------
 
 
-def test_breakout_requires_pullback_re_entry():
+def test_breakout_with_direction_allows_bp_and_continuation():
+    """First-leg follow-through patterns ride a fresh breakout.
+
+    The earlier "BO + BP only" gate dropped same-direction H1/H2/H3 and
+    ii/iii_breakout signals on real strong-breakout sessions (QUA-71:
+    2025-01-20 lost the 8k spike). With the relaxed rule any
+    with-breakout continuation pattern passes, while structurally-
+    aligned reversals (double_bottom in a long breakout) also go
+    through.
+    """
     cf = ContextFilter()
     s = _structure(always_in="long", leg_dir="up")
+
     bp = _check(
         cf,
         side="long",
@@ -444,8 +454,19 @@ def test_breakout_requires_pullback_re_entry():
         regime=BrooksRegime.BREAKOUT_MODE,
         structure=s,
     )
-    assert bp.allow
-    assert "breakout_with_direction_bp" in bp.reason
+    assert bp.allow, bp.reason
+    assert "breakout_with_direction_continuation" in bp.reason
+
+    h2 = _check(
+        cf,
+        side="long",
+        patterns=["h2"],
+        regime=BrooksRegime.BREAKOUT_MODE,
+        structure=s,
+    )
+    assert h2.allow, h2.reason
+    assert "breakout_with_direction_continuation" in h2.reason
+    assert "pullback" in h2.reason
 
     naked = _check(
         cf,
@@ -454,11 +475,55 @@ def test_breakout_requires_pullback_re_entry():
         regime=BrooksRegime.BREAKOUT_MODE,
         structure=s,
     )
-    assert not naked.allow
-    assert "breakout_needs_pullback_re_entry" in naked.reason
+    assert naked.allow, naked.reason
+    assert "breakout_with_direction_continuation" in naked.reason
+    assert "breakout" in naked.reason
+
+    aligned_reversal = _check(
+        cf,
+        side="long",
+        patterns=["double_bottom"],
+        regime=BrooksRegime.BREAKOUT_MODE,
+        structure=s,
+    )
+    assert aligned_reversal.allow, aligned_reversal.reason
+    assert "double_bottom" in aligned_reversal.reason
 
 
-def test_breakout_counter_needs_failure_pattern():
+def test_breakout_with_direction_short_continuation():
+    """Mirror of the long-side check: bear breakout + L2 short rides."""
+    cf = ContextFilter()
+    s = _structure(always_in="short", leg_dir="down")
+    res = _check(
+        cf,
+        side="short",
+        patterns=["l2"],
+        regime=BrooksRegime.BREAKOUT_MODE,
+        structure=s,
+    )
+    assert res.allow, res.reason
+    assert "breakout_with_direction_continuation" in res.reason
+
+
+def test_breakout_with_direction_unknown_pattern_rejected():
+    """Same-direction signal whose pattern_type is neither continuation
+    nor an aligned reversal still fails — we should not paper over an
+    unknown detector by treating breakout mode as a free pass."""
+    cf = ContextFilter()
+    s = _structure(always_in="long", leg_dir="up")
+    res = cf.check(
+        side="long",
+        signals=[_signal("not_a_real_detector", "long")],
+        regime=BrooksRegime.BREAKOUT_MODE,
+        structure=s,
+    )
+    assert not res.allow
+    assert "breakout_with_direction_no_continuation" in res.reason
+
+
+def test_breakout_counter_pure_pullback_rejected():
+    """Counter-direction L2 against a fresh long breakout — no reversal
+    package present, so default-reject."""
     cf = ContextFilter()
     s = _structure(always_in="long", leg_dir="up")
     res = _check(
@@ -470,6 +535,37 @@ def test_breakout_counter_needs_failure_pattern():
     )
     assert not res.allow
     assert "counter_breakout_needs_failure" in res.reason
+
+
+def test_breakout_counter_with_climax_exhaustion_allowed():
+    """Counter-direction signal stacked with a climax-exhaustion marker
+    (final_flag / mtr) is allowed — it's the failed-breakout-style fade
+    that reversed QUA-70's 2025-01-20 morning spike. Without this carve-
+    out the ``REVERSAL_TYPES`` final_flag / mtr would still be dropped
+    by the old ``{failed_breakout, wedge, double_*}`` allow-list."""
+    cf = ContextFilter()
+    s = _structure(always_in="long", leg_dir="up")
+
+    final_flag_combo = _check(
+        cf,
+        side="short",
+        patterns=["l2", "final_flag"],
+        regime=BrooksRegime.BREAKOUT_MODE,
+        structure=s,
+    )
+    assert final_flag_combo.allow, final_flag_combo.reason
+    assert "counter_breakout_reversal_package" in final_flag_combo.reason
+    assert "final_flag" in final_flag_combo.reason
+
+    mtr_combo = _check(
+        cf,
+        side="short",
+        patterns=["l2", "mtr_short"],
+        regime=BrooksRegime.BREAKOUT_MODE,
+        structure=s,
+    )
+    assert mtr_combo.allow, mtr_combo.reason
+    assert "counter_breakout_reversal_package" in mtr_combo.reason
 
 
 def test_breakout_counter_failure_allowed():
